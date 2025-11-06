@@ -158,9 +158,9 @@
 
 #### Integration
 
-- [ ] T088 [US1] Wire CharacterSet initialization in Application::Initialize in MatrixRainCore/src/Application.cpp
-- [ ] T089 [US1] Wire AnimationSystem initialization with Viewport reference in MatrixRainCore/src/Application.cpp
-- [ ] T090 [US1] Wire RenderSystem initialization with CharacterSet texture in MatrixRainCore/src/Application.cpp
+- [x] T088 [US1] Wire CharacterSet initialization in Application::Initialize in MatrixRainCore/src/Application.cpp
+- [x] T089 [US1] Wire AnimationSystem initialization with Viewport reference in MatrixRainCore/src/Application.cpp
+- [x] T090 [US1] Wire RenderSystem initialization with CharacterSet texture in MatrixRainCore/src/Application.cpp (texture SRV binding deferred until CharacterSet creates D3D11 texture)
 - [ ] T091 [US1] Verify integration test for complete animation loop in MatrixRainTests/integration/AnimationLoopTests.cpp
 
 **Checkpoint**: At this point, User Story 1 should be fully functional - launch app and see Matrix rain animation with all visual effects
