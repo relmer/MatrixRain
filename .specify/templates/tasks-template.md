@@ -8,9 +8,11 @@ description: "Task list template for feature implementation"
 **Input**: Design documents from `/specs/[###-feature-name]/`
 **Prerequisites**: plan.md (required), spec.md (required for user stories), research.md, data-model.md, contracts/
 
-**Tests**: The examples below include test tasks. Tests are OPTIONAL - only include them if explicitly requested in the feature specification.
+**Tests**: Tests are MANDATORY for all core library code (MatrixRainCore). Use Test-Driven Development: write tests first, verify they fail, then implement. The application entry point (MatrixRain.exe) does not require tests as it contains minimal logic.
 
 **Organization**: Tasks are grouped by user story to enable independent implementation and testing of each story.
+
+**Library-First Architecture**: All functionality goes in MatrixRainCore (static library). The MatrixRain.exe project contains only the minimal entry point (WinMain/main). Unit tests link against the core library to avoid duplicate compilation.
 
 ## Format: `[ID] [P?] [Story] Description`
 
@@ -245,7 +247,9 @@ With multiple developers:
 - [P] tasks = different files, no dependencies
 - [Story] label maps task to specific user story for traceability
 - Each user story should be independently completable and testable
-- Verify tests fail before implementing
-- Commit after each task or logical group
+- **TDD Mandatory**: Write tests FIRST for core library code, verify they FAIL before implementing
+- **Commit Discipline**: After completing each task, build code, run ALL tests, verify success, THEN commit
+- **One Task = One Commit**: Never bundle multiple tasks into a single commit
+- **No Partial Commits**: Each commit must leave codebase buildable and all tests passing
 - Stop at any checkpoint to validate story independently
 - Avoid: vague tasks, same file conflicts, cross-story dependencies that break independence
