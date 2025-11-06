@@ -54,6 +54,6 @@ namespace MatrixRain
         static constexpr size_t MAX_LENGTH = 30;
         static constexpr float MUTATION_PROBABILITY = 0.05f; // 5% per character per second
         static constexpr float BASE_VELOCITY = 100.0f; // Base pixels per second
-        static constexpr float BASE_DROP_INTERVAL = 0.1f; // Time between drops (in seconds)
+        static constexpr float BASE_DROP_INTERVAL = 0.5f; // Time between drops (in seconds)
     };
 }
