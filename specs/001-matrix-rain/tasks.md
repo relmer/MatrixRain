@@ -71,7 +71,7 @@
 - [x] T033 Define character constants in MatrixRainCore/src/characters/CharacterConstants.cpp with 71 katakana codepoints
 - [x] T034 Add Latin letter constants (A-Z, a-z) in MatrixRainCore/src/characters/CharacterConstants.cpp
 - [x] T035 Add numeral constants (0-9) in MatrixRainCore/src/characters/CharacterConstants.cpp
-- [ ] T036 Create high-resolution timer utility in MatrixRainCore/src/Timer.cpp using QueryPerformanceCounter
+- [x] T036 Create high-resolution timer utility in MatrixRainCore/src/Timer.cpp using QueryPerformanceCounter
 
 **Checkpoint**: Foundation ready - user story implementation can now begin in parallel
 
