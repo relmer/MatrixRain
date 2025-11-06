@@ -36,10 +36,8 @@ namespace MatrixRain
         m_characters.clear();
         m_characters.reserve(m_maxLength);
 
-        // Set velocity based on depth (only used for horizontal drift now)
-        std::uniform_real_distribution<float> driftDist(-5.0f, 5.0f);
-        
-        m_velocity.x = driftDist(g_generator);
+        // No horizontal drift - streaks stay at fixed X position
+        m_velocity.x = 0.0f;
         m_velocity.y = 0.0f;
         m_velocity.z = 0.0f;
 
@@ -63,9 +61,6 @@ namespace MatrixRain
 
     void CharacterStreak::Update(float deltaTime)
     {
-        // Apply horizontal drift (smooth)
-        m_position.x += m_velocity.x * deltaTime;
-
         // Discrete cell dropping based on depth
         float velocityScale = GetVelocityScale(m_position.z);
         float dropInterval = BASE_DROP_INTERVAL / velocityScale; // Faster streaks drop more frequently
@@ -136,13 +131,13 @@ namespace MatrixRain
             return true;
         }
 
-        // The streak should despawn when the TOP character (last in array)
+        // The streak should despawn when the last remaining character
         // has moved below the viewport
-        float topCharacterOffset = m_characters.back().positionOffset.y;
-        float topCharacterY = m_position.y + topCharacterOffset;
+        // Note: positionOffset.y is now absolute, not relative to m_position
+        float lastCharacterY = m_characters.back().positionOffset.y;
 
-        // Despawn when top character is below viewport (with some margin)
+        // Despawn when last character is below viewport (with some margin)
         constexpr float MARGIN = 50.0f;
-        return topCharacterY > viewportHeight + MARGIN;
+        return lastCharacterY > viewportHeight + MARGIN;
     }
 }
