@@ -132,18 +132,18 @@
 
 #### DirectX 11 Rendering
 
-- [ ] T068 [US1] Create RenderSystem class in MatrixRainCore/include/matrixrain/RenderSystem.h with D3D11 device, context, swap chain
-- [ ] T069 [US1] Implement RenderSystem::Initialize in MatrixRainCore/src/rendering/RenderSystem.cpp for D3D11 device creation
-- [ ] T070 [US1] Implement RenderSystem::CreateSwapChain in MatrixRainCore/src/rendering/RenderSystem.cpp for DXGI swap chain
-- [ ] T071 [US1] Implement RenderSystem::CreateRenderTargetView in MatrixRainCore/src/rendering/RenderSystem.cpp
-- [ ] T072 [US1] Create vertex shader in MatrixRainCore/src/rendering/shaders/CharacterVS.hlsl for instanced quad rendering
-- [ ] T073 [US1] Create pixel shader in MatrixRainCore/src/rendering/shaders/CharacterPS.hlsl for texture sampling, glow, fade
-- [ ] T074 [US1] Implement shader compilation in MatrixRainCore/src/rendering/RenderSystem.cpp for VS and PS
-- [ ] T075 [US1] Implement instance buffer creation in MatrixRainCore/src/rendering/RenderSystem.cpp for character attributes
-- [ ] T076 [US1] Implement RenderSystem::SortStreaksByDepth in MatrixRainCore/src/rendering/RenderSystem.cpp using std::stable_sort
-- [ ] T077 [US1] Implement RenderSystem::UpdateInstanceBuffer in MatrixRainCore/src/rendering/RenderSystem.cpp for character data upload
-- [ ] T078 [US1] Implement RenderSystem::Render in MatrixRainCore/src/rendering/RenderSystem.cpp for draw instanced calls
-- [ ] T079 [US1] Implement RenderSystem::Present in MatrixRainCore/src/rendering/RenderSystem.cpp for swap chain present
+- [x] T068 [US1] Create RenderSystem class in MatrixRainCore/include/matrixrain/RenderSystem.h with D3D11 device, context, swap chain
+- [x] T069 [US1] Implement RenderSystem::Initialize in MatrixRainCore/src/rendering/RenderSystem.cpp for D3D11 device creation
+- [x] T070 [US1] Implement RenderSystem::CreateSwapChain in MatrixRainCore/src/rendering/RenderSystem.cpp for DXGI swap chain
+- [x] T071 [US1] Implement RenderSystem::CreateRenderTargetView in MatrixRainCore/src/rendering/RenderSystem.cpp
+- [x] T072 [US1] Create vertex shader inline in MatrixRainCore/src/rendering/RenderSystem.cpp for instanced quad rendering
+- [x] T073 [US1] Create pixel shader inline in MatrixRainCore/src/rendering/RenderSystem.cpp for texture sampling, glow, fade
+- [x] T074 [US1] Implement shader compilation in MatrixRainCore/src/rendering/RenderSystem.cpp for VS and PS
+- [x] T075 [US1] Implement instance buffer creation in MatrixRainCore/src/rendering/RenderSystem.cpp for character attributes
+- [x] T076 [US1] Implement RenderSystem::SortStreaksByDepth in MatrixRainCore/src/rendering/RenderSystem.cpp using std::stable_sort
+- [x] T077 [US1] Implement RenderSystem::UpdateInstanceBuffer in MatrixRainCore/src/rendering/RenderSystem.cpp for character data upload
+- [x] T078 [US1] Implement RenderSystem::Render in MatrixRainCore/src/rendering/RenderSystem.cpp for draw instanced calls
+- [x] T079 [US1] Implement RenderSystem::Present in MatrixRainCore/src/rendering/RenderSystem.cpp for swap chain present
 
 #### Win32 Window and Main Loop
 
