@@ -147,14 +147,14 @@
 
 #### Win32 Window and Main Loop
 
-- [ ] T080 [US1] Create Application class in MatrixRainCore/include/matrixrain/Application.h with window handle, systems
-- [ ] T081 [US1] Implement Application::Initialize in MatrixRainCore/src/Application.cpp for window creation, system initialization
-- [ ] T082 [US1] Implement Application::Run in MatrixRainCore/src/Application.cpp for message loop with delta time calculation
-- [ ] T083 [US1] Implement Application::Update in MatrixRainCore/src/Application.cpp to call AnimationSystem::Update
-- [ ] T084 [US1] Implement Application::Render in MatrixRainCore/src/Application.cpp to call RenderSystem::Render
-- [ ] T085 [US1] Implement Application::Shutdown in MatrixRainCore/src/Application.cpp for cleanup
-- [ ] T086 [US1] Implement window procedure in MatrixRainCore/src/Application.cpp for WM_DESTROY, WM_SIZE messages
-- [ ] T087 [US1] Create WinMain entry point in MatrixRain/main.cpp calling Application::Initialize, Run, Shutdown (< 10 lines)
+- [x] T080 [US1] Create Application class in MatrixRainCore/include/matrixrain/Application.h with window handle, systems
+- [x] T081 [US1] Implement Application::Initialize in MatrixRainCore/src/Application.cpp for window creation, system initialization
+- [x] T082 [US1] Implement Application::Run in MatrixRainCore/src/Application.cpp for message loop with delta time calculation
+- [x] T083 [US1] Implement Application::Update in MatrixRainCore/src/Application.cpp to call AnimationSystem::Update
+- [x] T084 [US1] Implement Application::Render in MatrixRainCore/src/Application.cpp to call RenderSystem::Render
+- [x] T085 [US1] Implement Application::Shutdown in MatrixRainCore/src/Application.cpp for cleanup
+- [x] T086 [US1] Implement window procedure in MatrixRainCore/src/Application.cpp for WM_DESTROY, WM_SIZE messages
+- [x] T087 [US1] Create WinMain entry point in MatrixRain/main.cpp calling Application::Initialize, Run, Shutdown (18 lines)
 
 #### Integration
 
