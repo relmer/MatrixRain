@@ -13,6 +13,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     
     if (!app.Initialize(hInstance, nCmdShow))
     {
+        MessageBoxW(nullptr, L"Failed to initialize Matrix Rain application.\n\nCheck that DirectX 11 is available.", 
+                    L"Initialization Error", MB_OK | MB_ICONERROR);
         return -1;
     }
 

@@ -27,6 +27,7 @@ namespace MatrixRain
         // Create window
         if (!CreateApplicationWindow(nCmdShow))
         {
+            MessageBoxW(nullptr, L"Failed to create application window.", L"Error", MB_OK | MB_ICONERROR);
             return false;
         }
 
@@ -34,6 +35,7 @@ namespace MatrixRain
         CharacterSet& charSet = CharacterSet::GetInstance();
         if (!charSet.Initialize())
         {
+            MessageBoxW(nullptr, L"Failed to initialize CharacterSet.", L"Error", MB_OK | MB_ICONERROR);
             return false;
         }
 
@@ -49,12 +51,14 @@ namespace MatrixRain
         m_renderSystem = std::make_unique<RenderSystem>();
         if (!m_renderSystem->Initialize(m_hwnd, DEFAULT_WIDTH, DEFAULT_HEIGHT))
         {
+            MessageBoxW(nullptr, L"Failed to initialize RenderSystem.\n\nCheck that DirectX 11 is available.", L"Error", MB_OK | MB_ICONERROR);
             return false;
         }
 
         // Create texture atlas now that we have a D3D11 device
         if (!charSet.CreateTextureAtlas(m_renderSystem->GetDevice()))
         {
+            MessageBoxW(nullptr, L"Failed to create texture atlas.\n\nDirect2D/DirectWrite may not be available.", L"Error", MB_OK | MB_ICONERROR);
             return false;
         }
 
@@ -67,6 +71,14 @@ namespace MatrixRain
 
     bool Application::CreateApplicationWindow(int nCmdShow)
     {
+        // Verify HINSTANCE
+        if (!m_hInstance)
+        {
+            MessageBoxW(nullptr, L"Invalid HINSTANCE - application instance handle is null.", 
+                        L"Window Creation Error", MB_OK | MB_ICONERROR);
+            return false;
+        }
+
         // Register window class
         WNDCLASSEXW wcex = {};
         wcex.cbSize = sizeof(WNDCLASSEX);
@@ -79,7 +91,16 @@ namespace MatrixRain
 
         if (!RegisterClassExW(&wcex))
         {
-            return false;
+            // Check if class is already registered (ERROR_CLASS_ALREADY_EXISTS = 1410)
+            DWORD error = GetLastError();
+            if (error != ERROR_CLASS_ALREADY_EXISTS)
+            {
+                wchar_t errorMsg[256];
+                swprintf_s(errorMsg, L"Failed to register window class. Error code: %lu", error);
+                MessageBoxW(nullptr, errorMsg, L"Window Registration Error", MB_OK | MB_ICONERROR);
+                return false;
+            }
+            // Class already registered - continue
         }
 
         // Calculate window size to get desired client area
@@ -103,11 +124,21 @@ namespace MatrixRain
 
         if (!m_hwnd)
         {
+            DWORD error = GetLastError();
+            wchar_t errorMsg[256];
+            swprintf_s(errorMsg, L"Failed to create window. Error code: %lu", error);
+            MessageBoxW(nullptr, errorMsg, L"Window Creation Error", MB_OK | MB_ICONERROR);
             return false;
         }
 
         ShowWindow(m_hwnd, nCmdShow);
         UpdateWindow(m_hwnd);
+
+        // Debug: Verify window is visible
+        if (IsWindowVisible(m_hwnd))
+        {
+            OutputDebugStringW(L"Window is visible\n");
+        }
 
         return true;
     }
@@ -194,6 +225,9 @@ namespace MatrixRain
             CREATESTRUCT* pCreate = reinterpret_cast<CREATESTRUCT*>(lParam);
             pApp = reinterpret_cast<Application*>(pCreate->lpCreateParams);
             SetWindowLongPtr(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(pApp));
+            
+            // Let default processing continue for WM_NCCREATE
+            return DefWindowProc(hwnd, uMsg, wParam, lParam);
         }
         else
         {
