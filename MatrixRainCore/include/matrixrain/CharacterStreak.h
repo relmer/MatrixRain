@@ -38,18 +38,22 @@ namespace MatrixRain
         void SetPosition(const Vector3& position) { m_position = position; }
         const Vector3& GetVelocity() const { return m_velocity; }
         size_t GetLength() const { return m_characters.size(); }
+        size_t GetCurrentLength() const { return m_currentLength; } // Number of visible characters
         const std::vector<CharacterInstance>& GetCharacters() const { return m_characters; }
 
     private:
-        Vector3 m_position{};               // Head position of the streak
-        Vector3 m_velocity{};               // Velocity in pixels/second
+        Vector3 m_position{};               // Head position of the streak (in cells)
+        Vector3 m_velocity{};               // Velocity in pixels/second (only for drift)
         std::vector<CharacterInstance> m_characters; // Characters in the streak
         float m_mutationTimer{ 0.0f };      // Timer for character mutation
+        float m_dropTimer{ 0.0f };          // Timer for discrete cell dropping
         float m_characterSpacing{ 20.0f };  // Vertical spacing between characters
+        size_t m_currentLength{ 0 };        // How many characters have "appeared" so far
 
         static constexpr size_t MIN_LENGTH = 5;
         static constexpr size_t MAX_LENGTH = 30;
         static constexpr float MUTATION_PROBABILITY = 0.05f; // 5% per character per second
         static constexpr float BASE_VELOCITY = 100.0f; // Base pixels per second
+        static constexpr float BASE_DROP_INTERVAL = 0.1f; // Time between drops (in seconds)
     };
 }

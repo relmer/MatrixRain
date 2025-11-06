@@ -392,10 +392,13 @@ namespace MatrixRain
         for (const CharacterStreak* streak : streakPtrs)
         {
             const auto& characters = streak->GetCharacters();
+            size_t visibleCount = streak->GetCurrentLength();
             Vector3 streakPos = streak->GetPosition();
 
-            for (const auto& character : characters)
+            // Only render visible characters (up to currentLength)
+            for (size_t i = 0; i < visibleCount && i < characters.size(); i++)
             {
+                const auto& character = characters[i];
                 CharacterInstanceData data;
                 
                 // Position (streak base + character offset)
