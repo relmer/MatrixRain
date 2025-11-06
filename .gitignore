@@ -1,0 +1,93 @@
+# Visual Studio 2026 / C++ Build Artifacts
+bin/
+obj/
+out/
+x64/
+x86/
+Debug/
+Release/
+*.user
+*.suo
+*.sdf
+*.opensdf
+*.VC.db
+*.VC.VC.opendb
+.vs/
+
+# C++ Compiled Object Files
+*.o
+*.obj
+*.exe
+*.dll
+*.lib
+*.a
+*.so
+*.pdb
+*.ilk
+*.exp
+*.idb
+*.pch
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Logs and Temporary Files
+*.log
+*.tmp
+*.temp
+*.swp
+*.bak
+*~
+
+# VS Code
+.vscode/
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/c_cpp_properties.json
+
+# Environment and Configuration
+.env
+.env.*
+!.env.example
+
+# OS-specific
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Build System
+build/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+*.cmake
+!CMakeLists.txt
+
+# Package Managers
+vcpkg_installed/
+packages/
+.nuget/
+
+# Test Results
+TestResults/
+*.trx
+*.coverage
+*.coveragexml
+
+# ReSharper / Rider
+_ReSharper*/
+*.DotSettings.user
+.idea/
+*.sln.iml
+
+# NCrunch
+_NCrunch_*/
+.*crunch*.local.xml
+nCrunchTemp_*/
+
+# Backup files
+*.bak
+*.backup
+*~
