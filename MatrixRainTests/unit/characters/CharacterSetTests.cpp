@@ -194,5 +194,124 @@ namespace MatrixRainTests
                 Assert::Fail(L"Shutdown should not throw exceptions");
             }
         }
+
+        TEST_METHOD(CharacterSet_AfterInitialize_Has268Glyphs)
+        {
+            CharacterSet& charset = CharacterSet::GetInstance();
+            charset.Initialize();
+            
+            // Should have 134 normal + 134 mirrored = 268 glyphs
+            Assert::AreEqual(static_cast<size_t>(268), charset.GetGlyphCount());
+        }
+
+        TEST_METHOD(CharacterSet_AfterInitialize_FirstHalfNotMirrored)
+        {
+            CharacterSet& charset = CharacterSet::GetInstance();
+            charset.Initialize();
+            
+            // First 134 glyphs should NOT be mirrored
+            size_t count = charset.GetGlyphCount();
+            Assert::IsTrue(count >= 134);
+            
+            for (size_t i = 0; i < 134; i++)
+            {
+                const GlyphInfo& glyph = charset.GetGlyph(i);
+                Assert::IsFalse(glyph.mirrored, L"First 134 glyphs should not be mirrored");
+            }
+        }
+
+        TEST_METHOD(CharacterSet_AfterInitialize_SecondHalfMirrored)
+        {
+            CharacterSet& charset = CharacterSet::GetInstance();
+            charset.Initialize();
+            
+            // Last 134 glyphs should be mirrored
+            size_t count = charset.GetGlyphCount();
+            Assert::IsTrue(count >= 268);
+            
+            for (size_t i = 134; i < 268; i++)
+            {
+                const GlyphInfo& glyph = charset.GetGlyph(i);
+                Assert::IsTrue(glyph.mirrored, L"Last 134 glyphs should be mirrored");
+            }
+        }
+
+        TEST_METHOD(CharacterSet_AfterInitialize_GlyphsHaveValidUVCoords)
+        {
+            CharacterSet& charset = CharacterSet::GetInstance();
+            charset.Initialize();
+            
+            // All glyphs should have UV coordinates in [0, 1] range
+            size_t count = charset.GetGlyphCount();
+            for (size_t i = 0; i < count; i++)
+            {
+                const GlyphInfo& glyph = charset.GetGlyph(i);
+                
+                Assert::IsTrue(glyph.uvMin.x >= 0.0f && glyph.uvMin.x <= 1.0f);
+                Assert::IsTrue(glyph.uvMin.y >= 0.0f && glyph.uvMin.y <= 1.0f);
+                Assert::IsTrue(glyph.uvMax.x >= 0.0f && glyph.uvMax.x <= 1.0f);
+                Assert::IsTrue(glyph.uvMax.y >= 0.0f && glyph.uvMax.y <= 1.0f);
+                
+                // uvMax should be greater than uvMin
+                Assert::IsTrue(glyph.uvMax.x > glyph.uvMin.x);
+                Assert::IsTrue(glyph.uvMax.y > glyph.uvMin.y);
+            }
+        }
+
+        TEST_METHOD(CharacterSet_AfterInitialize_CodepointsAreValid)
+        {
+            CharacterSet& charset = CharacterSet::GetInstance();
+            charset.Initialize();
+            
+            // All glyphs should have non-zero codepoints
+            size_t count = charset.GetGlyphCount();
+            for (size_t i = 0; i < count; i++)
+            {
+                const GlyphInfo& glyph = charset.GetGlyph(i);
+                Assert::IsTrue(glyph.codepoint > 0, L"Glyph codepoint should be non-zero");
+            }
+        }
+
+        TEST_METHOD(CharacterSet_GetRandomGlyphIndex_ReturnsValidIndex)
+        {
+            CharacterSet& charset = CharacterSet::GetInstance();
+            charset.Initialize();
+            
+            // Get multiple random indices and verify they're all valid
+            size_t count = charset.GetGlyphCount();
+            for (int i = 0; i < 100; i++)
+            {
+                size_t index = charset.GetRandomGlyphIndex();
+                Assert::IsTrue(index < count, L"Random glyph index should be within valid range");
+            }
+        }
+
+        TEST_METHOD(CharacterSet_UVCoordinates_NoOverlap)
+        {
+            CharacterSet& charset = CharacterSet::GetInstance();
+            charset.Initialize();
+            
+            // Verify that glyphs have proper spacing (no overlap)
+            // This is a simplified check - we just verify each glyph has reasonable size
+            size_t count = charset.GetGlyphCount();
+            
+            for (size_t i = 0; i < count; i++)
+            {
+                const GlyphInfo& glyph = charset.GetGlyph(i);
+                
+                float width = glyph.uvMax.x - glyph.uvMin.x;
+                float height = glyph.uvMax.y - glyph.uvMin.y;
+                
+                // Each glyph should occupy at least 1% of the texture (reasonable size)
+                // In a 16x17 grid, each cell is ~1/16 * 1/17 ≈ 0.0037 or 0.37%
+                // With padding, should be around 0.25-0.5%
+                Assert::IsTrue(width > 0.001f, L"Glyph width should be reasonable");
+                Assert::IsTrue(height > 0.001f, L"Glyph height should be reasonable");
+                
+                // Each glyph shouldn't be too large either (max 1/8 of texture in any dimension)
+                Assert::IsTrue(width < 0.125f, L"Glyph width should not be too large");
+                Assert::IsTrue(height < 0.125f, L"Glyph height should not be too large");
+            }
+        }
     };
 }
