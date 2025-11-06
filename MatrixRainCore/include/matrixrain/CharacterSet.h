@@ -29,10 +29,15 @@ namespace MatrixRain
         // Get the singleton instance
         static CharacterSet& GetInstance();
 
-        // Initialize the character set and create texture atlas
+        // Initialize the character set (without texture creation)
         // Must be called once before using any other methods
         // Returns true on success, false on failure
         bool Initialize();
+
+        // Create the texture atlas using the provided D3D11 device
+        // Must be called after Initialize() and after D3D11 device is created
+        // Returns true on success, false on failure
+        bool CreateTextureAtlas(void* d3dDevice);
 
         // Get a random glyph from the set (uniform distribution)
         // Returns the index into the glyphs array
@@ -48,6 +53,10 @@ namespace MatrixRain
         // Returns nullptr if not initialized
         void* GetTextureResource() const;
 
+        // Get the shader resource view for the texture atlas
+        // Returns nullptr if texture not created
+        void* GetTextureResourceView() const;
+
         // Cleanup resources
         void Shutdown();
 
@@ -61,13 +70,13 @@ namespace MatrixRain
         CharacterSet& operator=(const CharacterSet&) = delete;
 
         // Internal initialization helpers
-        bool CreateTextureAtlas();
-        bool RenderGlyphsToAtlas();
+        bool RenderGlyphsToAtlas(void* d3dDevice);
         void CalculateUVCoordinates();
 
         // Member data
-        std::vector<GlyphInfo> m_glyphs;  // Array of all 266 glyphs
+        std::vector<GlyphInfo> m_glyphs;  // Array of all 268 glyphs
         void* m_textureResource;          // DirectX texture resource (ID3D11Texture2D*)
+        void* m_textureResourceView;      // DirectX shader resource view (ID3D11ShaderResourceView*)
         bool m_initialized;
     };
 }

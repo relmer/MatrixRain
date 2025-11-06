@@ -52,6 +52,12 @@ namespace MatrixRain
             return false;
         }
 
+        // Create texture atlas now that we have a D3D11 device
+        if (!charSet.CreateTextureAtlas(m_renderSystem->GetDevice()))
+        {
+            return false;
+        }
+
         // Initialize timer
         m_timer = std::make_unique<Timer>();
 

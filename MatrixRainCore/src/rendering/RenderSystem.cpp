@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "matrixrain/RenderSystem.h"
+#include "matrixrain/CharacterSet.h"
 #include <d3dcompiler.h>
 #include <algorithm>
 
@@ -489,8 +490,14 @@ namespace MatrixRain
 
         m_context->PSSetShader(m_pixelShader.Get(), nullptr, 0);
         m_context->PSSetSamplers(0, 1, m_samplerState.GetAddressOf());
-        // Note: Texture atlas SRV will be set when CharacterSet is fully implemented
-        // m_context->PSSetShaderResources(0, 1, &m_atlasTextureSRV);
+        
+        // Bind texture atlas from CharacterSet
+        CharacterSet& charSet = CharacterSet::GetInstance();
+        ID3D11ShaderResourceView* srv = static_cast<ID3D11ShaderResourceView*>(charSet.GetTextureResourceView());
+        if (srv)
+        {
+            m_context->PSSetShaderResources(0, 1, &srv);
+        }
 
         float blendFactor[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
         m_context->OMSetBlendState(m_blendState.Get(), blendFactor, 0xffffffff);
