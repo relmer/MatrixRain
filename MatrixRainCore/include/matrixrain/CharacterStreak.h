@@ -35,6 +35,7 @@ namespace MatrixRain
 
         // Accessors
         const Vector3& GetPosition() const { return m_position; }
+        void SetPosition(const Vector3& position) { m_position = position; }
         const Vector3& GetVelocity() const { return m_velocity; }
         size_t GetLength() const { return m_characters.size(); }
         const std::vector<CharacterInstance>& GetCharacters() const { return m_characters; }

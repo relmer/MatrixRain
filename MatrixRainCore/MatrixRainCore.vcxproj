@@ -92,6 +92,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="include\matrixrain\AnimationSystem.h" />
     <ClInclude Include="include\matrixrain\CharacterConstants.h" />
     <ClInclude Include="include\matrixrain\CharacterInstance.h" />
     <ClInclude Include="include\matrixrain\CharacterSet.h" />
@@ -106,6 +107,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="src\animation\AnimationSystem.cpp" />
     <ClCompile Include="src\animation\CharacterInstance.cpp" />
     <ClCompile Include="src\animation\CharacterStreak.cpp" />
     <ClCompile Include="src\characters\CharacterConstants.cpp" />
