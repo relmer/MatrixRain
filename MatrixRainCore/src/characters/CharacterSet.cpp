@@ -29,7 +29,20 @@ namespace MatrixRain
         }
 
         // TODO: Phase 3 will implement texture atlas creation
-        // For now, just mark as initialized
+        // For now, create placeholder glyphs for testing (268 glyphs = 134 chars × 2 with mirroring)
+        m_glyphs.clear();
+        m_glyphs.reserve(268);
+        
+        for (size_t i = 0; i < 268; i++)
+        {
+            GlyphInfo glyph;
+            glyph.uvMin = Vector2(0.0f, 0.0f);
+            glyph.uvMax = Vector2(1.0f, 1.0f);
+            glyph.codepoint = static_cast<wchar_t>(0x30A0 + (i % 134)); // Placeholder
+            glyph.mirrored = (i >= 134);
+            m_glyphs.push_back(glyph);
+        }
+        
         m_initialized = true;
         return true;
     }

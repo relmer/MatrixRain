@@ -107,6 +107,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="unit\animation\CharacterInstanceTests.cpp" />
+    <ClCompile Include="unit\animation\CharacterStreakTests.cpp" />
     <ClCompile Include="unit\characters\CharacterConstantsTests.cpp" />
     <ClCompile Include="unit\characters\CharacterSetTests.cpp" />
     <ClCompile Include="unit\MathTests.cpp" />

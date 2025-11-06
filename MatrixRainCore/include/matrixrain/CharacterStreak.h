@@ -1,0 +1,54 @@
+#pragma once
+#include "matrixrain/Math.h"
+#include "matrixrain/CharacterInstance.h"
+#include <vector>
+
+namespace MatrixRain
+{
+    /// <summary>
+    /// Represents a vertical streak of Matrix characters
+    /// falling through 3D space with velocity-based animation.
+    /// </summary>
+    class CharacterStreak
+    {
+    public:
+        CharacterStreak() = default;
+
+        /// <summary>
+        /// Initialize the streak at a given position with random length and velocity.
+        /// </summary>
+        /// <param name="position">Starting position in 3D space (x, y, z)</param>
+        void Spawn(const Vector3& position);
+
+        /// <summary>
+        /// Update the streak's position and character states.
+        /// </summary>
+        /// <param name="deltaTime">Time elapsed since last frame in seconds</param>
+        void Update(float deltaTime);
+
+        /// <summary>
+        /// Check if the streak should be removed from the scene.
+        /// </summary>
+        /// <param name="viewportHeight">Height of the viewport in pixels</param>
+        /// <returns>True if the streak has fallen completely off screen</returns>
+        bool ShouldDespawn(float viewportHeight) const;
+
+        // Accessors
+        const Vector3& GetPosition() const { return m_position; }
+        const Vector3& GetVelocity() const { return m_velocity; }
+        size_t GetLength() const { return m_characters.size(); }
+        const std::vector<CharacterInstance>& GetCharacters() const { return m_characters; }
+
+    private:
+        Vector3 m_position{};               // Head position of the streak
+        Vector3 m_velocity{};               // Velocity in pixels/second
+        std::vector<CharacterInstance> m_characters; // Characters in the streak
+        float m_mutationTimer{ 0.0f };      // Timer for character mutation
+        float m_characterSpacing{ 20.0f };  // Vertical spacing between characters
+
+        static constexpr size_t MIN_LENGTH = 5;
+        static constexpr size_t MAX_LENGTH = 30;
+        static constexpr float MUTATION_PROBABILITY = 0.05f; // 5% per character per second
+        static constexpr float BASE_VELOCITY = 100.0f; // Base pixels per second
+    };
+}

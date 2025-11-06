@@ -95,6 +95,7 @@
     <ClInclude Include="include\matrixrain\CharacterConstants.h" />
     <ClInclude Include="include\matrixrain\CharacterInstance.h" />
     <ClInclude Include="include\matrixrain\CharacterSet.h" />
+    <ClInclude Include="include\matrixrain\CharacterStreak.h" />
     <ClInclude Include="include\matrixrain\Math.h" />
     <ClInclude Include="include\matrixrain\Timer.h" />
     <ClInclude Include="pch.h" />
@@ -105,6 +106,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="src\animation\CharacterInstance.cpp" />
+    <ClCompile Include="src\animation\CharacterStreak.cpp" />
     <ClCompile Include="src\characters\CharacterConstants.cpp" />
     <ClCompile Include="src\characters\CharacterSet.cpp" />
     <ClCompile Include="src\Math.cpp" />
