@@ -77,7 +77,7 @@ namespace MatrixRain
 
     bool RenderSystem::CreateDevice()
     {
-        UINT createDeviceFlags = 0;
+        UINT createDeviceFlags = D3D11_CREATE_DEVICE_BGRA_SUPPORT; // Required for Direct2D interop
 #ifdef _DEBUG
         createDeviceFlags |= D3D11_CREATE_DEVICE_DEBUG;
 #endif

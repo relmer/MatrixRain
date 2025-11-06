@@ -218,85 +218,176 @@ namespace MatrixRain
         ID3D11Device* device = static_cast<ID3D11Device*>(d3dDevice);
         ID3D11Texture2D* texture = static_cast<ID3D11Texture2D*>(m_textureResource);
         
-        // Get device context
-        ComPtr<ID3D11DeviceContext> context;
-        device->GetImmediateContext(&context);
-        if (!context)
-        {
-            MessageBoxW(nullptr, L"Failed to get device context", L"Error", MB_OK | MB_ICONERROR);
-            return false;
-        }
-        
-        // Create a staging texture we can write to
-        D3D11_TEXTURE2D_DESC desc;
-        texture->GetDesc(&desc);
-        desc.Usage = D3D11_USAGE_STAGING;
-        desc.BindFlags = 0;
-        desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-        desc.MiscFlags = 0;
-        
-        ComPtr<ID3D11Texture2D> stagingTexture;
-        HRESULT hr = device->CreateTexture2D(&desc, nullptr, &stagingTexture);
+        // Get DXGI device for D2D
+        ComPtr<IDXGIDevice> dxgiDevice;
+        HRESULT hr = device->QueryInterface(__uuidof(IDXGIDevice), &dxgiDevice);
         if (FAILED(hr))
         {
             wchar_t errorMsg[256];
-            swprintf_s(errorMsg, L"Failed to create staging texture. HRESULT: 0x%08X", hr);
-            MessageBoxW(nullptr, errorMsg, L"Staging Texture Error", MB_OK | MB_ICONERROR);
+            swprintf_s(errorMsg, L"Failed to get DXGI device. HRESULT: 0x%08X", hr);
+            MessageBoxW(nullptr, errorMsg, L"DXGI Error", MB_OK | MB_ICONERROR);
             return false;
         }
         
-        // Map the staging texture and fill with green character data
-        D3D11_MAPPED_SUBRESOURCE mapped;
-        hr = context->Map(stagingTexture.Get(), 0, D3D11_MAP_WRITE, 0, &mapped);
+        // Create D2D factory
+        ComPtr<ID2D1Factory1> d2dFactory;
+        D2D1_FACTORY_OPTIONS options = {};
+#ifdef _DEBUG
+        options.debugLevel = D2D1_DEBUG_LEVEL_INFORMATION;
+#endif
+        hr = D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, __uuidof(ID2D1Factory1), &options, 
+                               reinterpret_cast<void**>(d2dFactory.GetAddressOf()));
         if (FAILED(hr))
         {
             wchar_t errorMsg[256];
-            swprintf_s(errorMsg, L"Failed to map staging texture. HRESULT: 0x%08X", hr);
-            MessageBoxW(nullptr, errorMsg, L"Map Error", MB_OK | MB_ICONERROR);
+            swprintf_s(errorMsg, L"Failed to create D2D factory. HRESULT: 0x%08X", hr);
+            MessageBoxW(nullptr, errorMsg, L"D2D Factory Error", MB_OK | MB_ICONERROR);
             return false;
         }
         
-        // Fill with simple green rectangles for each glyph (temporary - will be replaced with DirectWrite later)
-        uint32_t* pixels = static_cast<uint32_t*>(mapped.pData);
+        // Create D2D device
+        ComPtr<ID2D1Device> d2dDevice;
+        hr = d2dFactory->CreateDevice(dxgiDevice.Get(), &d2dDevice);
+        if (FAILED(hr))
+        {
+            wchar_t errorMsg[256];
+            swprintf_s(errorMsg, L"Failed to create D2D device. HRESULT: 0x%08X", hr);
+            MessageBoxW(nullptr, errorMsg, L"D2D Device Error", MB_OK | MB_ICONERROR);
+            return false;
+        }
+        
+        // Create D2D device context
+        ComPtr<ID2D1DeviceContext> d2dContext;
+        hr = d2dDevice->CreateDeviceContext(D2D1_DEVICE_CONTEXT_OPTIONS_NONE, &d2dContext);
+        if (FAILED(hr))
+        {
+            wchar_t errorMsg[256];
+            swprintf_s(errorMsg, L"Failed to create D2D device context. HRESULT: 0x%08X", hr);
+            MessageBoxW(nullptr, errorMsg, L"D2D Context Error", MB_OK | MB_ICONERROR);
+            return false;
+        }
+        
+        // Get DXGI surface from the D3D11 texture
+        ComPtr<IDXGISurface> dxgiSurface;
+        hr = texture->QueryInterface(__uuidof(IDXGISurface), &dxgiSurface);
+        if (FAILED(hr))
+        {
+            wchar_t errorMsg[256];
+            swprintf_s(errorMsg, L"Failed to get DXGI surface. HRESULT: 0x%08X", hr);
+            MessageBoxW(nullptr, errorMsg, L"DXGI Surface Error", MB_OK | MB_ICONERROR);
+            return false;
+        }
+
+        // Create D2D bitmap from DXGI surface
+        D2D1_BITMAP_PROPERTIES1 bitmapProps = D2D1::BitmapProperties1(
+            D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW,
+            D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED)
+        );
+
+        ComPtr<ID2D1Bitmap1> d2dBitmap;
+        hr = d2dContext->CreateBitmapFromDxgiSurface(dxgiSurface.Get(), &bitmapProps, &d2dBitmap);
+        if (FAILED(hr))
+        {
+            wchar_t errorMsg[256];
+            swprintf_s(errorMsg, L"Failed to create D2D bitmap. HRESULT: 0x%08X", hr);
+            MessageBoxW(nullptr, errorMsg, L"D2D Bitmap Error", MB_OK | MB_ICONERROR);
+            return false;
+        }
+
+        // Set the bitmap as the render target
+        d2dContext->SetTarget(d2dBitmap.Get());
+
+        // Create DirectWrite factory
+        ComPtr<IDWriteFactory> dwriteFactory;
+        hr = DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory), 
+                                 reinterpret_cast<IUnknown**>(dwriteFactory.GetAddressOf()));
+        if (FAILED(hr))
+        {
+            wchar_t errorMsg[256];
+            swprintf_s(errorMsg, L"Failed to create DirectWrite factory. HRESULT: 0x%08X", hr);
+            MessageBoxW(nullptr, errorMsg, L"DirectWrite Error", MB_OK | MB_ICONERROR);
+            return false;
+        }
+
+        // Create text format (Consolas, 80pt, centered)
+        ComPtr<IDWriteTextFormat> textFormat;
+        hr = dwriteFactory->CreateTextFormat(
+            L"Consolas",
+            nullptr,
+            DWRITE_FONT_WEIGHT_NORMAL,
+            DWRITE_FONT_STYLE_NORMAL,
+            DWRITE_FONT_STRETCH_NORMAL,
+            80.0f,
+            L"en-us",
+            &textFormat
+        );
+        if (FAILED(hr))
+        {
+            wchar_t errorMsg[256];
+            swprintf_s(errorMsg, L"Failed to create text format. HRESULT: 0x%08X", hr);
+            MessageBoxW(nullptr, errorMsg, L"Text Format Error", MB_OK | MB_ICONERROR);
+            return false;
+        }
+
+        textFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
+        textFormat->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
+
+        // Create brush (bright green)
+        ComPtr<ID2D1SolidColorBrush> brush;
+        hr = d2dContext->CreateSolidColorBrush(D2D1::ColorF(0.0f, 1.0f, 0.0f, 1.0f), &brush);
+        if (FAILED(hr))
+        {
+            wchar_t errorMsg[256];
+            swprintf_s(errorMsg, L"Failed to create brush. HRESULT: 0x%08X", hr);
+            MessageBoxW(nullptr, errorMsg, L"Brush Error", MB_OK | MB_ICONERROR);
+            return false;
+        }
+
+        // Begin drawing
+        d2dContext->BeginDraw();
+        d2dContext->Clear(D2D1::ColorF(0.0f, 0.0f, 0.0f, 0.0f)); // Transparent black
+
         constexpr size_t GRID_COLS = 16;
         constexpr size_t CELL_WIDTH = 128;
         constexpr size_t CELL_HEIGHT = 120;
-        
-        // Clear to transparent black
-        for (size_t y = 0; y < 2048; y++)
-        {
-            for (size_t x = 0; x < 2048; x++)
-            {
-                size_t index = y * (mapped.RowPitch / 4) + x;
-                pixels[index] = 0x00000000; // Transparent black (BGRA format)
-            }
-        }
-        
-        // Draw simple green rectangles for each glyph cell
+
+        // Render all glyphs
         for (size_t i = 0; i < m_glyphs.size(); i++)
         {
             size_t col = i % GRID_COLS;
             size_t row = i / GRID_COLS;
             
-            size_t startX = col * CELL_WIDTH + 20;
-            size_t startY = row * CELL_HEIGHT + 20;
-            size_t endX = (col + 1) * CELL_WIDTH - 20;
-            size_t endY = (row + 1) * CELL_HEIGHT - 20;
+            float x = static_cast<float>(col * CELL_WIDTH);
+            float y = static_cast<float>(row * CELL_HEIGHT);
             
-            for (size_t y = startY; y < endY && y < 2048; y++)
+            D2D1_RECT_F rect = D2D1::RectF(x, y, x + CELL_WIDTH, y + CELL_HEIGHT);
+            
+            // For glyphs in the second half (indices 134-267), apply horizontal mirroring
+            if (i >= 134)
             {
-                for (size_t x = startX; x < endX && x < 2048; x++)
-                {
-                    size_t index = y * (mapped.RowPitch / 4) + x;
-                    pixels[index] = 0xFF00FF00; // Bright green (BGRA format)
-                }
+                d2dContext->SetTransform(
+                    D2D1::Matrix3x2F::Scale(-1.0f, 1.0f, D2D1::Point2F(x + CELL_WIDTH / 2, y + CELL_HEIGHT / 2))
+                );
+            }
+            
+            wchar_t text[2] = { static_cast<wchar_t>(m_glyphs[i].codepoint), L'\0' };
+            d2dContext->DrawText(text, 1, textFormat.Get(), rect, brush.Get());
+            
+            // Reset transform if it was changed
+            if (i >= 134)
+            {
+                d2dContext->SetTransform(D2D1::Matrix3x2F::Identity());
             }
         }
-        
-        context->Unmap(stagingTexture.Get(), 0);
-        
-        // Copy from staging texture to actual texture
-        context->CopyResource(texture, stagingTexture.Get());
+
+        hr = d2dContext->EndDraw();
+        if (FAILED(hr))
+        {
+            wchar_t errorMsg[256];
+            swprintf_s(errorMsg, L"Failed to end D2D drawing. HRESULT: 0x%08X", hr);
+            MessageBoxW(nullptr, errorMsg, L"D2D EndDraw Error", MB_OK | MB_ICONERROR);
+            return false;
+        }
         
         return true;
 

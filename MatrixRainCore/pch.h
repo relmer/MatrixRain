@@ -22,7 +22,8 @@
 #include <dxgi1_2.h>
 
 // Direct2D and DirectWrite
-#include <d2d1.h>
+#include <d2d1_1.h>
+#include <d2d1helper.h>
 #include <dwrite.h>
 
 // Link required libraries
