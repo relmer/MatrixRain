@@ -111,6 +111,7 @@
     <ClCompile Include="unit\characters\CharacterConstantsTests.cpp" />
     <ClCompile Include="unit\characters\CharacterSetTests.cpp" />
     <ClCompile Include="unit\MathTests.cpp" />
+    <ClCompile Include="unit\state\ViewportTests.cpp" />
     <ClCompile Include="unit\TimerTests.cpp" />
   </ItemGroup>
   <ItemGroup>
