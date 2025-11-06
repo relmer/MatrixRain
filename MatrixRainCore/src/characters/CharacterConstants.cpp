@@ -1,12 +1,11 @@
 #include "pch.h"
-#include <vector>
-#include <cstdint>
+#include "matrixrain/CharacterConstants.h"
 
 namespace MatrixRain
 {
     namespace CharacterConstants
     {
-        // Katakana characters (71 codepoints from U+30A0 to U+30FF range)
+        // Katakana characters (72 codepoints from U+30A0 to U+30FF range)
         // These are the iconic characters from The Matrix
         const uint32_t KATAKANA_CODEPOINTS[] = {
             0x30A0, // ゠ Katakana-Hiragana Double Hyphen
@@ -82,7 +81,7 @@ namespace MatrixRain
             0x30E6, // ユ Yu
             0x30E7  // ョ Small Yo
         };
-        constexpr size_t KATAKANA_COUNT = sizeof(KATAKANA_CODEPOINTS) / sizeof(KATAKANA_CODEPOINTS[0]);
+        const size_t KATAKANA_COUNT = sizeof(KATAKANA_CODEPOINTS) / sizeof(KATAKANA_CODEPOINTS[0]);
 
         // Latin uppercase letters (A-Z): 26 characters
         const uint32_t LATIN_UPPERCASE_CODEPOINTS[] = {
@@ -113,7 +112,7 @@ namespace MatrixRain
             0x0059, // Y
             0x005A  // Z
         };
-        constexpr size_t LATIN_UPPERCASE_COUNT = sizeof(LATIN_UPPERCASE_CODEPOINTS) / sizeof(LATIN_UPPERCASE_CODEPOINTS[0]);
+        const size_t LATIN_UPPERCASE_COUNT = sizeof(LATIN_UPPERCASE_CODEPOINTS) / sizeof(LATIN_UPPERCASE_CODEPOINTS[0]);
 
         // Latin lowercase letters (a-z): 26 characters
         const uint32_t LATIN_LOWERCASE_CODEPOINTS[] = {
@@ -144,7 +143,7 @@ namespace MatrixRain
             0x0079, // y
             0x007A  // z
         };
-        constexpr size_t LATIN_LOWERCASE_COUNT = sizeof(LATIN_LOWERCASE_CODEPOINTS) / sizeof(LATIN_LOWERCASE_CODEPOINTS[0]);
+        const size_t LATIN_LOWERCASE_COUNT = sizeof(LATIN_LOWERCASE_CODEPOINTS) / sizeof(LATIN_LOWERCASE_CODEPOINTS[0]);
 
         // Numerals (0-9): 10 characters
         const uint32_t NUMERAL_CODEPOINTS[] = {
@@ -161,14 +160,14 @@ namespace MatrixRain
         };
         constexpr size_t NUMERAL_COUNT = sizeof(NUMERAL_CODEPOINTS) / sizeof(NUMERAL_CODEPOINTS[0]);
 
-        // Total: 71 + 26 + 26 + 10 = 133 unique characters
-        // With mirroring, the texture atlas will contain 133 * 2 = 266 glyphs
+        // Total: 72 + 26 + 26 + 10 = 134 unique characters
+        // With mirroring, the texture atlas will contain 134 * 2 = 268 glyphs
 
         // Helper function to get all codepoints in a single vector
         std::vector<uint32_t> GetAllCodepoints()
         {
             std::vector<uint32_t> allCodepoints;
-            allCodepoints.reserve(133);
+            allCodepoints.reserve(134);
 
             // Add katakana
             for (uint32_t cp : KATAKANA_CODEPOINTS)
