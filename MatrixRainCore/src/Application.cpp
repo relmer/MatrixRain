@@ -246,6 +246,15 @@ namespace MatrixRain
     {
         switch (uMsg)
         {
+        case WM_KEYDOWN:
+            if (wParam == VK_ESCAPE)
+            {
+                // ESC key pressed - exit application
+                PostQuitMessage(0);
+                return 0;
+            }
+            break;
+
         case WM_SIZE:
         {
             UINT width = LOWORD(lParam);
@@ -266,5 +275,7 @@ namespace MatrixRain
         default:
             return DefWindowProc(m_hwnd, uMsg, wParam, lParam);
         }
+        
+        return DefWindowProc(m_hwnd, uMsg, wParam, lParam);
     }
 }
