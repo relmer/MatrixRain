@@ -26,41 +26,39 @@ namespace MatrixRain
 
     void CharacterStreak::Spawn(const Vector3& position)
     {
-        m_position = position;
+        m_position = position; // This is the head position where new characters spawn
 
         // Random length between 5 and 30
         std::uniform_int_distribution<size_t> lengthDist(MIN_LENGTH, MAX_LENGTH);
-        size_t length = lengthDist(g_generator);
+        m_maxLength = lengthDist(g_generator);
 
-        // Initialize characters (but only show them as they "drop")
+        // Start with no characters - they'll be added as the streak "drops"
         m_characters.clear();
-        m_characters.reserve(length);
-
-        CharacterSet& charSet = CharacterSet::GetInstance();
-        charSet.Initialize(); // Ensure character set is initialized
-        for (size_t i = 0; i < length; i++)
-        {
-            CharacterInstance character;
-            character.glyphIndex = charSet.GetRandomGlyphIndex();
-            character.color = Color4(0.0f, 1.0f, 0.0f, 1.0f); // Green
-            character.brightness = 1.0f;
-            character.scale = 1.0f;
-            character.positionOffset = Vector2(0.0f, static_cast<float>(i) * m_characterSpacing);
-            character.fadeTimer = 0.0f;
-
-            m_characters.push_back(character);
-        }
+        m_characters.reserve(m_maxLength);
 
         // Set velocity based on depth (only used for horizontal drift now)
         std::uniform_real_distribution<float> driftDist(-5.0f, 5.0f);
         
         m_velocity.x = driftDist(g_generator);
-        m_velocity.y = 0.0f; // Y velocity no longer used - we drop in discrete cells
+        m_velocity.y = 0.0f;
         m_velocity.z = 0.0f;
 
         m_mutationTimer = 0.0f;
         m_dropTimer = 0.0f;
-        m_currentLength = 1; // Start with just the head visible
+        
+        // Spawn the first character immediately at the head position
+        CharacterSet& charSet = CharacterSet::GetInstance();
+        charSet.Initialize();
+        
+        CharacterInstance character;
+        character.glyphIndex = charSet.GetRandomGlyphIndex();
+        character.color = Color4(0.0f, 1.0f, 0.0f, 1.0f); // Green
+        character.brightness = 1.0f;
+        character.scale = 1.0f;
+        character.positionOffset = Vector2(0.0f, m_position.y);
+        character.fadeTimer = 0.0f;
+        
+        m_characters.push_back(character);
     }
 
     void CharacterStreak::Update(float deltaTime)
@@ -77,32 +75,47 @@ namespace MatrixRain
         {
             m_dropTimer -= dropInterval;
             
-            // Move down by one cell (discrete step)
-            m_position.y += m_characterSpacing;
-            
-            // Extend the visible length if we haven't shown all characters yet
-            if (m_currentLength < m_characters.size())
+            // Spawn a new character at the current head position
+            if (m_characters.size() < m_maxLength)
             {
-                m_currentLength++;
+                CharacterSet& charSet = CharacterSet::GetInstance();
+                charSet.Initialize();
+                
+                CharacterInstance character;
+                character.glyphIndex = charSet.GetRandomGlyphIndex();
+                character.color = Color4(0.0f, 1.0f, 0.0f, 1.0f); // Green
+                character.brightness = 1.0f;
+                character.scale = 1.0f;
+                // Store absolute position where this character was born
+                character.positionOffset = Vector2(0.0f, m_position.y);
+                character.fadeTimer = 0.0f;
+
+                m_characters.push_back(character);
             }
+            
+            // Move the head down by one cell for the next character
+            m_position.y += m_characterSpacing;
         }
 
-        // Update character fades (only for visible characters)
-        for (size_t i = 0; i < m_currentLength && i < m_characters.size(); i++)
+        // Update character fades for all characters
+        for (CharacterInstance& character : m_characters)
         {
-            m_characters[i].Update(deltaTime);
+            character.Update(deltaTime);
         }
+
+        // Remove characters that have fully faded
+        m_characters.erase(
+            std::remove_if(m_characters.begin(), m_characters.end(),
+                [](const CharacterInstance& c) { return c.brightness <= 0.0f; }),
+            m_characters.end()
+        );
 
         // Handle character mutation (5% probability per character per second)
-        m_mutationTimer += deltaTime;
-        
-        // Check for mutations based on accumulated time
         std::uniform_real_distribution<float> mutationDist(0.0f, 1.0f);
         CharacterSet& charSet = CharacterSet::GetInstance();
 
-        for (size_t i = 0; i < m_currentLength && i < m_characters.size(); i++)
+        for (CharacterInstance& character : m_characters)
         {
-            CharacterInstance& character = m_characters[i];
             float mutationChance = MUTATION_PROBABILITY * deltaTime;
             if (mutationDist(g_generator) < mutationChance)
             {

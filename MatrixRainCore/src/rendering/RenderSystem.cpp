@@ -392,18 +392,16 @@ namespace MatrixRain
         for (const CharacterStreak* streak : streakPtrs)
         {
             const auto& characters = streak->GetCharacters();
-            size_t visibleCount = streak->GetCurrentLength();
             Vector3 streakPos = streak->GetPosition();
 
-            // Only render visible characters (up to currentLength)
-            for (size_t i = 0; i < visibleCount && i < characters.size(); i++)
+            // Render all characters (they manage their own fading/removal)
+            for (const auto& character : characters)
             {
-                const auto& character = characters[i];
                 CharacterInstanceData data;
                 
-                // Position (streak base + character offset)
+                // Position - character stores its absolute Y, streak provides X and Z
                 data.position[0] = streakPos.x + character.positionOffset.x;
-                data.position[1] = streakPos.y + character.positionOffset.y;
+                data.position[1] = character.positionOffset.y; // Absolute Y position
                 data.position[2] = streakPos.z;
 
                 // Get UV coordinates from glyph

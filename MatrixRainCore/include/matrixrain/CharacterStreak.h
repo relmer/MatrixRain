@@ -38,7 +38,6 @@ namespace MatrixRain
         void SetPosition(const Vector3& position) { m_position = position; }
         const Vector3& GetVelocity() const { return m_velocity; }
         size_t GetLength() const { return m_characters.size(); }
-        size_t GetCurrentLength() const { return m_currentLength; } // Number of visible characters
         const std::vector<CharacterInstance>& GetCharacters() const { return m_characters; }
 
     private:
@@ -48,7 +47,7 @@ namespace MatrixRain
         float m_mutationTimer{ 0.0f };      // Timer for character mutation
         float m_dropTimer{ 0.0f };          // Timer for discrete cell dropping
         float m_characterSpacing{ 20.0f };  // Vertical spacing between characters
-        size_t m_currentLength{ 0 };        // How many characters have "appeared" so far
+        size_t m_maxLength{ 0 };            // Maximum number of characters in this streak
 
         static constexpr size_t MIN_LENGTH = 5;
         static constexpr size_t MAX_LENGTH = 30;
