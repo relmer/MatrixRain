@@ -89,12 +89,12 @@
 
 - [x] T037 [P] [US1] Test CharacterInstance initialization in MatrixRainTests/unit/characters/CharacterInstanceTests.cpp
 - [x] T038 [P] [US1] Test CharacterInstance brightness fade over 3 seconds in MatrixRainTests/unit/characters/CharacterInstanceTests.cpp
-- [ ] T039 [P] [US1] Test CharacterStreak initialization with random length 5-30 in MatrixRainTests/unit/animation/CharacterStreakTests.cpp
-- [ ] T040 [P] [US1] Test CharacterStreak velocity scaling by depth in MatrixRainTests/unit/animation/CharacterStreakTests.cpp
-- [ ] T041 [P] [US1] Test CharacterStreak update with delta time in MatrixRainTests/unit/animation/CharacterStreakTests.cpp
-- [ ] T042 [P] [US1] Test CharacterStreak character mutation 5% probability in MatrixRainTests/unit/animation/CharacterStreakTests.cpp
-- [ ] T043 [P] [US1] Test Viewport projection matrix generation in MatrixRainTests/unit/state/ViewportTests.cpp
-- [ ] T044 [P] [US1] Test Viewport resize handling in MatrixRainTests/unit/state/ViewportTests.cpp
+- [x] T039 [P] [US1] Test CharacterStreak initialization with random length 5-30 in MatrixRainTests/unit/animation/CharacterStreakTests.cpp
+- [x] T040 [P] [US1] Test CharacterStreak velocity scaling by depth in MatrixRainTests/unit/animation/CharacterStreakTests.cpp
+- [x] T041 [P] [US1] Test CharacterStreak update with delta time in MatrixRainTests/unit/animation/CharacterStreakTests.cpp
+- [x] T042 [P] [US1] Test CharacterStreak character mutation 5% probability in MatrixRainTests/unit/animation/CharacterStreakTests.cpp
+- [x] T043 [P] [US1] Test Viewport projection matrix generation in MatrixRainTests/unit/state/ViewportTests.cpp
+- [x] T044 [P] [US1] Test Viewport resize handling in MatrixRainTests/unit/state/ViewportTests.cpp
 - [ ] T045 [P] [US1] Test depth sorting back-to-front order in MatrixRainTests/unit/rendering/DepthSortingTests.cpp
 - [ ] T046 [P] [US1] Test zoom wrapping at Z=100 boundary in MatrixRainTests/unit/animation/ZoomTests.cpp
 - [ ] T047 [P] [US1] Test character color transitions white→green for leading character in MatrixRainTests/unit/animation/ColorTransitionTests.cpp
@@ -103,32 +103,32 @@
 
 #### Character Set and Texture Atlas
 
-- [ ] T048 [US1] Implement CharacterSet::Initialize in MatrixRainCore/src/characters/CharacterSet.cpp to create 2048x2048 atlas texture
-- [ ] T049 [US1] Implement Direct2D render target creation for texture atlas in MatrixRainCore/src/characters/CharacterSet.cpp
-- [ ] T050 [US1] Implement DirectWrite text rendering for 133 normal glyphs to atlas in MatrixRainCore/src/characters/CharacterSet.cpp
-- [ ] T051 [US1] Implement mirrored glyph rendering for 133 additional entries in MatrixRainCore/src/characters/CharacterSet.cpp
-- [ ] T052 [US1] Implement CharacterSet::GetRandomGlyph in MatrixRainCore/src/characters/CharacterSet.cpp with uniform distribution
-- [ ] T053 [US1] Store UV coordinates for all 266 glyphs in CharacterSet::glyphs array in MatrixRainCore/src/characters/CharacterSet.cpp
+- [x] T048 [US1] Implement CharacterSet::Initialize in MatrixRainCore/src/characters/CharacterSet.cpp to create 2048x2048 atlas texture
+- [x] T049 [US1] Implement Direct2D render target creation for texture atlas in MatrixRainCore/src/characters/CharacterSet.cpp
+- [x] T050 [US1] Implement DirectWrite text rendering for 133 normal glyphs to atlas in MatrixRainCore/src/characters/CharacterSet.cpp
+- [x] T051 [US1] Implement mirrored glyph rendering for 133 additional entries in MatrixRainCore/src/characters/CharacterSet.cpp
+- [x] T052 [US1] Implement CharacterSet::GetRandomGlyph in MatrixRainCore/src/characters/CharacterSet.cpp with uniform distribution
+- [x] T053 [US1] Store UV coordinates for all 266 glyphs in CharacterSet::glyphs array in MatrixRainCore/src/characters/CharacterSet.cpp
 
 #### Data Models
 
 - [x] T054 [P] [US1] Create CharacterInstance class in MatrixRainCore/include/matrixrain/CharacterInstance.h with glyphIndex, color, brightness, scale, positionOffset fields
 - [x] T055 [P] [US1] Implement CharacterInstance::Update in MatrixRainCore/src/animation/CharacterInstance.cpp for fade calculation
-- [ ] T056 [P] [US1] Create CharacterStreak class in MatrixRainCore/include/matrixrain/CharacterStreak.h with position, velocity, length, characters, timers
-- [ ] T057 [US1] Implement CharacterStreak::Spawn in MatrixRainCore/src/animation/CharacterStreak.cpp with random initialization
-- [ ] T058 [US1] Implement CharacterStreak::Update in MatrixRainCore/src/animation/CharacterStreak.cpp for position, fade, mutation
-- [ ] T059 [US1] Implement CharacterStreak::ShouldDespawn in MatrixRainCore/src/animation/CharacterStreak.cpp for viewport bounds check
-- [ ] T060 [P] [US1] Create Viewport class in MatrixRainCore/include/matrixrain/Viewport.h with width, height, projection fields
-- [ ] T061 [US1] Implement Viewport::UpdateProjection in MatrixRainCore/src/state/Viewport.cpp for orthographic matrix generation
+- [x] T056 [P] [US1] Create CharacterStreak class in MatrixRainCore/include/matrixrain/CharacterStreak.h with position, velocity, length, characters, timers
+- [x] T057 [US1] Implement CharacterStreak::Spawn in MatrixRainCore/src/animation/CharacterStreak.cpp with random initialization
+- [x] T058 [US1] Implement CharacterStreak::Update in MatrixRainCore/src/animation/CharacterStreak.cpp for position, fade, mutation
+- [x] T059 [US1] Implement CharacterStreak::ShouldDespawn in MatrixRainCore/src/animation/CharacterStreak.cpp for viewport bounds check
+- [x] T060 [P] [US1] Create Viewport class in MatrixRainCore/include/matrixrain/Viewport.h with width, height, projection fields
+- [x] T061 [US1] Implement Viewport::UpdateProjection in MatrixRainCore/src/state/Viewport.cpp for orthographic matrix generation
 
 #### Animation System
 
-- [ ] T062 [US1] Create AnimationSystem class in MatrixRainCore/include/matrixrain/AnimationSystem.h with streaks vector, zoom velocity
-- [ ] T063 [US1] Implement AnimationSystem::Initialize in MatrixRainCore/src/animation/AnimationSystem.cpp
-- [ ] T064 [US1] Implement AnimationSystem::Update in MatrixRainCore/src/animation/AnimationSystem.cpp for streak updates and zoom
-- [ ] T065 [US1] Implement AnimationSystem::SpawnStreak in MatrixRainCore/src/animation/AnimationSystem.cpp with random X/Z position
-- [ ] T066 [US1] Implement AnimationSystem::DespawnOffscreenStreaks in MatrixRainCore/src/animation/AnimationSystem.cpp
-- [ ] T067 [US1] Implement AnimationSystem::ApplyZoom in MatrixRainCore/src/animation/AnimationSystem.cpp with modulo wrapping at Z=100
+- [x] T062 [US1] Create AnimationSystem class in MatrixRainCore/include/matrixrain/AnimationSystem.h with streaks vector, zoom velocity
+- [x] T063 [US1] Implement AnimationSystem::Initialize in MatrixRainCore/src/animation/AnimationSystem.cpp
+- [x] T064 [US1] Implement AnimationSystem::Update in MatrixRainCore/src/animation/AnimationSystem.cpp for streak updates and zoom
+- [x] T065 [US1] Implement AnimationSystem::SpawnStreak in MatrixRainCore/src/animation/AnimationSystem.cpp with random X/Z position
+- [x] T066 [US1] Implement AnimationSystem::DespawnOffscreenStreaks in MatrixRainCore/src/animation/AnimationSystem.cpp
+- [x] T067 [US1] Implement AnimationSystem::ApplyZoom in MatrixRainCore/src/animation/AnimationSystem.cpp with modulo wrapping at Z=100
 
 #### DirectX 11 Rendering
 
