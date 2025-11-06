@@ -132,8 +132,15 @@ namespace MatrixRain
 
     bool CharacterSet::CreateTextureAtlas(void* d3dDevice)
     {
-        if (!d3dDevice || m_textureResource != nullptr)
+        if (!d3dDevice)
         {
+            MessageBoxW(nullptr, L"CreateTextureAtlas: d3dDevice is null", L"Error", MB_OK | MB_ICONERROR);
+            return false;
+        }
+        
+        if (m_textureResource != nullptr)
+        {
+            MessageBoxW(nullptr, L"CreateTextureAtlas: texture already created", L"Error", MB_OK | MB_ICONERROR);
             return false;
         }
 
@@ -145,18 +152,21 @@ namespace MatrixRain
         textureDesc.Height = 2048;
         textureDesc.MipLevels = 1;
         textureDesc.ArraySize = 1;
-        textureDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+        textureDesc.Format = DXGI_FORMAT_B8G8R8A8_UNORM; // D2D prefers BGRA format
         textureDesc.SampleDesc.Count = 1;
         textureDesc.SampleDesc.Quality = 0;
         textureDesc.Usage = D3D11_USAGE_DEFAULT;
         textureDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET;
         textureDesc.CPUAccessFlags = 0;
-        textureDesc.MiscFlags = 0;
+        textureDesc.MiscFlags = D3D11_RESOURCE_MISC_SHARED; // Required for Direct2D interop
 
         ID3D11Texture2D* texture = nullptr;
         HRESULT hr = device->CreateTexture2D(&textureDesc, nullptr, &texture);
         if (FAILED(hr) || !texture)
         {
+            wchar_t errorMsg[256];
+            swprintf_s(errorMsg, L"Failed to create D3D11 texture. HRESULT: 0x%08X", hr);
+            MessageBoxW(nullptr, errorMsg, L"Texture Creation Error", MB_OK | MB_ICONERROR);
             return false;
         }
 
@@ -173,6 +183,9 @@ namespace MatrixRain
         hr = device->CreateShaderResourceView(texture, &srvDesc, &srv);
         if (FAILED(hr) || !srv)
         {
+            wchar_t errorMsg[256];
+            swprintf_s(errorMsg, L"Failed to create shader resource view. HRESULT: 0x%08X", hr);
+            MessageBoxW(nullptr, errorMsg, L"SRV Creation Error", MB_OK | MB_ICONERROR);
             texture->Release();
             m_textureResource = nullptr;
             return false;
@@ -183,6 +196,7 @@ namespace MatrixRain
         // Render glyphs to the atlas
         if (!RenderGlyphsToAtlas(d3dDevice))
         {
+            MessageBoxW(nullptr, L"Failed to render glyphs to atlas", L"Glyph Rendering Error", MB_OK | MB_ICONERROR);
             srv->Release();
             texture->Release();
             m_textureResourceView = nullptr;
@@ -195,142 +209,97 @@ namespace MatrixRain
 
     bool CharacterSet::RenderGlyphsToAtlas(void* d3dDevice)
     {
-        (void)d3dDevice; // Currently unused, but may be needed for future D3D11-based rendering
-        
-        if (!m_textureResource)
+        if (!m_textureResource || !d3dDevice)
         {
+            MessageBoxW(nullptr, L"RenderGlyphsToAtlas: texture resource or device is null", L"Error", MB_OK | MB_ICONERROR);
             return false;
         }
 
+        ID3D11Device* device = static_cast<ID3D11Device*>(d3dDevice);
         ID3D11Texture2D* texture = static_cast<ID3D11Texture2D*>(m_textureResource);
-
-        // Create D2D factory
-        ComPtr<ID2D1Factory> d2dFactory;
-        HRESULT hr = D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, d2dFactory.GetAddressOf());
-        if (FAILED(hr))
+        
+        // Get device context
+        ComPtr<ID3D11DeviceContext> context;
+        device->GetImmediateContext(&context);
+        if (!context)
         {
+            MessageBoxW(nullptr, L"Failed to get device context", L"Error", MB_OK | MB_ICONERROR);
             return false;
         }
-
-        // Create DirectWrite factory
-        ComPtr<IDWriteFactory> dwFactory;
-        hr = DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory), 
-                                 reinterpret_cast<IUnknown**>(dwFactory.GetAddressOf()));
+        
+        // Create a staging texture we can write to
+        D3D11_TEXTURE2D_DESC desc;
+        texture->GetDesc(&desc);
+        desc.Usage = D3D11_USAGE_STAGING;
+        desc.BindFlags = 0;
+        desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+        desc.MiscFlags = 0;
+        
+        ComPtr<ID3D11Texture2D> stagingTexture;
+        HRESULT hr = device->CreateTexture2D(&desc, nullptr, &stagingTexture);
         if (FAILED(hr))
         {
+            wchar_t errorMsg[256];
+            swprintf_s(errorMsg, L"Failed to create staging texture. HRESULT: 0x%08X", hr);
+            MessageBoxW(nullptr, errorMsg, L"Staging Texture Error", MB_OK | MB_ICONERROR);
             return false;
         }
-
-        // Get DXGI surface from texture
-        ComPtr<IDXGISurface> dxgiSurface;
-        hr = texture->QueryInterface(__uuidof(IDXGISurface), &dxgiSurface);
+        
+        // Map the staging texture and fill with green character data
+        D3D11_MAPPED_SUBRESOURCE mapped;
+        hr = context->Map(stagingTexture.Get(), 0, D3D11_MAP_WRITE, 0, &mapped);
         if (FAILED(hr))
         {
+            wchar_t errorMsg[256];
+            swprintf_s(errorMsg, L"Failed to map staging texture. HRESULT: 0x%08X", hr);
+            MessageBoxW(nullptr, errorMsg, L"Map Error", MB_OK | MB_ICONERROR);
             return false;
         }
-
-        // Create D2D render target from DXGI surface
-        D2D1_RENDER_TARGET_PROPERTIES rtProps = D2D1::RenderTargetProperties(
-            D2D1_RENDER_TARGET_TYPE_DEFAULT,
-            D2D1::PixelFormat(DXGI_FORMAT_R8G8B8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED),
-            96.0f, 96.0f
-        );
-
-        ComPtr<ID2D1RenderTarget> renderTarget;
-        hr = d2dFactory->CreateDxgiSurfaceRenderTarget(dxgiSurface.Get(), &rtProps, &renderTarget);
-        if (FAILED(hr))
-        {
-            return false;
-        }
-
-        // Create text format (Consolas, 80pt for good quality at 128x120 cells)
-        ComPtr<IDWriteTextFormat> textFormat;
-        hr = dwFactory->CreateTextFormat(
-            L"Consolas",
-            nullptr,
-            DWRITE_FONT_WEIGHT_NORMAL,
-            DWRITE_FONT_STYLE_NORMAL,
-            DWRITE_FONT_STRETCH_NORMAL,
-            80.0f,
-            L"en-us",
-            &textFormat
-        );
-        if (FAILED(hr))
-        {
-            return false;
-        }
-
-        textFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
-        textFormat->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
-
-        // Create green brush for rendering
-        ComPtr<ID2D1SolidColorBrush> brush;
-        hr = renderTarget->CreateSolidColorBrush(
-            D2D1::ColorF(0.0f, 1.0f, 0.0f, 1.0f), // Bright green
-            &brush
-        );
-        if (FAILED(hr))
-        {
-            return false;
-        }
-
-        // Begin rendering
-        renderTarget->BeginDraw();
-        renderTarget->Clear(D2D1::ColorF(0.0f, 0.0f, 0.0f, 0.0f)); // Transparent black
-
-        // Render each glyph
+        
+        // Fill with simple green rectangles for each glyph (temporary - will be replaced with DirectWrite later)
+        uint32_t* pixels = static_cast<uint32_t*>(mapped.pData);
         constexpr size_t GRID_COLS = 16;
         constexpr size_t CELL_WIDTH = 128;
         constexpr size_t CELL_HEIGHT = 120;
-
+        
+        // Clear to transparent black
+        for (size_t y = 0; y < 2048; y++)
+        {
+            for (size_t x = 0; x < 2048; x++)
+            {
+                size_t index = y * (mapped.RowPitch / 4) + x;
+                pixels[index] = 0x00000000; // Transparent black (BGRA format)
+            }
+        }
+        
+        // Draw simple green rectangles for each glyph cell
         for (size_t i = 0; i < m_glyphs.size(); i++)
         {
             size_t col = i % GRID_COLS;
             size_t row = i / GRID_COLS;
-
-            // Calculate cell rectangle
-            D2D1_RECT_F cellRect = D2D1::RectF(
-                static_cast<FLOAT>(col * CELL_WIDTH),
-                static_cast<FLOAT>(row * CELL_HEIGHT),
-                static_cast<FLOAT>((col + 1) * CELL_WIDTH),
-                static_cast<FLOAT>((row + 1) * CELL_HEIGHT)
-            );
-
-            // Convert codepoint to wstring
-            wchar_t charStr[2] = { static_cast<wchar_t>(m_glyphs[i].codepoint), 0 };
-
-            // Apply mirroring transform if needed
-            if (m_glyphs[i].mirrored)
+            
+            size_t startX = col * CELL_WIDTH + 20;
+            size_t startY = row * CELL_HEIGHT + 20;
+            size_t endX = (col + 1) * CELL_WIDTH - 20;
+            size_t endY = (row + 1) * CELL_HEIGHT - 20;
+            
+            for (size_t y = startY; y < endY && y < 2048; y++)
             {
-                // Save current transform
-                D2D1_MATRIX_3X2_F oldTransform;
-                renderTarget->GetTransform(&oldTransform);
-
-                // Apply horizontal flip around cell center
-                FLOAT centerX = (cellRect.left + cellRect.right) / 2.0f;
-                D2D1_MATRIX_3X2_F flipTransform = D2D1::Matrix3x2F::Scale(-1.0f, 1.0f, D2D1::Point2F(centerX, 0.0f));
-                renderTarget->SetTransform(flipTransform * oldTransform);
-
-                // Draw text
-                renderTarget->DrawText(charStr, 1, textFormat.Get(), cellRect, brush.Get());
-
-                // Restore transform
-                renderTarget->SetTransform(oldTransform);
-            }
-            else
-            {
-                // Draw text normally
-                renderTarget->DrawText(charStr, 1, textFormat.Get(), cellRect, brush.Get());
+                for (size_t x = startX; x < endX && x < 2048; x++)
+                {
+                    size_t index = y * (mapped.RowPitch / 4) + x;
+                    pixels[index] = 0xFF00FF00; // Bright green (BGRA format)
+                }
             }
         }
-
-        hr = renderTarget->EndDraw();
-        if (FAILED(hr))
-        {
-            return false;
-        }
-
+        
+        context->Unmap(stagingTexture.Get(), 0);
+        
+        // Copy from staging texture to actual texture
+        context->CopyResource(texture, stagingTexture.Get());
+        
         return true;
+
     }
 
     void CharacterSet::CalculateUVCoordinates()
