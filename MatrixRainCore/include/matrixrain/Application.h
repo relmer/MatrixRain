@@ -1,0 +1,50 @@
+#pragma once
+
+#include <Windows.h>
+#include <memory>
+
+namespace MatrixRain
+{
+    class AnimationSystem;
+    class RenderSystem;
+    class Viewport;
+    class Timer;
+
+    class Application
+    {
+    public:
+        Application();
+        ~Application();
+
+        // Main application lifecycle
+        bool Initialize(HINSTANCE hInstance, int nCmdShow);
+        int Run();
+        void Shutdown();
+
+        // Window dimensions
+        static constexpr UINT DEFAULT_WIDTH = 1280;
+        static constexpr UINT DEFAULT_HEIGHT = 720;
+        static constexpr const wchar_t* WINDOW_TITLE = L"Matrix Rain";
+
+    private:
+        // Core systems
+        std::unique_ptr<Viewport> m_viewport;
+        std::unique_ptr<AnimationSystem> m_animationSystem;
+        std::unique_ptr<RenderSystem> m_renderSystem;
+        std::unique_ptr<Timer> m_timer;
+
+        // Win32 window
+        HWND m_hwnd;
+        HINSTANCE m_hInstance;
+        bool m_isRunning;
+
+        // Internal methods
+        bool CreateApplicationWindow(int nCmdShow);
+        void Update(float deltaTime);
+        void Render();
+        
+        // Window procedure
+        static LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
+        LRESULT HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam);
+    };
+}

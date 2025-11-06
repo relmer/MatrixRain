@@ -93,11 +93,13 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="include\matrixrain\AnimationSystem.h" />
+    <ClInclude Include="include\matrixrain\Application.h" />
     <ClInclude Include="include\matrixrain\CharacterConstants.h" />
     <ClInclude Include="include\matrixrain\CharacterInstance.h" />
     <ClInclude Include="include\matrixrain\CharacterSet.h" />
     <ClInclude Include="include\matrixrain\CharacterStreak.h" />
     <ClInclude Include="include\matrixrain\Math.h" />
+    <ClInclude Include="include\matrixrain\RenderSystem.h" />
     <ClInclude Include="include\matrixrain\Timer.h" />
     <ClInclude Include="include\matrixrain\Viewport.h" />
     <ClInclude Include="pch.h" />
@@ -110,9 +112,11 @@
     <ClCompile Include="src\animation\AnimationSystem.cpp" />
     <ClCompile Include="src\animation\CharacterInstance.cpp" />
     <ClCompile Include="src\animation\CharacterStreak.cpp" />
+    <ClCompile Include="src\Application.cpp" />
     <ClCompile Include="src\characters\CharacterConstants.cpp" />
     <ClCompile Include="src\characters\CharacterSet.cpp" />
     <ClCompile Include="src\Math.cpp" />
+    <ClCompile Include="src\rendering\RenderSystem.cpp" />
     <ClCompile Include="src\state\Viewport.cpp" />
     <ClCompile Include="src\Timer.cpp" />
   </ItemGroup>
