@@ -87,8 +87,8 @@
 
 > **NOTE: Write these tests FIRST, ensure they FAIL before implementation**
 
-- [ ] T037 [P] [US1] Test CharacterInstance initialization in MatrixRainTests/unit/characters/CharacterInstanceTests.cpp
-- [ ] T038 [P] [US1] Test CharacterInstance brightness fade over 3 seconds in MatrixRainTests/unit/characters/CharacterInstanceTests.cpp
+- [x] T037 [P] [US1] Test CharacterInstance initialization in MatrixRainTests/unit/characters/CharacterInstanceTests.cpp
+- [x] T038 [P] [US1] Test CharacterInstance brightness fade over 3 seconds in MatrixRainTests/unit/characters/CharacterInstanceTests.cpp
 - [ ] T039 [P] [US1] Test CharacterStreak initialization with random length 5-30 in MatrixRainTests/unit/animation/CharacterStreakTests.cpp
 - [ ] T040 [P] [US1] Test CharacterStreak velocity scaling by depth in MatrixRainTests/unit/animation/CharacterStreakTests.cpp
 - [ ] T041 [P] [US1] Test CharacterStreak update with delta time in MatrixRainTests/unit/animation/CharacterStreakTests.cpp
@@ -112,8 +112,8 @@
 
 #### Data Models
 
-- [ ] T054 [P] [US1] Create CharacterInstance class in MatrixRainCore/include/matrixrain/CharacterInstance.h with glyphIndex, color, brightness, scale, positionOffset fields
-- [ ] T055 [P] [US1] Implement CharacterInstance::Update in MatrixRainCore/src/animation/CharacterInstance.cpp for fade calculation
+- [x] T054 [P] [US1] Create CharacterInstance class in MatrixRainCore/include/matrixrain/CharacterInstance.h with glyphIndex, color, brightness, scale, positionOffset fields
+- [x] T055 [P] [US1] Implement CharacterInstance::Update in MatrixRainCore/src/animation/CharacterInstance.cpp for fade calculation
 - [ ] T056 [P] [US1] Create CharacterStreak class in MatrixRainCore/include/matrixrain/CharacterStreak.h with position, velocity, length, characters, timers
 - [ ] T057 [US1] Implement CharacterStreak::Spawn in MatrixRainCore/src/animation/CharacterStreak.cpp with random initialization
 - [ ] T058 [US1] Implement CharacterStreak::Update in MatrixRainCore/src/animation/CharacterStreak.cpp for position, fade, mutation
