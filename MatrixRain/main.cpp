@@ -1,7 +1,7 @@
 // MatrixRain - Entry Point
 // This file will be implemented in later phases with Application class integration
 
-#include <Windows.h>
+#include "pch.h"
 
 int WINAPI WinMain(
     _In_ HINSTANCE hInstance,
