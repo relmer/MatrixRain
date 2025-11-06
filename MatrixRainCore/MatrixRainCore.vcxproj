@@ -92,6 +92,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="include\matrixrain\CharacterSet.h" />
     <ClInclude Include="include\matrixrain\Math.h" />
     <ClInclude Include="pch.h" />
   </ItemGroup>
