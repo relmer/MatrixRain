@@ -12,6 +12,7 @@ namespace MatrixRain
         : m_hwnd(nullptr)
         , m_hInstance(nullptr)
         , m_isRunning(false)
+        , m_isPaused(false)
     {
     }
 
@@ -181,7 +182,7 @@ namespace MatrixRain
 
     void Application::Update(float deltaTime)
     {
-        if (m_animationSystem)
+        if (m_animationSystem && !m_isPaused)
         {
             m_animationSystem->Update(deltaTime);
         }
@@ -251,6 +252,12 @@ namespace MatrixRain
             {
                 // ESC key pressed - exit application
                 PostQuitMessage(0);
+                return 0;
+            }
+            else if (wParam == VK_SPACE)
+            {
+                // Spacebar pressed - toggle pause
+                m_isPaused = !m_isPaused;
                 return 0;
             }
             break;

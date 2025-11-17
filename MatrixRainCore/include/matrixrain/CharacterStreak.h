@@ -24,7 +24,8 @@ namespace MatrixRain
         /// Update the streak's position and character states.
         /// </summary>
         /// <param name="deltaTime">Time elapsed since last frame in seconds</param>
-        void Update(float deltaTime);
+        /// <param name="viewportHeight">Height of the viewport in pixels</param>
+        void Update(float deltaTime, float viewportHeight);
 
         /// <summary>
         /// Check if the streak should be removed from the scene.
@@ -48,11 +49,12 @@ namespace MatrixRain
         float m_dropTimer{ 0.0f };          // Timer for discrete cell dropping
         float m_characterSpacing{ 20.0f };  // Vertical spacing between characters
         size_t m_maxLength{ 0 };            // Maximum number of characters in this streak
+        bool m_isInFadingPhase{ false };    // True when head has reached bottom and final fade has started
 
-        static constexpr size_t MIN_LENGTH = 5;
+        static constexpr size_t MIN_LENGTH = 10;
         static constexpr size_t MAX_LENGTH = 30;
         static constexpr float MUTATION_PROBABILITY = 0.05f; // 5% per character per second
         static constexpr float BASE_VELOCITY = 100.0f; // Base pixels per second
-        static constexpr float BASE_DROP_INTERVAL = 0.5f; // Time between drops (in seconds)
+        static constexpr float BASE_DROP_INTERVAL = 0.3f; // Time between drops (in seconds)
     };
 }

@@ -50,16 +50,18 @@ namespace MatrixRain
         
         CharacterInstance character;
         character.glyphIndex = charSet.GetRandomGlyphIndex();
-        character.color = Color4(0.0f, 1.0f, 0.0f, 1.0f); // Green
+        character.color = Color4(1.0f, 1.0f, 1.0f, 1.0f); // White (head)
         character.brightness = 1.0f;
         character.scale = 1.0f;
         character.positionOffset = Vector2(0.0f, m_position.y);
-        character.fadeTimer = 0.0f;
+        character.isHead = true;
+        character.brightTimeRemaining = 0.0f; // Head doesn't need bright time
+        character.fadeTimeRemaining = 3.0f;
         
         m_characters.push_back(character);
     }
 
-    void CharacterStreak::Update(float deltaTime)
+    void CharacterStreak::Update(float deltaTime, float viewportHeight)
     {
         // Discrete cell dropping based on depth
         float velocityScale = GetVelocityScale(m_position.z);
@@ -70,40 +72,81 @@ namespace MatrixRain
         {
             m_dropTimer -= dropInterval;
             
-            // Spawn a new character at the current head position
-            if (m_characters.size() < m_maxLength)
+            // Continue adding characters until head reaches bottom (Phase 1 and 2)
+            // Stop adding when head reaches viewport bottom to enter Phase 3 (fade out)
+            if (m_position.y < viewportHeight)
             {
+                // Turn the previous head character green and calculate its bright time
+                if (!m_characters.empty())
+                {
+                    CharacterInstance& oldHead = m_characters.back();
+                    oldHead.isHead = false;
+                    oldHead.color = Color4(0.0f, 1.0f, 0.0f, 1.0f); // Green
+                    
+                    // Calculate how long this character should remain at full brightness
+                    // Characters further from head get less bright time
+                    if (m_characters.size() < m_maxLength)
+                    {
+                        size_t charactersStillToCome = m_maxLength - m_characters.size();
+                        oldHead.brightTimeRemaining = charactersStillToCome * dropInterval;
+                    }
+                    else
+                    {
+                        // Streak is at max length, start fading immediately
+                        oldHead.brightTimeRemaining = 0.0f;
+                    }
+                }
+                
                 CharacterSet& charSet = CharacterSet::GetInstance();
                 charSet.Initialize();
                 
                 CharacterInstance character;
                 character.glyphIndex = charSet.GetRandomGlyphIndex();
-                character.color = Color4(0.0f, 1.0f, 0.0f, 1.0f); // Green
+                character.color = Color4(1.0f, 1.0f, 1.0f, 1.0f); // White (head)
                 character.brightness = 1.0f;
                 character.scale = 1.0f;
                 // Store absolute position where this character was born
                 character.positionOffset = Vector2(0.0f, m_position.y);
-                character.fadeTimer = 0.0f;
+                character.isHead = true;
+                character.brightTimeRemaining = 0.0f; // Head doesn't need bright time
+                character.fadeTimeRemaining = 3.0f;
 
                 m_characters.push_back(character);
+                
+                // Move the head down by one cell for the next character
+                m_position.y += m_characterSpacing;
             }
-            
-            // Move the head down by one cell for the next character
-            m_position.y += m_characterSpacing;
+            else
+            {
+                // Head has gone offscreen - mark the current head as no longer head
+                if (!m_characters.empty())
+                {
+                    CharacterInstance& oldHead = m_characters.back();
+                    oldHead.isHead = false;
+                    oldHead.color = Color4(0.0f, 1.0f, 0.0f, 1.0f); // Green
+                    oldHead.brightTimeRemaining = 0.0f; // Start fading immediately
+                }
+            }
         }
 
-        // Update character fades for all characters
+        // Update character state: decrement timers and calculate brightness
         for (CharacterInstance& character : m_characters)
         {
+            // Skip the head - it stays at full brightness
+            if (character.isHead)
+            {
+                character.brightness = 1.0f;
+                continue;
+            }
+
             character.Update(deltaTime);
         }
 
-        // Remove characters that have fully faded
-        m_characters.erase(
-            std::remove_if(m_characters.begin(), m_characters.end(),
-                [](const CharacterInstance& c) { return c.brightness <= 0.0f; }),
-            m_characters.end()
-        );
+        // Remove characters that have fully faded (only from the tail/front of vector)
+        while (!m_characters.empty() && m_characters.front().brightness <= 0.0f)
+        {
+            m_characters.erase(m_characters.begin());
+        }
 
         // Handle character mutation (5% probability per character per second)
         std::uniform_real_distribution<float> mutationDist(0.0f, 1.0f);
@@ -114,30 +157,17 @@ namespace MatrixRain
             float mutationChance = MUTATION_PROBABILITY * deltaTime;
             if (mutationDist(g_generator) < mutationChance)
             {
-                // Mutate to a new random glyph
+                // Mutate to a new random glyph (keep existing fade state)
                 character.glyphIndex = charSet.GetRandomGlyphIndex();
-                
-                // Reset fade for the new character
-                character.fadeTimer = 0.0f;
-                character.brightness = 1.0f;
             }
         }
     }
 
-    bool CharacterStreak::ShouldDespawn(float viewportHeight) const
+    bool CharacterStreak::ShouldDespawn([[maybe_unused]] float viewportHeight) const
     {
-        if (m_characters.empty())
-        {
-            return true;
-        }
-
-        // The streak should despawn when the last remaining character
-        // has moved below the viewport
-        // Note: positionOffset.y is now absolute, not relative to m_position
-        float lastCharacterY = m_characters.back().positionOffset.y;
-
-        // Despawn when last character is below viewport (with some margin)
-        constexpr float MARGIN = 50.0f;
-        return lastCharacterY > viewportHeight + MARGIN;
+        // The streak should only despawn when all characters have faded out
+        // Characters are removed one by one as they fade in the Update() method
+        // Once the vector is empty, the streak is done
+        return m_characters.empty();
     }
 }

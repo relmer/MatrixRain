@@ -26,8 +26,8 @@ namespace MatrixRain
         m_spawnTimer = 0.0f;
         
         // Spawn initial set of streaks to fill the screen
-        // Estimate: ~20-30 streaks for a 1920x1080 viewport
-        size_t initialStreaks = 25;
+        // Reduced density for less cluttered appearance
+        size_t initialStreaks = 15;
         for (size_t i = 0; i < initialStreaks; i++)
         {
             SpawnStreak();
@@ -41,10 +41,12 @@ namespace MatrixRain
             return; // Not initialized
         }
 
+        float viewportHeight = static_cast<float>(m_viewport->GetHeight());
+
         // Update all existing streaks
         for (CharacterStreak& streak : m_streaks)
         {
-            streak.Update(deltaTime);
+            streak.Update(deltaTime, viewportHeight);
         }
 
         // Apply zoom effect (camera moves forward through depth)

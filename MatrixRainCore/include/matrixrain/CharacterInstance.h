@@ -7,12 +7,14 @@ namespace MatrixRain
     class CharacterInstance
     {
     public:
-        size_t glyphIndex;          // Index into CharacterSet glyphs array
-        Color4 color;               // Current color (for white->green transition)
-        float brightness;           // Current brightness (1.0 = full, 0.0 = faded out)
-        float scale;                // Scale multiplier for size variation
-        Vector2 positionOffset;     // Offset from streak base position
-        float fadeTimer;            // Time elapsed for fade calculation (0 to 3 seconds)
+        size_t glyphIndex = 0;              // Index into CharacterSet glyphs array
+        Color4 color{};                     // Current color (for white->green transition)
+        float brightness = 1.0f;            // Current brightness (1.0 = full, 0.0 = faded out)
+        float scale = 1.0f;                 // Scale multiplier for size variation
+        Vector2 positionOffset{};           // Offset from streak base position
+        bool isHead = false;                // True if this is the current head character (white)
+        float brightTimeRemaining = 0.0f;   // Time remaining at full brightness (before fade starts)
+        float fadeTimeRemaining = 3.0f;     // Time remaining during fade (3 seconds total)
 
         // Default constructor
         CharacterInstance();

@@ -5,6 +5,16 @@
 **Status**: Draft  
 **Input**: User description: "I'm building an app to show 'Matrix rain' in the style of The Matrix. The app should use DirectX for the best performance and should allow running both windowed and full-screen. The rain characters should be comprised of the full set of 71 half-width katakana characters (basic, dakuten, handakuten) and western Latin letters and numerals. They should be rendered backwards, flipped left-to-right, using a green color reminiscent of old green phosphor screens. The leading character of a drop of rain should render in white but turn to green as soon as the drop descends to the next character. The characters should fade to black over 3 seconds starting as soon as they first appear. The leading character of the drop should be chosen randomly from the set above, but as the drop advances down the screen, the characters it leaves behind should mostly remain unchanged. There should be a 5% chance of any still-visible (not fully faded to black) character switching to another character, but this does not alter the fade-out progression. The scene should be rendered with depth--some drops should be far away and others nearer to the camera. The scene should zoom in very slowly over time, never stopping. This will cause streaks of raining characters to appear to get bigger as the zoom increases. The characters should have a faint surrounding glow around them proportional to each of their current brightness levels. The user should be able to increase or decrease the density (number of drops/streaks) of rain by pressing + (or equals) to increase and - to decrease. There should be a minimum and maximum number of streaks visible at a time. The density is controlled by altering the frequency of new streaks being added, but their fade out rate should remain constant. The user should be able to toggle between windowed and full-screen by pressing Alt-Enter."
 
+## Clarifications
+
+### Session 2025-11-16
+
+- Q: What is the target falling speed for character streaks? → A: Variable: Speed randomized per streak within a range
+- Q: What is the exact RGB value for the green phosphor color? → A: RGB(0, 255, 100) - Classic bright Matrix green
+- Q: How should the character glow effect be implemented technically? → A: Gaussian blur with radius 4-8 pixels
+- Q: What is the time interval for a streak to advance one character position downward? → A: 0.3 seconds per character cell (3-4 cells/second)
+- Q: What is the zoom speed (camera advancing toward scene)? → A: 2.0 units/second (moderate, 50 second cycle, more noticeable)
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - View Animated Matrix Rain (Priority: P1)
@@ -81,15 +91,15 @@ A user wants to switch between windowed mode for casual viewing while multitaski
   - 52 Latin letters: uppercase A-Z (U+0041 to U+005A), lowercase a-z (U+0061 to U+007A)
   - 10 numerals: 0-9 (U+0030 to U+0039)
 - **FR-003**: System MUST render all characters mirrored/flipped left-to-right
-- **FR-004**: System MUST render characters in a green color reminiscent of vintage phosphor CRT monitors
+- **FR-004**: System MUST render characters in a green color reminiscent of vintage phosphor CRT monitors. Exact color: RGB(0, 255, 100).
 - **FR-005**: System MUST render the head character (leading/frontmost character) of each streak in white color, not green
-- **FR-006**: System MUST add a new white head character when the streak descends one additional character position, and simultaneously change the previous head character from white to green. The streak grows by adding new characters at the head while maintaining existing characters in their positions.
+- **FR-006**: System MUST add a new white head character when the streak descends one additional character position, and simultaneously change the previous head character from white to green. The streak grows by adding new characters at the head while maintaining existing characters in their positions. Streaks advance at base interval of 0.3 seconds per character cell, with variation applied per streak based on depth.
 - **FR-007**: System MUST fade each character from its initial brightness to black over exactly 3 seconds using linear interpolation. Fade begins when a character position is beyond the streak's maximum length from the head. Brightness calculation: `brightness = 1.0 - (fadeTimer / 3.0)` where fadeTimer accumulates delta time in seconds. Characters are removed when brightness reaches 0.0.
 - **FR-008**: System MUST randomly select the leading character for new positions from the character set
 - **FR-009**: System MUST keep trailing characters mostly unchanged, with a 5% probability per frame of any visible (brightness > 0.0) character switching to a different randomly-selected character from the character set. Mutation check performed during CharacterStreak::Update for each character. Mutation does not reset fade progression.
-- **FR-010**: System MUST render character streaks at varying depths to create a 3D perspective effect
-- **FR-011**: System MUST continuously zoom the camera/view inward at a slow, constant rate. Zoom position wraps using modulo operation at Z=100.0 boundary to prevent numerical overflow during extended runtime (hours). Wrapping is visually imperceptible due to continuous depth distribution of streaks.
-- **FR-012**: System MUST render a subtle glow around each character proportional to the character's current brightness level
+- **FR-010**: System MUST render character streaks at varying depths to create a 3D perspective effect. Each streak has randomized falling speed, with depth affecting both visual size and velocity.
+- **FR-011**: System MUST continuously zoom the camera/view inward at a constant rate of 2.0 units/second. Zoom position wraps using modulo operation at Z=100.0 boundary to prevent numerical overflow during extended runtime (hours). Wrapping is visually imperceptible due to continuous depth distribution of streaks.
+- **FR-012**: System MUST render a subtle glow around each character proportional to the character's current brightness level. Glow implemented using Gaussian blur with radius 4-8 pixels scaled by brightness.
 - **FR-013**: Users MUST be able to increase rain density by pressing the + key or = key
 - **FR-014**: Users MUST be able to decrease rain density by pressing the - key
 - **FR-015**: System MUST enforce a minimum number of character streaks (density floor). Minimum: 10 active streaks at density level 1.
@@ -107,7 +117,7 @@ A user wants to switch between windowed mode for casual viewing while multitaski
 
 - Default starting density will be set to a moderate level (density level 5, approximately 262 target streaks)
 - Character size will scale based on window resolution to maintain readability
-- Zoom speed will be calibrated to be barely perceptible but create noticeable growth over 1-2 minutes
+- Zoom speed: 2.0 units/second (50 second cycle at Z=100 wrap, noticeable growth over 60 seconds)
 - The 5% character mutation chance applies per frame, assuming ~60fps (approximately 3 mutations per second per visible character)
 - Window starts at default size of 1280x720 in windowed mode, centered on primary monitor
 - Streak length randomized between 10 and 30 characters per streak

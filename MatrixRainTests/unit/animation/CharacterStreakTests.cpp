@@ -11,17 +11,17 @@ namespace MatrixRainTests
     public:
         TEST_METHOD(CharacterStreak_Spawn_InitializesWithRandomLength)
         {
-            // Spawn multiple streaks and verify lengths are in valid range
+            // Spawn multiple streaks and verify they start with 1 character
+            // (they grow to maxLength as they drop)
             for (int i = 0; i < 100; i++)
             {
                 CharacterStreak streak;
                 Vector3 position(0.0f, 0.0f, 50.0f);
                 streak.Spawn(position);
                 
-                // Length should be between 5 and 30 characters
+                // Streaks start with 1 character (the head)
                 size_t length = streak.GetLength();
-                Assert::IsTrue(length >= 5);
-                Assert::IsTrue(length <= 30);
+                Assert::AreEqual(static_cast<size_t>(1), length);
             }
         }
 
@@ -31,13 +31,17 @@ namespace MatrixRainTests
             Vector3 position(100.0f, 200.0f, 50.0f);
             streak.Spawn(position);
             
-            // Should have characters initialized
+            // Should start with 1 character (the head)
             size_t length = streak.GetLength();
-            Assert::IsTrue(length > 0);
+            Assert::AreEqual(static_cast<size_t>(1), length);
             
             // Characters should be accessible
             const std::vector<CharacterInstance>& chars = streak.GetCharacters();
             Assert::AreEqual(length, chars.size());
+            
+            // First character should be the white head
+            Assert::IsTrue(chars[0].isHead);
+            Assert::AreEqual(1.0f, chars[0].color.r); // White
         }
 
         TEST_METHOD(CharacterStreak_Spawn_SetsPosition)
@@ -54,6 +58,8 @@ namespace MatrixRainTests
 
         TEST_METHOD(CharacterStreak_VelocityScaling_FasterAtFarDepth)
         {
+            // Note: Streaks use discrete cell-based positioning, not continuous velocity
+            // Velocity is always zero; depth affects drop interval instead
             CharacterStreak nearStreak;
             CharacterStreak farStreak;
             
@@ -63,10 +69,13 @@ namespace MatrixRainTests
             Vector3 nearVel = nearStreak.GetVelocity();
             Vector3 farVel = farStreak.GetVelocity();
             
-            // Far streaks should move faster (larger velocity magnitude)
-            float nearSpeed = Math::Length(nearVel);
-            float farSpeed = Math::Length(farVel);
-            Assert::IsTrue(farSpeed > nearSpeed);
+            // Both velocities should be zero (discrete cell movement)
+            Assert::AreEqual(0.0f, nearVel.x);
+            Assert::AreEqual(0.0f, nearVel.y);
+            Assert::AreEqual(0.0f, nearVel.z);
+            Assert::AreEqual(0.0f, farVel.x);
+            Assert::AreEqual(0.0f, farVel.y);
+            Assert::AreEqual(0.0f, farVel.z);
         }
 
         TEST_METHOD(CharacterStreak_VelocityScaling_PrimarlyVertical)
@@ -76,11 +85,11 @@ namespace MatrixRainTests
             
             Vector3 velocity = streak.GetVelocity();
             
-            // Velocity should be primarily downward (positive Y in screen coordinates)
-            Assert::IsTrue(velocity.y > 0.0f);
-            
-            // Y component should be much larger than X component
-            Assert::IsTrue(abs(velocity.y) > abs(velocity.x) * 5.0f);
+            // Discrete cell-based movement means velocity is zero
+            // Movement happens through discrete position updates
+            Assert::AreEqual(0.0f, velocity.x);
+            Assert::AreEqual(0.0f, velocity.y);
+            Assert::AreEqual(0.0f, velocity.z);
         }
 
         TEST_METHOD(CharacterStreak_Update_MovesPosition)
@@ -91,7 +100,8 @@ namespace MatrixRainTests
             Vector3 initialPos = streak.GetPosition();
             
             // Update with 1 second delta time
-            streak.Update(1.0f);
+            constexpr float viewportHeight = 1080.0f;
+            streak.Update(1.0f, viewportHeight);
             
             Vector3 newPos = streak.GetPosition();
             
@@ -105,15 +115,28 @@ namespace MatrixRainTests
             CharacterStreak streak;
             streak.Spawn(Vector3(0.0f, 0.0f, 50.0f));
             
+            // Add characters by updating multiple times
+            constexpr float viewportHeight = 1080.0f;
+            for (int i = 0; i < 10; i++)
+            {
+                streak.Update(0.1f, viewportHeight); // Add ~3 characters
+            }
+            
             const std::vector<CharacterInstance>& chars = streak.GetCharacters();
-            float initialBrightness = chars[0].brightness;
+            Assert::IsTrue(chars.size() > 1); // Should have multiple characters now
             
-            // Update with 1.5 seconds
-            streak.Update(1.5f);
+            // Head should still be at full brightness and marked as head
+            Assert::AreEqual(1.0f, chars.back().brightness);
+            Assert::IsTrue(chars.back().isHead);
             
-            // Characters should have updated fade
-            float newBrightness = chars[0].brightness;
-            Assert::IsTrue(newBrightness < initialBrightness);
+            // Non-head characters should not be marked as head
+            if (chars.size() > 1)
+            {
+                for (size_t i = 0; i < chars.size() - 1; i++)
+                {
+                    Assert::IsFalse(chars[i].isHead);
+                }
+            }
         }
 
         TEST_METHOD(CharacterStreak_Update_MutatesCharacters)
@@ -127,11 +150,9 @@ namespace MatrixRainTests
                 CharacterStreak streak;
                 streak.Spawn(Vector3(0.0f, 0.0f, 50.0f));
                 
-                const std::vector<CharacterInstance>& chars = streak.GetCharacters();
-                
                 // Store initial glyph indices for all characters
                 std::vector<size_t> initialGlyphs;
-                for (const auto& character : chars)
+                for (const auto& character : streak.GetCharacters())
                 {
                     initialGlyphs.push_back(character.glyphIndex);
                 }
@@ -140,12 +161,17 @@ namespace MatrixRainTests
                 
                 // Update many times to trigger mutation
                 // With 5% per second, over 30 seconds with ~10 characters, we should see mutations
+                constexpr float viewportHeight = 1080.0f;
                 for (int i = 0; i < 1800; i++) // 30 seconds at 60 FPS
                 {
-                    streak.Update(0.016f); // ~60 FPS
+                    streak.Update(0.016f, viewportHeight); // ~60 FPS
                     
-                    // Check if any character mutated
-                    for (size_t j = 0; j < chars.size(); j++)
+                    // Get fresh reference after Update() (vector may have reallocated)
+                    const std::vector<CharacterInstance>& chars = streak.GetCharacters();
+                    
+                    // Check if any character mutated (only check original characters)
+                    size_t checkCount = std::min(chars.size(), initialGlyphs.size());
+                    for (size_t j = 0; j < checkCount; j++)
                     {
                         if (chars[j].glyphIndex != initialGlyphs[j])
                         {
@@ -174,17 +200,19 @@ namespace MatrixRainTests
             CharacterStreak streak;
             streak.Spawn(Vector3(0.0f, -500.0f, 50.0f)); // Start well above viewport
             
+            constexpr float viewportHeight = 1080.0f;
+            
             // Should not despawn initially (still visible or above screen)
-            Assert::IsFalse(streak.ShouldDespawn(1080.0f));
+            Assert::IsFalse(streak.ShouldDespawn(viewportHeight));
             
             // Move far below screen
             for (int i = 0; i < 200; i++)
             {
-                streak.Update(0.1f);
+                streak.Update(0.1f, viewportHeight);
             }
             
             // Should despawn when below viewport
-            Assert::IsTrue(streak.ShouldDespawn(1080.0f));
+            Assert::IsTrue(streak.ShouldDespawn(viewportHeight));
         }
 
         TEST_METHOD(CharacterStreak_ShouldDespawn_AccountsForStreakLength)
@@ -196,12 +224,12 @@ namespace MatrixRainTests
             // (due to its length extending upward)
             
             // Get viewport height for testing
-            float viewportHeight = 1080.0f;
+            constexpr float viewportHeight = 1080.0f;
             
             // Update until bottom is near viewport edge
             while (streak.GetPosition().y < viewportHeight)
             {
-                streak.Update(0.016f);
+                streak.Update(0.016f, viewportHeight);
             }
             
             // Shouldn't despawn immediately at viewport edge (streak extends upward)

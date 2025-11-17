@@ -83,6 +83,7 @@ namespace MatrixRain
 
         static std::random_device rd;
         static std::mt19937 gen(rd());
+        // Create distribution fresh each time to avoid stale size issues
         std::uniform_int_distribution<size_t> dist(0, m_glyphs.size() - 1);
         return dist(gen);
     }
@@ -90,7 +91,7 @@ namespace MatrixRain
     const GlyphInfo& CharacterSet::GetGlyph(size_t index) const
     {
         static GlyphInfo defaultGlyph;
-        if (index >= m_glyphs.size())
+        if (m_glyphs.empty() || index >= m_glyphs.size())
         {
             return defaultGlyph;
         }
@@ -332,9 +333,9 @@ namespace MatrixRain
         textFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
         textFormat->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
 
-        // Create brush (bright green)
+        // Create brush (white - color will be applied by pixel shader)
         ComPtr<ID2D1SolidColorBrush> brush;
-        hr = d2dContext->CreateSolidColorBrush(D2D1::ColorF(0.0f, 1.0f, 0.0f, 1.0f), &brush);
+        hr = d2dContext->CreateSolidColorBrush(D2D1::ColorF(1.0f, 1.0f, 1.0f, 1.0f), &brush);
         if (FAILED(hr))
         {
             wchar_t errorMsg[256];
