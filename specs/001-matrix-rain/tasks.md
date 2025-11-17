@@ -89,7 +89,7 @@
 
 - [x] T037 [P] [US1] Test CharacterInstance initialization in MatrixRainTests/unit/characters/CharacterInstanceTests.cpp
 - [x] T038 [P] [US1] Test CharacterInstance brightness fade over 3 seconds in MatrixRainTests/unit/characters/CharacterInstanceTests.cpp
-- [x] T039 [P] [US1] Test CharacterStreak initialization with random length 5-30 in MatrixRainTests/unit/animation/CharacterStreakTests.cpp
+- [x] T039 [P] [US1] Test CharacterStreak initialization with random length 10-30 in MatrixRainTests/unit/animation/CharacterStreakTests.cpp
 - [x] T040 [P] [US1] Test CharacterStreak velocity scaling by depth in MatrixRainTests/unit/animation/CharacterStreakTests.cpp
 - [x] T041 [P] [US1] Test CharacterStreak update with delta time in MatrixRainTests/unit/animation/CharacterStreakTests.cpp
 - [x] T042 [P] [US1] Test CharacterStreak character mutation 5% probability in MatrixRainTests/unit/animation/CharacterStreakTests.cpp
@@ -109,6 +109,7 @@
 - [x] T051 [US1] Implement mirrored glyph rendering for 133 additional entries in MatrixRainCore/src/characters/CharacterSet.cpp
 - [x] T052 [US1] Implement CharacterSet::GetRandomGlyph in MatrixRainCore/src/characters/CharacterSet.cpp with uniform distribution
 - [x] T053 [US1] Store UV coordinates for all 266 glyphs in CharacterSet::glyphs array in MatrixRainCore/src/characters/CharacterSet.cpp
+- [ ] T053a [US1] Create D3D11 texture resource from Direct2D bitmap in MatrixRainCore/src/characters/CharacterSet.cpp and expose ID3D11ShaderResourceView for rendering
 
 #### Data Models
 
@@ -116,6 +117,7 @@
 - [x] T055 [P] [US1] Implement CharacterInstance::Update in MatrixRainCore/src/animation/CharacterInstance.cpp for fade calculation
 - [x] T056 [P] [US1] Create CharacterStreak class in MatrixRainCore/include/matrixrain/CharacterStreak.h with position, velocity, length, characters, timers
 - [x] T057 [US1] Implement CharacterStreak::Spawn in MatrixRainCore/src/animation/CharacterStreak.cpp with random initialization
+- [ ] T057a [US1] Implement character mutation logic in CharacterStreak::Update: for each visible character (brightness > 0.0), generate random float [0.0, 1.0], if < 0.05 then call CharacterSet::GetRandomGlyph and replace character glyph
 - [x] T058 [US1] Implement CharacterStreak::Update in MatrixRainCore/src/animation/CharacterStreak.cpp for position, fade, mutation
 - [x] T059 [US1] Implement CharacterStreak::ShouldDespawn in MatrixRainCore/src/animation/CharacterStreak.cpp for viewport bounds check
 - [x] T060 [P] [US1] Create Viewport class in MatrixRainCore/include/matrixrain/Viewport.h with width, height, projection fields
@@ -154,13 +156,13 @@
 - [x] T084 [US1] Implement Application::Render in MatrixRainCore/src/Application.cpp to call RenderSystem::Render
 - [x] T085 [US1] Implement Application::Shutdown in MatrixRainCore/src/Application.cpp for cleanup
 - [x] T086 [US1] Implement window procedure in MatrixRainCore/src/Application.cpp for WM_DESTROY, WM_SIZE messages
-- [x] T087 [US1] Create WinMain entry point in MatrixRain/main.cpp calling Application::Initialize, Run, Shutdown (18 lines)
+- [x] T087 [US1] Create WinMain entry point in MatrixRain/main.cpp calling Application::Initialize, Run, Shutdown (<10 lines per constitution requirement)
 
 #### Integration
 
 - [x] T088 [US1] Wire CharacterSet initialization in Application::Initialize in MatrixRainCore/src/Application.cpp
 - [x] T089 [US1] Wire AnimationSystem initialization with Viewport reference in MatrixRainCore/src/Application.cpp
-- [x] T090 [US1] Wire RenderSystem initialization with CharacterSet texture in MatrixRainCore/src/Application.cpp (texture SRV binding deferred until CharacterSet creates D3D11 texture)
+- [ ] T090 [US1] Wire RenderSystem initialization with CharacterSet texture SRV from T053a in MatrixRainCore/src/Application.cpp
 - [ ] T091 [US1] Verify integration test for complete animation loop in MatrixRainTests/integration/AnimationLoopTests.cpp
 
 **Checkpoint**: At this point, User Story 1 should be fully functional - launch app and see Matrix rain animation with all visual effects
@@ -175,10 +177,10 @@
 
 ### Tests for User Story 2 (TDD - Write FIRST)
 
-- [ ] T092 [P] [US2] Test DensityController initialization with level 5 default in MatrixRainTests/unit/state/DensityControllerTests.cpp
-- [ ] T093 [P] [US2] Test DensityController level increase to max 10 in MatrixRainTests/unit/state/DensityControllerTests.cpp
-- [ ] T094 [P] [US2] Test DensityController level decrease to min 1 in MatrixRainTests/unit/state/DensityControllerTests.cpp
-- [ ] T095 [P] [US2] Test DensityController spawn probability calculation in MatrixRainTests/unit/state/DensityControllerTests.cpp
+- [ ] T092 [P] [US2] Test DensityController initialization with level 5 default (target 262 streaks) in MatrixRainTests/unit/state/DensityControllerTests.cpp
+- [ ] T093 [P] [US2] Test DensityController level increase to max 10 (target 496 streaks) using formula: targetStreaks = 10 + (level-1)*54 in MatrixRainTests/unit/state/DensityControllerTests.cpp
+- [ ] T094 [P] [US2] Test DensityController level decrease to min 1 (target 10 streaks) using formula: targetStreaks = 10 + (level-1)*54 in MatrixRainTests/unit/state/DensityControllerTests.cpp
+- [ ] T095 [P] [US2] Test DensityController spawn probability calculation based on current streak count vs target in MatrixRainTests/unit/state/DensityControllerTests.cpp
 - [ ] T096 [P] [US2] Test DensityController bounds enforcement in MatrixRainTests/unit/state/DensityControllerTests.cpp
 - [ ] T097 [P] [US2] Test InputSystem keyboard event processing for VK_ADD in MatrixRainTests/unit/input/InputSystemTests.cpp
 - [ ] T098 [P] [US2] Test InputSystem keyboard event processing for VK_SUBTRACT in MatrixRainTests/unit/input/InputSystemTests.cpp
@@ -187,9 +189,9 @@
 
 ### Implementation for User Story 2
 
-- [ ] T101 [P] [US2] Create DensityController class in MatrixRainCore/include/matrixrain/DensityController.h with level, minStreaks, maxStreaks fields
-- [ ] T102 [US2] Implement DensityController::Initialize in MatrixRainCore/src/state/DensityController.cpp with level 5 default
-- [ ] T103 [US2] Implement DensityController::IncreaseLevel in MatrixRainCore/src/state/DensityController.cpp with max bound check
+- [ ] T101 [P] [US2] Create DensityController class in MatrixRainCore/include/matrixrain/DensityController.h with level (1-10), GetTargetStreakCount() method implementing formula: targetStreaks = 10 + (level-1)*54
+- [ ] T102 [US2] Implement DensityController::Initialize in MatrixRainCore/src/state/DensityController.cpp with level 5 default (262 target streaks)
+- [ ] T103 [US2] Implement DensityController::IncreaseLevel in MatrixRainCore/src/state/DensityController.cpp with max bound check (level <= 10)
 - [ ] T104 [US2] Implement DensityController::DecreaseLevel in MatrixRainCore/src/state/DensityController.cpp with min bound check
 - [ ] T105 [US2] Implement DensityController::UpdateSpawnLogic in MatrixRainCore/src/state/DensityController.cpp for spawn probability
 - [ ] T106 [US2] Implement DensityController::ShouldSpawnStreak in MatrixRainCore/src/state/DensityController.cpp based on active count
@@ -242,33 +244,62 @@
 
 ---
 
-## Phase 6: Polish & Cross-Cutting Concerns
+## Phase 6: Additional Window Controls & User Experience
 
-**Purpose**: Improvements that affect multiple user stories and final quality assurance
+**Purpose**: Window manipulation, keyboard shortcuts, and user experience improvements (FR-021 through FR-024)
 
-- [ ] T135 [P] Add frame time instrumentation to Application::Run in MatrixRainCore/src/Application.cpp for performance monitoring
-- [ ] T136 [P] Add memory leak detection via debug heap in MatrixRainCore/src/Application.cpp
-- [ ] T137 [P] Verify /W4 /WX compliance across all MatrixRainCore source files
-- [ ] T138 [P] Run static analysis on MatrixRainCore source files
-- [ ] T139 [P] Add error handling for D3D11CreateDevice failure in MatrixRainCore/src/rendering/RenderSystem.cpp
-- [ ] T140 [P] Add error handling for swap chain creation failure in MatrixRainCore/src/rendering/RenderSystem.cpp
-- [ ] T141 [P] Add error handling for shader compilation failure in MatrixRainCore/src/rendering/RenderSystem.cpp
-- [ ] T142 [P] Add error handling for DirectWrite initialization failure in MatrixRainCore/src/characters/CharacterSet.cpp
-- [ ] T143 [P] Add logging for key application events in MatrixRainCore/src/Application.cpp
-- [ ] T144 [P] Optimize instance buffer updates to use MAP_WRITE_DISCARD in MatrixRainCore/src/rendering/RenderSystem.cpp
-- [ ] T145 [P] Profile depth sorting performance with 500 streaks in Release build
-- [ ] T146 [P] Profile texture atlas creation time in Release build
-- [ ] T147 [P] Verify 60fps performance with 500 streaks at 1080p
-- [ ] T148 [P] Verify 3-second fade timing accuracy ±50ms
-- [ ] T149 [P] Verify zoom effect visible over 60 seconds
-- [ ] T150 [P] Verify display mode toggle completes in <200ms
-- [ ] T151 [P] Verify application startup time <1 second
-- [ ] T152 [P] Run memory profiler for 1-hour continuous operation
-- [ ] T153 [P] Add XML documentation comments to public API headers in MatrixRainCore/include/matrixrain/
-- [ ] T154 [P] Update specs/001-matrix-rain/quickstart.md with actual build instructions
-- [ ] T155 Run through quickstart.md validation on clean machine
-- [ ] T156 Final smoke test of all three user stories
-- [ ] T157 Commit discipline audit - verify one task per commit, all builds passing
+### Tests for Additional Controls (TDD - Write FIRST)
+
+- [ ] T135 [P] Test window centering on primary monitor at startup in MatrixRainTests/unit/ui/WindowTests.cpp
+- [ ] T136 [P] Test WM_NCHITTEST handling for borderless window drag in MatrixRainTests/unit/ui/WindowTests.cpp
+- [ ] T137 [P] Test ESC key handling for application exit in MatrixRainTests/unit/input/InputSystemTests.cpp
+- [ ] T138 [P] Test Space key handling for pause/resume in MatrixRainTests/unit/input/InputSystemTests.cpp
+- [ ] T139 [P] Test pause state freezes animation updates in MatrixRainTests/unit/animation/AnimationSystemTests.cpp
+- [ ] T140 [P] Test pause state preserves rendering in MatrixRainTests/unit/rendering/RenderSystemTests.cpp
+
+### Implementation for Additional Controls
+
+- [ ] T141 [P] Implement window centering in Application::Initialize in MatrixRainCore/src/Application.cpp using GetSystemMetrics for screen dimensions
+- [ ] T142 [P] Implement WM_NCHITTEST handler in window procedure to return HTCAPTION for client area drag in MatrixRainCore/src/Application.cpp
+- [ ] T143 [P] Add ESC key handler (VK_ESCAPE) in InputSystem::ProcessKeyDown to call Application::Shutdown in MatrixRainCore/src/input/InputSystem.cpp
+- [ ] T144 [P] Add Space key handler (VK_SPACE) in InputSystem::ProcessKeyDown to toggle pause state in MatrixRainCore/src/input/InputSystem.cpp
+- [ ] T145 [P] Add pause state flag to ApplicationState class in MatrixRainCore/include/matrixrain/ApplicationState.h
+- [ ] T146 Implement ApplicationState::TogglePause in MatrixRainCore/src/state/ApplicationState.cpp
+- [ ] T147 Modify Application::Update to skip AnimationSystem::Update when paused in MatrixRainCore/src/Application.cpp
+- [ ] T148 Ensure RenderSystem::Render continues when paused (maintains last frame) in MatrixRainCore/src/rendering/RenderSystem.cpp
+- [ ] T149 Verify integration test for pause/resume cycle in MatrixRainTests/integration/PauseResumeTests.cpp
+
+**Checkpoint**: Window manipulation and control shortcuts complete - users can drag window, pause/resume, and exit with ESC
+
+---
+
+## Phase 7: Polish & Cross-Cutting Concerns
+
+**Purpose**: Final quality assurance and performance validation
+
+- [ ] T150 [P] Add frame time instrumentation to Application::Run in MatrixRainCore/src/Application.cpp for performance monitoring
+- [ ] T151 [P] Add memory leak detection via debug heap in MatrixRainCore/src/Application.cpp
+- [ ] T152 [P] Verify /W4 /WX compliance across all MatrixRainCore source files
+- [ ] T153 [P] Run static analysis on MatrixRainCore source files
+- [ ] T154 [P] Add error handling for D3D11CreateDevice failure in MatrixRainCore/src/rendering/RenderSystem.cpp
+- [ ] T155 [P] Add error handling for swap chain creation failure in MatrixRainCore/src/rendering/RenderSystem.cpp
+- [ ] T156 [P] Add error handling for shader compilation failure in MatrixRainCore/src/rendering/RenderSystem.cpp
+- [ ] T157 [P] Add error handling for DirectWrite initialization failure in MatrixRainCore/src/characters/CharacterSet.cpp
+- [ ] T158 [P] Add logging for key application events in MatrixRainCore/src/Application.cpp
+- [ ] T159 [P] Optimize instance buffer updates to use MAP_WRITE_DISCARD in MatrixRainCore/src/rendering/RenderSystem.cpp
+- [ ] T160 [P] Profile depth sorting performance with 500 streaks in Release build
+- [ ] T161 [P] Profile texture atlas creation time in Release build
+- [ ] T162 [P] Verify 60fps performance with 500 streaks at 1080p
+- [ ] T163 [P] Verify 3-second fade timing accuracy ±50ms
+- [ ] T164 [P] Verify zoom effect visible over 60 seconds
+- [ ] T165 [P] Verify display mode toggle completes in <200ms
+- [ ] T166 [P] Verify application startup time <1 second
+- [ ] T167 [P] Run memory profiler for 1-hour continuous operation
+- [ ] T168 [P] Add XML documentation comments to public API headers in MatrixRainCore/include/matrixrain/
+- [ ] T169 [P] Update specs/001-matrix-rain/quickstart.md with actual build instructions
+- [ ] T170 Run through quickstart.md validation on clean machine
+- [ ] T171 Final smoke test of all user stories plus new controls (window drag, pause, ESC)
+- [ ] T172 Commit discipline audit - verify one task per commit, all builds passing
 
 ---
 

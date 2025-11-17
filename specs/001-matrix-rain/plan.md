@@ -28,8 +28,8 @@ Matrix Rain is a real-time visual effect application that renders cascading char
 - MatrixRainTests (native unit test project)
 
 **Performance Goals**: 60fps rendering at 1080p and higher resolutions, <1 second application startup, <200ms display mode toggle, 3-second character fade with ±50ms precision, <16ms input response for density controls  
-**Constraints**: Performance-driven design (DirectX chosen for GPU acceleration), real-time animation requiring frame-time-independent update logic, character glyph rendering requires font/texture atlas generation, zoom must continue indefinitely without numerical overflow  
-**Scale/Scope**: 10-500 concurrent character streaks (density range), 71 katakana + 52 Latin + 10 numerals = 133 total character glyphs, viewport adapts to any resolution (windowed 800x600 minimum to 4K+ full-screen), continuous operation for hours without performance degradation
+**Constraints**: Performance-driven design (DirectX chosen for GPU acceleration), real-time animation requiring frame-time-independent update logic, character glyph rendering requires font/texture atlas generation, zoom wraps at Z=100.0 boundary using modulo to prevent numerical overflow  
+**Scale/Scope**: 10-500 concurrent character streaks (density levels 1-10 using formula: targetStreaks = 10 + (level-1)*54), 71 katakana + 52 Latin + 10 numerals = 133 total character glyphs, streak lengths randomized 10-30 characters, viewport adapts to any resolution (windowed 800x600 minimum to 4K+ full-screen), continuous operation for hours without performance degradation
 
 ## Constitution Check
 

@@ -76,36 +76,42 @@ A user wants to switch between windowed mode for casual viewing while multitaski
 ### Functional Requirements
 
 - **FR-001**: System MUST render falling character streaks continuously at smooth frame rates
-- **FR-002**: System MUST use a character set containing the full set of 71 half-width katakana characters (basic katakana, dakuten forms, and handakuten forms), Latin letters (A-Z, a-z), and numerals (0-9)
+- **FR-002**: System MUST use a character set containing exactly 133 characters:
+  - 71 half-width katakana characters (Unicode U+FF66 to U+FF9F): 46 basic katakana (ｱ-ﾝ), 20 dakuten forms (ｶﾞ-ﾎﾞ), 5 handakuten forms (ﾊﾟ-ﾎﾟ)
+  - 52 Latin letters: uppercase A-Z (U+0041 to U+005A), lowercase a-z (U+0061 to U+007A)
+  - 10 numerals: 0-9 (U+0030 to U+0039)
 - **FR-003**: System MUST render all characters mirrored/flipped left-to-right
 - **FR-004**: System MUST render characters in a green color reminiscent of vintage phosphor CRT monitors
-- **FR-005**: System MUST render the leading character of each streak in white color
-- **FR-006**: System MUST change the leading character to green when the streak advances to the next position
-- **FR-007**: System MUST fade each character from its initial brightness to black over exactly 3 seconds
+- **FR-005**: System MUST render the head character (leading/frontmost character) of each streak in white color, not green
+- **FR-006**: System MUST add a new white head character when the streak descends one additional character position, and simultaneously change the previous head character from white to green. The streak grows by adding new characters at the head while maintaining existing characters in their positions.
+- **FR-007**: System MUST fade each character from its initial brightness to black over exactly 3 seconds using linear interpolation. Fade begins when a character position is beyond the streak's maximum length from the head. Brightness calculation: `brightness = 1.0 - (fadeTimer / 3.0)` where fadeTimer accumulates delta time in seconds. Characters are removed when brightness reaches 0.0.
 - **FR-008**: System MUST randomly select the leading character for new positions from the character set
-- **FR-009**: System MUST keep trailing characters mostly unchanged, with a 5% probability per frame of any visible character switching to a different character
+- **FR-009**: System MUST keep trailing characters mostly unchanged, with a 5% probability per frame of any visible (brightness > 0.0) character switching to a different randomly-selected character from the character set. Mutation check performed during CharacterStreak::Update for each character. Mutation does not reset fade progression.
 - **FR-010**: System MUST render character streaks at varying depths to create a 3D perspective effect
-- **FR-011**: System MUST continuously zoom the camera/view inward at a slow, constant rate
+- **FR-011**: System MUST continuously zoom the camera/view inward at a slow, constant rate. Zoom position wraps using modulo operation at Z=100.0 boundary to prevent numerical overflow during extended runtime (hours). Wrapping is visually imperceptible due to continuous depth distribution of streaks.
 - **FR-012**: System MUST render a subtle glow around each character proportional to the character's current brightness level
 - **FR-013**: Users MUST be able to increase rain density by pressing the + key or = key
 - **FR-014**: Users MUST be able to decrease rain density by pressing the - key
-- **FR-015**: System MUST enforce a minimum number of character streaks (density floor)
-- **FR-016**: System MUST enforce a maximum number of character streaks (density ceiling)
-- **FR-017**: System MUST adjust density by changing the spawn frequency of new streaks, not by altering fade-out rates
+- **FR-015**: System MUST enforce a minimum number of character streaks (density floor). Minimum: 10 active streaks at density level 1.
+- **FR-016**: System MUST enforce a maximum number of character streaks (density ceiling). Maximum: 500 active streaks at density level 10.
+- **FR-017**: System MUST adjust density by changing the spawn frequency of new streaks, not by altering fade-out rates. Density levels 1-10 map to target active streak counts using formula: `targetStreaks = 10 + (level - 1) * 54` (produces range 10 to 496, rounded to 10-500). Spawn frequency increases when current count < target.
 - **FR-018**: Users MUST be able to toggle between windowed and full-screen display modes by pressing Alt-Enter
 - **FR-019**: System MUST start in windowed mode by default
 - **FR-020**: System MUST preserve animation state (character positions, brightness levels, density setting) when switching display modes
+- **FR-021**: Users MUST be able to reposition the window in windowed mode by clicking and dragging anywhere within the window client area (borderless window drag)
+- **FR-022**: System MUST center the window horizontally and vertically on the primary monitor when the application is initially created and shown
+- **FR-023**: Users MUST be able to close the application by pressing the ESC key
+- **FR-024**: Users MUST be able to pause the animation by pressing the Space key. Pressing Space again MUST resume the animation. Pausing freezes all character movement, fade progression, and zoom but maintains current visual state.
 
 ### Assumptions
 
-- Default starting density will be set to a moderate level (approximately 50% between minimum and maximum)
-- Minimum streak count will be at least 10 to ensure the effect is visible
-- Maximum streak count will be constrained by performance testing (target 60fps on reference hardware)
+- Default starting density will be set to a moderate level (density level 5, approximately 262 target streaks)
 - Character size will scale based on window resolution to maintain readability
 - Zoom speed will be calibrated to be barely perceptible but create noticeable growth over 1-2 minutes
 - The 5% character mutation chance applies per frame, assuming ~60fps (approximately 3 mutations per second per visible character)
-- Character set includes all 71 half-width katakana characters: 46 basic (ｱ-ﾝ), 20 dakuten (ｶﾞ-ﾎﾞ), and 5 handakuten (ﾊﾟ-ﾎﾟ) forms, plus Latin letters and numerals
-- Window starts at a reasonable default size (e.g., 1280x720) in windowed mode
+- Window starts at default size of 1280x720 in windowed mode, centered on primary monitor
+- Streak length randomized between 10 and 30 characters per streak
+- Pausing freezes all animations but maintains current rendering (not a black screen)
 
 ### Key Entities
 
