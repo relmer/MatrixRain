@@ -348,6 +348,17 @@ namespace MatrixRain
             return 0;
         }
 
+        case WM_NCHITTEST:
+        {
+            // Allow dragging the window by clicking anywhere in the client area
+            LRESULT hit = DefWindowProc(m_hwnd, uMsg, wParam, lParam);
+            if (hit == HTCLIENT)
+            {
+                return HTCAPTION;  // Treat client area as title bar for dragging
+            }
+            return hit;
+        }
+
         case WM_DESTROY:
             PostQuitMessage(0);
             return 0;

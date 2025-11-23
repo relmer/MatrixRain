@@ -260,13 +260,13 @@
 ### Implementation for Additional Controls
 
 - [x] T141 [P] Implement window centering in Application::Initialize in MatrixRainCore/src/Application.cpp using GetSystemMetrics for screen dimensions (COMPLETED - FR-022)
-- [x] T142 [P] Implement WM_NCHITTEST handler in window procedure to return HTCAPTION for client area drag in MatrixRainCore/src/Application.cpp (COMPLETED - FR-021)
-- [ ] T143 [P] Add ESC key handler (VK_ESCAPE) in InputSystem::ProcessKeyDown to call Application::Shutdown in MatrixRainCore/src/input/InputSystem.cpp
-- [ ] T144 [P] Add Space key handler (VK_SPACE) in InputSystem::ProcessKeyDown to toggle pause state in MatrixRainCore/src/input/InputSystem.cpp
-- [ ] T145 [P] Add pause state flag to ApplicationState class in MatrixRainCore/include/matrixrain/ApplicationState.h
-- [ ] T146 Implement ApplicationState::TogglePause in MatrixRainCore/src/state/ApplicationState.cpp
-- [ ] T147 Modify Application::Update to skip AnimationSystem::Update when paused in MatrixRainCore/src/Application.cpp
-- [ ] T148 Ensure RenderSystem::Render continues when paused (maintains last frame) in MatrixRainCore/src/rendering/RenderSystem.cpp
+- [x] T142 [P] Implement WM_NCHITTEST handler in window procedure to return HTCAPTION for client area drag in MatrixRainCore/src/Application.cpp
+- [x] T143 [P] Add ESC key handler (VK_ESCAPE) in InputSystem::ProcessKeyDown to call Application::Shutdown in MatrixRainCore/src/input/InputSystem.cpp
+- [x] T144 [P] Add Space key handler (VK_SPACE) in InputSystem::ProcessKeyDown to toggle pause state in MatrixRainCore/src/input/InputSystem.cpp
+- [x] T145 [P] Add pause state flag to ApplicationState class in MatrixRainCore/include/matrixrain/ApplicationState.h
+- [x] T146 Implement ApplicationState::TogglePause in MatrixRainCore/src/state/ApplicationState.cpp
+- [x] T147 Modify Application::Update to skip AnimationSystem::Update when paused in MatrixRainCore/src/Application.cpp
+- [x] T148 Ensure RenderSystem::Render continues when paused (maintains last frame) in MatrixRainCore/src/rendering/RenderSystem.cpp
 - [ ] T149 Verify integration test for pause/resume cycle in MatrixRainTests/integration/PauseResumeTests.cpp
 
 **Checkpoint**: Window manipulation and control shortcuts complete - users can drag window, pause/resume, and exit with ESC
