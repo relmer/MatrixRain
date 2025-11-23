@@ -94,6 +94,7 @@
   <ItemGroup>
     <ClInclude Include="include\matrixrain\AnimationSystem.h" />
     <ClInclude Include="include\matrixrain\Application.h" />
+    <ClInclude Include="include\matrixrain\ApplicationState.h" />
     <ClInclude Include="include\matrixrain\CharacterConstants.h" />
     <ClInclude Include="include\matrixrain\CharacterInstance.h" />
     <ClInclude Include="include\matrixrain\CharacterSet.h" />
@@ -120,6 +121,7 @@
     <ClCompile Include="src\input\InputSystem.cpp" />
     <ClCompile Include="src\Math.cpp" />
     <ClCompile Include="src\rendering\RenderSystem.cpp" />
+    <ClCompile Include="src\state\ApplicationState.cpp" />
     <ClCompile Include="src\state\DensityController.cpp" />
     <ClCompile Include="src\state\Viewport.cpp" />
     <ClCompile Include="src\Timer.cpp" />

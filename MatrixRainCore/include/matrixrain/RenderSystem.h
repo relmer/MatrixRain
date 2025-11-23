@@ -46,6 +46,28 @@ namespace MatrixRain
         void Resize(UINT width, UINT height);
 
         /// <summary>
+        /// Recreate swap chain for display mode transitions (windowed ↔ fullscreen).
+        /// </summary>
+        /// <param name="hwnd">Window handle</param>
+        /// <param name="width">New width</param>
+        /// <param name="height">New height</param>
+        /// <param name="fullscreen">True for fullscreen, false for windowed</param>
+        /// <returns>True on success, false on failure</returns>
+        bool RecreateSwapChain(HWND hwnd, UINT width, UINT height, bool fullscreen);
+
+        /// <summary>
+        /// Set swap chain to fullscreen mode.
+        /// </summary>
+        /// <returns>True on success, false on failure</returns>
+        bool SetFullscreen();
+
+        /// <summary>
+        /// Set swap chain to windowed mode.
+        /// </summary>
+        /// <returns>True on success, false on failure</returns>
+        bool SetWindowed();
+
+        /// <summary>
         /// Clean up all DirectX resources.
         /// </summary>
         void Shutdown();

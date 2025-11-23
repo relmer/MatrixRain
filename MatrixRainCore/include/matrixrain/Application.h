@@ -11,6 +11,7 @@ namespace MatrixRain
     class Timer;
     class DensityController;
     class InputSystem;
+    class ApplicationState;
 
     class Application
     {
@@ -36,6 +37,7 @@ namespace MatrixRain
         std::unique_ptr<Timer> m_timer;
         std::unique_ptr<DensityController> m_densityController;
         std::unique_ptr<InputSystem> m_inputSystem;
+        std::unique_ptr<ApplicationState> m_appState;
 
         // Win32 window
         HWND m_hwnd;

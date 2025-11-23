@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "matrixrain/Application.h"
 #include "matrixrain/AnimationSystem.h"
+#include "matrixrain/ApplicationState.h"
 #include "matrixrain/RenderSystem.h"
 #include "matrixrain/Viewport.h"
 #include "matrixrain/Timer.h"
@@ -42,9 +43,14 @@ namespace MatrixRain
             return false;
         }
 
-        // Initialize viewport
+        // Initialize viewport with 75% of screen size
+        int screenWidth = GetSystemMetrics(SM_CXSCREEN);
+        int screenHeight = GetSystemMetrics(SM_CYSCREEN);
+        int windowWidth = static_cast<int>(screenWidth * 0.75f);
+        int windowHeight = static_cast<int>(screenHeight * 0.75f);
+        
         m_viewport = std::make_unique<Viewport>();
-        m_viewport->Resize(static_cast<float>(DEFAULT_WIDTH), static_cast<float>(DEFAULT_HEIGHT));
+        m_viewport->Resize(static_cast<float>(windowWidth), static_cast<float>(windowHeight));
 
         // Initialize density controller (before AnimationSystem)
         m_densityController = std::make_unique<DensityController>();
@@ -56,7 +62,7 @@ namespace MatrixRain
 
         // Initialize render system
         m_renderSystem = std::make_unique<RenderSystem>();
-        if (!m_renderSystem->Initialize(m_hwnd, DEFAULT_WIDTH, DEFAULT_HEIGHT))
+        if (!m_renderSystem->Initialize(m_hwnd, windowWidth, windowHeight))
         {
             MessageBoxW(nullptr, L"Failed to initialize RenderSystem.\n\nCheck that DirectX 11 is available.", L"Error", MB_OK | MB_ICONERROR);
             return false;
@@ -72,6 +78,10 @@ namespace MatrixRain
         // Initialize input system (after density controller)
         m_inputSystem = std::make_unique<InputSystem>();
         m_inputSystem->Initialize(*m_densityController);
+
+        // Initialize application state
+        m_appState = std::make_unique<ApplicationState>();
+        m_appState->Initialize();
 
         // Initialize timer
         m_timer = std::make_unique<Timer>();
@@ -114,19 +124,23 @@ namespace MatrixRain
             // Class already registered - continue
         }
 
-        // Calculate window size to get desired client area
-        RECT rc = { 0, 0, static_cast<LONG>(DEFAULT_WIDTH), static_cast<LONG>(DEFAULT_HEIGHT) };
-        AdjustWindowRect(&rc, WS_OVERLAPPEDWINDOW, FALSE);
+        // Center window on primary monitor with 75% of screen size
+        int screenWidth = GetSystemMetrics(SM_CXSCREEN);
+        int screenHeight = GetSystemMetrics(SM_CYSCREEN);
+        int windowWidth = static_cast<int>(screenWidth * 0.75f);
+        int windowHeight = static_cast<int>(screenHeight * 0.75f);
+        int posX = (screenWidth - windowWidth) / 2;
+        int posY = (screenHeight - windowHeight) / 2;
 
         // Create window
         m_hwnd = CreateWindowExW(
             0,
             L"MatrixRainWindowClass",
             WINDOW_TITLE,
-            WS_OVERLAPPEDWINDOW,
-            CW_USEDEFAULT, CW_USEDEFAULT,
-            rc.right - rc.left,
-            rc.bottom - rc.top,
+            WS_POPUP,  // Borderless window
+            posX, posY,
+            windowWidth,
+            windowHeight,
             nullptr,
             nullptr,
             m_hInstance,
@@ -270,6 +284,47 @@ namespace MatrixRain
             {
                 // Spacebar pressed - toggle pause
                 m_isPaused = !m_isPaused;
+                return 0;
+            }
+            else if (m_inputSystem && m_inputSystem->IsAltEnterPressed(static_cast<int>(wParam)))
+            {
+                // Alt+Enter pressed - toggle display mode
+                if (m_appState && m_renderSystem && m_viewport)
+                {
+                    m_appState->ToggleDisplayMode();
+                    DisplayMode newMode = m_appState->GetDisplayMode();
+                    
+                    if (newMode == DisplayMode::Fullscreen)
+                    {
+                        // Switch to borderless fullscreen windowed mode
+                        int screenWidth = GetSystemMetrics(SM_CXSCREEN);
+                        int screenHeight = GetSystemMetrics(SM_CYSCREEN);
+                        
+                        SetWindowLongPtr(m_hwnd, GWL_STYLE, WS_POPUP | WS_VISIBLE);
+                        SetWindowPos(m_hwnd, HWND_TOP, 0, 0, screenWidth, screenHeight, 
+                                     SWP_FRAMECHANGED | SWP_SHOWWINDOW);
+                        
+                        m_viewport->Resize(static_cast<float>(screenWidth), static_cast<float>(screenHeight));
+                        m_renderSystem->Resize(screenWidth, screenHeight);
+                    }
+                    else
+                    {
+                        // Return to windowed mode (75% of screen)
+                        int screenWidth = GetSystemMetrics(SM_CXSCREEN);
+                        int screenHeight = GetSystemMetrics(SM_CYSCREEN);
+                        int windowWidth = static_cast<int>(screenWidth * 0.75f);
+                        int windowHeight = static_cast<int>(screenHeight * 0.75f);
+                        int posX = (screenWidth - windowWidth) / 2;
+                        int posY = (screenHeight - windowHeight) / 2;
+                        
+                        SetWindowLongPtr(m_hwnd, GWL_STYLE, WS_POPUP | WS_VISIBLE);
+                        SetWindowPos(m_hwnd, HWND_TOP, posX, posY, windowWidth, windowHeight,
+                                     SWP_FRAMECHANGED | SWP_SHOWWINDOW);
+                        
+                        m_viewport->Resize(static_cast<float>(windowWidth), static_cast<float>(windowHeight));
+                        m_renderSystem->Resize(windowWidth, windowHeight);
+                    }
+                }
                 return 0;
             }
             else if (m_inputSystem)

@@ -24,6 +24,14 @@ namespace MatrixRain
         /// <param name="virtualKey">Virtual key code (VK_*)</param>
         void ProcessKeyDown(int virtualKey);
 
+        /// <summary>
+        /// Check if Alt+Enter keys are currently pressed.
+        /// Used for display mode toggle detection.
+        /// </summary>
+        /// <param name="virtualKey">The virtual key code to check (should be VK_RETURN)</param>
+        /// <returns>True if Enter is pressed while Alt is held down</returns>
+        bool IsAltEnterPressed(int virtualKey) const;
+
     private:
         void OnDensityIncrease();
         void OnDensityDecrease();

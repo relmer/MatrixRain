@@ -194,8 +194,8 @@ namespace MatrixRain
                 // Get quad vertex position
                 float2 quadPos = quadVertices[vertexID % 6];
                 
-                // Scale and position the quad
-                float2 charSize = float2(20.0, 30.0) * input.scale; // Character size in pixels
+                // Character size in world space (scaled up for visibility)
+                float2 charSize = float2(32.0, 48.0) * input.scale;
                 float2 worldPos = input.position.xy + quadPos * charSize;
                 
                 // Apply projection
@@ -557,5 +557,73 @@ namespace MatrixRain
         m_swapChain.Reset();
         m_context.Reset();
         m_device.Reset();
+    }
+
+
+
+
+    bool RenderSystem::RecreateSwapChain(HWND hwnd, UINT width, UINT height, bool fullscreen)
+    {
+        // Release render target view before recreating swap chain
+        m_renderTargetView.Reset();
+
+        // Release the old swap chain
+        m_swapChain.Reset();
+
+        // Create new swap chain with updated settings
+        if (!CreateSwapChain(hwnd, width, height))
+        {
+            return false;
+        }
+
+        // Set fullscreen state if requested
+        if (fullscreen)
+        {
+            HRESULT hr = m_swapChain->SetFullscreenState(TRUE, nullptr);
+            if (FAILED(hr))
+            {
+                // Fullscreen transition failed - stay windowed
+                return false;
+            }
+        }
+
+        // Recreate render target view
+        if (!CreateRenderTargetView())
+        {
+            return false;
+        }
+
+        // Resize viewport to match new dimensions
+        Resize(width, height);
+
+        return true;
+    }
+
+
+
+
+    bool RenderSystem::SetFullscreen()
+    {
+        if (!m_swapChain)
+        {
+            return false;
+        }
+
+        HRESULT hr = m_swapChain->SetFullscreenState(TRUE, nullptr);
+        return SUCCEEDED(hr);
+    }
+
+
+
+
+    bool RenderSystem::SetWindowed()
+    {
+        if (!m_swapChain)
+        {
+            return false;
+        }
+
+        HRESULT hr = m_swapChain->SetFullscreenState(FALSE, nullptr);
+        return SUCCEEDED(hr);
     }
 }

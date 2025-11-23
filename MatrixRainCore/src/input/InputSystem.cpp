@@ -47,4 +47,20 @@ namespace MatrixRain
             m_densityController->DecreaseLevel();
         }
     }
+
+
+
+
+    bool InputSystem::IsAltEnterPressed(int virtualKey) const
+    {
+        // Check if Enter key is pressed
+        if (virtualKey != VK_RETURN)
+        {
+            return false;
+        }
+
+        // Check if Alt key is currently held down
+        // GetAsyncKeyState returns high-order bit set if key is down
+        return (GetAsyncKeyState(VK_MENU) & 0x8000) != 0;
+    }
 }

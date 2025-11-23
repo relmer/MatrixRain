@@ -217,28 +217,28 @@
 
 ### Tests for User Story 3 (TDD - Write FIRST)
 
-- [ ] T116 [P] [US3] Test ApplicationState display mode initialization to Windowed in MatrixRainTests/unit/state/ApplicationStateTests.cpp
-- [ ] T117 [P] [US3] Test ApplicationState ToggleDisplayMode transition Windowed→Fullscreen in MatrixRainTests/unit/state/ApplicationStateTests.cpp
-- [ ] T118 [P] [US3] Test ApplicationState ToggleDisplayMode transition Fullscreen→Windowed in MatrixRainTests/unit/state/ApplicationStateTests.cpp
-- [ ] T119 [P] [US3] Test RenderSystem swap chain recreation for fullscreen in MatrixRainTests/unit/rendering/SwapChainTests.cpp
-- [ ] T120 [P] [US3] Test RenderSystem swap chain recreation for windowed in MatrixRainTests/unit/rendering/SwapChainTests.cpp
-- [ ] T121 [P] [US3] Test InputSystem Alt+Enter key combination detection in MatrixRainTests/unit/input/InputSystemTests.cpp
-- [ ] T122 [P] [US3] Test animation state preservation during display mode switch in MatrixRainTests/integration/DisplayModeTests.cpp
+- [X] T116 [P] [US3] Test ApplicationState display mode initialization to Windowed in MatrixRainTests/unit/state/ApplicationStateTests.cpp
+- [X] T117 [P] [US3] Test ApplicationState ToggleDisplayMode transition Windowed→Fullscreen in MatrixRainTests/unit/state/ApplicationStateTests.cpp
+- [X] T118 [P] [US3] Test ApplicationState ToggleDisplayMode transition Fullscreen→Windowed in MatrixRainTests/unit/state/ApplicationStateTests.cpp
+- [X] T119 [P] [US3] Test RenderSystem swap chain recreation for fullscreen in MatrixRainTests/unit/rendering/SwapChainTests.cpp
+- [X] T120 [P] [US3] Test RenderSystem swap chain recreation for windowed in MatrixRainTests/unit/rendering/SwapChainTests.cpp
+- [X] T121 [P] [US3] Test InputSystem Alt+Enter key combination detection in MatrixRainTests/unit/input/InputSystemTests.cpp
+- [X] T122 [P] [US3] Test animation state preservation during display mode switch in MatrixRainTests/integration/DisplayModeTests.cpp
 
 ### Implementation for User Story 3
 
-- [ ] T123 [P] [US3] Create ApplicationState class in MatrixRainCore/include/matrixrain/ApplicationState.h with displayMode enum, densityController, viewport
-- [ ] T124 [US3] Implement ApplicationState::Initialize in MatrixRainCore/src/state/ApplicationState.cpp with Windowed default
-- [ ] T125 [US3] Implement ApplicationState::ToggleDisplayMode in MatrixRainCore/src/state/ApplicationState.cpp
-- [ ] T126 [US3] Implement RenderSystem::RecreateSwapChain in MatrixRainCore/src/rendering/RenderSystem.cpp for mode transitions
-- [ ] T127 [US3] Implement RenderSystem::SetFullscreen in MatrixRainCore/src/rendering/RenderSystem.cpp calling IDXGISwapChain::SetFullscreenState
-- [ ] T128 [US3] Implement RenderSystem::SetWindowed in MatrixRainCore/src/rendering/RenderSystem.cpp with window style restoration
-- [ ] T129 [US3] Implement InputSystem::IsAltEnterPressed in MatrixRainCore/src/input/InputSystem.cpp checking VK_RETURN with Alt modifier
-- [ ] T130 [US3] Wire ApplicationState to Application class in MatrixRainCore/src/Application.cpp
-- [ ] T131 [US3] Add Alt+Enter handling to window procedure in MatrixRainCore/src/Application.cpp calling ApplicationState::ToggleDisplayMode
-- [ ] T132 [US3] Ensure Viewport updates on display mode switch in MatrixRainCore/src/state/Viewport.cpp
-- [ ] T133 [US3] Verify swap chain recreation preserves render target view in MatrixRainCore/src/rendering/RenderSystem.cpp
-- [ ] T134 [US3] Verify integration test for complete display mode toggle cycle in MatrixRainTests/integration/DisplayModeTests.cpp
+- [X] T123 [P] [US3] Create ApplicationState class in MatrixRainCore/include/matrixrain/ApplicationState.h with displayMode enum, densityController, viewport
+- [X] T124 [US3] Implement ApplicationState::Initialize in MatrixRainCore/src/state/ApplicationState.cpp with Windowed default
+- [X] T125 [US3] Implement ApplicationState::ToggleDisplayMode in MatrixRainCore/src/state/ApplicationState.cpp
+- [X] T126 [US3] Implement RenderSystem::RecreateSwapChain in MatrixRainCore/src/rendering/RenderSystem.cpp for mode transitions
+- [X] T127 [US3] Implement RenderSystem::SetFullscreen in MatrixRainCore/src/rendering/RenderSystem.cpp calling IDXGISwapChain::SetFullscreenState
+- [X] T128 [US3] Implement RenderSystem::SetWindowed in MatrixRainCore/src/rendering/RenderSystem.cpp with window style restoration
+- [X] T129 [US3] Implement InputSystem::IsAltEnterPressed in MatrixRainCore/src/input/InputSystem.cpp checking VK_RETURN with Alt modifier
+- [X] T130 [US3] Wire ApplicationState to Application class in MatrixRainCore/src/Application.cpp
+- [X] T131 [US3] Add Alt+Enter handling to window procedure in MatrixRainCore/src/Application.cpp calling ApplicationState::ToggleDisplayMode
+- [X] T132 [US3] Ensure Viewport updates on display mode switch in MatrixRainCore/src/state/Viewport.cpp
+- [X] T133 [US3] Verify swap chain recreation preserves render target view in MatrixRainCore/src/rendering/RenderSystem.cpp
+- [X] T134 [US3] Verify integration test for complete display mode toggle cycle in MatrixRainTests/integration/DisplayModeTests.cpp
 
 **Checkpoint**: All user stories should now be independently functional - full Matrix rain with density controls and display mode toggle
 
