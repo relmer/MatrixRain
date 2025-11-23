@@ -116,6 +116,7 @@
     <ClCompile Include="unit\rendering\DepthSortingTests.cpp" />
     <ClCompile Include="unit\state\ViewportTests.cpp" />
     <ClCompile Include="unit\TimerTests.cpp" />
+    <ClCompile Include="integration\AnimationLoopTests.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\MatrixRainCore\MatrixRainCore.vcxproj">

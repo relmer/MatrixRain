@@ -109,7 +109,7 @@
 - [x] T051 [US1] Implement mirrored glyph rendering for 133 additional entries in MatrixRainCore/src/characters/CharacterSet.cpp
 - [x] T052 [US1] Implement CharacterSet::GetRandomGlyph in MatrixRainCore/src/characters/CharacterSet.cpp with uniform distribution
 - [x] T053 [US1] Store UV coordinates for all 266 glyphs in CharacterSet::glyphs array in MatrixRainCore/src/characters/CharacterSet.cpp
-- [ ] T053a [US1] Create D3D11 texture resource from Direct2D bitmap in MatrixRainCore/src/characters/CharacterSet.cpp and expose ID3D11ShaderResourceView for rendering
+- [x] T053a [US1] Create D3D11 texture resource from Direct2D bitmap in MatrixRainCore/src/characters/CharacterSet.cpp and expose ID3D11ShaderResourceView for rendering
 
 #### Data Models
 
@@ -117,7 +117,7 @@
 - [x] T055 [P] [US1] Implement CharacterInstance::Update in MatrixRainCore/src/animation/CharacterInstance.cpp for fade calculation
 - [x] T056 [P] [US1] Create CharacterStreak class in MatrixRainCore/include/matrixrain/CharacterStreak.h with position, velocity, length, characters, timers
 - [x] T057 [US1] Implement CharacterStreak::Spawn in MatrixRainCore/src/animation/CharacterStreak.cpp with random initialization
-- [ ] T057a [US1] Implement character mutation logic in CharacterStreak::Update: for each visible character (brightness > 0.0), generate random float [0.0, 1.0], if < 0.05 then call CharacterSet::GetRandomGlyph and replace character glyph
+- [x] T057a [US1] Implement character mutation logic in CharacterStreak::Update: for each visible character (brightness > 0.0), generate random float [0.0, 1.0], if < 0.05 then call CharacterSet::GetRandomGlyph and replace character glyph
 - [x] T058 [US1] Implement CharacterStreak::Update in MatrixRainCore/src/animation/CharacterStreak.cpp for position, fade, mutation
 - [x] T059 [US1] Implement CharacterStreak::ShouldDespawn in MatrixRainCore/src/animation/CharacterStreak.cpp for viewport bounds check
 - [x] T060 [P] [US1] Create Viewport class in MatrixRainCore/include/matrixrain/Viewport.h with width, height, projection fields
@@ -162,8 +162,8 @@
 
 - [x] T088 [US1] Wire CharacterSet initialization in Application::Initialize in MatrixRainCore/src/Application.cpp
 - [x] T089 [US1] Wire AnimationSystem initialization with Viewport reference in MatrixRainCore/src/Application.cpp
-- [ ] T090 [US1] Wire RenderSystem initialization with CharacterSet texture SRV from T053a in MatrixRainCore/src/Application.cpp
-- [ ] T091 [US1] Verify integration test for complete animation loop in MatrixRainTests/integration/AnimationLoopTests.cpp
+- [x] T090 [US1] Wire RenderSystem initialization with CharacterSet texture SRV from T053a in MatrixRainCore/src/Application.cpp
+- [x] T091 [US1] Verify integration test for complete animation loop in MatrixRainTests/integration/AnimationLoopTests.cpp
 
 **Checkpoint**: At this point, User Story 1 should be fully functional - launch app and see Matrix rain animation with all visual effects
 
