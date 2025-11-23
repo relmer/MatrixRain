@@ -95,9 +95,9 @@
 - [x] T042 [P] [US1] Test CharacterStreak character mutation 5% probability in MatrixRainTests/unit/animation/CharacterStreakTests.cpp
 - [x] T043 [P] [US1] Test Viewport projection matrix generation in MatrixRainTests/unit/state/ViewportTests.cpp
 - [x] T044 [P] [US1] Test Viewport resize handling in MatrixRainTests/unit/state/ViewportTests.cpp
-- [ ] T045 [P] [US1] Test depth sorting back-to-front order in MatrixRainTests/unit/rendering/DepthSortingTests.cpp
-- [ ] T046 [P] [US1] Test zoom wrapping at Z=100 boundary in MatrixRainTests/unit/animation/ZoomTests.cpp
-- [ ] T047 [P] [US1] Test character color transitions white→green for leading character in MatrixRainTests/unit/animation/ColorTransitionTests.cpp
+- [x] T045 [P] [US1] Test depth sorting back-to-front order in MatrixRainTests/unit/rendering/DepthSortingTests.cpp
+- [x] T046 [P] [US1] Test zoom wrapping at Z=100 boundary in MatrixRainTests/unit/animation/ZoomTests.cpp
+- [x] T047 [P] [US1] Test character color transitions white→green for leading character in MatrixRainTests/unit/animation/ColorTransitionTests.cpp
 
 ### Implementation for User Story 1
 
