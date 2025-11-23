@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "matrixrain/AnimationSystem.h"
+#include "matrixrain/DensityController.h"
 #include <random>
 
 namespace MatrixRain
@@ -13,6 +14,7 @@ namespace MatrixRain
 
     AnimationSystem::AnimationSystem()
         : m_viewport(nullptr)
+        , m_densityController(nullptr)
         , m_zoomVelocity(DEFAULT_ZOOM_VELOCITY)
         , m_spawnTimer(0.0f)
         , m_spawnInterval(SPAWN_INTERVAL)
@@ -29,6 +31,21 @@ namespace MatrixRain
         // Reduced density for less cluttered appearance
         size_t initialStreaks = 15;
         for (size_t i = 0; i < initialStreaks; i++)
+        {
+            SpawnStreak();
+        }
+    }
+
+    void AnimationSystem::Initialize(const Viewport& viewport, DensityController& densityController)
+    {
+        m_viewport = &viewport;
+        m_densityController = &densityController;
+        m_streaks.clear();
+        m_spawnTimer = 0.0f;
+        
+        // Spawn initial set of streaks based on density controller
+        int targetStreaks = densityController.GetTargetStreakCount();
+        for (int i = 0; i < targetStreaks; i++)
         {
             SpawnStreak();
         }
@@ -55,12 +72,30 @@ namespace MatrixRain
         // Remove streaks that are off-screen
         DespawnOffscreenStreaks();
 
-        // Auto-spawn new streaks to maintain density
-        m_spawnTimer += deltaTime;
-        if (m_spawnTimer >= m_spawnInterval)
+        // Auto-spawn new streaks based on density controller (if available)
+        if (m_densityController)
         {
-            m_spawnTimer -= m_spawnInterval;
-            SpawnStreak();
+            // Use density controller to determine if we should spawn
+            int currentCount = static_cast<int>(m_streaks.size());
+            if (m_densityController->ShouldSpawnStreak(currentCount))
+            {
+                m_spawnTimer += deltaTime;
+                if (m_spawnTimer >= m_spawnInterval)
+                {
+                    m_spawnTimer -= m_spawnInterval;
+                    SpawnStreak();
+                }
+            }
+        }
+        else
+        {
+            // Fallback: auto-spawn to maintain fixed density
+            m_spawnTimer += deltaTime;
+            if (m_spawnTimer >= m_spawnInterval)
+            {
+                m_spawnTimer -= m_spawnInterval;
+                SpawnStreak();
+            }
         }
     }
 

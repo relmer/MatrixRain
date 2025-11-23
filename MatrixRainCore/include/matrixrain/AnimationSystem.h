@@ -6,6 +6,8 @@
 
 namespace MatrixRain
 {
+    class DensityController;
+
     /// <summary>
     /// Manages all animated character streaks and camera zoom effects.
     /// Handles spawning, updating, and despawning of streaks based on viewport bounds.
@@ -20,6 +22,13 @@ namespace MatrixRain
         /// </summary>
         /// <param name="viewport">Reference to the viewport for bounds checking</param>
         void Initialize(const Viewport& viewport);
+
+        /// <summary>
+        /// Initialize the animation system with viewport and density controller.
+        /// </summary>
+        /// <param name="viewport">Reference to the viewport for bounds checking</param>
+        /// <param name="densityController">Reference to density controller for spawn management</param>
+        void Initialize(const Viewport& viewport, DensityController& densityController);
 
         /// <summary>
         /// Update all active streaks and camera zoom.
@@ -56,6 +65,7 @@ namespace MatrixRain
     private:
         std::vector<CharacterStreak> m_streaks;  // All active character streaks
         const Viewport* m_viewport;               // Reference to viewport for bounds
+        DensityController* m_densityController;   // Reference to density controller (optional)
         float m_zoomVelocity;                     // Camera zoom speed (units per second)
         float m_spawnTimer;                       // Timer for automatic spawning
         float m_spawnInterval;                    // Time between automatic spawns

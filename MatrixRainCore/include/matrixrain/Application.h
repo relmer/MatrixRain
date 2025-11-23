@@ -9,6 +9,8 @@ namespace MatrixRain
     class RenderSystem;
     class Viewport;
     class Timer;
+    class DensityController;
+    class InputSystem;
 
     class Application
     {
@@ -32,6 +34,8 @@ namespace MatrixRain
         std::unique_ptr<AnimationSystem> m_animationSystem;
         std::unique_ptr<RenderSystem> m_renderSystem;
         std::unique_ptr<Timer> m_timer;
+        std::unique_ptr<DensityController> m_densityController;
+        std::unique_ptr<InputSystem> m_inputSystem;
 
         // Win32 window
         HWND m_hwnd;

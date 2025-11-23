@@ -112,11 +112,14 @@
     <ClCompile Include="unit\animation\ZoomTests.cpp" />
     <ClCompile Include="unit\characters\CharacterConstantsTests.cpp" />
     <ClCompile Include="unit\characters\CharacterSetTests.cpp" />
+    <ClCompile Include="unit\input\InputSystemTests.cpp" />
     <ClCompile Include="unit\MathTests.cpp" />
     <ClCompile Include="unit\rendering\DepthSortingTests.cpp" />
+    <ClCompile Include="unit\state\DensityControllerTests.cpp" />
     <ClCompile Include="unit\state\ViewportTests.cpp" />
     <ClCompile Include="unit\TimerTests.cpp" />
     <ClCompile Include="integration\AnimationLoopTests.cpp" />
+    <ClCompile Include="integration\DensityControlTests.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\MatrixRainCore\MatrixRainCore.vcxproj">

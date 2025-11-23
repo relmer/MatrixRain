@@ -5,6 +5,8 @@
 #include "matrixrain/Viewport.h"
 #include "matrixrain/Timer.h"
 #include "matrixrain/CharacterSet.h"
+#include "matrixrain/DensityController.h"
+#include "matrixrain/InputSystem.h"
 
 namespace MatrixRain
 {
@@ -44,9 +46,13 @@ namespace MatrixRain
         m_viewport = std::make_unique<Viewport>();
         m_viewport->Resize(static_cast<float>(DEFAULT_WIDTH), static_cast<float>(DEFAULT_HEIGHT));
 
-        // Initialize animation system
+        // Initialize density controller (before AnimationSystem)
+        m_densityController = std::make_unique<DensityController>();
+        m_densityController->Initialize();
+
+        // Initialize animation system with density controller
         m_animationSystem = std::make_unique<AnimationSystem>();
-        m_animationSystem->Initialize(*m_viewport);
+        m_animationSystem->Initialize(*m_viewport, *m_densityController);
 
         // Initialize render system
         m_renderSystem = std::make_unique<RenderSystem>();
@@ -62,6 +68,10 @@ namespace MatrixRain
             MessageBoxW(nullptr, L"Failed to create texture atlas.\n\nDirect2D/DirectWrite may not be available.", L"Error", MB_OK | MB_ICONERROR);
             return false;
         }
+
+        // Initialize input system (after density controller)
+        m_inputSystem = std::make_unique<InputSystem>();
+        m_inputSystem->Initialize(*m_densityController);
 
         // Initialize timer
         m_timer = std::make_unique<Timer>();
@@ -203,6 +213,8 @@ namespace MatrixRain
         m_renderSystem.reset();
         m_animationSystem.reset();
         m_viewport.reset();
+        m_inputSystem.reset();
+        m_densityController.reset();
 
         if (m_hwnd)
         {
@@ -258,6 +270,12 @@ namespace MatrixRain
             {
                 // Spacebar pressed - toggle pause
                 m_isPaused = !m_isPaused;
+                return 0;
+            }
+            else if (m_inputSystem)
+            {
+                // Process density control keys (+/- on both numpad and main keyboard)
+                m_inputSystem->ProcessKeyDown(static_cast<int>(wParam));
                 return 0;
             }
             break;

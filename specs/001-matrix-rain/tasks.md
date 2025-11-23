@@ -177,33 +177,33 @@
 
 ### Tests for User Story 2 (TDD - Write FIRST)
 
-- [ ] T092 [P] [US2] Test DensityController initialization with level 5 default (target 262 streaks) in MatrixRainTests/unit/state/DensityControllerTests.cpp
-- [ ] T093 [P] [US2] Test DensityController level increase to max 10 (target 496 streaks) using formula: targetStreaks = 10 + (level-1)*54 in MatrixRainTests/unit/state/DensityControllerTests.cpp
-- [ ] T094 [P] [US2] Test DensityController level decrease to min 1 (target 10 streaks) using formula: targetStreaks = 10 + (level-1)*54 in MatrixRainTests/unit/state/DensityControllerTests.cpp
-- [ ] T095 [P] [US2] Test DensityController spawn probability calculation based on current streak count vs target in MatrixRainTests/unit/state/DensityControllerTests.cpp
-- [ ] T096 [P] [US2] Test DensityController bounds enforcement in MatrixRainTests/unit/state/DensityControllerTests.cpp
-- [ ] T097 [P] [US2] Test InputSystem keyboard event processing for VK_ADD in MatrixRainTests/unit/input/InputSystemTests.cpp
-- [ ] T098 [P] [US2] Test InputSystem keyboard event processing for VK_SUBTRACT in MatrixRainTests/unit/input/InputSystemTests.cpp
-- [ ] T099 [P] [US2] Test InputSystem keyboard event processing for VK_OEM_PLUS in MatrixRainTests/unit/input/InputSystemTests.cpp
-- [ ] T100 [P] [US2] Test InputSystem keyboard event processing for VK_OEM_MINUS in MatrixRainTests/unit/input/InputSystemTests.cpp
+- [X] T092 [P] [US2] Test DensityController initialization with level 5 default (target 262 streaks) in MatrixRainTests/unit/state/DensityControllerTests.cpp
+- [X] T093 [P] [US2] Test DensityController level increase to max 10 (target 496 streaks) using formula: targetStreaks = 10 + (level-1)*54 in MatrixRainTests/unit/state/DensityControllerTests.cpp
+- [X] T094 [P] [US2] Test DensityController level decrease to min 1 (target 10 streaks) using formula: targetStreaks = 10 + (level-1)*54 in MatrixRainTests/unit/state/DensityControllerTests.cpp
+- [X] T095 [P] [US2] Test DensityController spawn probability calculation based on current streak count vs target in MatrixRainTests/unit/state/DensityControllerTests.cpp
+- [X] T096 [P] [US2] Test DensityController bounds enforcement in MatrixRainTests/unit/state/DensityControllerTests.cpp
+- [X] T097 [P] [US2] Test InputSystem keyboard event processing for VK_ADD in MatrixRainTests/unit/input/InputSystemTests.cpp
+- [X] T098 [P] [US2] Test InputSystem keyboard event processing for VK_SUBTRACT in MatrixRainTests/unit/input/InputSystemTests.cpp
+- [X] T099 [P] [US2] Test InputSystem keyboard event processing for VK_OEM_PLUS in MatrixRainTests/unit/input/InputSystemTests.cpp
+- [X] T100 [P] [US2] Test InputSystem keyboard event processing for VK_OEM_MINUS in MatrixRainTests/unit/input/InputSystemTests.cpp
 
 ### Implementation for User Story 2
 
-- [ ] T101 [P] [US2] Create DensityController class in MatrixRainCore/include/matrixrain/DensityController.h with level (1-10), GetTargetStreakCount() method implementing formula: targetStreaks = 10 + (level-1)*54
-- [ ] T102 [US2] Implement DensityController::Initialize in MatrixRainCore/src/state/DensityController.cpp with level 5 default (262 target streaks)
-- [ ] T103 [US2] Implement DensityController::IncreaseLevel in MatrixRainCore/src/state/DensityController.cpp with max bound check (level <= 10)
-- [ ] T104 [US2] Implement DensityController::DecreaseLevel in MatrixRainCore/src/state/DensityController.cpp with min bound check
-- [ ] T105 [US2] Implement DensityController::UpdateSpawnLogic in MatrixRainCore/src/state/DensityController.cpp for spawn probability
-- [ ] T106 [US2] Implement DensityController::ShouldSpawnStreak in MatrixRainCore/src/state/DensityController.cpp based on active count
-- [ ] T107 [P] [US2] Create InputSystem class in MatrixRainCore/include/matrixrain/InputSystem.h with keyboard state tracking
-- [ ] T108 [US2] Implement InputSystem::ProcessKeyDown in MatrixRainCore/src/input/InputSystem.cpp for WM_KEYDOWN handling
-- [ ] T109 [US2] Implement InputSystem::OnDensityIncrease in MatrixRainCore/src/input/InputSystem.cpp calling DensityController
-- [ ] T110 [US2] Implement InputSystem::OnDensityDecrease in MatrixRainCore/src/input/InputSystem.cpp calling DensityController
-- [ ] T111 [US2] Wire InputSystem initialization in Application::Initialize in MatrixRainCore/src/Application.cpp
-- [ ] T112 [US2] Wire DensityController to AnimationSystem in MatrixRainCore/src/Application.cpp
-- [ ] T113 [US2] Add WM_KEYDOWN message handling to window procedure in MatrixRainCore/src/Application.cpp
-- [ ] T114 [US2] Integrate DensityController::UpdateSpawnLogic into AnimationSystem::Update in MatrixRainCore/src/animation/AnimationSystem.cpp
-- [ ] T115 [US2] Verify integration test for density changes in MatrixRainTests/integration/DensityControlTests.cpp
+- [X] T101 [P] [US2] Create DensityController class in MatrixRainCore/include/matrixrain/DensityController.h with level (1-10), GetTargetStreakCount() method implementing formula: targetStreaks = 10 + (level-1)*54
+- [X] T102 [US2] Implement DensityController::Initialize in MatrixRainCore/src/state/DensityController.cpp with level 5 default (262 target streaks)
+- [X] T103 [US2] Implement DensityController::IncreaseLevel in MatrixRainCore/src/state/DensityController.cpp with max bound check (level <= 10)
+- [X] T104 [US2] Implement DensityController::DecreaseLevel in MatrixRainCore/src/state/DensityController.cpp with min bound check
+- [X] T105 [US2] Implement DensityController::UpdateSpawnLogic in MatrixRainCore/src/state/DensityController.cpp for spawn probability
+- [X] T106 [US2] Implement DensityController::ShouldSpawnStreak in MatrixRainCore/src/state/DensityController.cpp based on active count
+- [X] T107 [P] [US2] Create InputSystem class in MatrixRainCore/include/matrixrain/InputSystem.h with keyboard state tracking
+- [X] T108 [US2] Implement InputSystem::ProcessKeyDown in MatrixRainCore/src/input/InputSystem.cpp for WM_KEYDOWN handling
+- [X] T109 [US2] Implement InputSystem::OnDensityIncrease in MatrixRainCore/src/input/InputSystem.cpp calling DensityController
+- [X] T110 [US2] Implement InputSystem::OnDensityDecrease in MatrixRainCore/src/input/InputSystem.cpp calling DensityController
+- [X] T111 [US2] Wire InputSystem initialization in Application::Initialize in MatrixRainCore/src/Application.cpp
+- [X] T112 [US2] Wire DensityController to AnimationSystem in MatrixRainCore/src/Application.cpp
+- [X] T113 [US2] Add WM_KEYDOWN message handling to window procedure in MatrixRainCore/src/Application.cpp
+- [X] T114 [US2] Integrate DensityController::UpdateSpawnLogic into AnimationSystem::Update in MatrixRainCore/src/animation/AnimationSystem.cpp
+- [X] T115 [US2] Verify integration test for density changes in MatrixRainTests/integration/DensityControlTests.cpp
 
 **Checkpoint**: At this point, User Stories 1 AND 2 should both work - animation runs with controllable density via +/- keys
 
