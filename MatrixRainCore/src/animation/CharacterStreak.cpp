@@ -41,6 +41,11 @@ namespace MatrixRain
         m_velocity.y = 0.0f;
         m_velocity.z = 0.0f;
 
+        // Calculate drop interval once at spawn based on initial depth
+        // This ensures constant speed throughout the streak's lifetime
+        float velocityScale = GetVelocityScale(m_position.z);
+        m_dropInterval = BASE_DROP_INTERVAL / velocityScale;
+
         m_mutationTimer = 0.0f;
         m_dropTimer = 0.0f;
         
@@ -63,14 +68,11 @@ namespace MatrixRain
 
     void CharacterStreak::Update(float deltaTime, float viewportHeight)
     {
-        // Discrete cell dropping based on depth
-        float velocityScale = GetVelocityScale(m_position.z);
-        float dropInterval = BASE_DROP_INTERVAL / velocityScale; // Faster streaks drop more frequently
-        
+        // Use cached drop interval (constant for streak lifetime)
         m_dropTimer += deltaTime;
-        if (m_dropTimer >= dropInterval)
+        if (m_dropTimer >= m_dropInterval)
         {
-            m_dropTimer -= dropInterval;
+            m_dropTimer -= m_dropInterval;
             
             // Continue adding characters until head reaches bottom (Phase 1 and 2)
             // Stop adding when head reaches viewport bottom to enter Phase 3 (fade out)
@@ -88,7 +90,7 @@ namespace MatrixRain
                     if (m_characters.size() < m_maxLength)
                     {
                         size_t charactersStillToCome = m_maxLength - m_characters.size();
-                        oldHead.brightTimeRemaining = charactersStillToCome * dropInterval;
+                        oldHead.brightTimeRemaining = charactersStillToCome * m_dropInterval;
                     }
                     else
                     {

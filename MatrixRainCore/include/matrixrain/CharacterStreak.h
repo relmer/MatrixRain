@@ -47,6 +47,7 @@ namespace MatrixRain
         std::vector<CharacterInstance> m_characters; // Characters in the streak
         float m_mutationTimer{ 0.0f };      // Timer for character mutation
         float m_dropTimer{ 0.0f };          // Timer for discrete cell dropping
+        float m_dropInterval{ 0.3f };       // Cached drop interval (set at spawn, constant for streak lifetime)
         float m_characterSpacing{ 20.0f };  // Vertical spacing between characters
         size_t m_maxLength{ 0 };            // Maximum number of characters in this streak
         bool m_isInFadingPhase{ false };    // True when head has reached bottom and final fade has started
