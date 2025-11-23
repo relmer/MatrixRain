@@ -1,12 +1,10 @@
 #include "pch.h"
-#include "CppUnitTest.h"
+
+
 #include "MatrixRain/FPSCounter.h"
-#include <thread>
-#include <chrono>
 
-using namespace Microsoft::VisualStudio::CppUnitTestFramework;
+
 using namespace MatrixRain;
-
 namespace MatrixRainTests
 {
     TEST_CLASS(FPSCounterTests)

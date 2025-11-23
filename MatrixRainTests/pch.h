@@ -5,3 +5,9 @@
 
 // Microsoft C++ Unit Test Framework
 #include <CppUnitTest.h>
+
+// Additional C++ headers for testing
+#include <chrono>
+#include <thread>
+
+using namespace Microsoft::VisualStudio::CppUnitTestFramework;

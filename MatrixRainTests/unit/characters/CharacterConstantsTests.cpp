@@ -1,8 +1,10 @@
 #include "pch.h"
+
+
 #include "MatrixRain/CharacterConstants.h"
 
-using namespace Microsoft::VisualStudio::CppUnitTestFramework;
 
+using namespace MatrixRain;
 namespace MatrixRainTests
 {
     TEST_CLASS(CharacterConstantsTests)

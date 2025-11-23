@@ -1,9 +1,10 @@
 #include "pch.h"
+
+
 #include "MatrixRain/RenderSystem.h"
 
-using namespace Microsoft::VisualStudio::CppUnitTestFramework;
-using namespace MatrixRain;
 
+using namespace MatrixRain;
 namespace MatrixRainTests
 {
     TEST_CLASS(SwapChainTests)

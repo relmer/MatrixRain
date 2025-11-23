@@ -1,10 +1,12 @@
 #include "pch.h"
+
+
 #include "MatrixRain/AnimationSystem.h"
+
 #include "MatrixRain/Viewport.h"
 
-using namespace Microsoft::VisualStudio::CppUnitTestFramework;
-using namespace MatrixRain;
 
+using namespace MatrixRain;
 namespace MatrixRainTests
 {
 	TEST_CLASS(ZoomTests)

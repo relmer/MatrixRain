@@ -1,10 +1,10 @@
 #include "pch.h"
+
 #include "MatrixRain/Application.h"
 #include "MatrixRain/ApplicationState.h"
 
-using namespace Microsoft::VisualStudio::CppUnitTestFramework;
-using namespace MatrixRain;
 
+using namespace MatrixRain;
 namespace MatrixRainTests
 {
     TEST_CLASS(DisplayModeTests)

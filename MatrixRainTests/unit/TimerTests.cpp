@@ -1,11 +1,10 @@
 #include "pch.h"
+
+
 #include "MatrixRain/Timer.h"
-#include <thread>
-#include <chrono>
 
-using namespace Microsoft::VisualStudio::CppUnitTestFramework;
+
 using namespace MatrixRain;
-
 namespace MatrixRainTests
 {
     TEST_CLASS(TimerTests)

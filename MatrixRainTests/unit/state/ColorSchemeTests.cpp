@@ -1,10 +1,10 @@
 #include "pch.h"
-#include "CppUnitTest.h"
+
+
 #include "MatrixRain/ColorScheme.h"
 
-using namespace Microsoft::VisualStudio::CppUnitTestFramework;
-using namespace MatrixRain;
 
+using namespace MatrixRain;
 namespace MatrixRainTests
 {
     TEST_CLASS(ColorSchemeTests)

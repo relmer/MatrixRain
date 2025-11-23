@@ -1,11 +1,10 @@
 #include "pch.h"
+
+
 #include "MatrixRain/CharacterStreak.h"
-#include <vector>
-#include <algorithm>
 
-using namespace Microsoft::VisualStudio::CppUnitTestFramework;
+
 using namespace MatrixRain;
-
 namespace MatrixRainTests
 {
 	TEST_CLASS(DepthSortingTests)

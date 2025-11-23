@@ -1,12 +1,13 @@
 #include "pch.h"
-#include "CppUnitTest.h"
 #include "MatrixRain/AnimationSystem.h"
 #include "MatrixRain/Viewport.h"
 #include "MatrixRain/CharacterSet.h"
 
-using namespace Microsoft::VisualStudio::CppUnitTestFramework;
 
-namespace MatrixRain
+
+
+using namespace MatrixRain;
+namespace MatrixRainTests
 {
     TEST_CLASS(AnimationLoopTests)
     {

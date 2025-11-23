@@ -1,10 +1,12 @@
 #include "pch.h"
+
+
 #include "MatrixRain/InputSystem.h"
+
 #include "MatrixRain/DensityController.h"
 
-using namespace Microsoft::VisualStudio::CppUnitTestFramework;
-using namespace MatrixRain;
 
+using namespace MatrixRain;
 namespace MatrixRainTests
 {
 	TEST_CLASS(InputSystemTests)
