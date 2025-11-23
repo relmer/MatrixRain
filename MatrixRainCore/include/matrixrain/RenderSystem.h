@@ -2,7 +2,10 @@
 #include "matrixrain/AnimationSystem.h"
 #include "matrixrain/CharacterSet.h"
 #include "matrixrain/Viewport.h"
+#include "matrixrain/ColorScheme.h"
 #include <d3d11.h>
+#include <d2d1_1.h>
+#include <dwrite.h>
 #include <wrl/client.h>
 
 namespace MatrixRain
@@ -31,7 +34,9 @@ namespace MatrixRain
         /// </summary>
         /// <param name="animationSystem">Source of streak data to render</param>
         /// <param name="viewport">Viewport for projection matrix</param>
-        void Render(const AnimationSystem& animationSystem, const Viewport& viewport);
+        /// <param name="colorScheme">Current color scheme for rendering</param>
+        /// <param name="fps">Current FPS for display (0 to hide)</param>
+        void Render(const AnimationSystem& animationSystem, const Viewport& viewport, ColorScheme colorScheme = ColorScheme::Green, float fps = 0.0f);
 
         /// <summary>
         /// Present the rendered frame to the screen.
@@ -86,17 +91,28 @@ namespace MatrixRain
         bool CreateConstantBuffer();
         bool CreateBlendState();
         bool CreateSamplerState();
+        bool CreateDirect2DResources();
 
         // Rendering helpers
         void SortStreaksByDepth(std::vector<const CharacterStreak*>& streaks);
-        void UpdateInstanceBuffer(const AnimationSystem& animationSystem);
+        void UpdateInstanceBuffer(const AnimationSystem& animationSystem, ColorScheme colorScheme);
         void ClearRenderTarget();
+        void RenderFPSCounter(float fps);
 
         // DirectX resources
         Microsoft::WRL::ComPtr<ID3D11Device> m_device;
         Microsoft::WRL::ComPtr<ID3D11DeviceContext> m_context;
         Microsoft::WRL::ComPtr<IDXGISwapChain> m_swapChain;
         Microsoft::WRL::ComPtr<ID3D11RenderTargetView> m_renderTargetView;
+
+        // Direct2D/DirectWrite resources for FPS display
+        Microsoft::WRL::ComPtr<ID2D1Factory1> m_d2dFactory;
+        Microsoft::WRL::ComPtr<ID2D1Device> m_d2dDevice;
+        Microsoft::WRL::ComPtr<ID2D1DeviceContext> m_d2dContext;
+        Microsoft::WRL::ComPtr<ID2D1Bitmap1> m_d2dBitmap;
+        Microsoft::WRL::ComPtr<IDWriteFactory> m_dwriteFactory;
+        Microsoft::WRL::ComPtr<IDWriteTextFormat> m_fpsTextFormat;
+        Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> m_fpsBrush;
 
         // Shader resources
         Microsoft::WRL::ComPtr<ID3D11VertexShader> m_vertexShader;

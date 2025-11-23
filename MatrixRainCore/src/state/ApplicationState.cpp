@@ -5,6 +5,7 @@ namespace MatrixRain
 {
     ApplicationState::ApplicationState()
         : m_displayMode(DisplayMode::Windowed)
+        , m_colorScheme(ColorScheme::Green)
     {
     }
 
@@ -12,6 +13,9 @@ namespace MatrixRain
     {
         // Start in windowed mode (FR-019)
         m_displayMode = DisplayMode::Windowed;
+        
+        // Start with green color scheme (classic Matrix)
+        m_colorScheme = ColorScheme::Green;
     }
 
     void ApplicationState::ToggleDisplayMode()
@@ -26,4 +30,11 @@ namespace MatrixRain
             m_displayMode = DisplayMode::Windowed;
         }
     }
+
+    void ApplicationState::CycleColorScheme()
+    {
+        // Cycle to next color scheme
+        m_colorScheme = GetNextColorScheme(m_colorScheme);
+    }
 }
+

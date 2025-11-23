@@ -99,7 +99,9 @@
     <ClInclude Include="include\matrixrain\CharacterInstance.h" />
     <ClInclude Include="include\matrixrain\CharacterSet.h" />
     <ClInclude Include="include\matrixrain\CharacterStreak.h" />
+    <ClInclude Include="include\matrixrain\ColorScheme.h" />
     <ClInclude Include="include\matrixrain\DensityController.h" />
+    <ClInclude Include="include\matrixrain\FPSCounter.h" />
     <ClInclude Include="include\matrixrain\InputSystem.h" />
     <ClInclude Include="include\matrixrain\Math.h" />
     <ClInclude Include="include\matrixrain\RenderSystem.h" />
@@ -122,9 +124,11 @@
     <ClCompile Include="src\Math.cpp" />
     <ClCompile Include="src\rendering\RenderSystem.cpp" />
     <ClCompile Include="src\state\ApplicationState.cpp" />
+    <ClCompile Include="src\state\ColorScheme.cpp" />
     <ClCompile Include="src\state\DensityController.cpp" />
     <ClCompile Include="src\state\Viewport.cpp" />
     <ClCompile Include="src\Timer.cpp" />
+    <ClCompile Include="src\ui\FPSCounter.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

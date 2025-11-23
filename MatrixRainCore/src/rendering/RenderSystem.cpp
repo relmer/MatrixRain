@@ -1,12 +1,17 @@
 #include "pch.h"
 #include "matrixrain/RenderSystem.h"
 #include "matrixrain/CharacterSet.h"
+#include "matrixrain/ColorScheme.h"
 #include <d3dcompiler.h>
+#include <d2d1_1.h>
+#include <dwrite.h>
 #include <algorithm>
 
 #pragma comment(lib, "d3d11.lib")
 #pragma comment(lib, "dxgi.lib")
 #pragma comment(lib, "d3dcompiler.lib")
+#pragma comment(lib, "d2d1.lib")
+#pragma comment(lib, "dwrite.lib")
 
 namespace MatrixRain
 {
@@ -58,6 +63,11 @@ namespace MatrixRain
         }
 
         if (!CreateSamplerState())
+        {
+            return false;
+        }
+
+        if (!CreateDirect2DResources())
         {
             return false;
         }
@@ -125,7 +135,7 @@ namespace MatrixRain
         swapChainDesc.BufferCount = 2;
         swapChainDesc.BufferDesc.Width = width;
         swapChainDesc.BufferDesc.Height = height;
-        swapChainDesc.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+        swapChainDesc.BufferDesc.Format = DXGI_FORMAT_B8G8R8A8_UNORM; // Match D2D format requirement
         swapChainDesc.BufferDesc.RefreshRate.Numerator = 60;
         swapChainDesc.BufferDesc.RefreshRate.Denominator = 1;
         swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
@@ -356,6 +366,111 @@ namespace MatrixRain
         return SUCCEEDED(hr);
     }
 
+    bool RenderSystem::CreateDirect2DResources()
+    {
+        HRESULT hr;
+
+        // Create D2D factory
+        D2D1_FACTORY_OPTIONS options = {};
+#ifdef _DEBUG
+        options.debugLevel = D2D1_DEBUG_LEVEL_INFORMATION;
+#endif
+        hr = D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, __uuidof(ID2D1Factory1), &options,
+            reinterpret_cast<void**>(m_d2dFactory.GetAddressOf()));
+        if (FAILED(hr))
+        {
+            return false;
+        }
+
+        // Get DXGI device
+        Microsoft::WRL::ComPtr<IDXGIDevice> dxgiDevice;
+        hr = m_device.As(&dxgiDevice);
+        if (FAILED(hr))
+        {
+            return false;
+        }
+
+        // Create D2D device
+        hr = m_d2dFactory->CreateDevice(dxgiDevice.Get(), &m_d2dDevice);
+        if (FAILED(hr))
+        {
+            return false;
+        }
+
+        // Create D2D device context
+        hr = m_d2dDevice->CreateDeviceContext(D2D1_DEVICE_CONTEXT_OPTIONS_NONE, &m_d2dContext);
+        if (FAILED(hr))
+        {
+            return false;
+        }
+
+        // Get back buffer as DXGI surface
+        Microsoft::WRL::ComPtr<ID3D11Texture2D> backBuffer;
+        hr = m_swapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), &backBuffer);
+        if (FAILED(hr))
+        {
+            return false;
+        }
+
+        Microsoft::WRL::ComPtr<IDXGISurface> dxgiSurface;
+        hr = backBuffer.As(&dxgiSurface);
+        if (FAILED(hr))
+        {
+            return false;
+        }
+
+        // Create D2D bitmap from DXGI surface
+        D2D1_BITMAP_PROPERTIES1 bitmapProps = D2D1::BitmapProperties1(
+            D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW,
+            D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED)
+        );
+
+        hr = m_d2dContext->CreateBitmapFromDxgiSurface(dxgiSurface.Get(), &bitmapProps, &m_d2dBitmap);
+        if (FAILED(hr))
+        {
+            return false;
+        }
+
+        // Set the bitmap as the render target
+        m_d2dContext->SetTarget(m_d2dBitmap.Get());
+
+        // Create DirectWrite factory
+        hr = DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory),
+            reinterpret_cast<IUnknown**>(m_dwriteFactory.GetAddressOf()));
+        if (FAILED(hr))
+        {
+            return false;
+        }
+
+        // Create text format for FPS display (small, top-right aligned)
+        hr = m_dwriteFactory->CreateTextFormat(
+            L"Consolas",
+            nullptr,
+            DWRITE_FONT_WEIGHT_NORMAL,
+            DWRITE_FONT_STYLE_NORMAL,
+            DWRITE_FONT_STRETCH_NORMAL,
+            20.0f,
+            L"en-us",
+            &m_fpsTextFormat
+        );
+        if (FAILED(hr))
+        {
+            return false;
+        }
+
+        m_fpsTextFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_TRAILING);
+        m_fpsTextFormat->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_FAR);
+
+        // Create white brush for FPS text
+        hr = m_d2dContext->CreateSolidColorBrush(D2D1::ColorF(D2D1::ColorF::White), &m_fpsBrush);
+        if (FAILED(hr))
+        {
+            return false;
+        }
+
+        return true;
+    }
+
     void RenderSystem::ClearRenderTarget()
     {
         // Clear to black
@@ -373,8 +488,11 @@ namespace MatrixRain
             });
     }
 
-    void RenderSystem::UpdateInstanceBuffer(const AnimationSystem& animationSystem)
+    void RenderSystem::UpdateInstanceBuffer(const AnimationSystem& animationSystem, ColorScheme colorScheme)
     {
+        // Get color scheme RGB values
+        Color4 schemeColor = GetColorRGB(colorScheme);
+
         // Collect all character instances from all streaks
         std::vector<CharacterInstanceData> instanceData;
         
@@ -411,10 +529,25 @@ namespace MatrixRain
                 data.uvMax[0] = glyph.uvMax.x;
                 data.uvMax[1] = glyph.uvMax.y;
 
-                // Color and brightness
-                data.color[0] = character.color.r;
-                data.color[1] = character.color.g;
-                data.color[2] = character.color.b;
+                // Color and brightness - apply color scheme to trailing characters
+                // White characters (lead) should stay white regardless of color scheme
+                bool isWhite = (character.color.r > 0.9f && character.color.g > 0.9f && character.color.b > 0.9f);
+                
+                if (isWhite)
+                {
+                    // Keep white characters white (lead character)
+                    data.color[0] = character.color.r;
+                    data.color[1] = character.color.g;
+                    data.color[2] = character.color.b;
+                }
+                else
+                {
+                    // Replace trail color with current color scheme
+                    data.color[0] = schemeColor.r;
+                    data.color[1] = schemeColor.g;
+                    data.color[2] = schemeColor.b;
+                }
+                
                 data.color[3] = character.color.a;
                 data.brightness = character.brightness;
                 data.scale = character.scale;
@@ -439,7 +572,7 @@ namespace MatrixRain
         }
     }
 
-    void RenderSystem::Render(const AnimationSystem& animationSystem, const Viewport& viewport)
+    void RenderSystem::Render(const AnimationSystem& animationSystem, const Viewport& viewport, ColorScheme colorScheme, float fps)
     {
         if (!m_device || !m_context)
         {
@@ -464,7 +597,7 @@ namespace MatrixRain
         }
 
         // Update instance buffer with character data
-        UpdateInstanceBuffer(animationSystem);
+        UpdateInstanceBuffer(animationSystem, colorScheme);
 
         // Count total characters to render
         size_t totalCharacters = 0;
@@ -506,6 +639,12 @@ namespace MatrixRain
 
         // Draw instanced (6 vertices per quad, one instance per character)
         m_context->DrawInstanced(6, static_cast<UINT>(totalCharacters), 0, 0);
+
+        // Render FPS counter overlay if fps > 0
+        if (fps > 0.0f)
+        {
+            RenderFPSCounter(fps);
+        }
     }
 
     void RenderSystem::Present()
@@ -516,6 +655,44 @@ namespace MatrixRain
         }
     }
 
+    void RenderSystem::RenderFPSCounter(float fps)
+    {
+        if (!m_d2dContext || !m_fpsBrush || !m_fpsTextFormat)
+        {
+            return;
+        }
+
+        // Begin D2D rendering
+        m_d2dContext->BeginDraw();
+
+        // Format FPS text
+        wchar_t fpsText[32];
+        swprintf_s(fpsText, L"FPS: %.1f", fps);
+
+        // Get render target size for positioning
+        D2D1_SIZE_F size = m_d2dContext->GetSize();
+
+        // Create text layout rect (bottom-right corner with 10px padding)
+        D2D1_RECT_F textRect = D2D1::RectF(
+            size.width - 150.0f,    // Left (150px from right edge)
+            size.height - 40.0f,    // Top (40px from bottom)
+            size.width - 10.0f,     // Right (10px padding)
+            size.height - 10.0f     // Bottom (10px padding)
+        );
+
+        // Draw text
+        m_d2dContext->DrawText(
+            fpsText,
+            static_cast<UINT32>(wcslen(fpsText)),
+            m_fpsTextFormat.Get(),
+            textRect,
+            m_fpsBrush.Get()
+        );
+
+        // End D2D rendering
+        m_d2dContext->EndDraw();
+    }
+
     void RenderSystem::Resize(UINT width, UINT height)
     {
         if (!m_swapChain)
@@ -523,14 +700,37 @@ namespace MatrixRain
             return;
         }
 
-        // Release render target view
+        // Release render target view and D2D bitmap
         m_renderTargetView.Reset();
+        m_d2dBitmap.Reset();
 
         // Resize swap chain buffers
         m_swapChain->ResizeBuffers(0, width, height, DXGI_FORMAT_UNKNOWN, 0);
 
         // Recreate render target view
         CreateRenderTargetView();
+
+        // Recreate D2D bitmap for the new back buffer
+        if (m_d2dContext)
+        {
+            Microsoft::WRL::ComPtr<ID3D11Texture2D> backBuffer;
+            HRESULT hr = m_swapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), &backBuffer);
+            if (SUCCEEDED(hr))
+            {
+                Microsoft::WRL::ComPtr<IDXGISurface> dxgiSurface;
+                hr = backBuffer.As(&dxgiSurface);
+                if (SUCCEEDED(hr))
+                {
+                    D2D1_BITMAP_PROPERTIES1 bitmapProps = D2D1::BitmapProperties1(
+                        D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW,
+                        D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED)
+                    );
+
+                    m_d2dContext->CreateBitmapFromDxgiSurface(dxgiSurface.Get(), &bitmapProps, &m_d2dBitmap);
+                    m_d2dContext->SetTarget(m_d2dBitmap.Get());
+                }
+            }
+        }
 
         // Update viewport
         D3D11_VIEWPORT viewport = {};
@@ -545,6 +745,16 @@ namespace MatrixRain
 
     void RenderSystem::Shutdown()
     {
+        // Direct2D/DirectWrite resources
+        m_fpsBrush.Reset();
+        m_fpsTextFormat.Reset();
+        m_dwriteFactory.Reset();
+        m_d2dBitmap.Reset();
+        m_d2dContext.Reset();
+        m_d2dDevice.Reset();
+        m_d2dFactory.Reset();
+
+        // DirectX resources
         m_atlasTextureSRV.Reset();
         m_samplerState.Reset();
         m_blendState.Reset();

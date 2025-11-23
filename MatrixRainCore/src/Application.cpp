@@ -8,6 +8,7 @@
 #include "matrixrain/CharacterSet.h"
 #include "matrixrain/DensityController.h"
 #include "matrixrain/InputSystem.h"
+#include "matrixrain/FPSCounter.h"
 
 namespace MatrixRain
 {
@@ -82,6 +83,9 @@ namespace MatrixRain
         // Initialize application state
         m_appState = std::make_unique<ApplicationState>();
         m_appState->Initialize();
+
+        // Initialize FPS counter
+        m_fpsCounter = std::make_unique<FPSCounter>();
 
         // Initialize timer
         m_timer = std::make_unique<Timer>();
@@ -196,6 +200,12 @@ namespace MatrixRain
             float deltaTime = static_cast<float>(m_timer->GetElapsedSeconds());
             m_timer->Reset();
 
+            // Update FPS counter
+            if (m_fpsCounter)
+            {
+                m_fpsCounter->Update(deltaTime);
+            }
+
             // Update and render
             Update(deltaTime);
             Render();
@@ -214,9 +224,11 @@ namespace MatrixRain
 
     void Application::Render()
     {
-        if (m_renderSystem && m_animationSystem && m_viewport)
+        if (m_renderSystem && m_animationSystem && m_viewport && m_appState)
         {
-            m_renderSystem->Render(*m_animationSystem, *m_viewport);
+            float fps = m_fpsCounter ? m_fpsCounter->GetFPS() : 0.0f;
+            ColorScheme scheme = m_appState->GetColorScheme();
+            m_renderSystem->Render(*m_animationSystem, *m_viewport, scheme, fps);
             m_renderSystem->Present();
         }
     }
@@ -284,6 +296,12 @@ namespace MatrixRain
             {
                 // Spacebar pressed - toggle pause
                 m_isPaused = !m_isPaused;
+                return 0;
+            }
+            else if (wParam == 'C' && m_appState)
+            {
+                // C key pressed - cycle color scheme
+                m_appState->CycleColorScheme();
                 return 0;
             }
             else if (m_inputSystem && m_inputSystem->IsAltEnterPressed(static_cast<int>(wParam)))

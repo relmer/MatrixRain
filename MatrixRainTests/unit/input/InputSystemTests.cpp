@@ -124,6 +124,27 @@ namespace MatrixRainTests
 			
 			Assert::IsTrue(true, L"Alt+Enter detection interface exists");
 		}
+
+		// T177: Test InputSystem keyboard event processing for VK_C (color cycle)
+		TEST_METHOD(TestInputSystemProcessesVK_C)
+		{
+			// Given: InputSystem is initialized
+			// When: ProcessKeyDown(VK_C) is called (C key for color cycling)
+			// Then: Should be processed without errors
+			// Note: Actual color cycling logic is tested in ApplicationState
+			
+			DensityController densityController;
+			densityController.Initialize();
+			
+			InputSystem inputSystem;
+			inputSystem.Initialize(densityController);
+			
+			// Process VK_C - should not throw or crash
+			inputSystem.ProcessKeyDown('C');
+			
+			Assert::IsTrue(true, L"VK_C key processing should complete without error");
+		}
 	};
 }
+
 
