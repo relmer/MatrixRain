@@ -1,6 +1,6 @@
 #include "pch.h"
-#include "matrixrain/Math.h"
-#include <cmath>
+
+#include "MatrixRain/Math.h"
 
 namespace MatrixRain
 {

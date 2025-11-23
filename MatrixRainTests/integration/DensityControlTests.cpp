@@ -1,8 +1,8 @@
 #include "pch.h"
-#include "matrixrain/DensityController.h"
-#include "matrixrain/InputSystem.h"
-#include "matrixrain/AnimationSystem.h"
-#include "matrixrain/Viewport.h"
+#include "MatrixRain/DensityController.h"
+#include "MatrixRain/InputSystem.h"
+#include "MatrixRain/AnimationSystem.h"
+#include "MatrixRain/Viewport.h"
 
 using namespace Microsoft::VisualStudio::CppUnitTestFramework;
 using namespace MatrixRain;

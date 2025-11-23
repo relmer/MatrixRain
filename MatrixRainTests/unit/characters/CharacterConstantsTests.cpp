@@ -1,5 +1,5 @@
 #include "pch.h"
-#include "matrixrain/CharacterConstants.h"
+#include "MatrixRain/CharacterConstants.h"
 
 using namespace Microsoft::VisualStudio::CppUnitTestFramework;
 

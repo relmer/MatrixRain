@@ -1,5 +1,5 @@
 #include "pch.h"
-#include "matrixrain/CharacterStreak.h"
+#include "MatrixRain/CharacterStreak.h"
 
 using namespace Microsoft::VisualStudio::CppUnitTestFramework;
 using namespace MatrixRain;

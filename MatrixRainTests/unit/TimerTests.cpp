@@ -1,5 +1,5 @@
 #include "pch.h"
-#include "matrixrain/Timer.h"
+#include "MatrixRain/Timer.h"
 #include <thread>
 #include <chrono>
 

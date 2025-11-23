@@ -1,6 +1,6 @@
 #include "pch.h"
 #include "CppUnitTest.h"
-#include "matrixrain/ColorScheme.h"
+#include "MatrixRain/ColorScheme.h"
 
 using namespace Microsoft::VisualStudio::CppUnitTestFramework;
 using namespace MatrixRain;

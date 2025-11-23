@@ -1,5 +1,5 @@
 #pragma once
-#include "matrixrain/DensityController.h"
+#include "MatrixRain/DensityController.h"
 
 namespace MatrixRain
 {

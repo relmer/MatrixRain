@@ -1,5 +1,5 @@
 #include "pch.h"
-#include "matrixrain/DensityController.h"
+#include "MatrixRain/DensityController.h"
 
 using namespace Microsoft::VisualStudio::CppUnitTestFramework;
 using namespace MatrixRain;

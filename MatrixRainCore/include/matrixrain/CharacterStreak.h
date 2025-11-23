@@ -1,7 +1,6 @@
 #pragma once
-#include "matrixrain/Math.h"
-#include "matrixrain/CharacterInstance.h"
-#include <vector>
+#include "MatrixRain/Math.h"
+#include "MatrixRain/CharacterInstance.h"
 
 namespace MatrixRain
 {

@@ -1,6 +1,6 @@
 #include "pch.h"
-#include "matrixrain/Application.h"
-#include "matrixrain/ApplicationState.h"
+#include "MatrixRain/Application.h"
+#include "MatrixRain/ApplicationState.h"
 
 using namespace Microsoft::VisualStudio::CppUnitTestFramework;
 using namespace MatrixRain;

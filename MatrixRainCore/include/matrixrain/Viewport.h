@@ -1,5 +1,5 @@
 #pragma once
-#include "matrixrain/Math.h"
+#include "MatrixRain/Math.h"
 
 namespace MatrixRain
 {

@@ -1,12 +1,8 @@
 #pragma once
-#include "matrixrain/AnimationSystem.h"
-#include "matrixrain/CharacterSet.h"
-#include "matrixrain/Viewport.h"
-#include "matrixrain/ColorScheme.h"
-#include <d3d11.h>
-#include <d2d1_1.h>
-#include <dwrite.h>
-#include <wrl/client.h>
+#include "MatrixRain/AnimationSystem.h"
+#include "MatrixRain/CharacterSet.h"
+#include "MatrixRain/Viewport.h"
+#include "MatrixRain/ColorScheme.h"
 
 namespace MatrixRain
 {

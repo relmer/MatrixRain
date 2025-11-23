@@ -1,6 +1,6 @@
 #include "pch.h"
 #include "CppUnitTest.h"
-#include "matrixrain/FPSCounter.h"
+#include "MatrixRain/FPSCounter.h"
 #include <thread>
 #include <chrono>
 

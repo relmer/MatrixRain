@@ -1,5 +1,5 @@
 #include "pch.h"
-#include "matrixrain/Application.h"
+#include "MatrixRain/Application.h"
 
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
                       _In_opt_ HINSTANCE hPrevInstance,

@@ -1,13 +1,13 @@
 #include "pch.h"
-#include "matrixrain/CharacterSet.h"
-#include "matrixrain/CharacterConstants.h"
-#include <random>
-#include <d3d11.h>
-#include <d2d1.h>
-#include <dwrite.h>
-#include <wrl/client.h>
+
+#include "MatrixRain/CharacterSet.h"
+#include "MatrixRain/CharacterConstants.h"
 
 using Microsoft::WRL::ComPtr;
+
+
+
+
 
 namespace MatrixRain
 {

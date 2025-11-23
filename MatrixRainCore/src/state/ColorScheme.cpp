@@ -1,5 +1,5 @@
 #include "pch.h"
-#include "matrixrain/ColorScheme.h"
+#include "MatrixRain/ColorScheme.h"
 
 namespace MatrixRain
 {

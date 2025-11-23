@@ -1,6 +1,6 @@
 #include "pch.h"
-#include "matrixrain/DensityController.h"
-#include <algorithm>
+
+#include "MatrixRain/DensityController.h"
 
 namespace MatrixRain
 {

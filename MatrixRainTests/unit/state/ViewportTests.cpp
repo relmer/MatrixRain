@@ -1,6 +1,6 @@
 #include "pch.h"
-#include "matrixrain/Viewport.h"
-#include "matrixrain/Math.h"
+#include "MatrixRain/Viewport.h"
+#include "MatrixRain/Math.h"
 
 using namespace Microsoft::VisualStudio::CppUnitTestFramework;
 using namespace MatrixRain;

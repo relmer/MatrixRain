@@ -1,5 +1,5 @@
 #include "pch.h"
-#include "matrixrain/CharacterInstance.h"
+#include "MatrixRain/CharacterInstance.h"
 
 namespace MatrixRain
 {

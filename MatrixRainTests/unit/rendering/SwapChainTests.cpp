@@ -1,5 +1,5 @@
 #include "pch.h"
-#include "matrixrain/RenderSystem.h"
+#include "MatrixRain/RenderSystem.h"
 
 using namespace Microsoft::VisualStudio::CppUnitTestFramework;
 using namespace MatrixRain;

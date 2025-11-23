@@ -1,8 +1,8 @@
 #include "pch.h"
 #include "CppUnitTest.h"
-#include "matrixrain/AnimationSystem.h"
-#include "matrixrain/Viewport.h"
-#include "matrixrain/CharacterSet.h"
+#include "MatrixRain/AnimationSystem.h"
+#include "MatrixRain/Viewport.h"
+#include "MatrixRain/CharacterSet.h"
 
 using namespace Microsoft::VisualStudio::CppUnitTestFramework;
 

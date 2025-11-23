@@ -1,17 +1,13 @@
 #include "pch.h"
-#include "matrixrain/RenderSystem.h"
-#include "matrixrain/CharacterSet.h"
-#include "matrixrain/ColorScheme.h"
-#include <d3dcompiler.h>
-#include <d2d1_1.h>
-#include <dwrite.h>
-#include <algorithm>
 
-#pragma comment(lib, "d3d11.lib")
-#pragma comment(lib, "dxgi.lib")
-#pragma comment(lib, "d3dcompiler.lib")
-#pragma comment(lib, "d2d1.lib")
-#pragma comment(lib, "dwrite.lib")
+#include "MatrixRain/RenderSystem.h"
+
+#include "MatrixRain/CharacterSet.h"
+#include "MatrixRain/ColorScheme.h"
+
+
+
+
 
 namespace MatrixRain
 {

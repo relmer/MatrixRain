@@ -1,7 +1,11 @@
 #include "pch.h"
-#include "matrixrain/AnimationSystem.h"
-#include "matrixrain/DensityController.h"
-#include <random>
+
+#include "MatrixRain/AnimationSystem.h"
+#include "MatrixRain/DensityController.h"
+
+
+
+
 
 namespace MatrixRain
 {

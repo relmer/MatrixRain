@@ -1,7 +1,11 @@
 #include "pch.h"
-#include "matrixrain/CharacterStreak.h"
-#include "matrixrain/CharacterSet.h"
-#include <random>
+
+#include "MatrixRain/CharacterStreak.h"
+#include "MatrixRain/CharacterSet.h"
+
+
+
+
 
 namespace MatrixRain
 {

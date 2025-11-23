@@ -1,5 +1,5 @@
 #pragma once
-#include "matrixrain/ColorScheme.h"
+#include "MatrixRain/ColorScheme.h"
 
 namespace MatrixRain
 {

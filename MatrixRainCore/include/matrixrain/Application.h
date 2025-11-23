@@ -1,8 +1,5 @@
 #pragma once
 
-#include <Windows.h>
-#include <memory>
-
 namespace MatrixRain
 {
     class AnimationSystem;

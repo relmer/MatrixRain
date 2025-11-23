@@ -1,8 +1,6 @@
 #pragma once
-#include "matrixrain/CharacterStreak.h"
-#include "matrixrain/Viewport.h"
-#include <vector>
-#include <memory>
+#include "MatrixRain/CharacterStreak.h"
+#include "MatrixRain/Viewport.h"
 
 namespace MatrixRain
 {

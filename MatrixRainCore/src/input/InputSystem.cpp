@@ -1,5 +1,5 @@
 #include "pch.h"
-#include "matrixrain/InputSystem.h"
+#include "MatrixRain/InputSystem.h"
 
 namespace MatrixRain
 {
