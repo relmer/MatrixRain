@@ -250,8 +250,8 @@
 
 ### Tests for Additional Controls (TDD - Write FIRST)
 
-- [ ] T135 [P] Test window centering on primary monitor at startup in MatrixRainTests/unit/ui/WindowTests.cpp
-- [ ] T136 [P] Test WM_NCHITTEST handling for borderless window drag in MatrixRainTests/unit/ui/WindowTests.cpp
+- [x] T135 [P] Test window centering on primary monitor at startup in MatrixRainTests/unit/ui/WindowTests.cpp (RETROACTIVE - written after T141 implementation)
+- [x] T136 [P] Test WM_NCHITTEST handling for borderless window drag in MatrixRainTests/unit/ui/WindowTests.cpp (RETROACTIVE - written after T142 implementation)
 - [ ] T137 [P] Test ESC key handling for application exit in MatrixRainTests/unit/input/InputSystemTests.cpp
 - [ ] T138 [P] Test Space key handling for pause/resume in MatrixRainTests/unit/input/InputSystemTests.cpp
 - [ ] T139 [P] Test pause state freezes animation updates in MatrixRainTests/unit/animation/AnimationSystemTests.cpp

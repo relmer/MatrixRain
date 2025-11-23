@@ -43,9 +43,10 @@ namespace MatrixRain
         m_streaks.clear();
         m_spawnTimer = 0.0f;
         
-        // Spawn initial set of streaks based on density controller
-        int targetStreaks = densityController.GetTargetStreakCount();
-        for (int i = 0; i < targetStreaks; i++)
+        // Spawn small initial set - let automatic spawn logic reach target density over time
+        // This prevents overwhelming the screen at startup
+        size_t initialStreaks = 15;
+        for (size_t i = 0; i < initialStreaks; i++)
         {
             SpawnStreak();
         }
