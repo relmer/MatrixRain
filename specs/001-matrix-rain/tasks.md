@@ -259,8 +259,8 @@
 
 ### Implementation for Additional Controls
 
-- [ ] T141 [P] Implement window centering in Application::Initialize in MatrixRainCore/src/Application.cpp using GetSystemMetrics for screen dimensions
-- [ ] T142 [P] Implement WM_NCHITTEST handler in window procedure to return HTCAPTION for client area drag in MatrixRainCore/src/Application.cpp
+- [x] T141 [P] Implement window centering in Application::Initialize in MatrixRainCore/src/Application.cpp using GetSystemMetrics for screen dimensions (COMPLETED - FR-022)
+- [x] T142 [P] Implement WM_NCHITTEST handler in window procedure to return HTCAPTION for client area drag in MatrixRainCore/src/Application.cpp (COMPLETED - FR-021)
 - [ ] T143 [P] Add ESC key handler (VK_ESCAPE) in InputSystem::ProcessKeyDown to call Application::Shutdown in MatrixRainCore/src/input/InputSystem.cpp
 - [ ] T144 [P] Add Space key handler (VK_SPACE) in InputSystem::ProcessKeyDown to toggle pause state in MatrixRainCore/src/input/InputSystem.cpp
 - [ ] T145 [P] Add pause state flag to ApplicationState class in MatrixRainCore/include/matrixrain/ApplicationState.h
@@ -300,6 +300,40 @@
 - [ ] T170 Run through quickstart.md validation on clean machine
 - [ ] T171 Final smoke test of all user stories plus new controls (window drag, pause, ESC)
 - [ ] T172 Commit discipline audit - verify one task per commit, all builds passing
+
+---
+
+## Phase 8: Enhanced User Experience Features
+
+**Purpose**: Additional visual feedback and customization options
+
+### Tests for Enhanced Features (TDD - Write FIRST)
+
+- [ ] T173 [P] Test FPSCounter initialization and update logic in MatrixRainTests/unit/ui/FPSCounterTests.cpp
+- [ ] T174 [P] Test FPSCounter calculates average FPS over 1-second window in MatrixRainTests/unit/ui/FPSCounterTests.cpp
+- [ ] T175 [P] Test ColorScheme enum values (Green, Blue, Red, Amber) in MatrixRainTests/unit/state/ColorSchemeTests.cpp
+- [ ] T176 [P] Test ColorScheme cycling Green→Blue→Red→Amber→Green in MatrixRainTests/unit/state/ColorSchemeTests.cpp
+- [ ] T177 [P] Test InputSystem keyboard event processing for VK_C (color cycle) in MatrixRainTests/unit/input/InputSystemTests.cpp
+- [ ] T178 [P] Test color scheme RGB values: Green(0,255,100), Blue(0,100,255), Red(255,50,50), Amber(255,191,0) in MatrixRainTests/unit/state/ColorSchemeTests.cpp
+
+### Implementation for Enhanced Features
+
+- [ ] T179 [P] Create FPSCounter class in MatrixRainCore/include/matrixrain/FPSCounter.h with frame time tracking and averaging
+- [ ] T180 Implement FPSCounter::Update in MatrixRainCore/src/ui/FPSCounter.cpp to calculate rolling average FPS over 1-second window
+- [ ] T181 Implement FPSCounter::GetFPS in MatrixRainCore/src/ui/FPSCounter.cpp to return current FPS value
+- [ ] T182 [P] Create ColorScheme enum in MatrixRainCore/include/matrixrain/ColorScheme.h with Green, Blue, Red, Amber values
+- [ ] T183 [P] Add GetColorRGB helper function in MatrixRainCore/src/state/ColorScheme.cpp returning RGB values for each scheme
+- [ ] T184 Add ColorScheme member to ApplicationState in MatrixRainCore/include/matrixrain/ApplicationState.h with default Green
+- [ ] T185 Implement ApplicationState::CycleColorScheme in MatrixRainCore/src/state/ApplicationState.cpp to advance through color sequence
+- [ ] T186 Add VK_C key handler in InputSystem::ProcessKeyDown to call ApplicationState::CycleColorScheme in MatrixRainCore/src/input/InputSystem.cpp
+- [ ] T187 Wire FPSCounter to Application class in MatrixRainCore/src/Application.cpp, update per frame
+- [ ] T188 Implement FPS text rendering in RenderSystem::Render in MatrixRainCore/src/rendering/RenderSystem.cpp at bottom-right corner using Direct2D/DirectWrite
+- [ ] T189 Update CharacterInstance color calculation to use current ColorScheme from ApplicationState in MatrixRainCore/src/animation/CharacterInstance.cpp
+- [ ] T190 Update pixel shader to use dynamic color from constant buffer instead of hardcoded green in MatrixRainCore/src/rendering/RenderSystem.cpp
+- [ ] T191 Verify integration test for color cycling in MatrixRainTests/integration/ColorCycleTests.cpp
+- [ ] T192 Verify FPS counter displays and updates correctly in MatrixRainTests/integration/FPSDisplayTests.cpp
+
+**Checkpoint**: Enhanced UX features complete - users see FPS counter and can cycle colors with C key, window starts centered and is draggable
 
 ---
 

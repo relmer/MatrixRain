@@ -55,6 +55,10 @@ namespace MatrixRain
         // Create orthographic projection matrix
         // Parameters: left, right, bottom, top, nearZ, farZ
         static Matrix4x4 CreateOrthographic(float left, float right, float bottom, float top, float nearZ, float farZ);
+        
+        // Create perspective projection matrix
+        // Parameters: fovY (field of view in radians), aspect ratio, near plane, far plane
+        static Matrix4x4 CreatePerspective(float fovY, float aspectRatio, float nearZ, float farZ);
     };
 
     // Math utility functions

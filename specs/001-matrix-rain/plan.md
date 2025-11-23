@@ -21,6 +21,7 @@ Matrix Rain is a real-time visual effect application that renders cascading char
 **Storage**: N/A (no persistent data storage required)  
 **Testing**: Microsoft C++ Native Unit Test Framework (TDD mandatory - tests before implementation)  
 **Target Platform**: Windows 11 with latest SDK (x86-64 only, no Windows 10 support)  
+**Rendering Architecture**: Perspective projection with camera movement (authentic depth perception) combined with variable streak speeds based on Z-position (compound depth effect)  
 **Project Structure**:
 
 - MatrixRainCore.lib (core library - all functionality, 100% test coverage)
