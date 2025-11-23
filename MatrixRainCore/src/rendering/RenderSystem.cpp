@@ -146,6 +146,12 @@ namespace MatrixRain
         swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
 
         hr = dxgiFactory->CreateSwapChain(m_device.Get(), &swapChainDesc, &m_swapChain);
+        if (FAILED(hr)) return false;
+
+        // Disable DXGI's built-in Alt+Enter exclusive fullscreen toggle
+        // We handle fullscreen transitions manually for borderless windowed mode
+        hr = dxgiFactory->MakeWindowAssociation(hwnd, DXGI_MWA_NO_ALT_ENTER);
+        
         return SUCCEEDED(hr);
     }
 

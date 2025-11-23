@@ -126,6 +126,38 @@ namespace MatrixRain
         m_streaks.push_back(streak);
     }
 
+
+
+
+    void AnimationSystem::SpawnStreakInView()
+    {
+        if (!m_viewport)
+        {
+            return; // Not initialized
+        }
+
+        // Random X position across viewport width
+        std::uniform_real_distribution<float> xDist(0.0f, m_viewport->GetWidth());
+        float x = xDist(g_generator);
+
+        // Random Y position WITHIN viewport (0 to height) for immediate visibility
+        std::uniform_real_distribution<float> yDist(0.0f, m_viewport->GetHeight());
+        float y = yDist(g_generator);
+
+        // Random Z depth (0 = near, 100 = far)
+        std::uniform_real_distribution<float> zDist(0.0f, MAX_DEPTH);
+        float z = zDist(g_generator);
+
+        Vector3 position(x, y, z);
+
+        CharacterStreak streak;
+        streak.Spawn(position);
+        m_streaks.push_back(streak);
+    }
+
+
+
+
     void AnimationSystem::DespawnOffscreenStreaks()
     {
         if (!m_viewport)
@@ -169,4 +201,25 @@ namespace MatrixRain
             streak.SetPosition(position);
         }
     }
+
+
+
+
+    void AnimationSystem::RescaleStreaksForViewport(float oldWidth, float newWidth)
+    {
+        if (oldWidth <= 0.0f || newWidth <= 0.0f)
+        {
+            return;
+        }
+
+        float scaleRatio = newWidth / oldWidth;
+
+        for (CharacterStreak& streak : m_streaks)
+        {
+            Vector3 position = streak.GetPosition();
+            position.x *= scaleRatio;
+            streak.SetPosition(position);
+        }
+    }
 }
+

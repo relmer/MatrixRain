@@ -311,14 +311,27 @@ namespace MatrixRain
                 m_appState->CycleColorScheme();
                 return 0;
             }
-            else if (m_inputSystem && m_inputSystem->IsAltEnterPressed(static_cast<int>(wParam)))
+            else if (m_inputSystem)
+            {
+                // Process density control keys (+/- on both numpad and main keyboard)
+                m_inputSystem->ProcessKeyDown(static_cast<int>(wParam));
+                return 0;
+            }
+            break;
+
+        case WM_SYSKEYDOWN:
+            // Handle Alt+key combinations (Alt causes SYSKEYDOWN instead of KEYDOWN)
+            if (m_inputSystem && m_inputSystem->IsAltEnterPressed(static_cast<int>(wParam)))
             {
                 // Alt+Enter pressed - toggle display mode
-                if (m_appState && m_renderSystem && m_viewport)
+                if (m_appState && m_renderSystem && m_viewport && m_animationSystem)
                 {
                     m_inDisplayModeTransition = true;
                     m_appState->ToggleDisplayMode();
                     DisplayMode newMode = m_appState->GetDisplayMode();
+                    
+                    // Save old viewport width for rescaling streaks
+                    float oldWidth = m_viewport->GetWidth();
                     
                     if (newMode == DisplayMode::Fullscreen)
                     {
@@ -332,6 +345,11 @@ namespace MatrixRain
                         
                         m_viewport->Resize(static_cast<float>(screenWidth), static_cast<float>(screenHeight));
                         m_renderSystem->Resize(screenWidth, screenHeight);
+                        
+                        // Rescale existing streaks to fill new viewport width
+                        // Note: We don't spawn additional streaks here to avoid creating visible "waves"
+                        // The density controller will naturally spawn new streaks to fill the space over time
+                        m_animationSystem->RescaleStreaksForViewport(oldWidth, static_cast<float>(screenWidth));
                     }
                     else
                     {
@@ -349,6 +367,9 @@ namespace MatrixRain
                         
                         m_viewport->Resize(static_cast<float>(windowWidth), static_cast<float>(windowHeight));
                         m_renderSystem->Resize(windowWidth, windowHeight);
+                        
+                        // Rescale existing streaks to fit new viewport width (no new spawning when shrinking)
+                        m_animationSystem->RescaleStreaksForViewport(oldWidth, static_cast<float>(windowWidth));
                     }
                     m_inDisplayModeTransition = false;
                     
@@ -358,15 +379,9 @@ namespace MatrixRain
                         m_timer->Reset();
                     }
                 }
-                return 0;
+                return 0;  // Handled Alt+Enter
             }
-            else if (m_inputSystem)
-            {
-                // Process density control keys (+/- on both numpad and main keyboard)
-                m_inputSystem->ProcessKeyDown(static_cast<int>(wParam));
-                return 0;
-            }
-            break;
+            break;  // Let other Alt+key combinations pass through
 
         case WM_SIZE:
         {

@@ -45,6 +45,14 @@ namespace MatrixRain
         void SpawnStreak();
 
         /// <summary>
+        /// Spawn a streak at a random position within the viewport (for filling on resize).
+        /// X: random across viewport width
+        /// Y: random within viewport height (0 to height)
+        /// Z: random depth between 0 and 100
+        /// </summary>
+        void SpawnStreakInView();
+
+        /// <summary>
         /// Remove streaks that have moved completely off screen.
         /// </summary>
         void DespawnOffscreenStreaks();
@@ -55,6 +63,14 @@ namespace MatrixRain
         /// </summary>
         /// <param name="deltaTime">Time elapsed since last frame in seconds</param>
         void ApplyZoom(float deltaTime);
+
+        /// <summary>
+        /// Rescale streak positions when viewport size changes.
+        /// Proportionally adjusts X positions to match new viewport width.
+        /// </summary>
+        /// <param name="oldWidth">Previous viewport width</param>
+        /// <param name="newWidth">New viewport width</param>
+        void RescaleStreaksForViewport(float oldWidth, float newWidth);
 
         // Accessors
         const std::vector<CharacterStreak>& GetStreaks() const { return m_streaks; }

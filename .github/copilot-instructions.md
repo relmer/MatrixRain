@@ -545,9 +545,10 @@ namespace fs = std::filesystem;  // OK for heavy filesystem usage in this file
 
 ### MSBuild Location
 - **ALWAYS** use the full path to MSBuild.exe on this machine:
-  - `C:\Program Files\Microsoft Visual Studio\18\Insiders\MSBuild\Current\Bin\MSBuild.exe`
+  - `C:\Program Files\Microsoft Visual Studio\18\Enterprise\MSBuild\Current\Bin\MSBuild.exe`
 - **NEVER** assume `msbuild` is in PATH
 - Use this exact path for all build commands
+- **CRITICAL**: This path is Enterprise edition, NOT Insiders - use it exactly as specified
 
 ### Build Integration
 - Always run build after making changes
