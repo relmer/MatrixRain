@@ -46,6 +46,7 @@ namespace MatrixRain
         HINSTANCE m_hInstance;
         bool m_isRunning;
         bool m_isPaused;
+        bool m_inDisplayModeTransition;
 
         // Internal methods
         bool CreateApplicationWindow(int nCmdShow);

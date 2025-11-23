@@ -703,9 +703,19 @@ namespace MatrixRain
         // Release render target view and D2D bitmap
         m_renderTargetView.Reset();
         m_d2dBitmap.Reset();
+        
+        // CRITICAL: Clear D2D target before resizing
+        if (m_d2dContext)
+        {
+            m_d2dContext->SetTarget(nullptr);
+        }
 
         // Resize swap chain buffers
-        m_swapChain->ResizeBuffers(0, width, height, DXGI_FORMAT_UNKNOWN, 0);
+        HRESULT hr = m_swapChain->ResizeBuffers(0, width, height, DXGI_FORMAT_UNKNOWN, 0);
+        if (FAILED(hr))
+        {
+            return; // Failed to resize
+        }
 
         // Recreate render target view
         CreateRenderTargetView();
@@ -714,12 +724,12 @@ namespace MatrixRain
         if (m_d2dContext)
         {
             Microsoft::WRL::ComPtr<ID3D11Texture2D> backBuffer;
-            HRESULT hr = m_swapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), &backBuffer);
-            if (SUCCEEDED(hr))
+            HRESULT hrBackBuffer = m_swapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), &backBuffer);
+            if (SUCCEEDED(hrBackBuffer))
             {
                 Microsoft::WRL::ComPtr<IDXGISurface> dxgiSurface;
-                hr = backBuffer.As(&dxgiSurface);
-                if (SUCCEEDED(hr))
+                hrBackBuffer = backBuffer.As(&dxgiSurface);
+                if (SUCCEEDED(hrBackBuffer))
                 {
                     D2D1_BITMAP_PROPERTIES1 bitmapProps = D2D1::BitmapProperties1(
                         D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW,
@@ -774,8 +784,9 @@ namespace MatrixRain
 
     bool RenderSystem::RecreateSwapChain(HWND hwnd, UINT width, UINT height, bool fullscreen)
     {
-        // Release render target view before recreating swap chain
+        // Release render target view and D2D bitmap before recreating swap chain
         m_renderTargetView.Reset();
+        m_d2dBitmap.Reset();
 
         // Release the old swap chain
         m_swapChain.Reset();
@@ -801,6 +812,28 @@ namespace MatrixRain
         if (!CreateRenderTargetView())
         {
             return false;
+        }
+
+        // Recreate D2D bitmap for the new back buffer
+        if (m_d2dContext)
+        {
+            Microsoft::WRL::ComPtr<ID3D11Texture2D> backBuffer;
+            HRESULT hr = m_swapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), &backBuffer);
+            if (SUCCEEDED(hr))
+            {
+                Microsoft::WRL::ComPtr<IDXGISurface> dxgiSurface;
+                hr = backBuffer.As(&dxgiSurface);
+                if (SUCCEEDED(hr))
+                {
+                    D2D1_BITMAP_PROPERTIES1 bitmapProps = D2D1::BitmapProperties1(
+                        D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW,
+                        D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED)
+                    );
+
+                    m_d2dContext->CreateBitmapFromDxgiSurface(dxgiSurface.Get(), &bitmapProps, &m_d2dBitmap);
+                    m_d2dContext->SetTarget(m_d2dBitmap.Get());
+                }
+            }
         }
 
         // Resize viewport to match new dimensions

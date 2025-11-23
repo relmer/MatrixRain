@@ -17,6 +17,7 @@ namespace MatrixRain
         , m_hInstance(nullptr)
         , m_isRunning(false)
         , m_isPaused(false)
+        , m_inDisplayModeTransition(false)
     {
     }
 
@@ -200,6 +201,12 @@ namespace MatrixRain
             float deltaTime = static_cast<float>(m_timer->GetElapsedSeconds());
             m_timer->Reset();
 
+            // Skip updates/rendering during display mode transitions
+            if (m_inDisplayModeTransition)
+            {
+                continue;
+            }
+
             // Update FPS counter
             if (m_fpsCounter)
             {
@@ -309,6 +316,7 @@ namespace MatrixRain
                 // Alt+Enter pressed - toggle display mode
                 if (m_appState && m_renderSystem && m_viewport)
                 {
+                    m_inDisplayModeTransition = true;
                     m_appState->ToggleDisplayMode();
                     DisplayMode newMode = m_appState->GetDisplayMode();
                     
@@ -342,6 +350,13 @@ namespace MatrixRain
                         m_viewport->Resize(static_cast<float>(windowWidth), static_cast<float>(windowHeight));
                         m_renderSystem->Resize(windowWidth, windowHeight);
                     }
+                    m_inDisplayModeTransition = false;
+                    
+                    // Reset timer to prevent accumulated deltaTime from causing animation jump
+                    if (m_timer)
+                    {
+                        m_timer->Reset();
+                    }
                 }
                 return 0;
             }
@@ -355,6 +370,12 @@ namespace MatrixRain
 
         case WM_SIZE:
         {
+            // Skip redundant resize if we're in the middle of a display mode transition
+            if (m_inDisplayModeTransition)
+            {
+                return 0;
+            }
+            
             UINT width = LOWORD(lParam);
             UINT height = HIWORD(lParam);
             
