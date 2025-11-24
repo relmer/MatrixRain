@@ -613,7 +613,11 @@ namespace MatrixRain
 
             float4 main(PSInput input) : SV_TARGET
             {
-                float2 texelSize = float2(1.0 / 960.0, 1.0 / 540.0);
+                // Get texture dimensions dynamically
+                uint width, height;
+                inputTexture.GetDimensions(width, height);
+                float2 texelSize = float2(1.0 / width, 1.0 / height);
+                
                 float4 color = float4(0, 0, 0, 0);
                 
                 // 13-tap Gaussian blur for wider spread (horizontal)
@@ -641,7 +645,11 @@ namespace MatrixRain
 
             float4 main(PSInput input) : SV_TARGET
             {
-                float2 texelSize = float2(1.0 / 960.0, 1.0 / 540.0);
+                // Get texture dimensions dynamically
+                uint width, height;
+                inputTexture.GetDimensions(width, height);
+                float2 texelSize = float2(1.0 / width, 1.0 / height);
+                
                 float4 color = float4(0, 0, 0, 0);
                 
                 // 13-tap Gaussian blur for wider spread (vertical)
@@ -1149,6 +1157,17 @@ namespace MatrixRain
             return;
         }
 
+        // Release bloom resources before resizing - they need to be recreated with new dimensions
+        m_sceneSRV.Reset();
+        m_sceneRTV.Reset();
+        m_sceneTexture.Reset();
+        m_bloomSRV.Reset();
+        m_bloomRTV.Reset();
+        m_bloomTexture.Reset();
+        m_blurTempSRV.Reset();
+        m_blurTempRTV.Reset();
+        m_blurTempTexture.Reset();
+
         // Release render target view and D2D bitmap
         m_renderTargetView.Reset();
         m_d2dBitmap.Reset();
@@ -1190,6 +1209,9 @@ namespace MatrixRain
                 }
             }
         }
+
+        // Recreate bloom resources with new dimensions
+        CreateBloomResources(width, height);
 
         // Update viewport
         D3D11_VIEWPORT viewport = {};
