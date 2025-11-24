@@ -704,8 +704,8 @@ namespace MatrixRain
                 float4 scene = sceneTexture.Sample(samplerState, input.uv);
                 float4 bloom = bloomTexture.Sample(samplerState, input.uv);
                 
-                // Additive blend with moderate bloom intensity
-                return scene + bloom * 1.5;
+                // Additive blend with increased bloom intensity for stronger glow
+                return scene + bloom * 2.5;
             }
         )";
 
