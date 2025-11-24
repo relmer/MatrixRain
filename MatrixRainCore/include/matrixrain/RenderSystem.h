@@ -88,18 +88,36 @@ namespace MatrixRain
         bool CreateBlendState();
         bool CreateSamplerState();
         bool CreateDirect2DResources();
+        bool CreateBloomResources(UINT width, UINT height);
 
         // Rendering helpers
         void SortStreaksByDepth(std::vector<const CharacterStreak*>& streaks);
         void UpdateInstanceBuffer(const AnimationSystem& animationSystem, ColorScheme colorScheme);
         void ClearRenderTarget();
         void RenderFPSCounter(float fps);
+        void ApplyBloom();
 
         // DirectX resources
         Microsoft::WRL::ComPtr<ID3D11Device> m_device;
         Microsoft::WRL::ComPtr<ID3D11DeviceContext> m_context;
         Microsoft::WRL::ComPtr<IDXGISwapChain> m_swapChain;
         Microsoft::WRL::ComPtr<ID3D11RenderTargetView> m_renderTargetView;
+
+        // Bloom post-processing resources
+        Microsoft::WRL::ComPtr<ID3D11Texture2D> m_sceneTexture;
+        Microsoft::WRL::ComPtr<ID3D11RenderTargetView> m_sceneRTV;
+        Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_sceneSRV;
+        Microsoft::WRL::ComPtr<ID3D11Texture2D> m_bloomTexture;
+        Microsoft::WRL::ComPtr<ID3D11RenderTargetView> m_bloomRTV;
+        Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_bloomSRV;
+        Microsoft::WRL::ComPtr<ID3D11Texture2D> m_blurTempTexture;
+        Microsoft::WRL::ComPtr<ID3D11RenderTargetView> m_blurTempRTV;
+        Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_blurTempSRV;
+        Microsoft::WRL::ComPtr<ID3D11PixelShader> m_bloomExtractPS;
+        Microsoft::WRL::ComPtr<ID3D11PixelShader> m_blurHorizontalPS;
+        Microsoft::WRL::ComPtr<ID3D11PixelShader> m_blurVerticalPS;
+        Microsoft::WRL::ComPtr<ID3D11PixelShader> m_compositePS;
+        Microsoft::WRL::ComPtr<ID3D11Buffer> m_fullscreenQuadVB;
 
         // Direct2D/DirectWrite resources for FPS display
         Microsoft::WRL::ComPtr<ID2D1Factory1> m_d2dFactory;
@@ -114,6 +132,8 @@ namespace MatrixRain
         Microsoft::WRL::ComPtr<ID3D11VertexShader> m_vertexShader;
         Microsoft::WRL::ComPtr<ID3D11PixelShader> m_pixelShader;
         Microsoft::WRL::ComPtr<ID3D11InputLayout> m_inputLayout;
+        Microsoft::WRL::ComPtr<ID3D11InputLayout> m_fullscreenQuadInputLayout;
+        Microsoft::WRL::ComPtr<ID3D11VertexShader> m_fullscreenQuadVS;
 
         // Buffers
         Microsoft::WRL::ComPtr<ID3D11Buffer> m_instanceBuffer;
@@ -126,6 +146,10 @@ namespace MatrixRain
 
         // Texture atlas reference
         Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_atlasTextureSRV;
+
+        // Render target dimensions
+        UINT m_renderWidth;
+        UINT m_renderHeight;
 
         static constexpr UINT INITIAL_INSTANCE_CAPACITY = 10000; // Max characters per frame
     };

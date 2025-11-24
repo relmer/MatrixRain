@@ -13,6 +13,8 @@ namespace MatrixRain
 {
     RenderSystem::RenderSystem()
         : m_instanceBufferCapacity(INITIAL_INSTANCE_CAPACITY)
+        , m_renderWidth(0)
+        , m_renderHeight(0)
     {
     }
 
@@ -23,6 +25,10 @@ namespace MatrixRain
 
     bool RenderSystem::Initialize(HWND hwnd, UINT width, UINT height)
     {
+        // Store dimensions for viewport and render target sizing
+        m_renderWidth = width;
+        m_renderHeight = height;
+        
         if (!CreateDevice())
         {
             return false;
@@ -64,6 +70,11 @@ namespace MatrixRain
         }
 
         if (!CreateDirect2DResources())
+        {
+            return false;
+        }
+
+        if (!CreateBloomResources(width, height))
         {
             return false;
         }
@@ -473,6 +484,404 @@ namespace MatrixRain
         return true;
     }
 
+
+
+
+    bool RenderSystem::CreateBloomResources(UINT width, UINT height)
+    {
+        HRESULT hr;
+
+        // Safety check - don't create bloom resources with invalid dimensions
+        if (width == 0 || height == 0)
+        {
+            OutputDebugStringA("CreateBloomResources: Invalid dimensions (0x0), skipping bloom\n");
+            return true; // Return true to not fail initialization, just skip bloom
+        }
+
+        OutputDebugStringA("CreateBloomResources: Starting...\n");
+
+        // Create scene render target (full resolution)
+        D3D11_TEXTURE2D_DESC sceneTexDesc = {};
+        sceneTexDesc.Width = width;
+        sceneTexDesc.Height = height;
+        sceneTexDesc.MipLevels = 1;
+        sceneTexDesc.ArraySize = 1;
+        sceneTexDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+        sceneTexDesc.SampleDesc.Count = 1;
+        sceneTexDesc.Usage = D3D11_USAGE_DEFAULT;
+        sceneTexDesc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
+
+        hr = m_device->CreateTexture2D(&sceneTexDesc, nullptr, &m_sceneTexture);
+        if (FAILED(hr)) { OutputDebugStringA("FAILED: CreateTexture2D for scene\n"); return false; }
+
+        hr = m_device->CreateRenderTargetView(m_sceneTexture.Get(), nullptr, &m_sceneRTV);
+        if (FAILED(hr)) { OutputDebugStringA("FAILED: CreateRenderTargetView for scene\n"); return false; }
+
+        hr = m_device->CreateShaderResourceView(m_sceneTexture.Get(), nullptr, &m_sceneSRV);
+        if (FAILED(hr)) { OutputDebugStringA("FAILED: CreateShaderResourceView for scene\n"); return false; }
+
+        // Create bloom extraction texture (half resolution for performance)
+        UINT bloomWidth = width / 2;
+        UINT bloomHeight = height / 2;
+
+        D3D11_TEXTURE2D_DESC texDesc = {};
+        texDesc.Width = bloomWidth;
+        texDesc.Height = bloomHeight;
+        texDesc.MipLevels = 1;
+        texDesc.ArraySize = 1;
+        texDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+        texDesc.SampleDesc.Count = 1;
+        texDesc.Usage = D3D11_USAGE_DEFAULT;
+        texDesc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
+
+        hr = m_device->CreateTexture2D(&texDesc, nullptr, &m_bloomTexture);
+        if (FAILED(hr)) return false;
+
+        hr = m_device->CreateRenderTargetView(m_bloomTexture.Get(), nullptr, &m_bloomRTV);
+        if (FAILED(hr)) return false;
+
+        hr = m_device->CreateShaderResourceView(m_bloomTexture.Get(), nullptr, &m_bloomSRV);
+        if (FAILED(hr)) return false;
+
+        // Create temporary blur texture (same size as bloom)
+        hr = m_device->CreateTexture2D(&texDesc, nullptr, &m_blurTempTexture);
+        if (FAILED(hr)) return false;
+
+        hr = m_device->CreateRenderTargetView(m_blurTempTexture.Get(), nullptr, &m_blurTempRTV);
+        if (FAILED(hr)) return false;
+
+        hr = m_device->CreateShaderResourceView(m_blurTempTexture.Get(), nullptr, &m_blurTempSRV);
+        if (FAILED(hr)) return false;
+
+        // Shader compilation resources
+        Microsoft::WRL::ComPtr<ID3DBlob> vsBlob;
+        Microsoft::WRL::ComPtr<ID3DBlob> psBlob;
+        Microsoft::WRL::ComPtr<ID3DBlob> errorBlob;
+
+        // Compile fullscreen quad vertex shader
+        const char* quadVSSource = R"(
+            struct VSInput
+            {
+                float3 position : POSITION;
+                float2 uv : TEXCOORD;
+            };
+
+            struct PSInput
+            {
+                float4 position : SV_POSITION;
+                float2 uv : TEXCOORD;
+            };
+
+            PSInput main(VSInput input)
+            {
+                PSInput output;
+                output.position = float4(input.position, 1.0);
+                output.uv = input.uv;
+                return output;
+            }
+        )";
+
+        
+        hr = D3DCompile(quadVSSource, strlen(quadVSSource), "QuadVS", nullptr, nullptr,
+            "main", "vs_5_0", D3DCOMPILE_ENABLE_STRICTNESS, 0, &vsBlob, &errorBlob);
+        if (FAILED(hr))
+        {
+            if (errorBlob) OutputDebugStringA((char*)errorBlob->GetBufferPointer());
+            return false;
+        }
+        hr = m_device->CreateVertexShader(vsBlob->GetBufferPointer(), vsBlob->GetBufferSize(), nullptr, &m_fullscreenQuadVS);
+        if (FAILED(hr)) return false;
+
+        // Create input layout for fullscreen quad
+        D3D11_INPUT_ELEMENT_DESC quadLayoutDesc[] = {
+            { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+            { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0 }
+        };
+        hr = m_device->CreateInputLayout(quadLayoutDesc, 2, vsBlob->GetBufferPointer(), vsBlob->GetBufferSize(), &m_fullscreenQuadInputLayout);
+        if (FAILED(hr)) return false;
+
+        // Compile horizontal blur shader
+        const char* blurHSource = R"(
+            Texture2D inputTexture : register(t0);
+            SamplerState samplerState : register(s0);
+
+            struct PSInput
+            {
+                float4 position : SV_POSITION;
+                float2 uv : TEXCOORD;
+            };
+
+            float4 main(PSInput input) : SV_TARGET
+            {
+                float2 texelSize = float2(1.0 / 960.0, 1.0 / 540.0);
+                float4 color = float4(0, 0, 0, 0);
+                
+                // 13-tap Gaussian blur for wider spread (horizontal)
+                float weights[13] = { 0.02, 0.04, 0.06, 0.08, 0.10, 0.12, 0.16, 0.12, 0.10, 0.08, 0.06, 0.04, 0.02 };
+                for (int i = -6; i <= 6; i++)
+                {
+                    float2 offset = float2(i * texelSize.x, 0);
+                    color += inputTexture.Sample(samplerState, input.uv + offset) * weights[i + 6];
+                }
+                
+                return color;
+            }
+        )";
+
+        // Compile vertical blur shader
+        const char* blurVSource = R"(
+            Texture2D inputTexture : register(t0);
+            SamplerState samplerState : register(s0);
+
+            struct PSInput
+            {
+                float4 position : SV_POSITION;
+                float2 uv : TEXCOORD;
+            };
+
+            float4 main(PSInput input) : SV_TARGET
+            {
+                float2 texelSize = float2(1.0 / 960.0, 1.0 / 540.0);
+                float4 color = float4(0, 0, 0, 0);
+                
+                // 13-tap Gaussian blur for wider spread (vertical)
+                float weights[13] = { 0.02, 0.04, 0.06, 0.08, 0.10, 0.12, 0.16, 0.12, 0.10, 0.08, 0.06, 0.04, 0.02 };
+                for (int i = -6; i <= 6; i++)
+                {
+                    float2 offset = float2(0, i * texelSize.y);
+                    color += inputTexture.Sample(samplerState, input.uv + offset) * weights[i + 6];
+                }
+                
+                return color;
+            }
+        )";
+
+        // Compile bloom extraction shader (extract bright pixels only)
+        const char* extractSource = R"(
+            Texture2D inputTexture : register(t0);
+            SamplerState samplerState : register(s0);
+
+            struct PSInput
+            {
+                float4 position : SV_POSITION;
+                float2 uv : TEXCOORD;
+            };
+
+            float4 main(PSInput input) : SV_TARGET
+            {
+                float4 color = inputTexture.Sample(samplerState, input.uv);
+                
+                // Extract only bright pixels (luminance threshold)
+                // Calculate luminance
+                float luminance = dot(color.rgb, float3(0.2126, 0.7152, 0.0722));
+                
+                // Higher threshold to only extract very bright pixels
+                float threshold = 0.6;
+                
+                // Smooth falloff near threshold for gradual bloom
+                float bloomAmount = smoothstep(threshold, threshold + 0.2, luminance);
+                
+                // Return the bright color multiplied by bloom amount
+                // This extracts only bright areas and blacks out dim areas
+                return float4(color.rgb * bloomAmount, 1.0);
+            }
+        )";
+
+        // Compile composite shader
+        const char* compositeSource = R"(
+            Texture2D sceneTexture : register(t0);
+            Texture2D bloomTexture : register(t1);
+            SamplerState samplerState : register(s0);
+
+            struct PSInput
+            {
+                float4 position : SV_POSITION;
+                float2 uv : TEXCOORD;
+            };
+
+            float4 main(PSInput input) : SV_TARGET
+            {
+                float4 scene = sceneTexture.Sample(samplerState, input.uv);
+                float4 bloom = bloomTexture.Sample(samplerState, input.uv);
+                
+                // Additive blend with moderate bloom intensity
+                return scene + bloom * 1.5;
+            }
+        )";
+
+        // Compile bloom extraction shader
+        psBlob.Reset();
+        errorBlob.Reset();
+        hr = D3DCompile(extractSource, strlen(extractSource), "Extract", nullptr, nullptr,
+            "main", "ps_5_0", D3DCOMPILE_ENABLE_STRICTNESS, 0, &psBlob, &errorBlob);
+        if (FAILED(hr))
+        {
+            if (errorBlob) OutputDebugStringA((char*)errorBlob->GetBufferPointer());
+            return false;
+        }
+        hr = m_device->CreatePixelShader(psBlob->GetBufferPointer(), psBlob->GetBufferSize(), nullptr, &m_bloomExtractPS);
+        if (FAILED(hr)) return false;
+
+        // Compile horizontal blur
+        psBlob.Reset();
+        errorBlob.Reset();
+        hr = D3DCompile(blurHSource, strlen(blurHSource), "BlurH", nullptr, nullptr,
+            "main", "ps_5_0", D3DCOMPILE_ENABLE_STRICTNESS, 0, &psBlob, &errorBlob);
+        if (FAILED(hr))
+        {
+            if (errorBlob) OutputDebugStringA((char*)errorBlob->GetBufferPointer());
+            return false;
+        }
+        hr = m_device->CreatePixelShader(psBlob->GetBufferPointer(), psBlob->GetBufferSize(), nullptr, &m_blurHorizontalPS);
+        if (FAILED(hr)) return false;
+
+        // Compile vertical blur
+        psBlob.Reset();
+        errorBlob.Reset();
+        hr = D3DCompile(blurVSource, strlen(blurVSource), "BlurV", nullptr, nullptr,
+            "main", "ps_5_0", D3DCOMPILE_ENABLE_STRICTNESS, 0, &psBlob, &errorBlob);
+        if (FAILED(hr))
+        {
+            if (errorBlob) OutputDebugStringA((char*)errorBlob->GetBufferPointer());
+            return false;
+        }
+        hr = m_device->CreatePixelShader(psBlob->GetBufferPointer(), psBlob->GetBufferSize(), nullptr, &m_blurVerticalPS);
+        if (FAILED(hr)) return false;
+
+        // Compile composite shader
+        psBlob.Reset();
+        errorBlob.Reset();
+        hr = D3DCompile(compositeSource, strlen(compositeSource), "Composite", nullptr, nullptr,
+            "main", "ps_5_0", D3DCOMPILE_ENABLE_STRICTNESS, 0, &psBlob, &errorBlob);
+        if (FAILED(hr))
+        {
+            if (errorBlob) OutputDebugStringA((char*)errorBlob->GetBufferPointer());
+            return false;
+        }
+        hr = m_device->CreatePixelShader(psBlob->GetBufferPointer(), psBlob->GetBufferSize(), nullptr, &m_compositePS);
+        if (FAILED(hr)) return false;
+
+        // Create fullscreen quad vertex buffer
+        struct QuadVertex
+        {
+            float pos[3];
+            float uv[2];
+        };
+
+        QuadVertex quadVertices[] = {
+            { {-1, -1, 0}, {0, 1} },
+            { {-1,  1, 0}, {0, 0} },
+            { { 1,  1, 0}, {1, 0} },
+            { {-1, -1, 0}, {0, 1} },
+            { { 1,  1, 0}, {1, 0} },
+            { { 1, -1, 0}, {1, 1} }
+        };
+
+        D3D11_BUFFER_DESC vbDesc = {};
+        vbDesc.ByteWidth = sizeof(quadVertices);
+        vbDesc.Usage = D3D11_USAGE_IMMUTABLE;
+        vbDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+
+        D3D11_SUBRESOURCE_DATA vbData = {};
+        vbData.pSysMem = quadVertices;
+
+        hr = m_device->CreateBuffer(&vbDesc, &vbData, &m_fullscreenQuadVB);
+        return SUCCEEDED(hr);
+    }
+
+
+
+
+    void RenderSystem::ApplyBloom()
+    {
+        // Safety check - if bloom resources failed to create, skip
+        if (!m_sceneTexture || !m_bloomTexture || !m_bloomExtractPS || !m_compositePS)
+        {
+            OutputDebugStringA("ApplyBloom: Missing resources, skipping\n");
+            return;
+        }
+        
+        OutputDebugStringA("ApplyBloom: Running...\n");
+        
+        // Scene texture already has the rendered characters - no need to copy from backbuffer
+        
+        // Set viewport for half-resolution processing
+        D3D11_VIEWPORT halfViewport = {};
+        halfViewport.Width = static_cast<float>(m_renderWidth / 2);
+        halfViewport.Height = static_cast<float>(m_renderHeight / 2);
+        halfViewport.MinDepth = 0.0f;
+        halfViewport.MaxDepth = 1.0f;
+        m_context->RSSetViewports(1, &halfViewport);
+        
+        // EXTRACTION PASS: Extract only bright pixels from scene to bloom texture
+        m_context->OMSetRenderTargets(1, m_bloomRTV.GetAddressOf(), nullptr);
+        m_context->IASetInputLayout(m_fullscreenQuadInputLayout.Get());
+        m_context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+        UINT stride = sizeof(float) * 5;
+        UINT offset = 0;
+        m_context->IASetVertexBuffers(0, 1, m_fullscreenQuadVB.GetAddressOf(), &stride, &offset);
+        m_context->VSSetShader(m_fullscreenQuadVS.Get(), nullptr, 0);
+        m_context->VSSetConstantBuffers(0, 0, nullptr);
+        m_context->PSSetShader(m_bloomExtractPS.Get(), nullptr, 0);
+        m_context->PSSetShaderResources(0, 1, m_sceneSRV.GetAddressOf());
+        m_context->PSSetSamplers(0, 1, m_samplerState.GetAddressOf());
+        m_context->Draw(6, 0);
+        
+        ID3D11ShaderResourceView* nullSRV = nullptr;
+        m_context->PSSetShaderResources(0, 1, &nullSRV);
+        
+        // Horizontal blur pass (bloom → temp)
+        m_context->OMSetRenderTargets(1, m_blurTempRTV.GetAddressOf(), nullptr);
+        m_context->PSSetShader(m_blurHorizontalPS.Get(), nullptr, 0);
+        m_context->PSSetShaderResources(0, 1, m_bloomSRV.GetAddressOf());
+        m_context->Draw(6, 0);
+        
+        m_context->PSSetShaderResources(0, 1, &nullSRV);
+        
+        // Vertical blur pass (temp → bloom)
+        m_context->OMSetRenderTargets(1, m_bloomRTV.GetAddressOf(), nullptr);
+        m_context->PSSetShader(m_blurVerticalPS.Get(), nullptr, 0);
+        m_context->PSSetShaderResources(0, 1, m_blurTempSRV.GetAddressOf());
+        m_context->Draw(6, 0);
+        
+        m_context->PSSetShaderResources(0, 1, &nullSRV);
+        
+        // Restore full viewport
+        D3D11_VIEWPORT fullViewport = {};
+        fullViewport.Width = static_cast<float>(m_renderWidth);
+        fullViewport.Height = static_cast<float>(m_renderHeight);
+        fullViewport.MinDepth = 0.0f;
+        fullViewport.MaxDepth = 1.0f;
+        m_context->RSSetViewports(1, &fullViewport);
+        
+        // Composite back to backbuffer
+        m_context->OMSetRenderTargets(1, m_renderTargetView.GetAddressOf(), nullptr);
+        
+        // Disable blending for composite (we want to replace, not blend)
+        m_context->OMSetBlendState(nullptr, nullptr, 0xffffffff);
+        
+        m_context->PSSetShader(m_compositePS.Get(), nullptr, 0);
+        ID3D11ShaderResourceView* srvs[2] = { m_sceneSRV.Get(), m_bloomSRV.Get() };
+        m_context->PSSetShaderResources(0, 2, srvs);
+        m_context->PSSetSamplers(0, 1, m_samplerState.GetAddressOf());
+        m_context->Draw(6, 0);
+        
+        OutputDebugStringA("ApplyBloom: Composite pass done\n");
+        
+        // Cleanup
+        ID3D11ShaderResourceView* nullSRVs[2] = { nullptr, nullptr };
+        m_context->PSSetShaderResources(0, 2, nullSRVs);
+        
+        // Restore render state
+        m_context->IASetInputLayout(m_inputLayout.Get());
+        m_context->VSSetShader(m_vertexShader.Get(), nullptr, 0);
+        m_context->VSSetConstantBuffers(0, 1, m_constantBuffer.GetAddressOf());
+        m_context->PSSetShader(m_pixelShader.Get(), nullptr, 0);
+    }
+
+
+
+
     void RenderSystem::ClearRenderTarget()
     {
         // Clear to black
@@ -613,6 +1022,16 @@ namespace MatrixRain
             return;
         }
 
+        // Set viewport for rendering
+        D3D11_VIEWPORT vp = {};
+        vp.TopLeftX = 0.0f;
+        vp.TopLeftY = 0.0f;
+        vp.Width = static_cast<FLOAT>(viewport.GetWidth());
+        vp.Height = static_cast<FLOAT>(viewport.GetHeight());
+        vp.MinDepth = 0.0f;
+        vp.MaxDepth = 1.0f;
+        m_context->RSSetViewports(1, &vp);
+
         // Set render state
         m_context->IASetInputLayout(m_inputLayout.Get());
         m_context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
@@ -637,11 +1056,36 @@ namespace MatrixRain
 
         float blendFactor[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
         m_context->OMSetBlendState(m_blendState.Get(), blendFactor, 0xffffffff);
-        m_context->OMSetRenderTargets(1, m_renderTargetView.GetAddressOf(), nullptr);
+        
+        // Set full viewport for rendering
+        D3D11_VIEWPORT fullViewport = {};
+        fullViewport.Width = static_cast<float>(m_renderWidth);
+        fullViewport.Height = static_cast<float>(m_renderHeight);
+        fullViewport.MinDepth = 0.0f;
+        fullViewport.MaxDepth = 1.0f;
+        m_context->RSSetViewports(1, &fullViewport);
+        
+        // Render characters to scene texture (NOT directly to backbuffer)
+        if (m_sceneRTV)
+        {
+            // Clear scene texture
+            float clearColor[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
+            m_context->ClearRenderTargetView(m_sceneRTV.Get(), clearColor);
+            
+            m_context->OMSetRenderTargets(1, m_sceneRTV.GetAddressOf(), nullptr);
+            m_context->DrawInstanced(6, static_cast<UINT>(totalCharacters), 0, 0);
+            
+            // Now apply bloom (which will composite to backbuffer)
+            ApplyBloom();
+        }
+        else
+        {
+            // Fallback: render directly to backbuffer if bloom not available
+            m_context->OMSetRenderTargets(1, m_renderTargetView.GetAddressOf(), nullptr);
+            m_context->DrawInstanced(6, static_cast<UINT>(totalCharacters), 0, 0);
+        }
 
-        // Draw instanced (6 vertices per quad, one instance per character)
-        m_context->DrawInstanced(6, static_cast<UINT>(totalCharacters), 0, 0);
-
+        // Render FPS counter overlay if fps > 0
         // Render FPS counter overlay if fps > 0
         if (fps > 0.0f)
         {
@@ -697,6 +1141,9 @@ namespace MatrixRain
 
     void RenderSystem::Resize(UINT width, UINT height)
     {
+        m_renderWidth = width;
+        m_renderHeight = height;
+
         if (!m_swapChain)
         {
             return;
@@ -765,6 +1212,22 @@ namespace MatrixRain
         m_d2dContext.Reset();
         m_d2dDevice.Reset();
         m_d2dFactory.Reset();
+
+        // Bloom resources
+        m_fullscreenQuadVS.Reset();
+        m_fullscreenQuadVB.Reset();
+        m_compositePS.Reset();
+        m_blurVerticalPS.Reset();
+        m_blurHorizontalPS.Reset();
+        m_blurTempSRV.Reset();
+        m_blurTempRTV.Reset();
+        m_blurTempTexture.Reset();
+        m_bloomSRV.Reset();
+        m_bloomRTV.Reset();
+        m_bloomTexture.Reset();
+        m_sceneSRV.Reset();
+        m_sceneRTV.Reset();
+        m_sceneTexture.Reset();
 
         // DirectX resources
         m_atlasTextureSRV.Reset();
