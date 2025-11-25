@@ -481,6 +481,13 @@ namespace MatrixRain
             return false;
         }
 
+        // Create black brush for FPS text glow
+        hr = m_d2dContext->CreateSolidColorBrush(D2D1::ColorF(D2D1::ColorF::Black, 0.0f), &m_fpsGlowBrush);
+        if (FAILED(hr))
+        {
+            return false;
+        }
+
         return true;
     }
 
@@ -1107,7 +1114,7 @@ namespace MatrixRain
 
     void RenderSystem::RenderFPSCounter(float fps, int rainPercentage, int streakCount)
     {
-        if (!m_d2dContext || !m_fpsBrush || !m_fpsTextFormat)
+        if (!m_d2dContext || !m_fpsBrush || !m_fpsTextFormat || !m_fpsGlowBrush)
         {
             return;
         }
@@ -1129,6 +1136,44 @@ namespace MatrixRain
             size.width - 10.0f,     // Right (10px padding)
             size.height - 10.0f     // Bottom (10px padding)
         );
+
+        // Draw feathered glow effect by rendering text multiple times with offsets and decreasing opacity
+        // This creates a letter-shaped shadow that fades from opaque to transparent
+        const int glowLayers = 10;
+        for (int i = glowLayers; i > 0; --i)
+        {
+            float offset = static_cast<float>(i);
+            float opacity = 1.0f - (static_cast<float>(i) / static_cast<float>(glowLayers));
+
+            m_fpsGlowBrush->SetColor(D2D1::ColorF(D2D1::ColorF::Black, opacity));
+
+            // Draw text at 8 different offsets to create uniform glow
+            for (int dx = -1; dx <= 1; ++dx)
+            {
+                for (int dy = -1; dy <= 1; ++dy)
+                {
+                    if (dx == 0 && dy == 0)
+                    {
+                        continue;
+                    }
+
+                    D2D1_RECT_F glowRect = D2D1::RectF(
+                        textRect.left + offset * dx,
+                        textRect.top + offset * dy,
+                        textRect.right + offset * dx,
+                        textRect.bottom + offset * dy
+                    );
+
+                    m_d2dContext->DrawText(
+                        fpsText,
+                        static_cast<UINT32>(wcslen(fpsText)),
+                        m_fpsTextFormat.Get(),
+                        glowRect,
+                        m_fpsGlowBrush.Get()
+                    );
+                }
+            }
+        }
 
         // Draw text
         m_d2dContext->DrawText(

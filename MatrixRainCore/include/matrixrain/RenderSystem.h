@@ -129,6 +129,7 @@ namespace MatrixRain
         Microsoft::WRL::ComPtr<IDWriteFactory> m_dwriteFactory;
         Microsoft::WRL::ComPtr<IDWriteTextFormat> m_fpsTextFormat;
         Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> m_fpsBrush;
+        Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> m_fpsGlowBrush;
 
         // Shader resources
         Microsoft::WRL::ComPtr<ID3D11VertexShader> m_vertexShader;
