@@ -106,6 +106,82 @@ void Function2()
   - **Multiple spaces allowed** when needed to maintain column alignment in a contiguous block
   - Columnar alignment is required whenever there are contiguous lines of declarations/definitions (can include blank lines within the block)
 
+### Column Alignment for Assignment Statements
+- **Column alignment applies to assignment statements**, not just variable declarations
+- When multiple assignment statements appear consecutively, align the `=` operators
+- This creates visual clarity and makes code easier to scan
+- **For nested struct members**: Align ALL assignments in a block to the longest member name, even if mixing nested and non-nested members
+- **Shader code in string literals**: Column alignment rules apply to HLSL/GLSL shader code within raw string literals - align struct member declarations with `:` (semantic) operators
+
+**Correct** (column-aligned assignments):
+```cpp
+// Store dimensions for viewport and render target sizing
+m_renderWidth  = width;
+m_renderHeight = height;
+```
+
+**Wrong** (misaligned assignments):
+```cpp
+// Store dimensions for viewport and render target sizing
+m_renderWidth = width;
+m_renderHeight = height;
+```
+
+**Example with longer variable names**:
+```cpp
+m_instanceBufferCapacity = INITIAL_CAPACITY;
+m_renderWidth            = width;
+m_renderHeight           = height;
+m_bloomIntensity         = 2.5f;
+```
+
+**Correct handling of nested struct members** (all aligned to longest name):
+```cpp
+swapChainDesc.BufferCount                        = 2;
+swapChainDesc.BufferDesc.Width                   = width;
+swapChainDesc.BufferDesc.Height                  = height;
+swapChainDesc.BufferDesc.RefreshRate.Numerator   = 60;
+swapChainDesc.BufferDesc.RefreshRate.Denominator = 1;
+swapChainDesc.BufferUsage                        = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+swapChainDesc.SampleDesc.Count                   = 1;
+```
+
+**Wrong** (inconsistent alignment between nested/non-nested):
+```cpp
+swapChainDesc.BufferCount                       = 2;
+swapChainDesc.BufferDesc.Width                  = width;
+swapChainDesc.BufferDesc.RefreshRate.Numerator  = 60;
+swapChainDesc.BufferUsage          = DXGI_USAGE_RENDER_TARGET_OUTPUT;  // WRONG - different column
+swapChainDesc.SampleDesc.Count     = 1;  // WRONG - different column
+```
+
+**Shader code alignment** (HLSL struct members with semantics):
+```cpp
+// Correct - colon operators aligned
+struct VSInput
+{
+    float3 position   : POSITION;
+    float2 uvMin      : TEXCOORD0;
+    float2 uvMax      : TEXCOORD1;
+    float4 color      : COLOR;
+    float  brightness : BRIGHTNESS;
+    float  scale      : SCALE;
+    uint   instanceID : SV_InstanceID;
+};
+
+// Wrong - unaligned semantics
+struct VSInput
+{
+    float3 position : POSITION;
+    float2 uvMin : TEXCOORD0;
+    float2 uvMax : TEXCOORD1;
+    float4 color : COLOR;
+    float brightness : BRIGHTNESS;
+    float scale : SCALE;
+    uint instanceID : SV_InstanceID;
+};
+```
+
 ### Indentation Rules
 - **ALWAYS** preserve exact indentation when replacing code
 - **NEVER** start code at column 1 unless original was at column 1
@@ -300,6 +376,39 @@ CDirectoryLister::CDirectoryLister (...) :
 {
 ```
 
+### Line Wrapping - Separator Placement
+**CRITICAL**: When wrapping lines, separators (`:`, `,`) **ALWAYS** go at the **END** of the line, **NEVER** at the beginning of the wrapped line.
+
+**Correct**:
+```cpp
+CMyClass::CMyClass(int arg1, int arg2) :
+    m_member1 (arg1),
+    m_member2 (arg2)
+{
+}
+
+void Function(int arg1,
+              int arg2,
+              int arg3)
+{
+}
+```
+
+**Wrong**:
+```cpp
+CMyClass::CMyClass(int arg1, int arg2)
+    : m_member1 (arg1)  // WRONG - colon at start
+    , m_member2 (arg2)  // WRONG - comma at start
+{
+}
+
+void Function(int arg1
+              , int arg2  // WRONG - comma at start
+              , int arg3)
+{
+}
+```
+
 ### Include Order in .cpp Files
 **ALWAYS** follow this exact pattern:
 1. `#include "pch.h"` (always first, alone)
@@ -481,8 +590,8 @@ MyClass::MyClass()
 ```
 
 ### Function Parameter Alignment
-- For short parameter lists, keep all parameters on one line
-- For lengthy sets of parameters:
+- **For short parameter lists**, keep all parameters on one line
+- **For lengthy sets of parameters**:
   - First parameter stays on the line where function declaration/definition begins
   - Subsequent parameters aligned in column format (like variables), one per line
   - Parameters left-justified with the **first parameter**, not the left margin or one indent level
@@ -492,6 +601,40 @@ HRESULT LongFunctionName (LPCWSTR  pszFirstParam,
                           DWORD    dwSecondParam,
                           BOOL   * pfThirdParam,
                           size_t   cchBufferSize);
+```
+
+### Function Parameter Wrapping (Calls)
+- **When wrapping parameters in function calls**, keep the first parameter on the same line as the function name
+- **Subsequent parameters** are aligned directly under the first parameter (character-aligned, not indent-level aligned)
+- **ALWAYS insert one space before an opening parenthesis** unless the parentheses are empty `()`
+- This creates visual clarity showing which parameters belong to which function call
+- **Correct** (first parameter on function line, rest aligned under it, space before opening paren):
+```cpp
+HRESULT hr = D3D11CreateDevice (nullptr,                    // Default adapter
+                                 D3D_DRIVER_TYPE_HARDWARE,   // Hardware acceleration
+                                 nullptr,                    // No software rasterizer
+                                 createDeviceFlags,
+                                 featureLevels,
+                                 _countof (featureLevels),
+                                 D3D11_SDK_VERSION,
+                                 &m_device,
+                                 &featureLevel,
+                                 &m_context);
+```
+- **Wrong** (no space before opening paren, first parameter on new line):
+```cpp
+HRESULT hr = D3D11CreateDevice(
+    nullptr,                    // Default adapter
+    D3D_DRIVER_TYPE_HARDWARE,   // Hardware acceleration
+    nullptr,                    // No software rasterizer
+    createDeviceFlags,
+    featureLevels,
+    _countof(featureLevels),
+    D3D11_SDK_VERSION,
+    &m_device,
+    &featureLevel,
+    &m_context
+);
 ```
 
 ### Namespace Usage

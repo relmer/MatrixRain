@@ -11,22 +11,30 @@
 
 namespace MatrixRain
 {
-    RenderSystem::RenderSystem()
-        : m_instanceBufferCapacity(INITIAL_INSTANCE_CAPACITY)
-        , m_renderWidth(0)
-        , m_renderHeight(0)
+    RenderSystem::RenderSystem() :
+        m_instanceBufferCapacity (INITIAL_INSTANCE_CAPACITY),
+        m_renderWidth            (0),
+        m_renderHeight           (0)
     {
     }
+
+
+
+
 
     RenderSystem::~RenderSystem()
     {
         Shutdown();
     }
 
-    bool RenderSystem::Initialize(HWND hwnd, UINT width, UINT height)
+
+
+
+
+    bool RenderSystem::Initialize (HWND hwnd, UINT width, UINT height)
     {
         // Store dimensions for viewport and render target sizing
-        m_renderWidth = width;
+        m_renderWidth  = width;
         m_renderHeight = height;
         
         if (!CreateDevice())
@@ -83,14 +91,18 @@ namespace MatrixRain
         D3D11_VIEWPORT viewport = {};
         viewport.TopLeftX = 0.0f;
         viewport.TopLeftY = 0.0f;
-        viewport.Width = static_cast<FLOAT>(width);
-        viewport.Height = static_cast<FLOAT>(height);
+        viewport.Width    = static_cast<FLOAT> (width);
+        viewport.Height   = static_cast<FLOAT> (height);
         viewport.MinDepth = 0.0f;
         viewport.MaxDepth = 1.0f;
-        m_context->RSSetViewports(1, &viewport);
+        m_context->RSSetViewports (1, &viewport);
 
         return true;
     }
+
+
+
+
 
     bool RenderSystem::CreateDevice()
     {
@@ -106,71 +118,82 @@ namespace MatrixRain
 
         D3D_FEATURE_LEVEL featureLevel;
 
-        HRESULT hr = D3D11CreateDevice(
-            nullptr,                    // Default adapter
-            D3D_DRIVER_TYPE_HARDWARE,   // Hardware acceleration
-            nullptr,                    // No software rasterizer
-            createDeviceFlags,
-            featureLevels,
-            _countof(featureLevels),
-            D3D11_SDK_VERSION,
-            &m_device,
-            &featureLevel,
-            &m_context
-        );
+        HRESULT hr = D3D11CreateDevice (nullptr,                   // Default adapter
+                                        D3D_DRIVER_TYPE_HARDWARE,  // Hardware acceleration
+                                        nullptr,                   // No software rasterizer
+                                        createDeviceFlags,
+                                        featureLevels,
+                                        _countof (featureLevels),
+                                        D3D11_SDK_VERSION,
+                                        &m_device,
+                                        &featureLevel,
+                                        &m_context);
 
-        return SUCCEEDED(hr);
+        return SUCCEEDED (hr);
     }
 
-    bool RenderSystem::CreateSwapChain(HWND hwnd, UINT width, UINT height)
+
+
+
+
+    bool RenderSystem::CreateSwapChain (HWND hwnd, UINT width, UINT height)
     {
         // Get DXGI factory from device
         Microsoft::WRL::ComPtr<IDXGIDevice> dxgiDevice;
-        HRESULT hr = m_device.As(&dxgiDevice);
-        if (FAILED(hr)) return false;
+        HRESULT hr = m_device.As (&dxgiDevice);
+        if (FAILED (hr)) return false;
 
         Microsoft::WRL::ComPtr<IDXGIAdapter> dxgiAdapter;
-        hr = dxgiDevice->GetAdapter(&dxgiAdapter);
-        if (FAILED(hr)) return false;
+        hr = dxgiDevice->GetAdapter (&dxgiAdapter);
+        if (FAILED (hr)) return false;
 
         Microsoft::WRL::ComPtr<IDXGIFactory> dxgiFactory;
-        hr = dxgiAdapter->GetParent(__uuidof(IDXGIFactory), &dxgiFactory);
-        if (FAILED(hr)) return false;
+        hr = dxgiAdapter->GetParent (__uuidof (IDXGIFactory), &dxgiFactory);
+        if (FAILED (hr)) return false;
 
         // Create swap chain description
         DXGI_SWAP_CHAIN_DESC swapChainDesc = {};
-        swapChainDesc.BufferCount = 2;
-        swapChainDesc.BufferDesc.Width = width;
-        swapChainDesc.BufferDesc.Height = height;
-        swapChainDesc.BufferDesc.Format = DXGI_FORMAT_B8G8R8A8_UNORM; // Match D2D format requirement
-        swapChainDesc.BufferDesc.RefreshRate.Numerator = 60;
-        swapChainDesc.BufferDesc.RefreshRate.Denominator = 1;
-        swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-        swapChainDesc.OutputWindow = hwnd;
-        swapChainDesc.SampleDesc.Count = 1;
-        swapChainDesc.SampleDesc.Quality = 0;
-        swapChainDesc.Windowed = TRUE;
-        swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
 
-        hr = dxgiFactory->CreateSwapChain(m_device.Get(), &swapChainDesc, &m_swapChain);
-        if (FAILED(hr)) return false;
+        swapChainDesc.BufferCount                        = 2;
+        swapChainDesc.BufferDesc.Width                   = width;
+        swapChainDesc.BufferDesc.Height                  = height;
+        swapChainDesc.BufferDesc.Format                  = DXGI_FORMAT_B8G8R8A8_UNORM; // Match D2D format requirement
+        swapChainDesc.BufferDesc.RefreshRate.Numerator   = 60;
+        swapChainDesc.BufferDesc.RefreshRate.Denominator = 1;
+        swapChainDesc.BufferUsage                        = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+        swapChainDesc.OutputWindow                       = hwnd;
+        swapChainDesc.SampleDesc.Count                   = 1;
+        swapChainDesc.SampleDesc.Quality                 = 0;
+        swapChainDesc.Windowed                           = TRUE;
+        swapChainDesc.SwapEffect                         = DXGI_SWAP_EFFECT_FLIP_DISCARD;
+
+        hr = dxgiFactory->CreateSwapChain (m_device.Get(), &swapChainDesc, &m_swapChain);
+        if (FAILED (hr)) return false;
 
         // Disable DXGI's built-in Alt+Enter exclusive fullscreen toggle
         // We handle fullscreen transitions manually for borderless windowed mode
-        hr = dxgiFactory->MakeWindowAssociation(hwnd, DXGI_MWA_NO_ALT_ENTER);
+        hr = dxgiFactory->MakeWindowAssociation (hwnd, DXGI_MWA_NO_ALT_ENTER);
         
-        return SUCCEEDED(hr);
+        return SUCCEEDED (hr);
     }
+
+
+
+
 
     bool RenderSystem::CreateRenderTargetView()
     {
         Microsoft::WRL::ComPtr<ID3D11Texture2D> backBuffer;
-        HRESULT hr = m_swapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), &backBuffer);
-        if (FAILED(hr)) return false;
+        HRESULT hr = m_swapChain->GetBuffer (0, __uuidof (ID3D11Texture2D), &backBuffer);
+        if (FAILED (hr)) return false;
 
-        hr = m_device->CreateRenderTargetView(backBuffer.Get(), nullptr, &m_renderTargetView);
-        return SUCCEEDED(hr);
+        hr = m_device->CreateRenderTargetView (backBuffer.Get(), nullptr, &m_renderTargetView);
+        return SUCCEEDED (hr);
     }
+
+
+
+
 
     bool RenderSystem::CompileShaders()
     {
@@ -266,118 +289,144 @@ namespace MatrixRain
         Microsoft::WRL::ComPtr<ID3DBlob> vsBlob;
         Microsoft::WRL::ComPtr<ID3DBlob> errorBlob;
         
-        HRESULT hr = D3DCompile(
-            vsSource, strlen(vsSource),
-            "VS", nullptr, nullptr,
-            "main", "vs_5_0",
-            D3DCOMPILE_ENABLE_STRICTNESS, 0,
-            &vsBlob, &errorBlob
-        );
+        HRESULT hr = D3DCompile (vsSource, strlen (vsSource),
+                                 "VS", nullptr, nullptr,
+                                 "main", "vs_5_0",
+                                 D3DCOMPILE_ENABLE_STRICTNESS, 0,
+                                 &vsBlob, &errorBlob);
 
-        if (FAILED(hr))
+        if (FAILED (hr))
         {
             if (errorBlob)
             {
-                OutputDebugStringA((char*)errorBlob->GetBufferPointer());
+                OutputDebugStringA ((char*)errorBlob->GetBufferPointer());
             }
             return false;
         }
 
-        hr = m_device->CreateVertexShader(vsBlob->GetBufferPointer(), vsBlob->GetBufferSize(), nullptr, &m_vertexShader);
-        if (FAILED(hr)) return false;
+        hr = m_device->CreateVertexShader (vsBlob->GetBufferPointer(), vsBlob->GetBufferSize(), nullptr, &m_vertexShader);
+        if (FAILED (hr)) return false;
 
         // Create input layout
         D3D11_INPUT_ELEMENT_DESC inputLayout[] = {
-            { "POSITION",    0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0,  D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-            { "TEXCOORD",    0, DXGI_FORMAT_R32G32_FLOAT,    0, 12, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-            { "TEXCOORD",    1, DXGI_FORMAT_R32G32_FLOAT,    0, 20, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+            { "POSITION",    0, DXGI_FORMAT_R32G32B32_FLOAT,    0, 0,  D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+            { "TEXCOORD",    0, DXGI_FORMAT_R32G32_FLOAT,       0, 12, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+            { "TEXCOORD",    1, DXGI_FORMAT_R32G32_FLOAT,       0, 20, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
             { "COLOR",       0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 28, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-            { "BRIGHTNESS",  0, DXGI_FORMAT_R32_FLOAT,       0, 44, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-            { "SCALE",       0, DXGI_FORMAT_R32_FLOAT,       0, 48, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+            { "BRIGHTNESS",  0, DXGI_FORMAT_R32_FLOAT,          0, 44, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+            { "SCALE",       0, DXGI_FORMAT_R32_FLOAT,          0, 48, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
         };
 
-        hr = m_device->CreateInputLayout(inputLayout, _countof(inputLayout), vsBlob->GetBufferPointer(), vsBlob->GetBufferSize(), &m_inputLayout);
-        if (FAILED(hr)) return false;
+        hr = m_device->CreateInputLayout (inputLayout, _countof (inputLayout), vsBlob->GetBufferPointer(), vsBlob->GetBufferSize(), &m_inputLayout);
+        if (FAILED (hr)) return false;
 
         // Compile pixel shader
         Microsoft::WRL::ComPtr<ID3DBlob> psBlob;
-        hr = D3DCompile(
-            psSource, strlen(psSource),
-            "PS", nullptr, nullptr,
-            "main", "ps_5_0",
-            D3DCOMPILE_ENABLE_STRICTNESS, 0,
-            &psBlob, &errorBlob
-        );
+        hr = D3DCompile (psSource, 
+                         strlen (psSource),
+                         "PS", 
+                         nullptr, 
+                         nullptr,
+                         "main", 
+                         "ps_5_0",
+                         D3DCOMPILE_ENABLE_STRICTNESS, 
+                         0,
+                         &psBlob, 
+                         &errorBlob);
 
-        if (FAILED(hr))
+        if (FAILED (hr))
         {
             if (errorBlob)
             {
-                OutputDebugStringA((char*)errorBlob->GetBufferPointer());
+                OutputDebugStringA ((char*)errorBlob->GetBufferPointer());
             }
             return false;
         }
 
-        hr = m_device->CreatePixelShader(psBlob->GetBufferPointer(), psBlob->GetBufferSize(), nullptr, &m_pixelShader);
-        return SUCCEEDED(hr);
+        hr = m_device->CreatePixelShader (psBlob->GetBufferPointer(), psBlob->GetBufferSize(), nullptr, &m_pixelShader);
+        return SUCCEEDED (hr);
     }
+
+
+
+
 
     bool RenderSystem::CreateInstanceBuffer()
     {
         D3D11_BUFFER_DESC bufferDesc = {};
-        bufferDesc.ByteWidth = sizeof(CharacterInstanceData) * m_instanceBufferCapacity;
-        bufferDesc.Usage = D3D11_USAGE_DYNAMIC;
-        bufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+
+        bufferDesc.ByteWidth      = sizeof (CharacterInstanceData) * m_instanceBufferCapacity;
+        bufferDesc.Usage          = D3D11_USAGE_DYNAMIC;
+        bufferDesc.BindFlags      = D3D11_BIND_VERTEX_BUFFER;
         bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
 
-        HRESULT hr = m_device->CreateBuffer(&bufferDesc, nullptr, &m_instanceBuffer);
-        return SUCCEEDED(hr);
+        HRESULT hr = m_device->CreateBuffer (&bufferDesc, nullptr, &m_instanceBuffer);
+        return SUCCEEDED (hr);
     }
+
+
+
+
 
     bool RenderSystem::CreateConstantBuffer()
     {
         D3D11_BUFFER_DESC bufferDesc = {};
-        bufferDesc.ByteWidth = sizeof(ConstantBufferData);
-        bufferDesc.Usage = D3D11_USAGE_DYNAMIC;
-        bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+        
+        bufferDesc.ByteWidth      = sizeof (ConstantBufferData);
+        bufferDesc.Usage          = D3D11_USAGE_DYNAMIC;
+        bufferDesc.BindFlags      = D3D11_BIND_CONSTANT_BUFFER;
         bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
 
-        HRESULT hr = m_device->CreateBuffer(&bufferDesc, nullptr, &m_constantBuffer);
-        return SUCCEEDED(hr);
+        HRESULT hr = m_device->CreateBuffer (&bufferDesc, nullptr, &m_constantBuffer);
+        return SUCCEEDED (hr);
     }
+
+
+
+
 
     bool RenderSystem::CreateBlendState()
     {
         D3D11_BLEND_DESC blendDesc = {};
-        blendDesc.AlphaToCoverageEnable = FALSE;
-        blendDesc.IndependentBlendEnable = FALSE;
-        blendDesc.RenderTarget[0].BlendEnable = TRUE;
-        blendDesc.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC_ALPHA;
-        blendDesc.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC_ALPHA;
-        blendDesc.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
-        blendDesc.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
-        blendDesc.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
-        blendDesc.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
-        blendDesc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+        
+        blendDesc.AlphaToCoverageEnable                  = FALSE;
+        blendDesc.IndependentBlendEnable                 = FALSE;
+        blendDesc.RenderTarget[0].BlendEnable            = TRUE;
+        blendDesc.RenderTarget[0].SrcBlend               = D3D11_BLEND_SRC_ALPHA;
+        blendDesc.RenderTarget[0].DestBlend              = D3D11_BLEND_INV_SRC_ALPHA;
+        blendDesc.RenderTarget[0].BlendOp                = D3D11_BLEND_OP_ADD;
+        blendDesc.RenderTarget[0].SrcBlendAlpha          = D3D11_BLEND_ONE;
+        blendDesc.RenderTarget[0].DestBlendAlpha         = D3D11_BLEND_ZERO;
+        blendDesc.RenderTarget[0].BlendOpAlpha           = D3D11_BLEND_OP_ADD;
+        blendDesc.RenderTarget[0].RenderTargetWriteMask  = D3D11_COLOR_WRITE_ENABLE_ALL;
 
-        HRESULT hr = m_device->CreateBlendState(&blendDesc, &m_blendState);
-        return SUCCEEDED(hr);
+        HRESULT hr = m_device->CreateBlendState (&blendDesc, &m_blendState);
+        return SUCCEEDED (hr);
     }
+
+
+
+
 
     bool RenderSystem::CreateSamplerState()
     {
         D3D11_SAMPLER_DESC samplerDesc = {};
-        samplerDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
-        samplerDesc.AddressU = D3D11_TEXTURE_ADDRESS_CLAMP;
-        samplerDesc.AddressV = D3D11_TEXTURE_ADDRESS_CLAMP;
-        samplerDesc.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
-        samplerDesc.ComparisonFunc = D3D11_COMPARISON_NEVER;
-        samplerDesc.MinLOD = 0;
-        samplerDesc.MaxLOD = D3D11_FLOAT32_MAX;
 
-        HRESULT hr = m_device->CreateSamplerState(&samplerDesc, &m_samplerState);
-        return SUCCEEDED(hr);
+        samplerDesc.Filter         = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+        samplerDesc.AddressU       = D3D11_TEXTURE_ADDRESS_CLAMP;
+        samplerDesc.AddressV       = D3D11_TEXTURE_ADDRESS_CLAMP;
+        samplerDesc.AddressW       = D3D11_TEXTURE_ADDRESS_CLAMP;
+        samplerDesc.ComparisonFunc = D3D11_COMPARISON_NEVER;
+        samplerDesc.MinLOD         = 0;
+        samplerDesc.MaxLOD         = D3D11_FLOAT32_MAX;
+
+        HRESULT hr = m_device->CreateSamplerState (&samplerDesc, &m_samplerState);
+        return SUCCEEDED (hr);
     }
+
+
+
+
 
     bool RenderSystem::CreateDirect2DResources()
     {
@@ -388,102 +437,102 @@ namespace MatrixRain
 #ifdef _DEBUG
         options.debugLevel = D2D1_DEBUG_LEVEL_INFORMATION;
 #endif
-        hr = D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, __uuidof(ID2D1Factory1), &options,
-            reinterpret_cast<void**>(m_d2dFactory.GetAddressOf()));
-        if (FAILED(hr))
+        hr = D2D1CreateFactory (D2D1_FACTORY_TYPE_SINGLE_THREADED, 
+                                __uuidof (ID2D1Factory1), 
+                                &options,
+                                reinterpret_cast<void**> (m_d2dFactory.GetAddressOf()));
+        if (FAILED (hr))
         {
             return false;
         }
 
         // Get DXGI device
         Microsoft::WRL::ComPtr<IDXGIDevice> dxgiDevice;
-        hr = m_device.As(&dxgiDevice);
-        if (FAILED(hr))
+        hr = m_device.As (&dxgiDevice);
+        if (FAILED (hr))
         {
             return false;
         }
 
         // Create D2D device
-        hr = m_d2dFactory->CreateDevice(dxgiDevice.Get(), &m_d2dDevice);
-        if (FAILED(hr))
+        hr = m_d2dFactory->CreateDevice (dxgiDevice.Get(), &m_d2dDevice);
+        if (FAILED (hr))
         {
             return false;
         }
 
         // Create D2D device context
-        hr = m_d2dDevice->CreateDeviceContext(D2D1_DEVICE_CONTEXT_OPTIONS_NONE, &m_d2dContext);
-        if (FAILED(hr))
+        hr = m_d2dDevice->CreateDeviceContext (D2D1_DEVICE_CONTEXT_OPTIONS_NONE, &m_d2dContext);
+        if (FAILED (hr))
         {
             return false;
         }
 
         // Get back buffer as DXGI surface
         Microsoft::WRL::ComPtr<ID3D11Texture2D> backBuffer;
-        hr = m_swapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), &backBuffer);
-        if (FAILED(hr))
+        hr = m_swapChain->GetBuffer (0, __uuidof (ID3D11Texture2D), &backBuffer);
+        if (FAILED (hr))
         {
             return false;
         }
 
         Microsoft::WRL::ComPtr<IDXGISurface> dxgiSurface;
-        hr = backBuffer.As(&dxgiSurface);
-        if (FAILED(hr))
+        hr = backBuffer.As (&dxgiSurface);
+        if (FAILED (hr))
         {
             return false;
         }
 
         // Create D2D bitmap from DXGI surface
-        D2D1_BITMAP_PROPERTIES1 bitmapProps = D2D1::BitmapProperties1(
+        D2D1_BITMAP_PROPERTIES1 bitmapProps = D2D1::BitmapProperties1 (
             D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW,
-            D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED)
+            D2D1::PixelFormat (DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED)
         );
 
-        hr = m_d2dContext->CreateBitmapFromDxgiSurface(dxgiSurface.Get(), &bitmapProps, &m_d2dBitmap);
-        if (FAILED(hr))
+        hr = m_d2dContext->CreateBitmapFromDxgiSurface (dxgiSurface.Get(), &bitmapProps, &m_d2dBitmap);
+        if (FAILED (hr))
         {
             return false;
         }
 
         // Set the bitmap as the render target
-        m_d2dContext->SetTarget(m_d2dBitmap.Get());
+        m_d2dContext->SetTarget (m_d2dBitmap.Get());
 
         // Create DirectWrite factory
-        hr = DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory),
-            reinterpret_cast<IUnknown**>(m_dwriteFactory.GetAddressOf()));
+        hr = DWriteCreateFactory (DWRITE_FACTORY_TYPE_SHARED, __uuidof (IDWriteFactory),
+                                  reinterpret_cast<IUnknown**> (m_dwriteFactory.GetAddressOf()));
         if (FAILED(hr))
         {
             return false;
         }
 
         // Create text format for FPS display (small, top-right aligned)
-        hr = m_dwriteFactory->CreateTextFormat(
-            L"Consolas",
-            nullptr,
-            DWRITE_FONT_WEIGHT_NORMAL,
-            DWRITE_FONT_STYLE_NORMAL,
-            DWRITE_FONT_STRETCH_NORMAL,
-            20.0f,
-            L"en-us",
-            &m_fpsTextFormat
-        );
-        if (FAILED(hr))
+        hr = m_dwriteFactory->CreateTextFormat (L"Consolas",
+                                                nullptr,
+                                                DWRITE_FONT_WEIGHT_NORMAL,
+                                                DWRITE_FONT_STYLE_NORMAL,
+                                                DWRITE_FONT_STRETCH_NORMAL,
+                                                20.0f,
+                                                L"en-us",
+                                                &m_fpsTextFormat);
+        if (FAILED (hr))
         {
             return false;
         }
 
-        m_fpsTextFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_TRAILING);
-        m_fpsTextFormat->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_FAR);
+        m_fpsTextFormat->SetTextAlignment (DWRITE_TEXT_ALIGNMENT_TRAILING);
+        m_fpsTextFormat->SetParagraphAlignment (DWRITE_PARAGRAPH_ALIGNMENT_FAR);
 
         // Create white brush for FPS text
-        hr = m_d2dContext->CreateSolidColorBrush(D2D1::ColorF(D2D1::ColorF::White), &m_fpsBrush);
-        if (FAILED(hr))
+        hr = m_d2dContext->CreateSolidColorBrush (D2D1::ColorF (D2D1::ColorF::White), &m_fpsBrush);
+        if (FAILED (hr))
         {
             return false;
         }
 
         // Create black brush for FPS text glow
-        hr = m_d2dContext->CreateSolidColorBrush(D2D1::ColorF(D2D1::ColorF::Black, 0.0f), &m_fpsGlowBrush);
-        if (FAILED(hr))
+        hr = m_d2dContext->CreateSolidColorBrush (D2D1::ColorF (D2D1::ColorF::Black, 0.0f), &m_fpsGlowBrush);
+        if (FAILED (hr))
         {
             return false;
         }
@@ -494,71 +543,73 @@ namespace MatrixRain
 
 
 
-    bool RenderSystem::CreateBloomResources(UINT width, UINT height)
+
+    bool RenderSystem::CreateBloomResources (UINT width, UINT height)
     {
         HRESULT hr;
 
         // Safety check - don't create bloom resources with invalid dimensions
         if (width == 0 || height == 0)
         {
-            OutputDebugStringA("CreateBloomResources: Invalid dimensions (0x0), skipping bloom\n");
+            OutputDebugStringA ("CreateBloomResources: Invalid dimensions (0x0), skipping bloom\n");
             return true; // Return true to not fail initialization, just skip bloom
         }
 
-        OutputDebugStringA("CreateBloomResources: Starting...\n");
+        OutputDebugStringA ("CreateBloomResources: Starting...\n");
 
         // Create scene render target (full resolution)
         D3D11_TEXTURE2D_DESC sceneTexDesc = {};
-        sceneTexDesc.Width = width;
-        sceneTexDesc.Height = height;
-        sceneTexDesc.MipLevels = 1;
-        sceneTexDesc.ArraySize = 1;
-        sceneTexDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-        sceneTexDesc.SampleDesc.Count = 1;
-        sceneTexDesc.Usage = D3D11_USAGE_DEFAULT;
-        sceneTexDesc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
 
-        hr = m_device->CreateTexture2D(&sceneTexDesc, nullptr, &m_sceneTexture);
-        if (FAILED(hr)) { OutputDebugStringA("FAILED: CreateTexture2D for scene\n"); return false; }
+        sceneTexDesc.Width             = width;
+        sceneTexDesc.Height            = height;
+        sceneTexDesc.MipLevels         = 1;
+        sceneTexDesc.ArraySize         = 1;
+        sceneTexDesc.Format            = DXGI_FORMAT_R8G8B8A8_UNORM;
+        sceneTexDesc.SampleDesc.Count  = 1;
+        sceneTexDesc.Usage             = D3D11_USAGE_DEFAULT;
+        sceneTexDesc.BindFlags         = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
 
-        hr = m_device->CreateRenderTargetView(m_sceneTexture.Get(), nullptr, &m_sceneRTV);
-        if (FAILED(hr)) { OutputDebugStringA("FAILED: CreateRenderTargetView for scene\n"); return false; }
+        hr = m_device->CreateTexture2D (&sceneTexDesc, nullptr, &m_sceneTexture);
+        if (FAILED (hr)) { OutputDebugStringA ("FAILED: CreateTexture2D for scene\n"); return false; }
 
-        hr = m_device->CreateShaderResourceView(m_sceneTexture.Get(), nullptr, &m_sceneSRV);
-        if (FAILED(hr)) { OutputDebugStringA("FAILED: CreateShaderResourceView for scene\n"); return false; }
+        hr = m_device->CreateRenderTargetView (m_sceneTexture.Get(), nullptr, &m_sceneRTV);
+        if (FAILED (hr)) { OutputDebugStringA ("FAILED: CreateRenderTargetView for scene\n"); return false; }
+
+        hr = m_device->CreateShaderResourceView (m_sceneTexture.Get(), nullptr, &m_sceneSRV);
+        if (FAILED (hr)) { OutputDebugStringA ("FAILED: CreateShaderResourceView for scene\n"); return false; }
 
         // Create bloom extraction texture (half resolution for performance)
-        UINT bloomWidth = width / 2;
+        UINT bloomWidth  = width / 2;
         UINT bloomHeight = height / 2;
 
         D3D11_TEXTURE2D_DESC texDesc = {};
-        texDesc.Width = bloomWidth;
-        texDesc.Height = bloomHeight;
-        texDesc.MipLevels = 1;
-        texDesc.ArraySize = 1;
-        texDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+        texDesc.Width            = bloomWidth;
+        texDesc.Height           = bloomHeight;
+        texDesc.MipLevels        = 1;
+        texDesc.ArraySize        = 1;
+        texDesc.Format           = DXGI_FORMAT_R8G8B8A8_UNORM;
         texDesc.SampleDesc.Count = 1;
-        texDesc.Usage = D3D11_USAGE_DEFAULT;
-        texDesc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
+        texDesc.Usage            = D3D11_USAGE_DEFAULT;
+        texDesc.BindFlags        = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
 
-        hr = m_device->CreateTexture2D(&texDesc, nullptr, &m_bloomTexture);
-        if (FAILED(hr)) return false;
+        hr = m_device->CreateTexture2D (&texDesc, nullptr, &m_bloomTexture);
+        if (FAILED (hr)) return false;
 
-        hr = m_device->CreateRenderTargetView(m_bloomTexture.Get(), nullptr, &m_bloomRTV);
-        if (FAILED(hr)) return false;
+        hr = m_device->CreateRenderTargetView (m_bloomTexture.Get(), nullptr, &m_bloomRTV);
+        if (FAILED (hr)) return false;
 
-        hr = m_device->CreateShaderResourceView(m_bloomTexture.Get(), nullptr, &m_bloomSRV);
-        if (FAILED(hr)) return false;
+        hr = m_device->CreateShaderResourceView (m_bloomTexture.Get(), nullptr, &m_bloomSRV);
+        if (FAILED (hr)) return false;
 
         // Create temporary blur texture (same size as bloom)
-        hr = m_device->CreateTexture2D(&texDesc, nullptr, &m_blurTempTexture);
-        if (FAILED(hr)) return false;
+        hr = m_device->CreateTexture2D (&texDesc, nullptr, &m_blurTempTexture);
+        if (FAILED (hr)) return false;
 
-        hr = m_device->CreateRenderTargetView(m_blurTempTexture.Get(), nullptr, &m_blurTempRTV);
-        if (FAILED(hr)) return false;
+        hr = m_device->CreateRenderTargetView (m_blurTempTexture.Get(), nullptr, &m_blurTempRTV);
+        if (FAILED (hr)) return false;
 
-        hr = m_device->CreateShaderResourceView(m_blurTempTexture.Get(), nullptr, &m_blurTempSRV);
-        if (FAILED(hr)) return false;
+        hr = m_device->CreateShaderResourceView (m_blurTempTexture.Get(), nullptr, &m_blurTempSRV);
+        if (FAILED (hr)) return false;
 
         // Shader compilation resources
         Microsoft::WRL::ComPtr<ID3DBlob> vsBlob;
@@ -589,23 +640,23 @@ namespace MatrixRain
         )";
 
         
-        hr = D3DCompile(quadVSSource, strlen(quadVSSource), "QuadVS", nullptr, nullptr,
-            "main", "vs_5_0", D3DCOMPILE_ENABLE_STRICTNESS, 0, &vsBlob, &errorBlob);
-        if (FAILED(hr))
+        hr = D3DCompile (quadVSSource, strlen (quadVSSource), "QuadVS", nullptr, nullptr,
+                         "main", "vs_5_0", D3DCOMPILE_ENABLE_STRICTNESS, 0, &vsBlob, &errorBlob);
+        if (FAILED (hr))
         {
-            if (errorBlob) OutputDebugStringA((char*)errorBlob->GetBufferPointer());
+            if (errorBlob) OutputDebugStringA ((char*)errorBlob->GetBufferPointer());
             return false;
         }
-        hr = m_device->CreateVertexShader(vsBlob->GetBufferPointer(), vsBlob->GetBufferSize(), nullptr, &m_fullscreenQuadVS);
-        if (FAILED(hr)) return false;
+        hr = m_device->CreateVertexShader (vsBlob->GetBufferPointer(), vsBlob->GetBufferSize(), nullptr, &m_fullscreenQuadVS);
+        if (FAILED (hr)) return false;
 
         // Create input layout for fullscreen quad
         D3D11_INPUT_ELEMENT_DESC quadLayoutDesc[] = {
-            { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-            { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0 }
+            { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0,  D3D11_INPUT_PER_VERTEX_DATA, 0 },
+            { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,    0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0 }
         };
-        hr = m_device->CreateInputLayout(quadLayoutDesc, 2, vsBlob->GetBufferPointer(), vsBlob->GetBufferSize(), &m_fullscreenQuadInputLayout);
-        if (FAILED(hr)) return false;
+        hr = m_device->CreateInputLayout (quadLayoutDesc, 2, vsBlob->GetBufferPointer(), vsBlob->GetBufferSize(), &m_fullscreenQuadInputLayout);
+        if (FAILED (hr)) return false;
 
         // Compile horizontal blur shader
         const char* blurHSource = R"(
@@ -727,54 +778,54 @@ namespace MatrixRain
         // Compile bloom extraction shader
         psBlob.Reset();
         errorBlob.Reset();
-        hr = D3DCompile(extractSource, strlen(extractSource), "Extract", nullptr, nullptr,
-            "main", "ps_5_0", D3DCOMPILE_ENABLE_STRICTNESS, 0, &psBlob, &errorBlob);
-        if (FAILED(hr))
+        hr = D3DCompile (extractSource, strlen (extractSource), "Extract", nullptr, nullptr,
+                         "main", "ps_5_0", D3DCOMPILE_ENABLE_STRICTNESS, 0, &psBlob, &errorBlob);
+        if (FAILED (hr))
         {
-            if (errorBlob) OutputDebugStringA((char*)errorBlob->GetBufferPointer());
+            if (errorBlob) OutputDebugStringA ((char*)errorBlob->GetBufferPointer());
             return false;
         }
-        hr = m_device->CreatePixelShader(psBlob->GetBufferPointer(), psBlob->GetBufferSize(), nullptr, &m_bloomExtractPS);
-        if (FAILED(hr)) return false;
+        hr = m_device->CreatePixelShader (psBlob->GetBufferPointer(), psBlob->GetBufferSize(), nullptr, &m_bloomExtractPS);
+        if (FAILED (hr)) return false;
 
         // Compile horizontal blur
         psBlob.Reset();
         errorBlob.Reset();
-        hr = D3DCompile(blurHSource, strlen(blurHSource), "BlurH", nullptr, nullptr,
-            "main", "ps_5_0", D3DCOMPILE_ENABLE_STRICTNESS, 0, &psBlob, &errorBlob);
-        if (FAILED(hr))
+        hr = D3DCompile (blurHSource, strlen (blurHSource), "BlurH", nullptr, nullptr,
+                         "main", "ps_5_0", D3DCOMPILE_ENABLE_STRICTNESS, 0, &psBlob, &errorBlob);
+        if (FAILED (hr))
         {
-            if (errorBlob) OutputDebugStringA((char*)errorBlob->GetBufferPointer());
+            if (errorBlob) OutputDebugStringA ((char*)errorBlob->GetBufferPointer());
             return false;
         }
-        hr = m_device->CreatePixelShader(psBlob->GetBufferPointer(), psBlob->GetBufferSize(), nullptr, &m_blurHorizontalPS);
-        if (FAILED(hr)) return false;
+        hr = m_device->CreatePixelShader (psBlob->GetBufferPointer(), psBlob->GetBufferSize(), nullptr, &m_blurHorizontalPS);
+        if (FAILED (hr)) return false;
 
         // Compile vertical blur
         psBlob.Reset();
         errorBlob.Reset();
-        hr = D3DCompile(blurVSource, strlen(blurVSource), "BlurV", nullptr, nullptr,
-            "main", "ps_5_0", D3DCOMPILE_ENABLE_STRICTNESS, 0, &psBlob, &errorBlob);
-        if (FAILED(hr))
+        hr = D3DCompile (blurVSource, strlen (blurVSource), "BlurV", nullptr, nullptr,
+                         "main", "ps_5_0", D3DCOMPILE_ENABLE_STRICTNESS, 0, &psBlob, &errorBlob);
+        if (FAILED (hr))
         {
-            if (errorBlob) OutputDebugStringA((char*)errorBlob->GetBufferPointer());
+            if (errorBlob) OutputDebugStringA ((char*)errorBlob->GetBufferPointer());
             return false;
         }
-        hr = m_device->CreatePixelShader(psBlob->GetBufferPointer(), psBlob->GetBufferSize(), nullptr, &m_blurVerticalPS);
-        if (FAILED(hr)) return false;
+        hr = m_device->CreatePixelShader (psBlob->GetBufferPointer(), psBlob->GetBufferSize(), nullptr, &m_blurVerticalPS);
+        if (FAILED (hr)) return false;
 
         // Compile composite shader
         psBlob.Reset();
         errorBlob.Reset();
-        hr = D3DCompile(compositeSource, strlen(compositeSource), "Composite", nullptr, nullptr,
-            "main", "ps_5_0", D3DCOMPILE_ENABLE_STRICTNESS, 0, &psBlob, &errorBlob);
-        if (FAILED(hr))
+        hr = D3DCompile (compositeSource, strlen (compositeSource), "Composite", nullptr, nullptr,
+                         "main", "ps_5_0", D3DCOMPILE_ENABLE_STRICTNESS, 0, &psBlob, &errorBlob);
+        if (FAILED (hr))
         {
-            if (errorBlob) OutputDebugStringA((char*)errorBlob->GetBufferPointer());
+            if (errorBlob) OutputDebugStringA ((char*)errorBlob->GetBufferPointer());
             return false;
         }
-        hr = m_device->CreatePixelShader(psBlob->GetBufferPointer(), psBlob->GetBufferSize(), nullptr, &m_compositePS);
-        if (FAILED(hr)) return false;
+        hr = m_device->CreatePixelShader (psBlob->GetBufferPointer(), psBlob->GetBufferSize(), nullptr, &m_compositePS);
+        if (FAILED (hr)) return false;
 
         // Create fullscreen quad vertex buffer
         struct QuadVertex
@@ -793,16 +844,17 @@ namespace MatrixRain
         };
 
         D3D11_BUFFER_DESC vbDesc = {};
-        vbDesc.ByteWidth = sizeof(quadVertices);
-        vbDesc.Usage = D3D11_USAGE_IMMUTABLE;
+        vbDesc.ByteWidth = sizeof (quadVertices);
+        vbDesc.Usage     = D3D11_USAGE_IMMUTABLE;
         vbDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
 
         D3D11_SUBRESOURCE_DATA vbData = {};
         vbData.pSysMem = quadVertices;
 
-        hr = m_device->CreateBuffer(&vbDesc, &vbData, &m_fullscreenQuadVB);
-        return SUCCEEDED(hr);
+        hr = m_device->CreateBuffer (&vbDesc, &vbData, &m_fullscreenQuadVB);
+        return SUCCEEDED (hr);
     }
+
 
 
 
@@ -812,7 +864,7 @@ namespace MatrixRain
         // Safety check - if bloom resources failed to create, skip
         if (!m_sceneTexture || !m_bloomTexture || !m_bloomExtractPS || !m_compositePS)
         {
-            OutputDebugStringA("ApplyBloom: Missing resources, skipping\n");
+            OutputDebugStringA ("ApplyBloom: Missing resources, skipping\n");
             return;
         }
         
@@ -820,75 +872,78 @@ namespace MatrixRain
         
         // Set viewport for half-resolution processing
         D3D11_VIEWPORT halfViewport = {};
-        halfViewport.Width = static_cast<float>(m_renderWidth / 2);
-        halfViewport.Height = static_cast<float>(m_renderHeight / 2);
+
+        halfViewport.Width    = static_cast<float> (m_renderWidth / 2);
+        halfViewport.Height   = static_cast<float> (m_renderHeight / 2);
         halfViewport.MinDepth = 0.0f;
         halfViewport.MaxDepth = 1.0f;
-        m_context->RSSetViewports(1, &halfViewport);
+        
+        m_context->RSSetViewports (1, &halfViewport);
         
         // EXTRACTION PASS: Extract only bright pixels from scene to bloom texture
-        m_context->OMSetRenderTargets(1, m_bloomRTV.GetAddressOf(), nullptr);
-        m_context->IASetInputLayout(m_fullscreenQuadInputLayout.Get());
-        m_context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-        UINT stride = sizeof(float) * 5;
+        m_context->OMSetRenderTargets     (1, m_bloomRTV.GetAddressOf(), nullptr);
+        m_context->IASetInputLayout       (m_fullscreenQuadInputLayout.Get());
+        m_context->IASetPrimitiveTopology (D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+        UINT stride = sizeof (float) * 5;
         UINT offset = 0;
-        m_context->IASetVertexBuffers(0, 1, m_fullscreenQuadVB.GetAddressOf(), &stride, &offset);
-        m_context->VSSetShader(m_fullscreenQuadVS.Get(), nullptr, 0);
-        m_context->VSSetConstantBuffers(0, 0, nullptr);
-        m_context->PSSetShader(m_bloomExtractPS.Get(), nullptr, 0);
-        m_context->PSSetShaderResources(0, 1, m_sceneSRV.GetAddressOf());
-        m_context->PSSetSamplers(0, 1, m_samplerState.GetAddressOf());
-        m_context->Draw(6, 0);
+        m_context->IASetVertexBuffers   (0, 1, m_fullscreenQuadVB.GetAddressOf(), &stride, &offset);
+        m_context->VSSetShader          (m_fullscreenQuadVS.Get(), nullptr, 0);
+        m_context->VSSetConstantBuffers (0, 0, nullptr);
+        m_context->PSSetShader          (m_bloomExtractPS.Get(), nullptr, 0);
+        m_context->PSSetShaderResources (0, 1, m_sceneSRV.GetAddressOf());
+        m_context->PSSetSamplers        (0, 1, m_samplerState.GetAddressOf());
+        m_context->Draw (6, 0);
         
-        ID3D11ShaderResourceView* nullSRV = nullptr;
-        m_context->PSSetShaderResources(0, 1, &nullSRV);
+        ID3D11ShaderResourceView * nullSRV = nullptr;
+        m_context->PSSetShaderResources (0, 1, &nullSRV);
         
         // Horizontal blur pass (bloom → temp)
-        m_context->OMSetRenderTargets(1, m_blurTempRTV.GetAddressOf(), nullptr);
-        m_context->PSSetShader(m_blurHorizontalPS.Get(), nullptr, 0);
-        m_context->PSSetShaderResources(0, 1, m_bloomSRV.GetAddressOf());
-        m_context->Draw(6, 0);
+        m_context->OMSetRenderTargets   (1, m_blurTempRTV.GetAddressOf(), nullptr);
+        m_context->PSSetShader          (m_blurHorizontalPS.Get(), nullptr, 0);
+        m_context->PSSetShaderResources (0, 1, m_bloomSRV.GetAddressOf());
+        m_context->Draw (6, 0);
         
-        m_context->PSSetShaderResources(0, 1, &nullSRV);
+        m_context->PSSetShaderResources (0, 1, &nullSRV);
         
         // Vertical blur pass (temp → bloom)
-        m_context->OMSetRenderTargets(1, m_bloomRTV.GetAddressOf(), nullptr);
-        m_context->PSSetShader(m_blurVerticalPS.Get(), nullptr, 0);
-        m_context->PSSetShaderResources(0, 1, m_blurTempSRV.GetAddressOf());
-        m_context->Draw(6, 0);
+        m_context->OMSetRenderTargets   (1, m_bloomRTV.GetAddressOf(), nullptr);
+        m_context->PSSetShader          (m_blurVerticalPS.Get(), nullptr, 0);
+        m_context->PSSetShaderResources (0, 1, m_blurTempSRV.GetAddressOf());
+        m_context->Draw (6, 0);
         
-        m_context->PSSetShaderResources(0, 1, &nullSRV);
+        m_context->PSSetShaderResources (0, 1, &nullSRV);
         
         // Restore full viewport
         D3D11_VIEWPORT fullViewport = {};
-        fullViewport.Width = static_cast<float>(m_renderWidth);
-        fullViewport.Height = static_cast<float>(m_renderHeight);
+        fullViewport.Width    = static_cast<float> (m_renderWidth);
+        fullViewport.Height   = static_cast<float> (m_renderHeight);
         fullViewport.MinDepth = 0.0f;
         fullViewport.MaxDepth = 1.0f;
-        m_context->RSSetViewports(1, &fullViewport);
+        m_context->RSSetViewports (1, &fullViewport);
         
         // Composite back to backbuffer
-        m_context->OMSetRenderTargets(1, m_renderTargetView.GetAddressOf(), nullptr);
+        m_context->OMSetRenderTargets (1, m_renderTargetView.GetAddressOf(), nullptr);
         
         // Disable blending for composite (we want to replace, not blend)
-        m_context->OMSetBlendState(nullptr, nullptr, 0xffffffff);
+        m_context->OMSetBlendState (nullptr, nullptr, 0xffffffff);
         
-        m_context->PSSetShader(m_compositePS.Get(), nullptr, 0);
-        ID3D11ShaderResourceView* srvs[2] = { m_sceneSRV.Get(), m_bloomSRV.Get() };
-        m_context->PSSetShaderResources(0, 2, srvs);
-        m_context->PSSetSamplers(0, 1, m_samplerState.GetAddressOf());
-        m_context->Draw(6, 0);
+        m_context->PSSetShader (m_compositePS.Get(), nullptr, 0);
+        ID3D11ShaderResourceView * srvs[2] = { m_sceneSRV.Get(), m_bloomSRV.Get() };
+        m_context->PSSetShaderResources (0, 2, srvs);
+        m_context->PSSetSamplers        (0, 1, m_samplerState.GetAddressOf());
+        m_context->Draw (6, 0);
         
         // Cleanup
-        ID3D11ShaderResourceView* nullSRVs[2] = { nullptr, nullptr };
-        m_context->PSSetShaderResources(0, 2, nullSRVs);
+        ID3D11ShaderResourceView * nullSRVs[2] = { nullptr, nullptr };
+        m_context->PSSetShaderResources (0, 2, nullSRVs);
         
         // Restore render state
-        m_context->IASetInputLayout(m_inputLayout.Get());
-        m_context->VSSetShader(m_vertexShader.Get(), nullptr, 0);
-        m_context->VSSetConstantBuffers(0, 1, m_constantBuffer.GetAddressOf());
-        m_context->PSSetShader(m_pixelShader.Get(), nullptr, 0);
+        m_context->IASetInputLayout     (m_inputLayout.Get());
+        m_context->VSSetShader          (m_vertexShader.Get(), nullptr, 0);
+        m_context->VSSetConstantBuffers (0, 1, m_constantBuffer.GetAddressOf());
+        m_context->PSSetShader          (m_pixelShader.Get(), nullptr, 0);
     }
+
 
 
 
@@ -897,23 +952,31 @@ namespace MatrixRain
     {
         // Clear to black
         float clearColor[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
-        m_context->ClearRenderTargetView(m_renderTargetView.Get(), clearColor);
+        m_context->ClearRenderTargetView (m_renderTargetView.Get(), clearColor);
     }
 
-    void RenderSystem::SortStreaksByDepth(std::vector<const CharacterStreak*>& streaks)
+
+
+
+
+    void RenderSystem::SortStreaksByDepth (std::vector<const CharacterStreak*>& streaks)
     {
         // Sort back-to-front (far to near) for proper alpha blending
-        std::stable_sort(streaks.begin(), streaks.end(),
-            [](const CharacterStreak* a, const CharacterStreak* b)
+        std::stable_sort (streaks.begin(), streaks.end(),
+            [](const CharacterStreak * a, const CharacterStreak * b)
             {
                 return a->GetPosition().z > b->GetPosition().z;
             });
     }
 
-    void RenderSystem::UpdateInstanceBuffer(const AnimationSystem& animationSystem, ColorScheme colorScheme)
+
+
+
+
+    void RenderSystem::UpdateInstanceBuffer (const AnimationSystem& animationSystem, ColorScheme colorScheme)
     {
         // Get color scheme RGB values
-        Color4 schemeColor = GetColorRGB(colorScheme);
+        Color4 schemeColor = GetColorRGB (colorScheme);
 
         // Collect all character instances from all streaks
         std::vector<CharacterInstanceData> instanceData;
@@ -922,9 +985,9 @@ namespace MatrixRain
         std::vector<const CharacterStreak*> streakPtrs;
         for (const auto& streak : animationSystem.GetStreaks())
         {
-            streakPtrs.push_back(&streak);
+            streakPtrs.push_back (&streak);
         }
-        SortStreaksByDepth(streakPtrs);
+        SortStreaksByDepth (streakPtrs);
 
         CharacterSet& charSet = CharacterSet::GetInstance();
 
@@ -945,7 +1008,7 @@ namespace MatrixRain
                 data.position[2] = streakPos.z;
 
                 // Get UV coordinates from glyph
-                const GlyphInfo& glyph = charSet.GetGlyph(character.glyphIndex);
+                const GlyphInfo& glyph = charSet.GetGlyph (character.glyphIndex);
                 data.uvMin[0] = glyph.uvMin.x;
                 data.uvMin[1] = glyph.uvMin.y;
                 data.uvMax[0] = glyph.uvMax.x;
@@ -970,11 +1033,11 @@ namespace MatrixRain
                     data.color[2] = schemeColor.b;
                 }
                 
-                data.color[3] = character.color.a;
+                data.color[3]   = character.color.a;
                 data.brightness = character.brightness;
-                data.scale = character.scale;
+                data.scale      = character.scale;
 
-                instanceData.push_back(data);
+                instanceData.push_back (data);
             }
         }
 
@@ -985,16 +1048,20 @@ namespace MatrixRain
 
         // Map instance buffer and upload data
         D3D11_MAPPED_SUBRESOURCE mappedResource;
-        HRESULT hr = m_context->Map(m_instanceBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
-        if (SUCCEEDED(hr))
+        HRESULT hr = m_context->Map (m_instanceBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
+        if (SUCCEEDED (hr))
         {
-            size_t bytesToCopy = sizeof(CharacterInstanceData) * std::min(instanceData.size(), static_cast<size_t>(m_instanceBufferCapacity));
-            memcpy(mappedResource.pData, instanceData.data(), bytesToCopy);
-            m_context->Unmap(m_instanceBuffer.Get(), 0);
+            size_t bytesToCopy = sizeof (CharacterInstanceData) * std::min (instanceData.size(), static_cast<size_t> (m_instanceBufferCapacity));
+            memcpy (mappedResource.pData, instanceData.data(), bytesToCopy);
+            m_context->Unmap (m_instanceBuffer.Get(), 0);
         }
     }
 
-    void RenderSystem::Render(const AnimationSystem& animationSystem, const Viewport& viewport, ColorScheme colorScheme, float fps, int rainPercentage, int streakCount)
+
+
+
+
+    void RenderSystem::Render (const AnimationSystem& animationSystem, const Viewport& viewport, ColorScheme colorScheme, float fps, int rainPercentage, int streakCount)
     {
         if (!m_device || !m_context)
         {
@@ -1007,19 +1074,19 @@ namespace MatrixRain
         // Update constant buffer with projection matrix
         const Matrix4x4& projection = viewport.GetProjectionMatrix();
         D3D11_MAPPED_SUBRESOURCE mappedResource;
-        HRESULT hr = m_context->Map(m_constantBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
-        if (SUCCEEDED(hr))
+        HRESULT hr = m_context->Map (m_constantBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
+        if (SUCCEEDED (hr))
         {
-            ConstantBufferData* cbData = reinterpret_cast<ConstantBufferData*>(mappedResource.pData);
+            ConstantBufferData* cbData = reinterpret_cast<ConstantBufferData*> (mappedResource.pData);
             
             // Copy projection matrix (4x4 = 16 floats)
-            memcpy(cbData->projection, &projection.m[0][0], sizeof(float) * 16);
+            memcpy (cbData->projection, &projection.m[0][0], sizeof (float) * 16);
             
-            m_context->Unmap(m_constantBuffer.Get(), 0);
+            m_context->Unmap (m_constantBuffer.Get(), 0);
         }
 
         // Update instance buffer with character data
-        UpdateInstanceBuffer(animationSystem, colorScheme);
+        UpdateInstanceBuffer (animationSystem, colorScheme);
 
         // Count total characters to render
         size_t totalCharacters = 0;
@@ -1037,41 +1104,41 @@ namespace MatrixRain
         D3D11_VIEWPORT vp = {};
         vp.TopLeftX = 0.0f;
         vp.TopLeftY = 0.0f;
-        vp.Width = static_cast<FLOAT>(viewport.GetWidth());
-        vp.Height = static_cast<FLOAT>(viewport.GetHeight());
+        vp.Width    = static_cast<FLOAT> (viewport.GetWidth());
+        vp.Height   = static_cast<FLOAT> (viewport.GetHeight());
         vp.MinDepth = 0.0f;
         vp.MaxDepth = 1.0f;
-        m_context->RSSetViewports(1, &vp);
+        m_context->RSSetViewports (1, &vp);
 
         // Set render state
-        m_context->IASetInputLayout(m_inputLayout.Get());
-        m_context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+        m_context->IASetInputLayout (m_inputLayout.Get());
+        m_context->IASetPrimitiveTopology (D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-        UINT stride = sizeof(CharacterInstanceData);
+        UINT stride = sizeof (CharacterInstanceData);
         UINT offset = 0;
-        m_context->IASetVertexBuffers(0, 1, m_instanceBuffer.GetAddressOf(), &stride, &offset);
+        m_context->IASetVertexBuffers (0, 1, m_instanceBuffer.GetAddressOf(), &stride, &offset);
 
-        m_context->VSSetShader(m_vertexShader.Get(), nullptr, 0);
-        m_context->VSSetConstantBuffers(0, 1, m_constantBuffer.GetAddressOf());
+        m_context->VSSetShader (m_vertexShader.Get(), nullptr, 0);
+        m_context->VSSetConstantBuffers (0, 1, m_constantBuffer.GetAddressOf());
 
-        m_context->PSSetShader(m_pixelShader.Get(), nullptr, 0);
-        m_context->PSSetSamplers(0, 1, m_samplerState.GetAddressOf());
+        m_context->PSSetShader (m_pixelShader.Get(), nullptr, 0);
+        m_context->PSSetSamplers (0, 1, m_samplerState.GetAddressOf());
         
         // Bind texture atlas from CharacterSet
         CharacterSet& charSet = CharacterSet::GetInstance();
-        ID3D11ShaderResourceView* srv = static_cast<ID3D11ShaderResourceView*>(charSet.GetTextureResourceView());
+        ID3D11ShaderResourceView* srv = static_cast<ID3D11ShaderResourceView*> (charSet.GetTextureResourceView());
         if (srv)
         {
-            m_context->PSSetShaderResources(0, 1, &srv);
+            m_context->PSSetShaderResources (0, 1, &srv);
         }
 
         float blendFactor[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
-        m_context->OMSetBlendState(m_blendState.Get(), blendFactor, 0xffffffff);
+        m_context->OMSetBlendState (m_blendState.Get(), blendFactor, 0xffffffff);
         
         // Set full viewport for rendering
         D3D11_VIEWPORT fullViewport = {};
-        fullViewport.Width = static_cast<float>(m_renderWidth);
-        fullViewport.Height = static_cast<float>(m_renderHeight);
+        fullViewport.Width    = static_cast<float> (m_renderWidth);
+        fullViewport.Height   = static_cast<float> (m_renderHeight);
         fullViewport.MinDepth = 0.0f;
         fullViewport.MaxDepth = 1.0f;
         m_context->RSSetViewports(1, &fullViewport);
@@ -1081,10 +1148,10 @@ namespace MatrixRain
         {
             // Clear scene texture
             float clearColor[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
-            m_context->ClearRenderTargetView(m_sceneRTV.Get(), clearColor);
+            m_context->ClearRenderTargetView (m_sceneRTV.Get(), clearColor);
             
-            m_context->OMSetRenderTargets(1, m_sceneRTV.GetAddressOf(), nullptr);
-            m_context->DrawInstanced(6, static_cast<UINT>(totalCharacters), 0, 0);
+            m_context->OMSetRenderTargets (1, m_sceneRTV.GetAddressOf(), nullptr);
+            m_context->DrawInstanced (6, static_cast<UINT> (totalCharacters), 0, 0);
             
             // Now apply bloom (which will composite to backbuffer)
             ApplyBloom();
@@ -1092,27 +1159,35 @@ namespace MatrixRain
         else
         {
             // Fallback: render directly to backbuffer if bloom not available
-            m_context->OMSetRenderTargets(1, m_renderTargetView.GetAddressOf(), nullptr);
-            m_context->DrawInstanced(6, static_cast<UINT>(totalCharacters), 0, 0);
+            m_context->OMSetRenderTargets (1, m_renderTargetView.GetAddressOf(), nullptr);
+            m_context->DrawInstanced (6, static_cast<UINT> (totalCharacters), 0, 0);
         }
 
         // Render FPS counter overlay if fps > 0
         // Render FPS counter overlay if fps > 0
         if (fps > 0.0f)
         {
-            RenderFPSCounter(fps, rainPercentage, streakCount);
+            RenderFPSCounter (fps, rainPercentage, streakCount);
         }
     }
+
+
+
+
 
     void RenderSystem::Present()
     {
         if (m_swapChain)
         {
-            m_swapChain->Present(1, 0); // VSync enabled
+            m_swapChain->Present (1, 0); // VSync enabled
         }
     }
 
-    void RenderSystem::RenderFPSCounter(float fps, int rainPercentage, int streakCount)
+
+
+
+
+    void RenderSystem::RenderFPSCounter (float fps, int rainPercentage, int streakCount)
     {
         if (!m_d2dContext || !m_fpsBrush || !m_fpsTextFormat || !m_fpsGlowBrush)
         {
@@ -1124,13 +1199,13 @@ namespace MatrixRain
 
         // Format FPS text with rain density info: "Rain xxx% (yyy), zz FPS"
         wchar_t fpsText[64];
-        swprintf_s(fpsText, L"Rain %d%% (%d), %.0f FPS", rainPercentage, streakCount, fps);
+        swprintf_s (fpsText, L"Rain %d%% (%d), %.0f FPS", rainPercentage, streakCount, fps);
 
         // Get render target size for positioning
         D2D1_SIZE_F size = m_d2dContext->GetSize();
 
         // Create text layout rect (bottom-right corner with 10px padding)
-        D2D1_RECT_F textRect = D2D1::RectF(
+        D2D1_RECT_F textRect = D2D1::RectF (
             size.width - 300.0f,    // Left (300px from right edge for longer text)
             size.height - 40.0f,    // Top (40px from bottom)
             size.width - 10.0f,     // Right (10px padding)
@@ -1142,10 +1217,10 @@ namespace MatrixRain
         const int glowLayers = 10;
         for (int i = glowLayers; i > 0; --i)
         {
-            float offset = static_cast<float>(i);
-            float opacity = 1.0f - (static_cast<float>(i) / static_cast<float>(glowLayers));
+            float offset  = static_cast<float> (i);
+            float opacity = 1.0f - (static_cast<float> (i) / static_cast<float> (glowLayers));
 
-            m_fpsGlowBrush->SetColor(D2D1::ColorF(D2D1::ColorF::Black, opacity));
+            m_fpsGlowBrush->SetColor (D2D1::ColorF (D2D1::ColorF::Black, opacity));
 
             // Draw text at 8 different offsets to create uniform glow
             for (int dx = -1; dx <= 1; ++dx)
@@ -1157,16 +1232,16 @@ namespace MatrixRain
                         continue;
                     }
 
-                    D2D1_RECT_F glowRect = D2D1::RectF(
+                    D2D1_RECT_F glowRect = D2D1::RectF (
                         textRect.left + offset * dx,
                         textRect.top + offset * dy,
                         textRect.right + offset * dx,
                         textRect.bottom + offset * dy
                     );
 
-                    m_d2dContext->DrawText(
+                    m_d2dContext->DrawText (
                         fpsText,
-                        static_cast<UINT32>(wcslen(fpsText)),
+                        static_cast<UINT32> (wcslen (fpsText)),
                         m_fpsTextFormat.Get(),
                         glowRect,
                         m_fpsGlowBrush.Get()
@@ -1176,9 +1251,9 @@ namespace MatrixRain
         }
 
         // Draw text
-        m_d2dContext->DrawText(
+        m_d2dContext->DrawText (
             fpsText,
-            static_cast<UINT32>(wcslen(fpsText)),
+            static_cast<UINT32> (wcslen (fpsText)),
             m_fpsTextFormat.Get(),
             textRect,
             m_fpsBrush.Get()
@@ -1188,9 +1263,13 @@ namespace MatrixRain
         m_d2dContext->EndDraw();
     }
 
-    void RenderSystem::Resize(UINT width, UINT height)
+
+
+
+
+    void RenderSystem::Resize (UINT width, UINT height)
     {
-        m_renderWidth = width;
+        m_renderWidth  = width;
         m_renderHeight = height;
 
         if (!m_swapChain)
@@ -1216,12 +1295,12 @@ namespace MatrixRain
         // CRITICAL: Clear D2D target before resizing
         if (m_d2dContext)
         {
-            m_d2dContext->SetTarget(nullptr);
+            m_d2dContext->SetTarget (nullptr);
         }
 
         // Resize swap chain buffers
-        HRESULT hr = m_swapChain->ResizeBuffers(0, width, height, DXGI_FORMAT_UNKNOWN, 0);
-        if (FAILED(hr))
+        HRESULT hr = m_swapChain->ResizeBuffers (0, width, height, DXGI_FORMAT_UNKNOWN, 0);
+        if (FAILED (hr))
         {
             return; // Failed to resize
         }
@@ -1233,37 +1312,41 @@ namespace MatrixRain
         if (m_d2dContext)
         {
             Microsoft::WRL::ComPtr<ID3D11Texture2D> backBuffer;
-            HRESULT hrBackBuffer = m_swapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), &backBuffer);
-            if (SUCCEEDED(hrBackBuffer))
+            HRESULT hrBackBuffer = m_swapChain->GetBuffer (0, __uuidof (ID3D11Texture2D), &backBuffer);
+            if (SUCCEEDED (hrBackBuffer))
             {
                 Microsoft::WRL::ComPtr<IDXGISurface> dxgiSurface;
-                hrBackBuffer = backBuffer.As(&dxgiSurface);
-                if (SUCCEEDED(hrBackBuffer))
+                hrBackBuffer = backBuffer.As (&dxgiSurface);
+                if (SUCCEEDED (hrBackBuffer))
                 {
-                    D2D1_BITMAP_PROPERTIES1 bitmapProps = D2D1::BitmapProperties1(
+                    D2D1_BITMAP_PROPERTIES1 bitmapProps = D2D1::BitmapProperties1 (
                         D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW,
-                        D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED)
+                        D2D1::PixelFormat (DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED)
                     );
 
-                    m_d2dContext->CreateBitmapFromDxgiSurface(dxgiSurface.Get(), &bitmapProps, &m_d2dBitmap);
-                    m_d2dContext->SetTarget(m_d2dBitmap.Get());
+                    m_d2dContext->CreateBitmapFromDxgiSurface (dxgiSurface.Get(), &bitmapProps, &m_d2dBitmap);
+                    m_d2dContext->SetTarget (m_d2dBitmap.Get());
                 }
             }
         }
 
         // Recreate bloom resources with new dimensions
-        CreateBloomResources(width, height);
+        CreateBloomResources (width, height);
 
         // Update viewport
         D3D11_VIEWPORT viewport = {};
         viewport.TopLeftX = 0.0f;
         viewport.TopLeftY = 0.0f;
-        viewport.Width = static_cast<FLOAT>(width);
-        viewport.Height = static_cast<FLOAT>(height);
+        viewport.Width    = static_cast<FLOAT> (width);
+        viewport.Height   = static_cast<FLOAT> (height);
         viewport.MinDepth = 0.0f;
         viewport.MaxDepth = 1.0f;
-        m_context->RSSetViewports(1, &viewport);
+        m_context->RSSetViewports (1, &viewport);
     }
+
+
+
+
 
     void RenderSystem::Shutdown()
     {
@@ -1310,7 +1393,8 @@ namespace MatrixRain
 
 
 
-    bool RenderSystem::RecreateSwapChain(HWND hwnd, UINT width, UINT height, bool fullscreen)
+
+    bool RenderSystem::RecreateSwapChain (HWND hwnd, UINT width, UINT height, bool fullscreen)
     {
         // Release render target view and D2D bitmap before recreating swap chain
         m_renderTargetView.Reset();
@@ -1320,7 +1404,7 @@ namespace MatrixRain
         m_swapChain.Reset();
 
         // Create new swap chain with updated settings
-        if (!CreateSwapChain(hwnd, width, height))
+        if (!CreateSwapChain (hwnd, width, height))
         {
             return false;
         }
@@ -1328,8 +1412,8 @@ namespace MatrixRain
         // Set fullscreen state if requested
         if (fullscreen)
         {
-            HRESULT hr = m_swapChain->SetFullscreenState(TRUE, nullptr);
-            if (FAILED(hr))
+            HRESULT hr = m_swapChain->SetFullscreenState (TRUE, nullptr);
+            if (FAILED (hr))
             {
                 // Fullscreen transition failed - stay windowed
                 return false;
@@ -1346,29 +1430,30 @@ namespace MatrixRain
         if (m_d2dContext)
         {
             Microsoft::WRL::ComPtr<ID3D11Texture2D> backBuffer;
-            HRESULT hr = m_swapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), &backBuffer);
-            if (SUCCEEDED(hr))
+            HRESULT hr = m_swapChain->GetBuffer (0, __uuidof (ID3D11Texture2D), &backBuffer);
+            if (SUCCEEDED (hr))
             {
                 Microsoft::WRL::ComPtr<IDXGISurface> dxgiSurface;
-                hr = backBuffer.As(&dxgiSurface);
-                if (SUCCEEDED(hr))
+                hr = backBuffer.As (&dxgiSurface);
+                if (SUCCEEDED (hr))
                 {
-                    D2D1_BITMAP_PROPERTIES1 bitmapProps = D2D1::BitmapProperties1(
+                    D2D1_BITMAP_PROPERTIES1 bitmapProps = D2D1::BitmapProperties1 (
                         D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW,
-                        D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED)
+                        D2D1::PixelFormat (DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED)
                     );
 
-                    m_d2dContext->CreateBitmapFromDxgiSurface(dxgiSurface.Get(), &bitmapProps, &m_d2dBitmap);
-                    m_d2dContext->SetTarget(m_d2dBitmap.Get());
+                    m_d2dContext->CreateBitmapFromDxgiSurface (dxgiSurface.Get(), &bitmapProps, &m_d2dBitmap);
+                    m_d2dContext->SetTarget (m_d2dBitmap.Get());
                 }
             }
         }
 
         // Resize viewport to match new dimensions
-        Resize(width, height);
+        Resize (width, height);
 
         return true;
     }
+
 
 
 
@@ -1380,9 +1465,10 @@ namespace MatrixRain
             return false;
         }
 
-        HRESULT hr = m_swapChain->SetFullscreenState(TRUE, nullptr);
-        return SUCCEEDED(hr);
+        HRESULT hr = m_swapChain->SetFullscreenState (TRUE, nullptr);
+        return SUCCEEDED (hr);
     }
+
 
 
 
@@ -1394,7 +1480,7 @@ namespace MatrixRain
             return false;
         }
 
-        HRESULT hr = m_swapChain->SetFullscreenState(FALSE, nullptr);
-        return SUCCEEDED(hr);
+        HRESULT hr = m_swapChain->SetFullscreenState (FALSE, nullptr);
+        return SUCCEEDED (hr);
     }
 }
