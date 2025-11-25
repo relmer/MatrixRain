@@ -80,9 +80,16 @@ namespace MatrixRain
         // Auto-spawn new streaks based on density controller (if available)
         if (m_densityController)
         {
-            // Use density controller to determine if we should spawn
             int currentCount = static_cast<int>(m_streaks.size());
-            if (m_densityController->ShouldSpawnStreak(currentCount))
+            int targetCount = m_densityController->GetTargetStreakCount();
+            
+            // Remove excess streaks immediately if above target
+            if (currentCount > targetCount)
+            {
+                RemoveExcessStreaks(targetCount);
+            }
+            // Spawn new streaks if below target
+            else if (m_densityController->ShouldSpawnStreak(currentCount))
             {
                 m_spawnTimer += deltaTime;
                 if (m_spawnTimer >= m_spawnInterval)
@@ -182,6 +189,33 @@ namespace MatrixRain
             m_streaks.end()
         );
     }
+
+
+
+
+    void AnimationSystem::RemoveExcessStreaks(int targetCount)
+    {
+        int currentCount = static_cast<int>(m_streaks.size());
+        if (currentCount <= targetCount)
+        {
+            return; // No excess to remove
+        }
+
+        // Calculate how many to remove
+        int removeCount = currentCount - targetCount;
+
+        // Sort streaks by Z depth (furthest first) - these are oldest/least visible
+        std::sort(m_streaks.begin(), m_streaks.end(),
+            [](const CharacterStreak& a, const CharacterStreak& b) {
+                return a.GetPosition().z > b.GetPosition().z;
+            });
+
+        // Remove the furthest streaks
+        m_streaks.erase(m_streaks.begin(), m_streaks.begin() + removeCount);
+    }
+
+
+
 
     void AnimationSystem::ApplyZoom(float deltaTime)
     {

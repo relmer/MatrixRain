@@ -2,38 +2,34 @@
 
 namespace MatrixRain
 {
+    class Viewport;
+
     /// <summary>
-    /// Controls the density of falling character streaks via a 10-level system.
-    /// Implements formula: targetStreaks = 10 + (level-1)*54
-    /// Level 1 (min): 10 streaks
-    /// Level 5 (default): 226 streaks
-    /// Level 10 (max): 496 streaks
+    /// Controls the density of falling character streaks via percentage-based system (0-100%).
+    /// Min streaks: 1 (always at least one, even at 0%)
+    /// Max streaks: viewportWidth / characterWidth / 2 (allows for overlap)
+    /// Formula: targetStreaks = max(1, (maxPossibleStreaks * percentage / 100))
     /// </summary>
     class DensityController
     {
     public:
-        DensityController();
+        DensityController(const Viewport& viewport, float characterWidth);
 
         /// <summary>
-        /// Initialize with default level 5 (226 target streaks).
-        /// </summary>
-        void Initialize();
-
-        /// <summary>
-        /// Increase density level (max 10).
+        /// Increase density percentage by step amount (max 100%).
         /// </summary>
         void IncreaseLevel();
 
         /// <summary>
-        /// Decrease density level (min 1).
+        /// Decrease density percentage by step amount (min 0%).
         /// </summary>
         void DecreaseLevel();
 
         /// <summary>
-        /// Get target number of streaks for current level.
-        /// Formula: targetStreaks = 10 + (level-1)*54
+        /// Get target number of streaks based on current percentage and viewport width.
+        /// Formula: max(1, (viewportWidth / characterWidth / 2) * percentage / 100)
         /// </summary>
-        /// <returns>Target streak count for current level</returns>
+        /// <returns>Target streak count for current percentage</returns>
         int GetTargetStreakCount() const;
 
         /// <summary>
@@ -45,15 +41,18 @@ namespace MatrixRain
         bool ShouldSpawnStreak(int currentActiveCount) const;
 
         // Accessors
-        int GetLevel() const { return m_level; }
+        int GetPercentage() const { return m_percentage; }
+        int GetMaxPossibleStreaks() const;
 
-    private:
-        int m_level;                    // Current density level (1-10)
+private:
+        int m_percentage;                           // Current density percentage (0-100)
+        const Viewport& m_viewport;                 // Reference to viewport for width calculations
+        float m_characterWidth;                     // Width of one character in pixels (horizontal spacing)
         
-        static constexpr int MIN_LEVEL = 1;
-        static constexpr int MAX_LEVEL = 10;
-        static constexpr int DEFAULT_LEVEL = 5;
-        static constexpr int BASE_STREAK_COUNT = 10;
-        static constexpr int STREAK_INCREMENT_PER_LEVEL = 54;
+        static constexpr int MIN_PERCENTAGE = 0;
+        static constexpr int MAX_PERCENTAGE = 100;
+        static constexpr int DEFAULT_PERCENTAGE = 80;  // Start at 80% density
+        static constexpr int PERCENTAGE_STEP = 5;      // Change by 5% per +/- press
+        static constexpr int MIN_STREAKS = 1;          // Always show at least one streak
     };
 }

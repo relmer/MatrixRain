@@ -56,6 +56,13 @@ namespace MatrixRain
         void DespawnOffscreenStreaks();
 
         /// <summary>
+        /// Remove excess streaks when density is reduced.
+        /// Removes oldest streaks (furthest from camera) first.
+        /// </summary>
+        /// <param name="targetCount">Target number of streaks to maintain</param>
+        void RemoveExcessStreaks(int targetCount);
+
+        /// <summary>
         /// Apply continuous zoom effect to all streaks.
         /// Moves camera forward (decreases Z), wraps at Z=0 boundary.
         /// </summary>
@@ -86,6 +93,6 @@ namespace MatrixRain
 
         static constexpr float DEFAULT_ZOOM_VELOCITY = 5.0f;  // Units per second
         static constexpr float MAX_DEPTH = 100.0f;            // Far plane
-        static constexpr float SPAWN_INTERVAL = 0.2f;         // Spawn every 200ms
+        static constexpr float SPAWN_INTERVAL = 0.05f;        // Spawn every 50ms (fast response)
     };
 }

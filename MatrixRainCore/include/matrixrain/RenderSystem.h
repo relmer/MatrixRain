@@ -32,7 +32,9 @@ namespace MatrixRain
         /// <param name="viewport">Viewport for projection matrix</param>
         /// <param name="colorScheme">Current color scheme for rendering</param>
         /// <param name="fps">Current FPS for display (0 to hide)</param>
-        void Render(const AnimationSystem& animationSystem, const Viewport& viewport, ColorScheme colorScheme = ColorScheme::Green, float fps = 0.0f);
+        /// <param name="rainPercentage">Current rain density percentage (0-100)</param>
+        /// <param name="streakCount">Current number of active streaks</param>
+        void Render(const AnimationSystem& animationSystem, const Viewport& viewport, ColorScheme colorScheme = ColorScheme::Green, float fps = 0.0f, int rainPercentage = 0, int streakCount = 0);
 
         /// <summary>
         /// Present the rendered frame to the screen.
@@ -94,7 +96,7 @@ namespace MatrixRain
         void SortStreaksByDepth(std::vector<const CharacterStreak*>& streaks);
         void UpdateInstanceBuffer(const AnimationSystem& animationSystem, ColorScheme colorScheme);
         void ClearRenderTarget();
-        void RenderFPSCounter(float fps);
+        void RenderFPSCounter(float fps, int rainPercentage, int streakCount);
         void ApplyBloom();
 
         // DirectX resources

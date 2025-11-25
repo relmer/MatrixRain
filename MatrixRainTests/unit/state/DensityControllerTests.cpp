@@ -2,6 +2,7 @@
 
 
 #include "MatrixRain/DensityController.h"
+#include "MatrixRain/Viewport.h"
 
 
 using namespace MatrixRain;
@@ -11,113 +12,155 @@ namespace MatrixRainTests
 	{
 	public:
 		
-		TEST_METHOD(TestDensityControllerInitializationWithLevel5Default)
+		TEST_METHOD(TestDensityControllerInitializationWithDefaultPercentage)
 		{
-			// T092: Test DensityController initialization with level 5 default
-			// Formula: targetStreaks = 10 + (level-1)*54
-			// Level 5: 10 + (5-1)*54 = 10 + 4*54 = 10 + 216 = 226
+			// Test DensityController initialization with 80% default
+			// For a 1920px viewport: max = 1920 / (32/2) = 120 streaks
+			// At 80%: target = 120 * 0.80 = 96 streaks
 			
-			DensityController controller;
-			controller.Initialize();
+			Viewport viewport;
+			viewport.Resize(1920.0f, 1080.0f);
 			
-			Assert::AreEqual(5, controller.GetLevel(), L"Default level should be 5");
-			Assert::AreEqual(226, controller.GetTargetStreakCount(), L"Target streak count for level 5 should be 226");
+			DensityController controller(viewport, 32.0f);
+			
+			Assert::AreEqual(80, controller.GetPercentage(), L"Default percentage should be 80");
+			Assert::AreEqual(120, controller.GetMaxPossibleStreaks(), L"Max possible streaks for 1920px should be 120");
+			Assert::AreEqual(96, controller.GetTargetStreakCount(), L"Target streak count at 80% should be 96");
 		}
 
-		TEST_METHOD(TestDensityControllerIncreasesToMax10)
+		TEST_METHOD(TestDensityControllerIncreasesToMax100Percent)
 		{
-			// T093: Test DensityController level increase to max 10
-			// Formula: targetStreaks = 10 + (level-1)*54
-			// Level 10: 10 + (10-1)*54 = 10 + 9*54 = 10 + 486 = 496
+			// Test DensityController percentage increase to max 100%
+			// Step size is 5%, so 80% → 85% → 90% → 95% → 100%
 			
-			DensityController controller;
-			controller.Initialize();
+			Viewport viewport;
+			viewport.Resize(1920.0f, 1080.0f);
 			
-			// Increase from level 5 to 10 (5 increments)
-			for (int i = 0; i < 5; ++i)
-			{
-				controller.IncreaseLevel();
-			}
+			DensityController controller(viewport, 32.0f);
 			
-			Assert::AreEqual(10, controller.GetLevel(), L"Level should be at max 10");
-			Assert::AreEqual(496, controller.GetTargetStreakCount(), L"Target streak count for level 10 should be 496");
+			// Increase from 80% to 100% (4 steps of 5%)
+			controller.IncreaseLevel(); // 85%
+			controller.IncreaseLevel(); // 90%
+			controller.IncreaseLevel(); // 95%
+			controller.IncreaseLevel(); // 100%
+			
+			Assert::AreEqual(100, controller.GetPercentage(), L"Percentage should be at max 100");
+			Assert::AreEqual(120, controller.GetTargetStreakCount(), L"Target at 100% should equal max possible (120)");
 			
 			// Try to increase beyond max
 			controller.IncreaseLevel();
 			controller.IncreaseLevel();
 			
-			Assert::AreEqual(10, controller.GetLevel(), L"Level should remain at max 10");
-			Assert::AreEqual(496, controller.GetTargetStreakCount(), L"Target streak count should remain 496");
+			Assert::AreEqual(100, controller.GetPercentage(), L"Percentage should remain at max 100");
+			Assert::AreEqual(120, controller.GetTargetStreakCount(), L"Target should remain at max (120)");
 		}
 
-		TEST_METHOD(TestDensityControllerDecreasesToMin1)
+		TEST_METHOD(TestDensityControllerDecreasesToMin0PercentButKeepsMinStreak)
 		{
-			// T094: Test DensityController level decrease to min 1
-			// Formula: targetStreaks = 10 + (level-1)*54
-			// Level 1: 10 + (1-1)*54 = 10 + 0 = 10
+			// Test DensityController percentage decrease to min 0%
+			// Even at 0%, should maintain minimum of 1 streak
 			
-			DensityController controller;
-			controller.Initialize();
+			Viewport viewport;
+			viewport.Resize(1920.0f, 1080.0f);
 			
-			// Decrease from level 5 to 1 (4 decrements)
-			for (int i = 0; i < 4; ++i)
+			DensityController controller(viewport, 32.0f);
+			
+			// Decrease from 80% to 0% (16 steps of 5%)
+			for (int i = 0; i < 16; ++i)
 			{
 				controller.DecreaseLevel();
 			}
 			
-			Assert::AreEqual(1, controller.GetLevel(), L"Level should be at min 1");
-			Assert::AreEqual(10, controller.GetTargetStreakCount(), L"Target streak count for level 1 should be 10");
+			Assert::AreEqual(0, controller.GetPercentage(), L"Percentage should be at min 0");
+			Assert::AreEqual(1, controller.GetTargetStreakCount(), L"Target at 0% should be minimum 1 streak");
 			
 			// Try to decrease beyond min
 			controller.DecreaseLevel();
 			controller.DecreaseLevel();
 			
-			Assert::AreEqual(1, controller.GetLevel(), L"Level should remain at min 1");
-			Assert::AreEqual(10, controller.GetTargetStreakCount(), L"Target streak count should remain 10");
+			Assert::AreEqual(0, controller.GetPercentage(), L"Percentage should remain at min 0");
+			Assert::AreEqual(1, controller.GetTargetStreakCount(), L"Target should remain at minimum 1");
 		}
 
 		TEST_METHOD(TestDensityControllerSpawnProbability)
 		{
-			// T095: Test DensityController spawn probability calculation
+			// Test DensityController spawn probability calculation
 			
-			DensityController controller;
-			controller.Initialize();
+			Viewport viewport;
+			viewport.Resize(1920.0f, 1080.0f);
 			
-			int target = controller.GetTargetStreakCount(); // 226 for level 5
+			DensityController controller(viewport, 32.0f);
+			
+			int target = controller.GetTargetStreakCount(); // 96 for 80% at 1920px
 			
 			// Below target: should spawn
 			Assert::IsTrue(controller.ShouldSpawnStreak(0), L"Should spawn when count is 0");
-			Assert::IsTrue(controller.ShouldSpawnStreak(100), L"Should spawn when below target");
+			Assert::IsTrue(controller.ShouldSpawnStreak(10), L"Should spawn when below target");
 			Assert::IsTrue(controller.ShouldSpawnStreak(target - 1), L"Should spawn when just below target");
 			
 			// At or above target: should not spawn
 			Assert::IsFalse(controller.ShouldSpawnStreak(target), L"Should not spawn when at target");
 			Assert::IsFalse(controller.ShouldSpawnStreak(target + 1), L"Should not spawn when above target");
-			Assert::IsFalse(controller.ShouldSpawnStreak(500), L"Should not spawn when well above target");
+			Assert::IsFalse(controller.ShouldSpawnStreak(100), L"Should not spawn when well above target");
 		}
 
 		TEST_METHOD(TestDensityControllerBoundsEnforcement)
 		{
-			// T096: Test DensityController bounds enforcement
+			// Test DensityController bounds enforcement
 			
-			DensityController controller;
-			controller.Initialize();
+			Viewport viewport;
+			viewport.Resize(1920.0f, 1080.0f);
+			
+			DensityController controller(viewport, 32.0f);
 			
 			// Test max bound enforcement
-			for (int i = 0; i < 20; ++i) // Try to go way beyond max
+			for (int i = 0; i < 30; ++i) // Try to go way beyond max
 			{
 				controller.IncreaseLevel();
 			}
-			Assert::AreEqual(10, controller.GetLevel(), L"Level should be clamped at max 10");
-			Assert::AreEqual(496, controller.GetTargetStreakCount(), L"Target count should match max level");
+			Assert::AreEqual(100, controller.GetPercentage(), L"Percentage should be clamped at max 100");
+			Assert::AreEqual(120, controller.GetTargetStreakCount(), L"Target count should match 100% of max");
 			
 			// Test min bound enforcement
-			for (int i = 0; i < 20; ++i) // Try to go way beyond min
+			for (int i = 0; i < 30; ++i) // Try to go way beyond min
 			{
 				controller.DecreaseLevel();
 			}
-			Assert::AreEqual(1, controller.GetLevel(), L"Level should be clamped at min 1");
-			Assert::AreEqual(10, controller.GetTargetStreakCount(), L"Target count should match min level");
+			Assert::AreEqual(0, controller.GetPercentage(), L"Percentage should be clamped at min 0");
+			Assert::AreEqual(1, controller.GetTargetStreakCount(), L"Target count should be minimum 1 streak");
+		}
+		
+		TEST_METHOD(TestDensityControllerScalesWithViewportWidth)
+		{
+			// Test that max streaks scales with viewport width
+			
+			// Small viewport: 640px
+			Viewport smallViewport;
+			smallViewport.Resize(640.0f, 480.0f);
+			DensityController smallController(smallViewport, 32.0f);
+			
+			// Max = 640 / (32/2) = 40 streaks
+			Assert::AreEqual(40, smallController.GetMaxPossibleStreaks(), L"Max for 640px should be 40");
+			
+			// Medium viewport: 1920px
+			Viewport mediumViewport;
+			mediumViewport.Resize(1920.0f, 1080.0f);
+			DensityController mediumController(mediumViewport, 32.0f);
+			
+			// Max = 1920 / (32/2) = 120 streaks
+			Assert::AreEqual(120, mediumController.GetMaxPossibleStreaks(), L"Max for 1920px should be 120");
+			
+			// Large viewport: 3840px (4K)
+			Viewport largeViewport;
+			largeViewport.Resize(3840.0f, 2160.0f);
+			DensityController largeController(largeViewport, 32.0f);
+			
+			// Max = 3840 / (32/2) = 240 streaks
+			Assert::AreEqual(240, largeController.GetMaxPossibleStreaks(), L"Max for 3840px should be 240");
 		}
 	};
 }
+
+
+
+

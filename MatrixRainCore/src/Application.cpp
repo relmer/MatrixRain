@@ -54,11 +54,8 @@ namespace MatrixRain
         m_viewport = std::make_unique<Viewport>();
         m_viewport->Resize(static_cast<float>(windowWidth), static_cast<float>(windowHeight));
 
-        // Initialize density controller (before AnimationSystem)
-        m_densityController = std::make_unique<DensityController>();
-        m_densityController->Initialize();
-
-        // Initialize animation system with density controller
+    // Initialize density controller (before AnimationSystem) with viewport reference
+    m_densityController = std::make_unique<DensityController>(*m_viewport, 32.0f); // Character width matches horizontal spacing        // Initialize animation system with density controller
         m_animationSystem = std::make_unique<AnimationSystem>();
         m_animationSystem->Initialize(*m_viewport, *m_densityController);
 
@@ -235,7 +232,9 @@ namespace MatrixRain
         {
             float fps = m_fpsCounter ? m_fpsCounter->GetFPS() : 0.0f;
             ColorScheme scheme = m_appState->GetColorScheme();
-            m_renderSystem->Render(*m_animationSystem, *m_viewport, scheme, fps);
+            int rainPercentage = m_densityController ? m_densityController->GetPercentage() : 0;
+            int streakCount = static_cast<int>(m_animationSystem->GetActiveStreakCount());
+            m_renderSystem->Render(*m_animationSystem, *m_viewport, scheme, fps, rainPercentage, streakCount);
             m_renderSystem->Present();
         }
     }

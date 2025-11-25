@@ -51,9 +51,9 @@ namespace MatrixRain
         size_t m_maxLength{ 0 };            // Maximum number of characters in this streak
         bool m_isInFadingPhase{ false };    // True when head has reached bottom and final fade has started
 
-        static constexpr size_t MIN_LENGTH = 10;
+        static constexpr size_t MIN_LENGTH = 20; // Longer minimum for better visibility
         static constexpr size_t MAX_LENGTH = 30;
-        static constexpr float MUTATION_PROBABILITY = 0.05f; // 5% per character per second
+        static constexpr float MUTATION_PROBABILITY = 0.40f; // 40% per character per second (authentic Matrix feel)
         static constexpr float BASE_VELOCITY = 100.0f; // Base pixels per second
         static constexpr float BASE_DROP_INTERVAL = 0.3f; // Time between drops (in seconds)
     };

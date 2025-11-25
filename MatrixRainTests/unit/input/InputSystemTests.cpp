@@ -2,8 +2,8 @@
 
 
 #include "MatrixRain/InputSystem.h"
-
 #include "MatrixRain/DensityController.h"
+#include "MatrixRain/Viewport.h"
 
 
 using namespace MatrixRain;
@@ -16,99 +16,99 @@ namespace MatrixRainTests
 		TEST_METHOD(TestInputSystemProcessesVK_ADD)
 		{
 			// T097: Test InputSystem keyboard event processing for VK_ADD
-			// 
-			// Given: InputSystem is initialized with DensityController at level 5
+			// Given: InputSystem is initialized with DensityController at 80%
 			// When: ProcessKeyDown(VK_ADD) is called
-			// Then: DensityController level should increase to 6
+			// Then: DensityController percentage should increase by 5% to 85%
 			
-			DensityController densityController;
-			densityController.Initialize(); // Level 5
+			Viewport viewport;
+			viewport.Resize(1920.0f, 1080.0f); // Max = 120 streaks
+			
+			DensityController densityController(viewport, 32.0f); // 80%
 			
 			InputSystem inputSystem;
 			inputSystem.Initialize(densityController);
 			
-			// Verify initial state
-			Assert::AreEqual(226, densityController.GetTargetStreakCount(), L"Initial level should be 5 (226 streaks)");
+			// Verify initial state (80% of 120 = 96 streaks)
+			Assert::AreEqual(80, densityController.GetPercentage(), L"Initial percentage should be 80");
+			Assert::AreEqual(96, densityController.GetTargetStreakCount(), L"Initial should be 96 streaks at 80%");
 			
 			// Process VK_ADD
 			inputSystem.ProcessKeyDown(VK_ADD);
 			
-			// Verify level increased (Level 6 = 10 + (6-1)*54 = 280 streaks)
-			Assert::AreEqual(280, densityController.GetTargetStreakCount(), L"VK_ADD should increase level to 6 (280 streaks)");
+			// Verify percentage increased (85% of 120 = 102 streaks)
+			Assert::AreEqual(85, densityController.GetPercentage(), L"VK_ADD should increase to 85%");
+			Assert::AreEqual(102, densityController.GetTargetStreakCount(), L"Should be 102 streaks at 85%");
 		}
 
 		TEST_METHOD(TestInputSystemProcessesVK_SUBTRACT)
 		{
 			// T098: Test InputSystem keyboard event processing for VK_SUBTRACT
-			// 
-			// Given: InputSystem is initialized with DensityController at level 5
+			// Given: InputSystem is initialized with DensityController at 80%
 			// When: ProcessKeyDown(VK_SUBTRACT) is called
-			// Then: DensityController level should decrease to 4
+			// Then: DensityController percentage should decrease by 5% to 75%
 			
-			DensityController densityController;
-			densityController.Initialize(); // Level 5
+			Viewport viewport;
+			viewport.Resize(1920.0f, 1080.0f); // Max = 120 streaks
+			
+			DensityController densityController(viewport, 32.0f); // 80%
 			
 			InputSystem inputSystem;
 			inputSystem.Initialize(densityController);
 			
-			// Verify initial state
-			Assert::AreEqual(226, densityController.GetTargetStreakCount(), L"Initial level should be 5 (226 streaks)");
+			// Verify initial state (80% of 120 = 96 streaks)
+			Assert::AreEqual(80, densityController.GetPercentage(), L"Initial percentage should be 80");
+			Assert::AreEqual(96, densityController.GetTargetStreakCount(), L"Initial should be 96 streaks at 80%");
 			
 			// Process VK_SUBTRACT
 			inputSystem.ProcessKeyDown(VK_SUBTRACT);
 			
-			// Verify level decreased (Level 4 = 10 + (4-1)*54 = 172 streaks)
-			Assert::AreEqual(172, densityController.GetTargetStreakCount(), L"VK_SUBTRACT should decrease level to 4 (172 streaks)");
+			// Verify percentage decreased (75% of 120 = 90 streaks)
+			Assert::AreEqual(75, densityController.GetPercentage(), L"VK_SUBTRACT should decrease to 75%");
+			Assert::AreEqual(90, densityController.GetTargetStreakCount(), L"Should be 90 streaks at 75%");
 		}
 
 		TEST_METHOD(TestInputSystemProcessesVK_OEM_PLUS)
 		{
 			// T099: Test InputSystem keyboard event processing for VK_OEM_PLUS
-			// 
-			// Given: InputSystem is initialized with DensityController at level 5
+			// Given: InputSystem is initialized with DensityController at 80%
 			// When: ProcessKeyDown(VK_OEM_PLUS) is called (regular '=' key, shift for '+')
-			// Then: DensityController level should increase to 6
-			//       This handles the main keyboard '+' key (not numpad)
+			// Then: DensityController percentage should increase by 5% to 85%
 			
-			DensityController densityController;
-			densityController.Initialize(); // Level 5
+			Viewport viewport;
+			viewport.Resize(1920.0f, 1080.0f);
+			
+			DensityController densityController(viewport, 32.0f);
 			
 			InputSystem inputSystem;
 			inputSystem.Initialize(densityController);
 			
-			// Verify initial state
-			Assert::AreEqual(226, densityController.GetTargetStreakCount(), L"Initial level should be 5 (226 streaks)");
-			
 			// Process VK_OEM_PLUS
 			inputSystem.ProcessKeyDown(VK_OEM_PLUS);
 			
-			// Verify level increased (Level 6 = 10 + (6-1)*54 = 280 streaks)
-			Assert::AreEqual(280, densityController.GetTargetStreakCount(), L"VK_OEM_PLUS should increase level to 6 (280 streaks)");
+			// Verify percentage increased
+			Assert::AreEqual(85, densityController.GetPercentage(), L"VK_OEM_PLUS should increase to 85%");
 		}
 
 		TEST_METHOD(TestInputSystemProcessesVK_OEM_MINUS)
 		{
 			// T100: Test InputSystem keyboard event processing for VK_OEM_MINUS
-			// 
-			// Given: InputSystem is initialized with DensityController at level 5
-			// When: ProcessKeyDown(VK_OEM_MINUS) is called (regular '-' key)
-			// Then: DensityController level should decrease to 4
-			//       This handles the main keyboard '-' key (not numpad)
+			// Given: InputSystem is initialized with DensityController at 80%
+			// When: ProcessKeyDown(VK_OEM_MINUS) is called
+			// Then: DensityController percentage should decrease by 5% to 75%
 			
-			DensityController densityController;
-			densityController.Initialize(); // Level 5
+			Viewport viewport;
+			viewport.Resize(1920.0f, 1080.0f);
+			
+			DensityController densityController(viewport, 32.0f);
 			
 			InputSystem inputSystem;
 			inputSystem.Initialize(densityController);
 			
-			// Verify initial state
-			Assert::AreEqual(226, densityController.GetTargetStreakCount(), L"Initial level should be 5 (226 streaks)");
-			
 			// Process VK_OEM_MINUS
 			inputSystem.ProcessKeyDown(VK_OEM_MINUS);
 			
-			// Verify level decreased (Level 4 = 10 + (4-1)*54 = 172 streaks)
-			Assert::AreEqual(172, densityController.GetTargetStreakCount(), L"VK_OEM_MINUS should decrease level to 4 (172 streaks)");
+			// Verify percentage decreased
+			Assert::AreEqual(75, densityController.GetPercentage(), L"VK_OEM_MINUS should decrease to 75%");
 		}
 
 		// T121: Test InputSystem Alt+Enter key combination detection
@@ -135,8 +135,10 @@ namespace MatrixRainTests
 			// Then: Should be processed without errors
 			// Note: Actual color cycling logic is tested in ApplicationState
 			
-			DensityController densityController;
-			densityController.Initialize();
+			Viewport viewport;
+			viewport.Resize(1920.0f, 1080.0f);
+			
+			DensityController densityController(viewport, 32.0f);
 			
 			InputSystem inputSystem;
 			inputSystem.Initialize(densityController);
@@ -148,5 +150,6 @@ namespace MatrixRainTests
 		}
 	};
 }
+
 
 

@@ -809,8 +809,6 @@ namespace MatrixRain
             return;
         }
         
-        OutputDebugStringA("ApplyBloom: Running...\n");
-        
         // Scene texture already has the rendered characters - no need to copy from backbuffer
         
         // Set viewport for half-resolution processing
@@ -873,8 +871,6 @@ namespace MatrixRain
         m_context->PSSetShaderResources(0, 2, srvs);
         m_context->PSSetSamplers(0, 1, m_samplerState.GetAddressOf());
         m_context->Draw(6, 0);
-        
-        OutputDebugStringA("ApplyBloom: Composite pass done\n");
         
         // Cleanup
         ID3D11ShaderResourceView* nullSRVs[2] = { nullptr, nullptr };
@@ -991,7 +987,7 @@ namespace MatrixRain
         }
     }
 
-    void RenderSystem::Render(const AnimationSystem& animationSystem, const Viewport& viewport, ColorScheme colorScheme, float fps)
+    void RenderSystem::Render(const AnimationSystem& animationSystem, const Viewport& viewport, ColorScheme colorScheme, float fps, int rainPercentage, int streakCount)
     {
         if (!m_device || !m_context)
         {
@@ -1097,7 +1093,7 @@ namespace MatrixRain
         // Render FPS counter overlay if fps > 0
         if (fps > 0.0f)
         {
-            RenderFPSCounter(fps);
+            RenderFPSCounter(fps, rainPercentage, streakCount);
         }
     }
 
@@ -1109,7 +1105,7 @@ namespace MatrixRain
         }
     }
 
-    void RenderSystem::RenderFPSCounter(float fps)
+    void RenderSystem::RenderFPSCounter(float fps, int rainPercentage, int streakCount)
     {
         if (!m_d2dContext || !m_fpsBrush || !m_fpsTextFormat)
         {
@@ -1119,16 +1115,16 @@ namespace MatrixRain
         // Begin D2D rendering
         m_d2dContext->BeginDraw();
 
-        // Format FPS text
-        wchar_t fpsText[32];
-        swprintf_s(fpsText, L"FPS: %.1f", fps);
+        // Format FPS text with rain density info: "Rain xxx% (yyy), zz FPS"
+        wchar_t fpsText[64];
+        swprintf_s(fpsText, L"Rain %d%% (%d), %.0f FPS", rainPercentage, streakCount, fps);
 
         // Get render target size for positioning
         D2D1_SIZE_F size = m_d2dContext->GetSize();
 
         // Create text layout rect (bottom-right corner with 10px padding)
         D2D1_RECT_F textRect = D2D1::RectF(
-            size.width - 150.0f,    // Left (150px from right edge)
+            size.width - 300.0f,    // Left (300px from right edge for longer text)
             size.height - 40.0f,    // Top (40px from bottom)
             size.width - 10.0f,     // Right (10px padding)
             size.height - 10.0f     // Bottom (10px padding)
