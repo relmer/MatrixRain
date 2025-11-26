@@ -36,7 +36,8 @@ namespace MatrixRain
             if (brightTimeRemaining <= 0.0f)
             {
                 brightTimeRemaining = 0.0f;
-                // Transition to fading phase - fadeTimeRemaining already set to 3.0
+                // Transition to fading phase - reset fade timer to full duration
+                fadeTimeRemaining = 3.0f;
             }
         }
 
