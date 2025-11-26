@@ -95,7 +95,7 @@ namespace MatrixRain
 
         // Rendering helpers
         void SortStreaksByDepth(std::vector<const CharacterStreak*>& streaks);
-        void UpdateInstanceBuffer(const AnimationSystem& animationSystem, ColorScheme colorScheme);
+        HRESULT UpdateInstanceBuffer(const AnimationSystem& animationSystem, ColorScheme colorScheme);
         void ClearRenderTarget();
         void RenderFPSCounter(float fps, int rainPercentage, int streakCount);
         HRESULT ApplyBloom();

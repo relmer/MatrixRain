@@ -1058,23 +1058,23 @@ namespace MatrixRain
 
 
 
-    void RenderSystem::UpdateInstanceBuffer (const AnimationSystem& animationSystem, ColorScheme colorScheme)
+    HRESULT RenderSystem::UpdateInstanceBuffer (const AnimationSystem& animationSystem, ColorScheme colorScheme)
     {
-        // Get color scheme RGB values
-        Color4 schemeColor = GetColorRGB (colorScheme);
+        HRESULT                              hr = S_OK;
+        Color4                               schemeColor = GetColorRGB (colorScheme);
+        std::vector<CharacterInstanceData>   instanceData;
+        std::vector<const CharacterStreak*>  streakPtrs;
+        D3D11_MAPPED_SUBRESOURCE             mappedResource;
+        CharacterSet&                        charSet = CharacterSet::GetInstance();
+        size_t                               bytesToCopy;
 
-        // Collect all character instances from all streaks
-        std::vector<CharacterInstanceData> instanceData;
-        
+
         // Get streaks sorted by depth
-        std::vector<const CharacterStreak*> streakPtrs;
         for (const auto& streak : animationSystem.GetStreaks())
         {
             streakPtrs.push_back (&streak);
         }
         SortStreaksByDepth (streakPtrs);
-
-        CharacterSet& charSet = CharacterSet::GetInstance();
 
         // Build instance data
         for (const CharacterStreak* streak : streakPtrs)
@@ -1126,20 +1126,18 @@ namespace MatrixRain
             }
         }
 
-        if (instanceData.empty())
-        {
-            return;
-        }
+        BAIL_OUT_IF (instanceData.empty(), S_OK);
 
         // Map instance buffer and upload data
-        D3D11_MAPPED_SUBRESOURCE mappedResource;
-        HRESULT hr = m_context->Map (m_instanceBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
-        if (SUCCEEDED (hr))
-        {
-            size_t bytesToCopy = sizeof (CharacterInstanceData) * std::min (instanceData.size(), static_cast<size_t> (m_instanceBufferCapacity));
-            memcpy (mappedResource.pData, instanceData.data(), bytesToCopy);
-            m_context->Unmap (m_instanceBuffer.Get(), 0);
-        }
+        hr = m_context->Map (m_instanceBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
+        CHRA (hr);
+
+        bytesToCopy = sizeof (CharacterInstanceData) * std::min (instanceData.size(), static_cast<size_t> (m_instanceBufferCapacity));
+        memcpy (mappedResource.pData, instanceData.data(), bytesToCopy);
+        m_context->Unmap (m_instanceBuffer.Get(), 0);
+
+    Error:
+        return hr;
     }
 
 
@@ -1171,7 +1169,7 @@ namespace MatrixRain
         }
 
         // Update instance buffer with character data
-        UpdateInstanceBuffer (animationSystem, colorScheme);
+        (void)UpdateInstanceBuffer (animationSystem, colorScheme);  // Ignore return - errors already handled within
 
         // Count total characters to render
         size_t totalCharacters = 0;
