@@ -50,7 +50,7 @@ namespace MatrixRain
         hr = CreateRenderTargetView();
         CHR (hr);
 
-        hr = CompileShaders();
+        hr = CompileCharacterShaders();
         CHR (hr);
 
         hr = CreateInstanceBuffer();
@@ -193,24 +193,13 @@ namespace MatrixRain
 
 
 
-    HRESULT RenderSystem::CompileShaders()
-    {
-        HRESULT                          hr = S_OK;
-        Microsoft::WRL::ComPtr<ID3DBlob> vsBlob;
-        Microsoft::WRL::ComPtr<ID3DBlob> psBlob;
-        Microsoft::WRL::ComPtr<ID3DBlob> errorBlob;
-        D3D11_INPUT_ELEMENT_DESC         inputLayout[] = {
-            { "POSITION",    0, DXGI_FORMAT_R32G32B32_FLOAT,    0, 0,  D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-            { "TEXCOORD",    0, DXGI_FORMAT_R32G32_FLOAT,       0, 12, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-            { "TEXCOORD",    1, DXGI_FORMAT_R32G32_FLOAT,       0, 20, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-            { "COLOR",       0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 28, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-            { "BRIGHTNESS",  0, DXGI_FORMAT_R32_FLOAT,          0, 44, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-            { "SCALE",       0, DXGI_FORMAT_R32_FLOAT,          0, 48, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-        };
+    ////////////////////////////////////////////////////////////////////////////////
+    //
+    // Shader source code
+    //
+    ////////////////////////////////////////////////////////////////////////////////
 
-
-        // Simple vertex shader for instanced quads
-        const char* vsSource = R"(
+    static const char* s_kszVertexShaderSource = R"(
             cbuffer Constants : register(b0)
             {
                 float4x4 projection;
@@ -269,8 +258,7 @@ namespace MatrixRain
             }
         )";
 
-        // Simple pixel shader with texture sampling and glow
-        const char* psSource = R"(
+    static const char* s_kszPixelShaderSource = R"(
             Texture2D atlasTexture : register(t0);
             SamplerState samplerState : register(s0);
 
@@ -297,51 +285,118 @@ namespace MatrixRain
             }
         )";
 
-        // Compile vertex shader
-        hr = D3DCompile (vsSource, 
-                         strlen (vsSource),
-                         "VS", 
-                         nullptr, 
-                         nullptr,
-                         "main", 
-                         "vs_5_0",
-                         D3DCOMPILE_ENABLE_STRICTNESS, 
-                         0,
-                         &vsBlob, 
-                         &errorBlob);
-        if (FAILED (hr) && errorBlob.Get())
+    static const D3D11_INPUT_ELEMENT_DESC s_krgInputLayout[] = {
+        { "POSITION",   0, DXGI_FORMAT_R32G32B32_FLOAT,    0, 0,  D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+        { "TEXCOORD",   0, DXGI_FORMAT_R32G32_FLOAT,       0, 12, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+        { "TEXCOORD",   1, DXGI_FORMAT_R32G32_FLOAT,       0, 20, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+        { "COLOR",      0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 28, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+        { "BRIGHTNESS", 0, DXGI_FORMAT_R32_FLOAT,          0, 44, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+        { "SCALE",      0, DXGI_FORMAT_R32_FLOAT,          0, 48, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+    };
+
+
+
+
+    ////////////////////////////////////////////////////////////////////////////////
+    //
+    //  Shader compilation table structure
+    //
+    ////////////////////////////////////////////////////////////////////////////////
+
+    struct RenderSystem::ShaderCompileEntry
+    {
+        const char *   pszSource;
+        const char *   pszName;
+        const char *   pszEntryPoint;
+        const char *   pszTarget;
+        LPCWSTR        pszErrorMsg;
+        ID3DBlob   **  ppBlob;
+    };
+
+
+
+
+    ////////////////////////////////////////////////////////////////////////////////
+    //
+    //  RenderSystem::CompileShadersFromTable
+    //
+    ////////////////////////////////////////////////////////////////////////////////
+
+    HRESULT RenderSystem::CompileShadersFromTable (const ShaderCompileEntry* pTable, size_t cEntries)
+    {
+        HRESULT                          hr = S_OK;
+        Microsoft::WRL::ComPtr<ID3DBlob> errorBlob;
+
+
+        for (size_t i = 0; i < cEntries; ++i)
         {
-            OutputDebugStringA ((char*)errorBlob->GetBufferPointer());
+            const ShaderCompileEntry& entry = pTable[i];
+
+            errorBlob.Reset();
+
+            hr = D3DCompile (entry.pszSource,
+                             strlen (entry.pszSource),
+                             entry.pszName,
+                             nullptr,
+                             nullptr,
+                             entry.pszEntryPoint,
+                             entry.pszTarget,
+                             D3DCOMPILE_ENABLE_STRICTNESS,
+                             0,
+                             entry.ppBlob,
+                             &errorBlob);
+            if (FAILED (hr) && errorBlob)
+            {
+                OutputDebugStringA ((char*)errorBlob->GetBufferPointer());
+            }
+            CHRLA (hr, entry.pszErrorMsg);
         }
-        CHRLA (hr, L"D3DCompile failed for vertex shader");
 
-        hr = m_device->CreateVertexShader (vsBlob->GetBufferPointer(), vsBlob->GetBufferSize(), nullptr, &m_vertexShader);
+    Error:
+        return hr;
+    }
+
+
+
+
+    HRESULT RenderSystem::CompileCharacterShaders()
+    {
+        HRESULT                          hr = S_OK;
+        Microsoft::WRL::ComPtr<ID3DBlob> vsBlob;
+        Microsoft::WRL::ComPtr<ID3DBlob> psBlob;
+        ShaderCompileEntry               shaderTable[] = {
+            { s_kszVertexShaderSource, "VS", "main", "vs_5_0",  L"D3DCompile failed for vertex shader", vsBlob.GetAddressOf() },
+            { s_kszPixelShaderSource,  "PS", "main", "ps_5_0",  L"D3DCompile failed for pixel shader",  psBlob.GetAddressOf() }
+        };
+
+
+
+        
+
+        // Compile shaders from table
+        hr = CompileShadersFromTable (shaderTable, _countof (shaderTable));
+        CHR (hr);        // Create vertex shader
+        hr = m_device->CreateVertexShader (vsBlob->GetBufferPointer(),
+                                           vsBlob->GetBufferSize(),
+                                           nullptr,
+                                           &m_vertexShader);
         CHRA (hr);
 
-        // Create input layout
-        hr = m_device->CreateInputLayout (inputLayout, _countof (inputLayout), vsBlob->GetBufferPointer(), vsBlob->GetBufferSize(), &m_inputLayout);
+        // Create pixel shader
+        hr = m_device->CreatePixelShader (psBlob->GetBufferPointer(),
+                                          psBlob->GetBufferSize(),
+                                          nullptr,
+                                          &m_pixelShader);
         CHRA (hr);
 
-        // Compile pixel shader
-        hr = D3DCompile (psSource, 
-                         strlen (psSource),
-                         "PS", 
-                         nullptr, 
-                         nullptr,
-                         "main", 
-                         "ps_5_0",
-                         D3DCOMPILE_ENABLE_STRICTNESS, 
-                         0,
-                         &psBlob, 
-                         &errorBlob);
-        if (FAILED (hr) && errorBlob.Get())
-        {
-            OutputDebugStringA ((char*)errorBlob->GetBufferPointer());
-        }
-        CHRLA (hr, L"D3DCompile failed for pixel shader");
-
-        hr = m_device->CreatePixelShader (psBlob->GetBufferPointer(), psBlob->GetBufferSize(), nullptr, &m_pixelShader);
+        // Create input layout using vertex shader blob
+        hr = m_device->CreateInputLayout (s_krgInputLayout,
+                                          _countof (s_krgInputLayout),
+                                          vsBlob->GetBufferPointer(),
+                                          vsBlob->GetBufferSize(),
+                                          &m_inputLayout);
         CHRA (hr);
+
 
     Error:
         return hr;
@@ -517,26 +572,175 @@ namespace MatrixRain
 
 
 
-    HRESULT RenderSystem::CreateBloomResources (UINT width, UINT height)
+    ////////////////////////////////////////////////////////////////////////////////
+    //
+    // Bloom shader source code
+    //
+    ////////////////////////////////////////////////////////////////////////////////
+
+    static const char* s_kszQuadVertexShaderSource = R"(
+            struct VSInput
+            {
+                float3 position : POSITION;
+                float2 uv : TEXCOORD;
+            };
+
+            struct PSInput
+            {
+                float4 position : SV_POSITION;
+                float2 uv : TEXCOORD;
+            };
+
+            PSInput main(VSInput input)
+            {
+                PSInput output;
+                output.position = float4(input.position, 1.0);
+                output.uv = input.uv;
+                return output;
+            }
+        )";
+
+    static const char* s_kszBlurHorizontalShaderSource = R"(
+            Texture2D inputTexture : register(t0);
+            SamplerState samplerState : register(s0);
+
+            struct PSInput
+            {
+                float4 position : SV_POSITION;
+                float2 uv : TEXCOORD;
+            };
+
+            float4 main(PSInput input) : SV_TARGET
+            {
+                // Get texture dimensions dynamically
+                uint width, height;
+                inputTexture.GetDimensions(width, height);
+                float2 texelSize = float2(1.0 / width, 1.0 / height);
+                
+                float4 color = float4(0, 0, 0, 0);
+                
+                // 13-tap Gaussian blur for wider spread (horizontal)
+                float weights[13] = { 0.02, 0.04, 0.06, 0.08, 0.10, 0.12, 0.16, 0.12, 0.10, 0.08, 0.06, 0.04, 0.02 };
+                for (int i = -6; i <= 6; i++)
+                {
+                    float2 offset = float2(i * texelSize.x, 0);
+                    color += inputTexture.Sample(samplerState, input.uv + offset) * weights[i + 6];
+                }
+                
+                return color;
+            }
+        )";
+
+    static const char* s_kszBlurVerticalShaderSource = R"(
+            Texture2D inputTexture : register(t0);
+            SamplerState samplerState : register(s0);
+
+            struct PSInput
+            {
+                float4 position : SV_POSITION;
+                float2 uv : TEXCOORD;
+            };
+
+            float4 main(PSInput input) : SV_TARGET
+            {
+                // Get texture dimensions dynamically
+                uint width, height;
+                inputTexture.GetDimensions(width, height);
+                float2 texelSize = float2(1.0 / width, 1.0 / height);
+                
+                float4 color = float4(0, 0, 0, 0);
+                
+                // 13-tap Gaussian blur for wider spread (vertical)
+                float weights[13] = { 0.02, 0.04, 0.06, 0.08, 0.10, 0.12, 0.16, 0.12, 0.10, 0.08, 0.06, 0.04, 0.02 };
+                for (int i = -6; i <= 6; i++)
+                {
+                    float2 offset = float2(0, i * texelSize.y);
+                    color += inputTexture.Sample(samplerState, input.uv + offset) * weights[i + 6];
+                }
+                
+                return color;
+            }
+        )";
+
+    static const char* s_kszBloomExtractShaderSource = R"(
+            Texture2D inputTexture : register(t0);
+            SamplerState samplerState : register(s0);
+
+            struct PSInput
+            {
+                float4 position : SV_POSITION;
+                float2 uv : TEXCOORD;
+            };
+
+            float4 main(PSInput input) : SV_TARGET
+            {
+                float4 color = inputTexture.Sample(samplerState, input.uv);
+                
+                // Extract only bright pixels (luminance threshold)
+                // Calculate luminance
+                float luminance = dot(color.rgb, float3(0.2126, 0.7152, 0.0722));
+                
+                // Higher threshold to only extract very bright pixels
+                float threshold = 0.6;
+                
+                // Smooth falloff near threshold for gradual bloom
+                float bloomAmount = smoothstep(threshold, threshold + 0.2, luminance);
+                
+                // Return the bright color multiplied by bloom amount
+                // This extracts only bright areas and blacks out dim areas
+                return float4(color.rgb * bloomAmount, 1.0);
+            }
+        )";
+
+    static const char* s_kszBloomCompositeShaderSource = R"(
+            Texture2D sceneTexture : register(t0);
+            Texture2D bloomTexture : register(t1);
+            SamplerState samplerState : register(s0);
+
+            struct PSInput
+            {
+                float4 position : SV_POSITION;
+                float2 uv : TEXCOORD;
+            };
+
+            float4 main(PSInput input) : SV_TARGET
+            {
+                float4 scene = sceneTexture.Sample(samplerState, input.uv);
+                float4 bloom = bloomTexture.Sample(samplerState, input.uv);
+                
+                // Additive blend with increased bloom intensity for stronger glow
+                return scene + bloom * 2.5;
+            }
+        )";
+
+    static const D3D11_INPUT_ELEMENT_DESC s_krgQuadInputLayout[] = {
+        { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0,  D3D11_INPUT_PER_VERTEX_DATA, 0 },
+        { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,    0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0 }
+    };
+
+
+
+
+    ////////////////////////////////////////////////////////////////////////////////
+    //
+    //  RenderSystem::CompileBloomShaders
+    //
+    ////////////////////////////////////////////////////////////////////////////////
+
+    HRESULT RenderSystem::CompileBloomShaders()
     {
-        HRESULT                          hr         = S_OK;
-        UINT                             bloomWidth;
-        UINT                             bloomHeight;
-        D3D11_TEXTURE2D_DESC             sceneTexDesc = {};
-        D3D11_TEXTURE2D_DESC             texDesc      = {};
-        Microsoft::WRL::ComPtr<ID3DBlob> vsBlob;
-        Microsoft::WRL::ComPtr<ID3DBlob> psBlob;
-        Microsoft::WRL::ComPtr<ID3DBlob> errorBlob;
-        D3D11_INPUT_ELEMENT_DESC         quadLayoutDesc[] = {
-            { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0,  D3D11_INPUT_PER_VERTEX_DATA, 0 },
-            { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,    0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0 }
-        };
+        HRESULT                          hr = S_OK;
+        Microsoft::WRL::ComPtr<ID3DBlob> quadVSBlob;
+        Microsoft::WRL::ComPtr<ID3DBlob> extractPSBlob;
+        Microsoft::WRL::ComPtr<ID3DBlob> blurHPSBlob;
+        Microsoft::WRL::ComPtr<ID3DBlob> blurVPSBlob;
+        Microsoft::WRL::ComPtr<ID3DBlob> compositePSBlob;
         struct QuadVertex
         {
             float pos[3];
             float uv[2];
         };
-        QuadVertex               quadVertices[] = {
+        QuadVertex             quadVertices[] = {
             { {-1, -1, 0}, {0, 1} },
             { {-1,  1, 0}, {0, 0} },
             { { 1,  1, 0}, {1, 0} },
@@ -544,20 +748,69 @@ namespace MatrixRain
             { { 1,  1, 0}, {1, 0} },
             { { 1, -1, 0}, {1, 1} }
         };
-        D3D11_BUFFER_DESC        vbDesc = {};
-        D3D11_SUBRESOURCE_DATA   vbData = {};
-        // Shader sources declared at top to avoid goto issues
-        static const char* quadVSSource;
-        static const char* blurHSource;
-        static const char* blurVSource;
-        static const char* extractSource;
-        static const char* compositeSource;
+        D3D11_BUFFER_DESC      vbDesc = {};
+        D3D11_SUBRESOURCE_DATA vbData = {};
+        ShaderCompileEntry     bloomShaderTable[] = {
+            { s_kszQuadVertexShaderSource,         "QuadVS",    "main", "vs_5_0", L"D3DCompile failed for quad vertex shader",     quadVSBlob.GetAddressOf() },
+            { s_kszBloomExtractShaderSource,       "Extract",   "main", "ps_5_0", L"D3DCompile failed for bloom extract shader",   extractPSBlob.GetAddressOf() },
+            { s_kszBlurHorizontalShaderSource,     "BlurH",     "main", "ps_5_0", L"D3DCompile failed for horizontal blur shader", blurHPSBlob.GetAddressOf() },
+            { s_kszBlurVerticalShaderSource,       "BlurV",     "main", "ps_5_0", L"D3DCompile failed for vertical blur shader",   blurVPSBlob.GetAddressOf() },
+            { s_kszBloomCompositeShaderSource,     "Composite", "main", "ps_5_0", L"D3DCompile failed for composite shader",       compositePSBlob.GetAddressOf() }
+        };
+
+
+        // Compile shaders from table
+        hr = CompileShadersFromTable (bloomShaderTable, _countof (bloomShaderTable));
+        CHR (hr);
+        
+        hr = m_device->CreateVertexShader (quadVSBlob->GetBufferPointer(), quadVSBlob->GetBufferSize(), nullptr, &m_fullscreenQuadVS);
+        CHRA (hr);
+        
+        hr = m_device->CreatePixelShader (extractPSBlob->GetBufferPointer(), extractPSBlob->GetBufferSize(), nullptr, &m_bloomExtractPS);
+        CHRA (hr);
+        
+        hr = m_device->CreatePixelShader (blurHPSBlob->GetBufferPointer(), blurHPSBlob->GetBufferSize(), nullptr, &m_blurHorizontalPS);
+        CHRA (hr);
+        
+        hr = m_device->CreatePixelShader (blurVPSBlob->GetBufferPointer(), blurVPSBlob->GetBufferSize(), nullptr, &m_blurVerticalPS);
+        CHRA (hr);
+        
+        hr = m_device->CreatePixelShader (compositePSBlob->GetBufferPointer(), compositePSBlob->GetBufferSize(), nullptr, &m_compositePS);
+        CHRA (hr);
+        
+        hr = m_device->CreateInputLayout (s_krgQuadInputLayout, _countof (s_krgQuadInputLayout), 
+                                           quadVSBlob->GetBufferPointer(), quadVSBlob->GetBufferSize(), &m_fullscreenQuadInputLayout);
+        CHRA (hr);
+
+        // Create fullscreen quad vertex buffer
+        vbDesc.ByteWidth = sizeof (quadVertices);
+        vbDesc.Usage     = D3D11_USAGE_IMMUTABLE;
+        vbDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+
+        vbData.pSysMem = quadVertices;
+
+        hr = m_device->CreateBuffer (&vbDesc, &vbData, &m_fullscreenQuadVB);
+        CHRA (hr);
+
+    Error:
+        return hr;
+    }
+
+
+
+
+
+    HRESULT RenderSystem::CreateBloomResources (UINT width, UINT height)
+    {
+        HRESULT              hr         = S_OK;
+        UINT                 bloomWidth;
+        UINT                 bloomHeight;
+        D3D11_TEXTURE2D_DESC sceneTexDesc = {};
+        D3D11_TEXTURE2D_DESC texDesc      = {};
 
 
         // Safety check - don't create bloom resources with invalid dimensions
         BAIL_OUT_IF (width == 0 || height == 0, S_OK);  // Return success without creating resources
-
-        OutputDebugStringA ("CreateBloomResources: Starting...\n");
 
         // Create scene render target (full resolution)
         sceneTexDesc.Width             = width;
@@ -610,228 +863,9 @@ namespace MatrixRain
         hr = m_device->CreateShaderResourceView (m_blurTempTexture.Get(), nullptr, &m_blurTempSRV);
         CHRA (hr);
 
-        // Shader compilation resources
-        // Compile fullscreen quad vertex shader
-        quadVSSource = R"(
-            struct VSInput
-            {
-                float3 position : POSITION;
-                float2 uv : TEXCOORD;
-            };
-
-            struct PSInput
-            {
-                float4 position : SV_POSITION;
-                float2 uv : TEXCOORD;
-            };
-
-            PSInput main(VSInput input)
-            {
-                PSInput output;
-                output.position = float4(input.position, 1.0);
-                output.uv = input.uv;
-                return output;
-            }
-        )";
-
-        
-        hr = D3DCompile (quadVSSource, strlen (quadVSSource), "QuadVS", nullptr, nullptr,
-                         "main", "vs_5_0", D3DCOMPILE_ENABLE_STRICTNESS, 0, &vsBlob, &errorBlob);
-        if (FAILED (hr) && errorBlob)
-        {
-            OutputDebugStringA ((char*)errorBlob->GetBufferPointer());
-        }
-        CHRA (hr);
-
-        hr = m_device->CreateVertexShader (vsBlob->GetBufferPointer(), vsBlob->GetBufferSize(), nullptr, &m_fullscreenQuadVS);
-        CHRA (hr);
-
-        // Create input layout for fullscreen quad
-        hr = m_device->CreateInputLayout (quadLayoutDesc, 2, vsBlob->GetBufferPointer(), vsBlob->GetBufferSize(), &m_fullscreenQuadInputLayout);
-        CHRA (hr);
-
-        // Compile horizontal blur shader
-        blurHSource = R"(
-            Texture2D inputTexture : register(t0);
-            SamplerState samplerState : register(s0);
-
-            struct PSInput
-            {
-                float4 position : SV_POSITION;
-                float2 uv : TEXCOORD;
-            };
-
-            float4 main(PSInput input) : SV_TARGET
-            {
-                // Get texture dimensions dynamically
-                uint width, height;
-                inputTexture.GetDimensions(width, height);
-                float2 texelSize = float2(1.0 / width, 1.0 / height);
-                
-                float4 color = float4(0, 0, 0, 0);
-                
-                // 13-tap Gaussian blur for wider spread (horizontal)
-                float weights[13] = { 0.02, 0.04, 0.06, 0.08, 0.10, 0.12, 0.16, 0.12, 0.10, 0.08, 0.06, 0.04, 0.02 };
-                for (int i = -6; i <= 6; i++)
-                {
-                    float2 offset = float2(i * texelSize.x, 0);
-                    color += inputTexture.Sample(samplerState, input.uv + offset) * weights[i + 6];
-                }
-                
-                return color;
-            }
-        )";
-
-        // Compile vertical blur shader
-        blurVSource = R"(
-            Texture2D inputTexture : register(t0);
-            SamplerState samplerState : register(s0);
-
-            struct PSInput
-            {
-                float4 position : SV_POSITION;
-                float2 uv : TEXCOORD;
-            };
-
-            float4 main(PSInput input) : SV_TARGET
-            {
-                // Get texture dimensions dynamically
-                uint width, height;
-                inputTexture.GetDimensions(width, height);
-                float2 texelSize = float2(1.0 / width, 1.0 / height);
-                
-                float4 color = float4(0, 0, 0, 0);
-                
-                // 13-tap Gaussian blur for wider spread (vertical)
-                float weights[13] = { 0.02, 0.04, 0.06, 0.08, 0.10, 0.12, 0.16, 0.12, 0.10, 0.08, 0.06, 0.04, 0.02 };
-                for (int i = -6; i <= 6; i++)
-                {
-                    float2 offset = float2(0, i * texelSize.y);
-                    color += inputTexture.Sample(samplerState, input.uv + offset) * weights[i + 6];
-                }
-                
-                return color;
-            }
-        )";
-
-        // Compile bloom extraction shader (extract bright pixels only)
-        extractSource = R"(
-            Texture2D inputTexture : register(t0);
-            SamplerState samplerState : register(s0);
-
-            struct PSInput
-            {
-                float4 position : SV_POSITION;
-                float2 uv : TEXCOORD;
-            };
-
-            float4 main(PSInput input) : SV_TARGET
-            {
-                float4 color = inputTexture.Sample(samplerState, input.uv);
-                
-                // Extract only bright pixels (luminance threshold)
-                // Calculate luminance
-                float luminance = dot(color.rgb, float3(0.2126, 0.7152, 0.0722));
-                
-                // Higher threshold to only extract very bright pixels
-                float threshold = 0.6;
-                
-                // Smooth falloff near threshold for gradual bloom
-                float bloomAmount = smoothstep(threshold, threshold + 0.2, luminance);
-                
-                // Return the bright color multiplied by bloom amount
-                // This extracts only bright areas and blacks out dim areas
-                return float4(color.rgb * bloomAmount, 1.0);
-            }
-        )";
-
-        // Compile composite shader
-        compositeSource = R"(
-            Texture2D sceneTexture : register(t0);
-            Texture2D bloomTexture : register(t1);
-            SamplerState samplerState : register(s0);
-
-            struct PSInput
-            {
-                float4 position : SV_POSITION;
-                float2 uv : TEXCOORD;
-            };
-
-            float4 main(PSInput input) : SV_TARGET
-            {
-                float4 scene = sceneTexture.Sample(samplerState, input.uv);
-                float4 bloom = bloomTexture.Sample(samplerState, input.uv);
-                
-                // Additive blend with increased bloom intensity for stronger glow
-                return scene + bloom * 2.5;
-            }
-        )";
-
-        // Compile bloom extraction shader
-        psBlob.Reset();
-        errorBlob.Reset();
-        hr = D3DCompile (extractSource, strlen (extractSource), "Extract", nullptr, nullptr,
-                         "main", "ps_5_0", D3DCOMPILE_ENABLE_STRICTNESS, 0, &psBlob, &errorBlob);
-        if (FAILED (hr) && errorBlob)
-        {
-            OutputDebugStringA ((char*)errorBlob->GetBufferPointer());
-        }
-        CHRA (hr);
-
-        hr = m_device->CreatePixelShader (psBlob->GetBufferPointer(), psBlob->GetBufferSize(), nullptr, &m_bloomExtractPS);
-        CHRA (hr);
-
-        // Compile horizontal blur
-        psBlob.Reset();
-        errorBlob.Reset();
-        hr = D3DCompile (blurHSource, strlen (blurHSource), "BlurH", nullptr, nullptr,
-                         "main", "ps_5_0", D3DCOMPILE_ENABLE_STRICTNESS, 0, &psBlob, &errorBlob);
-        if (FAILED (hr) && errorBlob)
-        {
-            OutputDebugStringA ((char*)errorBlob->GetBufferPointer());
-        }
-        CHRA (hr);
-
-        hr = m_device->CreatePixelShader (psBlob->GetBufferPointer(), psBlob->GetBufferSize(), nullptr, &m_blurHorizontalPS);
-        CHRA (hr);
-
-        // Compile vertical blur
-        psBlob.Reset();
-        errorBlob.Reset();
-        hr = D3DCompile (blurVSource, strlen (blurVSource), "BlurV", nullptr, nullptr,
-                         "main", "ps_5_0", D3DCOMPILE_ENABLE_STRICTNESS, 0, &psBlob, &errorBlob);
-        if (FAILED (hr) && errorBlob)
-        {
-            OutputDebugStringA ((char*)errorBlob->GetBufferPointer());
-        }
-        CHRA (hr);
-
-        hr = m_device->CreatePixelShader (psBlob->GetBufferPointer(), psBlob->GetBufferSize(), nullptr, &m_blurVerticalPS);
-        CHRA (hr);
-
-        // Compile composite shader
-        psBlob.Reset();
-        errorBlob.Reset();
-        hr = D3DCompile (compositeSource, strlen (compositeSource), "Composite", nullptr, nullptr,
-                         "main", "ps_5_0", D3DCOMPILE_ENABLE_STRICTNESS, 0, &psBlob, &errorBlob);
-        if (FAILED (hr) && errorBlob.Get())
-        {
-            OutputDebugStringA ((char*)errorBlob->GetBufferPointer());
-        }
-        CHRA (hr);
-
-        hr = m_device->CreatePixelShader (psBlob->GetBufferPointer(), psBlob->GetBufferSize(), nullptr, &m_compositePS);
-        CHRA (hr);
-
-        // Create fullscreen quad vertex buffer
-        vbDesc.ByteWidth = sizeof (quadVertices);
-        vbDesc.Usage     = D3D11_USAGE_IMMUTABLE;
-        vbDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-
-        vbData.pSysMem = quadVertices;
-
-        hr = m_device->CreateBuffer (&vbDesc, &vbData, &m_fullscreenQuadVB);
-        CHRA (hr);
+        // Compile bloom shaders and create fullscreen quad resources
+        hr = CompileBloomShaders();
+        CHR (hr);
 
     Error:
         return hr;

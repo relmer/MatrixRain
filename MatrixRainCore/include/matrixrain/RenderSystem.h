@@ -84,7 +84,8 @@ namespace MatrixRain
         HRESULT CreateDevice();
         HRESULT CreateSwapChain(HWND hwnd, UINT width, UINT height);
         HRESULT CreateRenderTargetView();
-        HRESULT CompileShaders();
+        HRESULT CompileCharacterShaders();
+        HRESULT CompileBloomShaders();
         HRESULT CreateInstanceBuffer();
         HRESULT CreateConstantBuffer();
         HRESULT CreateBlendState();
@@ -107,6 +108,10 @@ namespace MatrixRain
 
         // Resource recreation helpers
         HRESULT RecreateDirect2DBitmap();
+
+        // Shader compilation helpers
+        struct ShaderCompileEntry;
+        HRESULT CompileShadersFromTable (const ShaderCompileEntry* pTable, size_t cEntries);
 
         // DirectX resources
         Microsoft::WRL::ComPtr<ID3D11Device> m_device;
