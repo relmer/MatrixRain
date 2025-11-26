@@ -875,67 +875,136 @@ namespace MatrixRain
 
 
 
-    void RenderSystem::ApplyBloom()
+    ////////////////////////////////////////////////////////////////////////////////
+    //
+    //  RenderSystem::SetRenderPipelineState
+    //
+    //  Generic helper to set up rendering pipeline state.
+    //
+    ////////////////////////////////////////////////////////////////////////////////
+
+    void RenderSystem::SetRenderPipelineState(ID3D11InputLayout* pInputLayout,
+                                                D3D11_PRIMITIVE_TOPOLOGY topology,
+                                                ID3D11Buffer* pVertexBuffer,
+                                                UINT stride,
+                                                ID3D11VertexShader* pVertexShader,
+                                                ID3D11Buffer* pConstantBuffer,
+                                                ID3D11PixelShader* pPixelShader)
     {
-        // Safety check - if bloom resources failed to create, skip
-        if (!m_sceneTexture || !m_bloomTexture || !m_bloomExtractPS || !m_compositePS)
+        UINT offset = 0;
+
+
+        m_context->IASetInputLayout       (pInputLayout);
+        m_context->IASetPrimitiveTopology (topology);
+        m_context->IASetVertexBuffers     (0, 1, &pVertexBuffer, &stride, &offset);
+        m_context->VSSetShader            (pVertexShader, nullptr, 0);
+        
+        if (pConstantBuffer)
         {
-            OutputDebugStringA ("ApplyBloom: Missing resources, skipping\n");
-            return;
+            m_context->VSSetConstantBuffers (0, 1, &pConstantBuffer);
         }
+        else
+        {
+            m_context->VSSetConstantBuffers (0, 0, nullptr);
+        }
+        
+        if (pPixelShader)
+        {
+            m_context->PSSetShader (pPixelShader, nullptr, 0);
+        }
+    }
+
+
+
+
+
+    ////////////////////////////////////////////////////////////////////////////////
+    //
+    //  RenderSystem::RenderFullscreenPass
+    //
+    //  Renders a fullscreen quad pass with the specified render target, pixel shader,
+    //  and shader resources. Automatically unbinds shader resources after drawing.
+    //
+    ////////////////////////////////////////////////////////////////////////////////
+
+    void RenderSystem::RenderFullscreenPass(ID3D11RenderTargetView* pRenderTarget,
+                                             ID3D11PixelShader* pPixelShader,
+                                             ID3D11ShaderResourceView* const* ppShaderResources,
+                                             UINT numResources)
+    {
+        m_context->OMSetRenderTargets   (1, &pRenderTarget, nullptr);
+        m_context->PSSetShader          (pPixelShader, nullptr, 0);
+        m_context->PSSetShaderResources (0, numResources, ppShaderResources);
+        m_context->Draw (6, 0);
+        
+        // Unbind shader resources to avoid hazards
+        ID3D11ShaderResourceView* nullSRVs[D3D11_COMMONSHADER_INPUT_RESOURCE_SLOT_COUNT] = {};
+        m_context->PSSetShaderResources (0, numResources, nullSRVs);
+    }
+
+
+
+
+
+    ////////////////////////////////////////////////////////////////////////////////
+    //
+    //  RenderSystem::SetViewport
+    //
+    //  Sets the viewport dimensions.
+    //
+    ////////////////////////////////////////////////////////////////////////////////
+
+    void RenderSystem::SetViewport(UINT width, UINT height)
+    {
+        D3D11_VIEWPORT viewport = {};
+
+
+        viewport.Width    = static_cast<float> (width);
+        viewport.Height   = static_cast<float> (height);
+        viewport.MinDepth = 0.0f;
+        viewport.MaxDepth = 1.0f;
+        
+        m_context->RSSetViewports (1, &viewport);
+    }
+
+
+
+
+
+    HRESULT RenderSystem::ApplyBloom()
+    {
+        HRESULT                    hr      = S_OK;
+        ID3D11ShaderResourceView * srvs[2];
+
+
+        // Safety check - if bloom resources failed to create, skip
+        CBREx (m_sceneTexture && m_bloomTexture && m_bloomExtractPS && m_compositePS, E_UNEXPECTED);
         
         // Scene texture already has the rendered characters - no need to copy from backbuffer
         
         // Set viewport for half-resolution processing
-        D3D11_VIEWPORT halfViewport = {};
-
-        halfViewport.Width    = static_cast<float> (m_renderWidth / 2);
-        halfViewport.Height   = static_cast<float> (m_renderHeight / 2);
-        halfViewport.MinDepth = 0.0f;
-        halfViewport.MaxDepth = 1.0f;
-        
-        m_context->RSSetViewports (1, &halfViewport);
+        SetViewport (m_renderWidth / 2, m_renderHeight / 2);
         
         // EXTRACTION PASS: Extract only bright pixels from scene to bloom texture
-        m_context->OMSetRenderTargets     (1, m_bloomRTV.GetAddressOf(), nullptr);
-        m_context->IASetInputLayout       (m_fullscreenQuadInputLayout.Get());
-        m_context->IASetPrimitiveTopology (D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-        UINT stride = sizeof (float) * 5;
-        UINT offset = 0;
-        m_context->IASetVertexBuffers   (0, 1, m_fullscreenQuadVB.GetAddressOf(), &stride, &offset);
-        m_context->VSSetShader          (m_fullscreenQuadVS.Get(), nullptr, 0);
-        m_context->VSSetConstantBuffers (0, 0, nullptr);
-        m_context->PSSetShader          (m_bloomExtractPS.Get(), nullptr, 0);
-        m_context->PSSetShaderResources (0, 1, m_sceneSRV.GetAddressOf());
-        m_context->PSSetSamplers        (0, 1, m_samplerState.GetAddressOf());
-        m_context->Draw (6, 0);
+        SetRenderPipelineState (m_fullscreenQuadInputLayout.Get(),
+                                D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST,
+                                m_fullscreenQuadVB.Get(),
+                                sizeof (float) * 5,
+                                m_fullscreenQuadVS.Get(),
+                                nullptr,
+                                nullptr);
+        m_context->PSSetSamplers (0, 1, m_samplerState.GetAddressOf());
         
-        ID3D11ShaderResourceView * nullSRV = nullptr;
-        m_context->PSSetShaderResources (0, 1, &nullSRV);
+        RenderFullscreenPass (m_bloomRTV.Get(), m_bloomExtractPS.Get(), m_sceneSRV.GetAddressOf(), 1);
         
         // Horizontal blur pass (bloom → temp)
-        m_context->OMSetRenderTargets   (1, m_blurTempRTV.GetAddressOf(), nullptr);
-        m_context->PSSetShader          (m_blurHorizontalPS.Get(), nullptr, 0);
-        m_context->PSSetShaderResources (0, 1, m_bloomSRV.GetAddressOf());
-        m_context->Draw (6, 0);
-        
-        m_context->PSSetShaderResources (0, 1, &nullSRV);
+        RenderFullscreenPass (m_blurTempRTV.Get(), m_blurHorizontalPS.Get(), m_bloomSRV.GetAddressOf(), 1);
         
         // Vertical blur pass (temp → bloom)
-        m_context->OMSetRenderTargets   (1, m_bloomRTV.GetAddressOf(), nullptr);
-        m_context->PSSetShader          (m_blurVerticalPS.Get(), nullptr, 0);
-        m_context->PSSetShaderResources (0, 1, m_blurTempSRV.GetAddressOf());
-        m_context->Draw (6, 0);
-        
-        m_context->PSSetShaderResources (0, 1, &nullSRV);
+        RenderFullscreenPass (m_bloomRTV.Get(), m_blurVerticalPS.Get(), m_blurTempSRV.GetAddressOf(), 1);
         
         // Restore full viewport
-        D3D11_VIEWPORT fullViewport = {};
-        fullViewport.Width    = static_cast<float> (m_renderWidth);
-        fullViewport.Height   = static_cast<float> (m_renderHeight);
-        fullViewport.MinDepth = 0.0f;
-        fullViewport.MaxDepth = 1.0f;
-        m_context->RSSetViewports (1, &fullViewport);
+        SetViewport (m_renderWidth, m_renderHeight);
         
         // Composite back to backbuffer
         m_context->OMSetRenderTargets (1, m_renderTargetView.GetAddressOf(), nullptr);
@@ -943,21 +1012,21 @@ namespace MatrixRain
         // Disable blending for composite (we want to replace, not blend)
         m_context->OMSetBlendState (nullptr, nullptr, 0xffffffff);
         
-        m_context->PSSetShader (m_compositePS.Get(), nullptr, 0);
-        ID3D11ShaderResourceView * srvs[2] = { m_sceneSRV.Get(), m_bloomSRV.Get() };
-        m_context->PSSetShaderResources (0, 2, srvs);
-        m_context->PSSetSamplers        (0, 1, m_samplerState.GetAddressOf());
-        m_context->Draw (6, 0);
-        
-        // Cleanup
-        ID3D11ShaderResourceView * nullSRVs[2] = { nullptr, nullptr };
-        m_context->PSSetShaderResources (0, 2, nullSRVs);
+        srvs[0] = m_sceneSRV.Get();
+        srvs[1] = m_bloomSRV.Get();
+        RenderFullscreenPass (m_renderTargetView.Get(), m_compositePS.Get(), srvs, 2);
         
         // Restore render state
-        m_context->IASetInputLayout     (m_inputLayout.Get());
-        m_context->VSSetShader          (m_vertexShader.Get(), nullptr, 0);
-        m_context->VSSetConstantBuffers (0, 1, m_constantBuffer.GetAddressOf());
-        m_context->PSSetShader          (m_pixelShader.Get(), nullptr, 0);
+        SetRenderPipelineState (m_inputLayout.Get(),
+                                D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST,
+                                m_instanceBuffer.Get(),
+                                sizeof (CharacterInstanceData),
+                                m_vertexShader.Get(),
+                                m_constantBuffer.Get(),
+                                m_pixelShader.Get());
+
+    Error:
+        return hr;
     }
 
 
@@ -1170,7 +1239,7 @@ namespace MatrixRain
             m_context->DrawInstanced (6, static_cast<UINT> (totalCharacters), 0, 0);
             
             // Now apply bloom (which will composite to backbuffer)
-            ApplyBloom();
+            (void)ApplyBloom();  // Ignore return - errors already handled within
         }
         else
         {

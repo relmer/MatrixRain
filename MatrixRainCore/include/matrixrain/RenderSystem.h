@@ -98,7 +98,10 @@ namespace MatrixRain
         void UpdateInstanceBuffer(const AnimationSystem& animationSystem, ColorScheme colorScheme);
         void ClearRenderTarget();
         void RenderFPSCounter(float fps, int rainPercentage, int streakCount);
-        void ApplyBloom();
+        HRESULT ApplyBloom();
+        void RenderFullscreenPass(ID3D11RenderTargetView* pRenderTarget, ID3D11PixelShader* pPixelShader, ID3D11ShaderResourceView* const* ppShaderResources, UINT numResources);
+        void SetRenderPipelineState(ID3D11InputLayout* pInputLayout, D3D11_PRIMITIVE_TOPOLOGY topology, ID3D11Buffer* pVertexBuffer, UINT stride, ID3D11VertexShader* pVertexShader, ID3D11Buffer* pConstantBuffer, ID3D11PixelShader* pPixelShader);
+        void SetViewport(UINT width, UINT height);
 
         // Resource cleanup helpers
         void ReleaseBloomResources();
