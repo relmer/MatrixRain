@@ -260,20 +260,146 @@ g_pConsole->Printf (CConfig::Error, L"Error: %s\n", msg);
 - Use `enum class` over plain `enum`
 - Use `nullptr` not `NULL`
 
-### Error Handling
-- Use custom error handling macros (EHM) when present in codebase
-- Follow existing patterns: `CHR`, `CBR`, `CWRA`, etc.
-- Include `Error:` labels for cleanup in functions returning `HRESULT`
-- **NEVER** omit the `Error:` label even if currently unused
+### Error Handling with EHM (Error Handling Macros)
+
+#### Core EHM Principles
+When EHM is present in a codebase (included via `pch.h`), use it consistently for error handling:
+
+**Basic Rules:**
 - All functions returning `HRESULT` must declare `HRESULT hr = S_OK;` as first variable
-- Use `BAIL_OUT_IF(condition, hr_value)` for early exit with specific HRESULT
-- `A` suffix (e.g., `CHRA`) means "assert" - triggers debug break on failure
-- `Ex` suffix (e.g., `CHREx`) allows custom error code replacement
-- `CHR` variants: check HRESULT, goto Error if failed
-- `CWR` variants: check Win32 BOOL results, convert to HRESULT
-- `CBR` variants: check boolean conditions
+- Include `Error:` label for cleanup in functions returning `HRESULT`
+- **NEVER** omit the `Error:` label even if currently unused
+- **NEVER** embed function calls within EHM macro parameters
+- Variables must be declared at the top of their scope (before any `goto Error` can occur)
+- Use `{ }` blocks to create new scopes when local variables are needed mid-function
+
+**Correct Pattern:**
+```cpp
+HRESULT MyFunction()
+{
+    HRESULT hr = S_OK;
+    
+    // Declare ALL variables at top of scope
+    ComPtr<ID3D11Device> device;
+    DWORD flags = 0;
+    
+    hr = CreateDeviceFunction (&device);
+    CHRA (hr);  // Check result, NOT CreateDeviceFunction() directly
+    
+    hr = device->SomeMethod (flags);
+    CHRA (hr);
+    
+Error:
+    return hr;
+}
+```
+
+**Wrong Pattern:**
+```cpp
+// WRONG - don't do this:
+CHRA (CreateDeviceFunction (&device));  // Function call embedded in macro!
+
+// WRONG - variable declared after potential goto:
+CHRA (hr);
+ComPtr<ID3D11Device> device;  // Can't jump past this declaration!
+```
+
+#### EHM Macro Variants
+
+**Assert vs Non-Assert:**
+- Use `-A` suffix macros (`CHRA`, `CBRA`, `CWRA`) when calling **external APIs**:
+  - Windows APIs, DirectX, COM methods, third-party libraries
+  - These trigger debug break at the **actual point of failure**
+- Use non-`-A` macros (`CHR`, `CBR`, `CWR`) when calling **internal project functions**:
+  - Propagates error without additional assert
+  - Prevents redundant debug breaks as error bubbles up call stack
+
+**Example:**
+```cpp
+// External API - use Assert version:
+hr = m_device->CreateVertexShader (blob, size, nullptr, &shader);
+CHRA (hr);  // Assert on API failure
+
+// Internal function - use non-Assert version:
+hr = CreateDevice();
+CHR (hr);   // Propagate error without assert
+```
+
+**Logging Variants:**
+- Use `-L` suffix (`CHRL`, `CHRLA`) **only when providing useful diagnostic information**
+- Don't use `-L` for redundant messages like "Function X failed"
+- File and line number are logged automatically, so only add `-L` for:
+  - Variable values that help diagnose issues
+  - Contextual information not obvious from file:line
+  - State information that aids debugging
+
+**Example:**
+```cpp
+// No -L needed - file:line tells us what failed:
+hr = m_device->CreateVertexShader (...);
+CHRA (hr);
+
+// -L adds useful context:
+hr = m_device->CreateTexture2D (&desc, nullptr, &texture);
+CHRLA (hr, "Texture dimensions: %dx%d", width, height);
+
+// -L provides context about why:
+CBRLA (width > 0 && height > 0, E_INVALIDARG, "Invalid dimensions (0x0), skipping bloom");
+```
+
+#### Common EHM Macros
+- `CHR(hr)` - Check HRESULT, goto Error if failed
+- `CHRA(hr)` - Check HRESULT with assert
+- `CHRL(hr, msg, ...)` - Check HRESULT with logging
+- `CHRLA(hr, msg, ...)` - Check HRESULT with assert and logging
+- `CBR(condition)` - Check boolean, goto Error if false
+- `CBRA(condition)` - Check boolean with assert
+- `CWR(boolResult)` - Check Win32 BOOL, convert to HRESULT
+- `CWRA(boolResult)` - Check Win32 BOOL with assert
+- `CHREx(hr, newHr)` - Check HRESULT, replace with custom error code
+- `BAIL_OUT_IF(condition, hr_value)` - Early exit with specific HRESULT
+
+#### Variable Declaration with EHM
+Because EHM uses `goto`, all variables must be declared before any potential jump:
+
+```cpp
+HRESULT MyFunction()
+{
+    HRESULT hr = S_OK;
+    
+    // ALL variables declared upfront
+    ComPtr<ID3D11Device>        device;
+    ComPtr<IDXGIFactory>        factory;
+    D3D11_TEXTURE2D_DESC        texDesc  = {};
+    DWORD                       flags    = 0;
+    
+    
+    hr = CreateDevice (&device);
+    CHRA (hr);
+    
+    // If you need a local variable mid-function, create a new scope:
+    {
+        ComPtr<ID3D11Texture2D> tempTexture;
+        
+        hr = device->CreateTexture2D (&texDesc, nullptr, &tempTexture);
+        CHRA (hr);
+    }
+    
+Error:
+    return hr;
+}
+```
+
+#### Function Return Types with EHM
+- Most functions using EHM should return `HRESULT` directly (not `bool`)
+- This allows error codes to propagate up the call stack
+- Calling code checks the result with `CHR()` or `CHRA()`
+- Only use `bool` returns for functions that truly represent success/failure without needing error codes
+
+#### Additional Error Handling
 - Use `ASSERT()` for debug-only invariant checks
-- Use runtime checks (`CBR`/`CWR`) for expected failure cases
+- Use `CBR`/`CBRA` for runtime checks on expected conditions
+- Use `BAIL_OUT_IF(condition, hr_value)` for early exit with specific HRESULT
 
 ---
 

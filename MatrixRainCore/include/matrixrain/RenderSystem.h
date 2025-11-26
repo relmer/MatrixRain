@@ -81,16 +81,16 @@ namespace MatrixRain
 
     private:
         // Initialization helpers
-        bool CreateDevice();
-        bool CreateSwapChain(HWND hwnd, UINT width, UINT height);
-        bool CreateRenderTargetView();
-        bool CompileShaders();
-        bool CreateInstanceBuffer();
-        bool CreateConstantBuffer();
-        bool CreateBlendState();
-        bool CreateSamplerState();
-        bool CreateDirect2DResources();
-        bool CreateBloomResources(UINT width, UINT height);
+        HRESULT CreateDevice();
+        HRESULT CreateSwapChain(HWND hwnd, UINT width, UINT height);
+        HRESULT CreateRenderTargetView();
+        HRESULT CompileShaders();
+        HRESULT CreateInstanceBuffer();
+        HRESULT CreateConstantBuffer();
+        HRESULT CreateBlendState();
+        HRESULT CreateSamplerState();
+        HRESULT CreateDirect2DResources();
+        HRESULT CreateBloomResources(UINT width, UINT height);
 
         // Rendering helpers
         void SortStreaksByDepth(std::vector<const CharacterStreak*>& streaks);
@@ -98,6 +98,15 @@ namespace MatrixRain
         void ClearRenderTarget();
         void RenderFPSCounter(float fps, int rainPercentage, int streakCount);
         void ApplyBloom();
+
+        // Resource cleanup helpers
+        void ReleaseBloomResources();
+        void ReleaseDirect2DResources();
+        void ReleaseRenderTargetResources();
+        void ReleaseDirectXResources();
+
+        // Resource recreation helpers
+        HRESULT RecreateDirect2DBitmap();
 
         // DirectX resources
         Microsoft::WRL::ComPtr<ID3D11Device> m_device;
