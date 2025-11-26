@@ -22,6 +22,7 @@ namespace MatrixRain
         , m_zoomVelocity(DEFAULT_ZOOM_VELOCITY)
         , m_spawnTimer(0.0f)
         , m_spawnInterval(SPAWN_INTERVAL)
+        , m_previousTargetCount(0)
     {
     }
 
@@ -81,38 +82,38 @@ namespace MatrixRain
         if (m_densityController)
         {
             int currentCount = static_cast<int>(m_streaks.size());
-            int targetCount = m_densityController->GetTargetStreakCount();
+            int targetCount  = m_densityController->GetTargetStreakCount();
             
             // Remove excess streaks immediately if above target
             if (currentCount > targetCount)
             {
                 RemoveExcessStreaks(targetCount);
+                m_previousTargetCount = targetCount;
             }
             // Spawn new streaks if below target
             else if (m_densityController->ShouldSpawnStreak(currentCount))
             {
                 int deficit = targetCount - currentCount;
                 
-                // Burst spawn if far below target
-                if (deficit >= BURST_SPAWN_THRESHOLD)
+                // Detect density change: target increased from previous frame
+                bool densityChanged = (targetCount > m_previousTargetCount);
+                
+                // Spawn ALL needed streaks immediately
+                for (int i = 0; i < deficit; i++)
                 {
-                    // Spawn multiple streaks to quickly reach target
-                    int burstCount = std::min(deficit / 2, 100);  // Spawn half the deficit, max 100 per frame
-                    for (int i = 0; i < burstCount; i++)
+                    if (densityChanged)
                     {
-                        SpawnStreakInView();  // Spawn anywhere on screen
+                        // Density increased - spawn anywhere on screen
+                        SpawnStreakInView();
                     }
-                }
-                else
-                {
-                    // Normal timed spawning
-                    m_spawnTimer += deltaTime;
-                    if (m_spawnTimer >= m_spawnInterval)
+                    else
                     {
-                        m_spawnTimer -= m_spawnInterval;
+                        // Replacing aged-off streaks - spawn at top
                         SpawnStreak();
                     }
                 }
+                
+                m_previousTargetCount = targetCount;
             }
         }
         else

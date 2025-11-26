@@ -90,10 +90,10 @@ namespace MatrixRain
         float m_zoomVelocity;                     // Camera zoom speed (units per second)
         float m_spawnTimer;                       // Timer for automatic spawning
         float m_spawnInterval;                    // Time between automatic spawns
+        int m_previousTargetCount;                // Previous frame's target count (to detect density changes)
 
         static constexpr float DEFAULT_ZOOM_VELOCITY = 5.0f;  // Units per second
         static constexpr float MAX_DEPTH = 100.0f;            // Far plane
         static constexpr float SPAWN_INTERVAL = 0.05f;        // Spawn every 50ms (fast response)
-        static constexpr int BURST_SPAWN_THRESHOLD = 50;      // Burst spawn when this many below target
     };
 }
