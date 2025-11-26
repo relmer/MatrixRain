@@ -5,12 +5,14 @@ namespace MatrixRain
 {
     InputSystem::InputSystem()
         : m_densityController(nullptr)
+        , m_appState(nullptr)
     {
     }
 
-    void InputSystem::Initialize(DensityController& densityController)
+    void InputSystem::Initialize(DensityController& densityController, ApplicationState& appState)
     {
         m_densityController = &densityController;
+        m_appState = &appState;
     }
 
     void InputSystem::ProcessKeyDown(int virtualKey)
@@ -25,6 +27,13 @@ namespace MatrixRain
         case VK_SUBTRACT:   // Numpad -
         case VK_OEM_MINUS:  // Main keyboard -
             OnDensityDecrease();
+            break;
+
+        case VK_OEM_3:      // Backtick/tilde key (`~)
+            if (m_appState)
+            {
+                m_appState->ToggleDebugFadeTimes();
+            }
             break;
 
         default:

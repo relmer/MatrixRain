@@ -52,6 +52,7 @@ namespace MatrixRain
 
         m_mutationTimer = 0.0f;
         m_dropTimer = 0.0f;
+        m_isInFadingPhase = false;
         
         // Spawn the first character immediately at the head position
         CharacterSet& charSet = CharacterSet::GetInstance();
@@ -64,8 +65,8 @@ namespace MatrixRain
         character.scale = 1.0f;
         character.positionOffset = Vector2(0.0f, m_position.y);
         character.isHead = true;
-        character.brightTimeRemaining = 0.0f; // Head doesn't need bright time
-        character.fadeTimeRemaining = 3.0f;
+        character.lifetime = 0.0f; // Head has no lifetime (stays alive while isHead=true)
+        character.fadeTime = 3.0f;
         
         m_characters.push_back(character);
     }
@@ -89,18 +90,11 @@ namespace MatrixRain
                     oldHead.isHead = false;
                     oldHead.color = Color4(0.0f, 1.0f, 0.0f, 1.0f); // Green
                     
-                    // Calculate how long this character should remain at full brightness
-                    // Characters further from head get less bright time
-                    if (m_characters.size() < m_maxLength)
-                    {
-                        size_t charactersStillToCome = m_maxLength - m_characters.size();
-                        oldHead.brightTimeRemaining = charactersStillToCome * m_dropInterval;
-                    }
-                    else
-                    {
-                        // Streak is at max length, start fading immediately
-                        oldHead.brightTimeRemaining = 0.0f;
-                    }
+                    // Set lifetime ONLY for this character (don't recalculate others!)
+                    // Character index from front determines bright time
+                    size_t characterIndex = m_characters.size() - 1;
+                    float brightTime = characterIndex * m_dropInterval;
+                    oldHead.lifetime = brightTime + oldHead.fadeTime;
                 }
                 
                 CharacterSet& charSet = CharacterSet::GetInstance();
@@ -114,24 +108,30 @@ namespace MatrixRain
                 // Store absolute position where this character was born
                 character.positionOffset = Vector2(0.0f, m_position.y);
                 character.isHead = true;
-                character.brightTimeRemaining = 0.0f; // Head doesn't need bright time
-                character.fadeTimeRemaining = 3.0f;
+                character.lifetime = 0.0f; // Head has no lifetime (stays alive while isHead=true)
+                character.fadeTime = 3.0f;
 
                 m_characters.push_back(character);
                 
                 // Move the head down by one cell for the next character
                 m_position.y += m_characterSpacing;
             }
-            else
+            else if (!m_isInFadingPhase)
             {
-                // Head has gone offscreen - mark the current head as no longer head
+                // Head has just gone offscreen - transition to fading phase (only once)
                 if (!m_characters.empty())
                 {
                     CharacterInstance& oldHead = m_characters.back();
                     oldHead.isHead = false;
                     oldHead.color = Color4(0.0f, 1.0f, 0.0f, 1.0f); // Green
-                    oldHead.brightTimeRemaining = 0.0f; // Start fading immediately
+                    
+                    // Set lifetime for the final head character
+                    size_t characterIndex = m_characters.size() - 1;
+                    float brightTime = characterIndex * m_dropInterval;
+                    oldHead.lifetime = brightTime + oldHead.fadeTime;
                 }
+                
+                m_isInFadingPhase = true;
             }
         }
 
@@ -152,6 +152,12 @@ namespace MatrixRain
         while (!m_characters.empty() && m_characters.front().brightness <= 0.0f)
         {
             m_characters.erase(m_characters.begin());
+        }
+        
+        // Also remove any faded characters from the back (e.g., when head goes offscreen and fades)
+        while (!m_characters.empty() && m_characters.back().brightness <= 0.0f)
+        {
+            m_characters.pop_back();
         }
 
         // Handle character mutation (5% probability per character per second)

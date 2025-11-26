@@ -1,5 +1,6 @@
 #pragma once
 #include "MatrixRain/DensityController.h"
+#include "MatrixRain/ApplicationState.h"
 
 namespace MatrixRain
 {
@@ -13,10 +14,11 @@ namespace MatrixRain
         InputSystem();
 
         /// <summary>
-        /// Initialize the input system with a density controller reference.
+        /// Initialize the input system with required component references.
         /// </summary>
         /// <param name="densityController">Reference to density controller for +/- keys</param>
-        void Initialize(DensityController& densityController);
+        /// <param name="appState">Reference to application state for debug toggle</param>
+        void Initialize(DensityController& densityController, ApplicationState& appState);
 
         /// <summary>
         /// Process a keyboard key-down event.
@@ -36,6 +38,7 @@ namespace MatrixRain
         void OnDensityIncrease();
         void OnDensityDecrease();
 
-        DensityController* m_densityController;
+        DensityController * m_densityController;
+        ApplicationState  * m_appState;
     };
 }

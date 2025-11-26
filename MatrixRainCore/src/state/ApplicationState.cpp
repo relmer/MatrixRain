@@ -6,6 +6,7 @@ namespace MatrixRain
     ApplicationState::ApplicationState()
         : m_displayMode(DisplayMode::Windowed)
         , m_colorScheme(ColorScheme::Green)
+        , m_showDebugFadeTimes(false)
     {
     }
 
@@ -16,6 +17,9 @@ namespace MatrixRain
         
         // Start with green color scheme (classic Matrix)
         m_colorScheme = ColorScheme::Green;
+        
+        // Debug fade times off by default
+        m_showDebugFadeTimes = false;
     }
 
     void ApplicationState::ToggleDisplayMode()
@@ -35,6 +39,15 @@ namespace MatrixRain
     {
         // Cycle to next color scheme
         m_colorScheme = GetNextColorScheme(m_colorScheme);
+    }
+
+
+
+
+
+    void ApplicationState::ToggleDebugFadeTimes()
+    {
+        m_showDebugFadeTimes = !m_showDebugFadeTimes;
     }
 }
 

@@ -10,8 +10,8 @@ namespace MatrixRain
         , scale(1.0f)
         , positionOffset(0.0f, 0.0f)
         , isHead(false)
-        , brightTimeRemaining(0.0f)
-        , fadeTimeRemaining(3.0f)
+        , lifetime(0.0f)
+        , fadeTime(3.0f)
     {
     }
 
@@ -22,46 +22,31 @@ namespace MatrixRain
         , scale(scale)
         , positionOffset(offset)
         , isHead(false)
-        , brightTimeRemaining(0.0f)
-        , fadeTimeRemaining(3.0f)
+        , lifetime(0.0f)
+        , fadeTime(3.0f)
     {
     }
 
     void CharacterInstance::Update(float deltaTime)
     {
-        // Update bright time first
-        if (brightTimeRemaining > 0.0f)
+        // Decrement lifetime
+        lifetime -= deltaTime;
+        
+        if (lifetime <= 0.0f)
         {
-            brightTimeRemaining -= deltaTime;
-            if (brightTimeRemaining <= 0.0f)
-            {
-                brightTimeRemaining = 0.0f;
-                // Transition to fading phase - reset fade timer to full duration
-                fadeTimeRemaining = 3.0f;
-            }
+            // Dead - ready for removal
+            lifetime = 0.0f;
+            brightness = 0.0f;
         }
-
-        // If bright time is over, update fade
-        if (brightTimeRemaining <= 0.0f)
-        {
-            fadeTimeRemaining -= deltaTime;
-            
-            if (fadeTimeRemaining <= 0.0f)
-            {
-                fadeTimeRemaining = 0.0f;
-                brightness = 0.0f;
-            }
-            else
-            {
-                // Linear fade: brightness goes from 1.0 to 0.0 as fadeTimeRemaining goes from 3.0 to 0.0
-                constexpr float FADE_DURATION = 3.0f;
-                brightness = fadeTimeRemaining / FADE_DURATION;
-            }
-        }
-        else
+        else if (lifetime > fadeTime)
         {
             // Still in bright phase
             brightness = 1.0f;
+        }
+        else
+        {
+            // In fade phase: brightness fades from 1.0 to 0.0 as lifetime goes from fadeTime to 0
+            brightness = lifetime / fadeTime;
         }
     }
 }

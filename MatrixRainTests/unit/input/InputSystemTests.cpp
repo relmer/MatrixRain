@@ -3,6 +3,7 @@
 
 #include "MatrixRain/InputSystem.h"
 #include "MatrixRain/DensityController.h"
+#include "MatrixRain/ApplicationState.h"
 #include "MatrixRain/Viewport.h"
 
 
@@ -24,9 +25,10 @@ namespace MatrixRainTests
 			viewport.Resize(1920.0f, 1080.0f); // Max = 120 streaks
 			
 			DensityController densityController(viewport, 32.0f); // 80%
+			ApplicationState appState;
 			
 			InputSystem inputSystem;
-			inputSystem.Initialize(densityController);
+			inputSystem.Initialize(densityController, appState);
 			
 			// Verify initial state (80% of 120 = 96 streaks)
 			Assert::AreEqual(80, densityController.GetPercentage(), L"Initial percentage should be 80");
@@ -51,9 +53,10 @@ namespace MatrixRainTests
 			viewport.Resize(1920.0f, 1080.0f); // Max = 120 streaks
 			
 			DensityController densityController(viewport, 32.0f); // 80%
+			ApplicationState appState;
 			
 			InputSystem inputSystem;
-			inputSystem.Initialize(densityController);
+			inputSystem.Initialize(densityController, appState);
 			
 			// Verify initial state (80% of 120 = 96 streaks)
 			Assert::AreEqual(80, densityController.GetPercentage(), L"Initial percentage should be 80");
@@ -78,9 +81,10 @@ namespace MatrixRainTests
 			viewport.Resize(1920.0f, 1080.0f);
 			
 			DensityController densityController(viewport, 32.0f);
+			ApplicationState appState;
 			
 			InputSystem inputSystem;
-			inputSystem.Initialize(densityController);
+			inputSystem.Initialize(densityController, appState);
 			
 			// Process VK_OEM_PLUS
 			inputSystem.ProcessKeyDown(VK_OEM_PLUS);
@@ -100,9 +104,10 @@ namespace MatrixRainTests
 			viewport.Resize(1920.0f, 1080.0f);
 			
 			DensityController densityController(viewport, 32.0f);
+			ApplicationState appState;
 			
 			InputSystem inputSystem;
-			inputSystem.Initialize(densityController);
+			inputSystem.Initialize(densityController, appState);
 			
 			// Process VK_OEM_MINUS
 			inputSystem.ProcessKeyDown(VK_OEM_MINUS);
@@ -139,9 +144,10 @@ namespace MatrixRainTests
 			viewport.Resize(1920.0f, 1080.0f);
 			
 			DensityController densityController(viewport, 32.0f);
+			ApplicationState appState;
 			
 			InputSystem inputSystem;
-			inputSystem.Initialize(densityController);
+			inputSystem.Initialize(densityController, appState);
 			
 			// Process VK_C - should not throw or crash
 			inputSystem.ProcessKeyDown('C');

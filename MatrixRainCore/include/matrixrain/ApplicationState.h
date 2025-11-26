@@ -38,15 +38,22 @@ namespace MatrixRain
         /// </summary>
         void CycleColorScheme();
 
+        /// <summary>
+        /// Toggle debug fade times display.
+        /// </summary>
+        void ToggleDebugFadeTimes();
+
         // Accessors
         DisplayMode GetDisplayMode() const { return m_displayMode; }
         void SetDisplayMode(DisplayMode mode) { m_displayMode = mode; }
         ColorScheme GetColorScheme() const { return m_colorScheme; }
         void SetColorScheme(ColorScheme scheme) { m_colorScheme = scheme; }
+        bool GetShowDebugFadeTimes() const { return m_showDebugFadeTimes; }
 
     private:
-        DisplayMode m_displayMode;  // Current display mode
-        ColorScheme m_colorScheme;  // Current color scheme
+        DisplayMode m_displayMode;       // Current display mode
+        ColorScheme m_colorScheme;       // Current color scheme
+        bool        m_showDebugFadeTimes; // Show debug fade time overlay
     };
 }
 

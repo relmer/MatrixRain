@@ -3,6 +3,7 @@
 #include "MatrixRain/DensityController.h"
 #include "MatrixRain/InputSystem.h"
 #include "MatrixRain/AnimationSystem.h"
+#include "MatrixRain/ApplicationState.h"
 #include "MatrixRain/Viewport.h"
 
 
@@ -30,9 +31,10 @@ namespace MatrixRainTests
 			viewport.Resize(1920.0f, 1080.0f); // Max = 120 streaks
 			
 			DensityController densityController(viewport, 32.0f); // 80% of 120 = 96 streaks
+			ApplicationState appState;
 			
 			InputSystem inputSystem;
-			inputSystem.Initialize(densityController);
+			inputSystem.Initialize(densityController, appState);
 			
 			AnimationSystem animationSystem;
 			animationSystem.Initialize(viewport, densityController);

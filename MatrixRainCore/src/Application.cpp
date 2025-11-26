@@ -74,13 +74,15 @@ namespace MatrixRain
             return false;
         }
 
-        // Initialize input system (after density controller)
+        // Initialize input system (after density controller and app state)
         m_inputSystem = std::make_unique<InputSystem>();
-        m_inputSystem->Initialize(*m_densityController);
 
         // Initialize application state
         m_appState = std::make_unique<ApplicationState>();
         m_appState->Initialize();
+        
+        // Now initialize input system with both dependencies
+        m_inputSystem->Initialize(*m_densityController, *m_appState);
 
         // Initialize FPS counter
         m_fpsCounter = std::make_unique<FPSCounter>();
@@ -234,7 +236,8 @@ namespace MatrixRain
             ColorScheme scheme = m_appState->GetColorScheme();
             int rainPercentage = m_densityController ? m_densityController->GetPercentage() : 0;
             int streakCount = static_cast<int>(m_animationSystem->GetActiveStreakCount());
-            m_renderSystem->Render(*m_animationSystem, *m_viewport, scheme, fps, rainPercentage, streakCount);
+            bool showDebugFadeTimes = m_appState->GetShowDebugFadeTimes();
+            m_renderSystem->Render(*m_animationSystem, *m_viewport, scheme, fps, rainPercentage, streakCount, showDebugFadeTimes);
             m_renderSystem->Present();
         }
     }

@@ -37,7 +37,8 @@ namespace MatrixRain
         /// <param name="fps">Current FPS for display (0 to hide)</param>
         /// <param name="rainPercentage">Current rain density percentage (0-100)</param>
         /// <param name="streakCount">Current number of active streaks</param>
-        void Render(const AnimationSystem& animationSystem, const Viewport& viewport, ColorScheme colorScheme = ColorScheme::Green, float fps = 0.0f, int rainPercentage = 0, int streakCount = 0);
+        /// <param name="showDebugFadeTimes">True to show debug fade time overlay</param>
+        void Render(const AnimationSystem& animationSystem, const Viewport& viewport, ColorScheme colorScheme = ColorScheme::Green, float fps = 0.0f, int rainPercentage = 0, int streakCount = 0, bool showDebugFadeTimes = false);
 
         /// <summary>
         /// Present the rendered frame to the screen.
@@ -143,6 +144,7 @@ namespace MatrixRain
         HRESULT UpdateInstanceBuffer(const AnimationSystem& animationSystem, ColorScheme colorScheme);
         void ClearRenderTarget();
         void RenderFPSCounter(float fps, int rainPercentage, int streakCount);
+        void RenderDebugFadeTimes(const AnimationSystem& animationSystem);
         HRESULT ApplyBloom();
         void RenderFullscreenPass(ID3D11RenderTargetView* pRenderTarget, ID3D11PixelShader* pPixelShader, ID3D11ShaderResourceView* const* ppShaderResources, UINT numResources);
         void SetRenderPipelineState(ID3D11InputLayout* pInputLayout, D3D11_PRIMITIVE_TOPOLOGY topology, ID3D11Buffer* pVertexBuffer, UINT stride, ID3D11VertexShader* pVertexShader, ID3D11Buffer* pConstantBuffer, ID3D11PixelShader* pPixelShader);
