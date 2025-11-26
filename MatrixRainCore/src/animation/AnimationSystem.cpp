@@ -91,11 +91,27 @@ namespace MatrixRain
             // Spawn new streaks if below target
             else if (m_densityController->ShouldSpawnStreak(currentCount))
             {
-                m_spawnTimer += deltaTime;
-                if (m_spawnTimer >= m_spawnInterval)
+                int deficit = targetCount - currentCount;
+                
+                // Burst spawn if far below target
+                if (deficit >= BURST_SPAWN_THRESHOLD)
                 {
-                    m_spawnTimer -= m_spawnInterval;
-                    SpawnStreak();
+                    // Spawn multiple streaks to quickly reach target
+                    int burstCount = std::min(deficit / 2, 100);  // Spawn half the deficit, max 100 per frame
+                    for (int i = 0; i < burstCount; i++)
+                    {
+                        SpawnStreakInView();  // Spawn anywhere on screen
+                    }
+                }
+                else
+                {
+                    // Normal timed spawning
+                    m_spawnTimer += deltaTime;
+                    if (m_spawnTimer >= m_spawnInterval)
+                    {
+                        m_spawnTimer -= m_spawnInterval;
+                        SpawnStreak();
+                    }
                 }
             }
         }

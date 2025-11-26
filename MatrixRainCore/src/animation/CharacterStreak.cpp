@@ -20,7 +20,7 @@ namespace MatrixRain
         float GetVelocityScale(float depth)
         {
             constexpr float MIN_SCALE = 1.0f;
-            constexpr float MAX_SCALE = 3.0f;
+            constexpr float MAX_SCALE = 6.0f;
             constexpr float MAX_DEPTH = 100.0f;
 
             float normalizedDepth = std::clamp(depth / MAX_DEPTH, 0.0f, 1.0f);

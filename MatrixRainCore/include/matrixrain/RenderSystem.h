@@ -1,11 +1,14 @@
 #pragma once
 #include "MatrixRain/AnimationSystem.h"
-#include "MatrixRain/CharacterSet.h"
+#include "MatrixRain/CharacterInstance.h"
 #include "MatrixRain/Viewport.h"
 #include "MatrixRain/ColorScheme.h"
 
 namespace MatrixRain
 {
+    // Forward declarations
+    class CharacterStreak;
+
     /// <summary>
     /// Manages DirectX 11 rendering pipeline for Matrix Rain effect.
     /// Handles device creation, shader compilation, instanced rendering, and presentation.
@@ -79,6 +82,48 @@ namespace MatrixRain
         ID3D11Device* GetDevice() const { return m_device.Get(); }
         ID3D11DeviceContext* GetContext() const { return m_context.Get(); }
 
+        // Internal data structures (public for static helper function access)
+        /// <summary>
+        /// Instance data for rendering a single character glyph.
+        /// Packed tightly for GPU upload.
+        /// </summary>
+        struct CharacterInstanceData
+        {
+            float position[3];      // World position (x, y, z)
+            float uvMin[2];         // Top-left UV coordinate
+            float uvMax[2];         // Bottom-right UV coordinate
+            float color[4];         // RGBA color
+            float brightness;       // Brightness multiplier (0-1)
+            float scale;            // Scale multiplier
+            float padding[2];       // Padding to align to 16 bytes
+
+            CharacterInstanceData() :
+                position   { 0.0f, 0.0f, 0.0f },
+                uvMin      { 0.0f, 0.0f },
+                uvMax      { 1.0f, 1.0f },
+                color      { 0.0f, 1.0f, 0.0f, 1.0f },
+                brightness ( 1.0f ),
+                scale      ( 1.0f ),
+                padding    { 0.0f, 0.0f }
+            {
+            }
+        };
+
+        /// <summary>
+        /// Constant buffer data passed to shaders each frame.
+        /// </summary>
+        struct ConstantBufferData
+        {
+            float projection[16];   // 4x4 projection matrix (column-major)
+            float padding[48];      // Padding to 256 bytes for optimal GPU alignment
+
+            ConstantBufferData() :
+                projection { 1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1 },
+                padding    {}
+            {
+            }
+        };
+
     private:
         // Initialization helpers
         HRESULT CreateDevice();
@@ -102,6 +147,7 @@ namespace MatrixRain
         void RenderFullscreenPass(ID3D11RenderTargetView* pRenderTarget, ID3D11PixelShader* pPixelShader, ID3D11ShaderResourceView* const* ppShaderResources, UINT numResources);
         void SetRenderPipelineState(ID3D11InputLayout* pInputLayout, D3D11_PRIMITIVE_TOPOLOGY topology, ID3D11Buffer* pVertexBuffer, UINT stride, ID3D11VertexShader* pVertexShader, ID3D11Buffer* pConstantBuffer, ID3D11PixelShader* pPixelShader);
         void SetViewport(UINT width, UINT height);
+        static void BuildCharacterInstanceData(const CharacterInstance& character, const Vector3& streakPos, const Color4& schemeColor, CharacterInstanceData& data);
 
         // Resource cleanup helpers
         void ReleaseBloomResources();
@@ -171,47 +217,10 @@ namespace MatrixRain
         UINT m_renderWidth;
         UINT m_renderHeight;
 
+        // Per-frame working data (reused to avoid allocations)
+        std::vector<CharacterInstanceData> m_instanceData;
+        std::vector<const CharacterStreak*> m_streakPtrs;
+
         static constexpr UINT INITIAL_INSTANCE_CAPACITY = 10000; // Max characters per frame
-    };
-
-    /// <summary>
-    /// Instance data for rendering a single character glyph.
-    /// Packed tightly for GPU upload.
-    /// </summary>
-    struct CharacterInstanceData
-    {
-        float position[3];      // World position (x, y, z)
-        float uvMin[2];         // Top-left UV coordinate
-        float uvMax[2];         // Bottom-right UV coordinate
-        float color[4];         // RGBA color
-        float brightness;       // Brightness multiplier (0-1)
-        float scale;            // Scale multiplier
-        float padding[2];       // Padding to align to 16 bytes
-
-        CharacterInstanceData()
-            : position{ 0.0f, 0.0f, 0.0f }
-            , uvMin{ 0.0f, 0.0f }
-            , uvMax{ 1.0f, 1.0f }
-            , color{ 0.0f, 1.0f, 0.0f, 1.0f }
-            , brightness(1.0f)
-            , scale(1.0f)
-            , padding{ 0.0f, 0.0f }
-        {
-        }
-    };
-
-    /// <summary>
-    /// Constant buffer data passed to shaders each frame.
-    /// </summary>
-    struct ConstantBufferData
-    {
-        float projection[16];   // 4x4 projection matrix (column-major)
-        float padding[48];      // Padding to 256 bytes for optimal GPU alignment
-
-        ConstantBufferData()
-            : projection{ 1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1 }
-            , padding{}
-        {
-        }
     };
 }

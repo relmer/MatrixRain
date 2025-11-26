@@ -94,5 +94,6 @@ namespace MatrixRain
         static constexpr float DEFAULT_ZOOM_VELOCITY = 5.0f;  // Units per second
         static constexpr float MAX_DEPTH = 100.0f;            // Far plane
         static constexpr float SPAWN_INTERVAL = 0.05f;        // Spawn every 50ms (fast response)
+        static constexpr int BURST_SPAWN_THRESHOLD = 50;      // Burst spawn when this many below target
     };
 }

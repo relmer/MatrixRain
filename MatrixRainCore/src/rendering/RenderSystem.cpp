@@ -1058,26 +1058,80 @@ namespace MatrixRain
 
 
 
+    ////////////////////////////////////////////////////////////////////////////////
+    //
+    //  RenderSystem::BuildCharacterInstanceData
+    //
+    //  Builds instance data for a single character.
+    //
+    ////////////////////////////////////////////////////////////////////////////////
+
+    void RenderSystem::BuildCharacterInstanceData (const CharacterInstance & character, const Vector3 & streakPos, const Color4 & schemeColor, RenderSystem::CharacterInstanceData & data)
+    {
+        CharacterSet & charSet = CharacterSet::GetInstance();
+
+
+        // Position - character stores its absolute Y, streak provides X and Z
+        data.position[0] = streakPos.x + character.positionOffset.x;
+        data.position[1] = character.positionOffset.y; // Absolute Y position
+        data.position[2] = streakPos.z;
+
+        // Get UV coordinates from glyph
+        const GlyphInfo & glyph = charSet.GetGlyph (character.glyphIndex);
+        data.uvMin[0] = glyph.uvMin.x;
+        data.uvMin[1] = glyph.uvMin.y;
+        data.uvMax[0] = glyph.uvMax.x;
+        data.uvMax[1] = glyph.uvMax.y;
+
+        // Color and brightness - apply color scheme to trailing characters
+        // White characters (lead) should stay white regardless of color scheme
+        bool isWhite = (character.color.r > 0.9f && character.color.g > 0.9f && character.color.b > 0.9f);
+        
+        if (isWhite)
+        {
+            // Keep white characters white (lead character)
+            data.color[0] = character.color.r;
+            data.color[1] = character.color.g;
+            data.color[2] = character.color.b;
+        }
+        else
+        {
+            // Replace trail color with current color scheme
+            data.color[0] = schemeColor.r;
+            data.color[1] = schemeColor.g;
+            data.color[2] = schemeColor.b;
+        }
+        
+        data.color[3]   = character.color.a;
+        data.brightness = character.brightness;
+        data.scale      = character.scale;
+    }
+
+
+
+
+
     HRESULT RenderSystem::UpdateInstanceBuffer (const AnimationSystem& animationSystem, ColorScheme colorScheme)
     {
-        HRESULT                              hr = S_OK;
-        Color4                               schemeColor = GetColorRGB (colorScheme);
-        std::vector<CharacterInstanceData>   instanceData;
-        std::vector<const CharacterStreak*>  streakPtrs;
-        D3D11_MAPPED_SUBRESOURCE             mappedResource;
-        CharacterSet&                        charSet = CharacterSet::GetInstance();
-        size_t                               bytesToCopy;
+        HRESULT                  hr = S_OK;
+        Color4                   schemeColor = GetColorRGB (colorScheme);
+        D3D11_MAPPED_SUBRESOURCE mappedResource;
+        size_t                   bytesToCopy;
 
+
+        // Clear working data from previous frame (reuse allocated capacity)
+        m_instanceData.clear();
+        m_streakPtrs.clear();
 
         // Get streaks sorted by depth
         for (const auto& streak : animationSystem.GetStreaks())
         {
-            streakPtrs.push_back (&streak);
+            m_streakPtrs.push_back (&streak);
         }
-        SortStreaksByDepth (streakPtrs);
+        SortStreaksByDepth (m_streakPtrs);
 
         // Build instance data
-        for (const CharacterStreak* streak : streakPtrs)
+        for (const CharacterStreak* streak : m_streakPtrs)
         {
             const auto& characters = streak->GetCharacters();
             Vector3 streakPos = streak->GetPosition();
@@ -1086,54 +1140,19 @@ namespace MatrixRain
             for (const auto& character : characters)
             {
                 CharacterInstanceData data;
-                
-                // Position - character stores its absolute Y, streak provides X and Z
-                data.position[0] = streakPos.x + character.positionOffset.x;
-                data.position[1] = character.positionOffset.y; // Absolute Y position
-                data.position[2] = streakPos.z;
-
-                // Get UV coordinates from glyph
-                const GlyphInfo& glyph = charSet.GetGlyph (character.glyphIndex);
-                data.uvMin[0] = glyph.uvMin.x;
-                data.uvMin[1] = glyph.uvMin.y;
-                data.uvMax[0] = glyph.uvMax.x;
-                data.uvMax[1] = glyph.uvMax.y;
-
-                // Color and brightness - apply color scheme to trailing characters
-                // White characters (lead) should stay white regardless of color scheme
-                bool isWhite = (character.color.r > 0.9f && character.color.g > 0.9f && character.color.b > 0.9f);
-                
-                if (isWhite)
-                {
-                    // Keep white characters white (lead character)
-                    data.color[0] = character.color.r;
-                    data.color[1] = character.color.g;
-                    data.color[2] = character.color.b;
-                }
-                else
-                {
-                    // Replace trail color with current color scheme
-                    data.color[0] = schemeColor.r;
-                    data.color[1] = schemeColor.g;
-                    data.color[2] = schemeColor.b;
-                }
-                
-                data.color[3]   = character.color.a;
-                data.brightness = character.brightness;
-                data.scale      = character.scale;
-
-                instanceData.push_back (data);
+                BuildCharacterInstanceData (character, streakPos, schemeColor, data);
+                m_instanceData.push_back (data);
             }
         }
 
-        BAIL_OUT_IF (instanceData.empty(), S_OK);
+        BAIL_OUT_IF (m_instanceData.empty(), S_OK);
 
         // Map instance buffer and upload data
         hr = m_context->Map (m_instanceBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
         CHRA (hr);
 
-        bytesToCopy = sizeof (CharacterInstanceData) * std::min (instanceData.size(), static_cast<size_t> (m_instanceBufferCapacity));
-        memcpy (mappedResource.pData, instanceData.data(), bytesToCopy);
+        bytesToCopy = sizeof (CharacterInstanceData) * std::min (m_instanceData.size(), static_cast<size_t> (m_instanceBufferCapacity));
+        memcpy (mappedResource.pData, m_instanceData.data(), bytesToCopy);
         m_context->Unmap (m_instanceBuffer.Get(), 0);
 
     Error:
