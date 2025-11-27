@@ -332,8 +332,9 @@ namespace MatrixRain
                     m_appState->ToggleDisplayMode();
                     DisplayMode newMode = m_appState->GetDisplayMode();
                     
-                    // Save old viewport width for rescaling streaks
+                    // Save old viewport dimensions for rescaling streaks
                     float oldWidth = m_viewport->GetWidth();
+                    float oldHeight = m_viewport->GetHeight();
                     
                     if (newMode == DisplayMode::Fullscreen)
                     {
@@ -348,10 +349,9 @@ namespace MatrixRain
                         m_viewport->Resize(static_cast<float>(screenWidth), static_cast<float>(screenHeight));
                         m_renderSystem->Resize(screenWidth, screenHeight);
                         
-                        // Rescale existing streaks to fill new viewport width
-                        // Note: We don't spawn additional streaks here to avoid creating visible "waves"
-                        // The density controller will naturally spawn new streaks to fill the space over time
-                        m_animationSystem->RescaleStreaksForViewport(oldWidth, static_cast<float>(screenWidth));
+                        // Rescale existing streaks to fill new viewport dimensions
+                        m_animationSystem->RescaleStreaksForViewport(oldWidth, static_cast<float>(screenWidth), 
+                                                                      oldHeight, static_cast<float>(screenHeight));
                     }
                     else
                     {
@@ -370,8 +370,9 @@ namespace MatrixRain
                         m_viewport->Resize(static_cast<float>(windowWidth), static_cast<float>(windowHeight));
                         m_renderSystem->Resize(windowWidth, windowHeight);
                         
-                        // Rescale existing streaks to fit new viewport width (no new spawning when shrinking)
-                        m_animationSystem->RescaleStreaksForViewport(oldWidth, static_cast<float>(windowWidth));
+                        // Rescale existing streaks to fit new viewport dimensions
+                        m_animationSystem->RescaleStreaksForViewport(oldWidth, static_cast<float>(windowWidth),
+                                                                      oldHeight, static_cast<float>(windowHeight));
                     }
                     m_inDisplayModeTransition = false;
                     

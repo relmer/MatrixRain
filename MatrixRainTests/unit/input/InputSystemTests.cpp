@@ -22,7 +22,7 @@ namespace MatrixRainTests
 			// Then: DensityController percentage should increase by 5% to 85%
 			
 			Viewport viewport;
-			viewport.Resize(1920.0f, 1080.0f); // Max = 120 streaks
+			viewport.Resize(1920.0f, 1080.0f); // Max = 480 streaks
 			
 			DensityController densityController(viewport, 32.0f); // 80%
 			ApplicationState appState;
@@ -30,16 +30,16 @@ namespace MatrixRainTests
 			InputSystem inputSystem;
 			inputSystem.Initialize(densityController, appState);
 			
-			// Verify initial state (80% of 120 = 96 streaks)
+			// Verify initial state (80% of 480 = 384 streaks)
 			Assert::AreEqual(80, densityController.GetPercentage(), L"Initial percentage should be 80");
-			Assert::AreEqual(96, densityController.GetTargetStreakCount(), L"Initial should be 96 streaks at 80%");
+			Assert::AreEqual(384, densityController.GetTargetStreakCount(), L"Initial should be 384 streaks at 80%");
 			
 			// Process VK_ADD
 			inputSystem.ProcessKeyDown(VK_ADD);
 			
-			// Verify percentage increased (85% of 120 = 102 streaks)
+			// Verify percentage increased (85% of 480 = 408 streaks)
 			Assert::AreEqual(85, densityController.GetPercentage(), L"VK_ADD should increase to 85%");
-			Assert::AreEqual(102, densityController.GetTargetStreakCount(), L"Should be 102 streaks at 85%");
+			Assert::AreEqual(408, densityController.GetTargetStreakCount(), L"Should be 408 streaks at 85%");
 		}
 
 		TEST_METHOD(TestInputSystemProcessesVK_SUBTRACT)
@@ -50,7 +50,7 @@ namespace MatrixRainTests
 			// Then: DensityController percentage should decrease by 5% to 75%
 			
 			Viewport viewport;
-			viewport.Resize(1920.0f, 1080.0f); // Max = 120 streaks
+			viewport.Resize(1920.0f, 1080.0f); // Max = 480 streaks
 			
 			DensityController densityController(viewport, 32.0f); // 80%
 			ApplicationState appState;
@@ -58,16 +58,16 @@ namespace MatrixRainTests
 			InputSystem inputSystem;
 			inputSystem.Initialize(densityController, appState);
 			
-			// Verify initial state (80% of 120 = 96 streaks)
+			// Verify initial state (80% of 480 = 384 streaks)
 			Assert::AreEqual(80, densityController.GetPercentage(), L"Initial percentage should be 80");
-			Assert::AreEqual(96, densityController.GetTargetStreakCount(), L"Initial should be 96 streaks at 80%");
+			Assert::AreEqual(384, densityController.GetTargetStreakCount(), L"Initial should be 384 streaks at 80%");
 			
 			// Process VK_SUBTRACT
 			inputSystem.ProcessKeyDown(VK_SUBTRACT);
 			
-			// Verify percentage decreased (75% of 120 = 90 streaks)
+			// Verify percentage decreased (75% of 480 = 360 streaks)
 			Assert::AreEqual(75, densityController.GetPercentage(), L"VK_SUBTRACT should decrease to 75%");
-			Assert::AreEqual(90, densityController.GetTargetStreakCount(), L"Should be 90 streaks at 75%");
+			Assert::AreEqual(360, densityController.GetTargetStreakCount(), L"Should be 360 streaks at 75%");
 		}
 
 		TEST_METHOD(TestInputSystemProcessesVK_OEM_PLUS)

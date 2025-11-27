@@ -33,6 +33,13 @@ namespace MatrixRain
         /// <returns>True if the streak has fallen completely off screen</returns>
         bool ShouldDespawn(float viewportHeight) const;
 
+        /// <summary>
+        /// Rescale all character positions when viewport size changes.
+        /// </summary>
+        /// <param name="scaleX">X scale ratio (newWidth / oldWidth)</param>
+        /// <param name="scaleY">Y scale ratio (newHeight / oldHeight)</param>
+        void RescalePositions(float scaleX, float scaleY);
+
         // Accessors
         const Vector3& GetPosition() const { return m_position; }
         void SetPosition(const Vector3& position) { m_position = position; }

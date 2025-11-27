@@ -260,21 +260,30 @@ namespace MatrixRain
 
 
 
-    void AnimationSystem::RescaleStreaksForViewport(float oldWidth, float newWidth)
+    void AnimationSystem::RescaleStreaksForViewport(float oldWidth, float newWidth, float oldHeight, float newHeight)
     {
-        if (oldWidth <= 0.0f || newWidth <= 0.0f)
+        if (oldWidth <= 0.0f || newWidth <= 0.0f || oldHeight <= 0.0f || newHeight <= 0.0f)
         {
             return;
         }
 
-        float scaleRatio = newWidth / oldWidth;
+        float scaleX = newWidth / oldWidth;
+        float scaleY = newHeight / oldHeight;
 
         for (CharacterStreak& streak : m_streaks)
         {
-            Vector3 position = streak.GetPosition();
-            position.x *= scaleRatio;
-            streak.SetPosition(position);
+            streak.RescalePositions(scaleX, scaleY);
         }
     }
+
+
+
+
+    void AnimationSystem::ClearAllStreaks()
+    {
+        m_streaks.clear();
+        m_previousTargetCount = 0;
+    }
 }
+
 

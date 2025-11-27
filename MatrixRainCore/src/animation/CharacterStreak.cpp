@@ -182,4 +182,33 @@ namespace MatrixRain
         // Once the vector is empty, the streak is done
         return m_characters.empty();
     }
+
+
+
+
+    void CharacterStreak::RescalePositions(float scaleX, float scaleY)
+    {
+        // Scale the streak head position
+        m_position.x *= scaleX;
+        m_position.y *= scaleY;
+
+        // Add small random jitter to X to break up banding patterns from scaling
+        std::uniform_real_distribution<float> jitterDist(-16.0f, 16.0f);
+        m_position.x += jitterDist(g_generator);
+
+        // Recalculate character positions based on fixed spacing from the new head position
+        // Characters are stored back-to-front (tail at [0], head at [size-1])
+        // Each character should be 32px above the next one
+        for (size_t i = 0; i < m_characters.size(); i++)
+        {
+            CharacterInstance& character = m_characters[i];
+            
+            // Scale X offset
+            character.positionOffset.x *= scaleX;
+            
+            // Recalculate Y position: start from current head, go backwards by spacing
+            size_t distanceFromHead = m_characters.size() - 1 - i;
+            character.positionOffset.y = m_position.y - (distanceFromHead * m_characterSpacing);
+        }
+    }
 }

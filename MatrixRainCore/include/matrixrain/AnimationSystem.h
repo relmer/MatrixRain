@@ -71,11 +71,18 @@ namespace MatrixRain
 
         /// <summary>
         /// Rescale streak positions when viewport size changes.
-        /// Proportionally adjusts X positions to match new viewport width.
+        /// Proportionally adjusts X and Y positions to match new viewport dimensions.
         /// </summary>
         /// <param name="oldWidth">Previous viewport width</param>
         /// <param name="newWidth">New viewport width</param>
-        void RescaleStreaksForViewport(float oldWidth, float newWidth);
+        /// <param name="oldHeight">Previous viewport height</param>
+        /// <param name="newHeight">New viewport height</param>
+        void RescaleStreaksForViewport(float oldWidth, float newWidth, float oldHeight, float newHeight);
+
+        /// <summary>
+        /// Clear all active streaks (used when switching display modes).
+        /// </summary>
+        void ClearAllStreaks();
 
         // Accessors
         const std::vector<CharacterStreak>& GetStreaks() const { return m_streaks; }
