@@ -90,6 +90,14 @@ namespace MatrixRain
         float GetZoomVelocity() const { return m_zoomVelocity; }
         void SetZoomVelocity(float velocity) { m_zoomVelocity = velocity; }
 
+#ifdef _DEBUG
+        /// <summary>
+        /// Check for whole-streak appearance/disappearance by comparing current frame to previous.
+        /// Detects if entire streaks blink in/out rather than individual characters fading.
+        /// </summary>
+        void DebugCheckFrameDiff();
+#endif
+
     private:
         std::vector<CharacterStreak> m_streaks;  // All active character streaks
         const Viewport* m_viewport;               // Reference to viewport for bounds
@@ -98,6 +106,10 @@ namespace MatrixRain
         float m_spawnTimer;                       // Timer for automatic spawning
         float m_spawnInterval;                    // Time between automatic spawns
         int m_previousTargetCount;                // Previous frame's target count (to detect density changes)
+
+#ifdef _DEBUG
+        std::vector<CharacterStreak> m_previousFrameStreaks;  // Previous frame snapshot for diff detection
+#endif
 
         static constexpr float DEFAULT_ZOOM_VELOCITY = 5.0f;  // Units per second
         static constexpr float MAX_DEPTH = 100.0f;            // Far plane

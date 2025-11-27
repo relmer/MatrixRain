@@ -12,7 +12,7 @@
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>18.0</VCProjectVersion>
-    <ProjectGuid>{B8D0F2E4-3C5E-4G9D-0B2F-6E7C8D9F0G1B}</ProjectGuid>
+    <ProjectGuid>{0207A3DC-C617-480F-9AFE-95B0FBC24654}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>MatrixRain</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>

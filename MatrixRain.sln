@@ -1,13 +1,12 @@
-
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 18
 VisualStudioVersion = 18.0.0.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MatrixRainCore", "MatrixRainCore\MatrixRainCore.vcxproj", "{A7C9F1E3-2B4D-4F8C-9A1E-5D6B7C8E9F0A}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MatrixRain", "MatrixRain\MatrixRain.vcxproj", "{B8D0F2E4-3C5E-4G9D-0B2F-6E7C8D9F0G1B}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MatrixRain", "MatrixRain\MatrixRain.vcxproj", "{0207A3DC-C617-480F-9AFE-95B0FBC24654}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MatrixRainTests", "MatrixRainTests\MatrixRainTests.vcxproj", "{C9E1F3E5-4D6F-4H0E-1C3G-7F8D9E0G1H2C}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MatrixRainTests", "MatrixRainTests\MatrixRainTests.vcxproj", "{760038C6-D6B4-40E3-9FEA-6B1C959DE044}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -19,14 +18,14 @@ Global
 		{A7C9F1E3-2B4D-4F8C-9A1E-5D6B7C8E9F0A}.Debug|x64.Build.0 = Debug|x64
 		{A7C9F1E3-2B4D-4F8C-9A1E-5D6B7C8E9F0A}.Release|x64.ActiveCfg = Release|x64
 		{A7C9F1E3-2B4D-4F8C-9A1E-5D6B7C8E9F0A}.Release|x64.Build.0 = Release|x64
-		{B8D0F2E4-3C5E-4G9D-0B2F-6E7C8D9F0G1B}.Debug|x64.ActiveCfg = Debug|x64
-		{B8D0F2E4-3C5E-4G9D-0B2F-6E7C8D9F0G1B}.Debug|x64.Build.0 = Debug|x64
-		{B8D0F2E4-3C5E-4G9D-0B2F-6E7C8D9F0G1B}.Release|x64.ActiveCfg = Release|x64
-		{B8D0F2E4-3C5E-4G9D-0B2F-6E7C8D9F0G1B}.Release|x64.Build.0 = Release|x64
-		{C9E1F3E5-4D6F-4H0E-1C3G-7F8D9E0G1H2C}.Debug|x64.ActiveCfg = Debug|x64
-		{C9E1F3E5-4D6F-4H0E-1C3G-7F8D9E0G1H2C}.Debug|x64.Build.0 = Debug|x64
-		{C9E1F3E5-4D6F-4H0E-1C3G-7F8D9E0G1H2C}.Release|x64.ActiveCfg = Release|x64
-		{C9E1F3E5-4D6F-4H0E-1C3G-7F8D9E0G1H2C}.Release|x64.Build.0 = Release|x64
+		{0207A3DC-C617-480F-9AFE-95B0FBC24654}.Debug|x64.ActiveCfg = Debug|x64
+		{0207A3DC-C617-480F-9AFE-95B0FBC24654}.Debug|x64.Build.0 = Debug|x64
+		{0207A3DC-C617-480F-9AFE-95B0FBC24654}.Release|x64.ActiveCfg = Release|x64
+		{0207A3DC-C617-480F-9AFE-95B0FBC24654}.Release|x64.Build.0 = Release|x64
+		{760038C6-D6B4-40E3-9FEA-6B1C959DE044}.Debug|x64.ActiveCfg = Debug|x64
+		{760038C6-D6B4-40E3-9FEA-6B1C959DE044}.Debug|x64.Build.0 = Debug|x64
+		{760038C6-D6B4-40E3-9FEA-6B1C959DE044}.Release|x64.ActiveCfg = Release|x64
+		{760038C6-D6B4-40E3-9FEA-6B1C959DE044}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

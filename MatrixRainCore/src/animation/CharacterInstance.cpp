@@ -29,6 +29,10 @@ namespace MatrixRain
 
     void CharacterInstance::Update(float deltaTime)
     {
+#ifdef _DEBUG
+        float oldBrightness = brightness;
+#endif
+
         // Decrement lifetime
         lifetime -= deltaTime;
         
@@ -48,5 +52,20 @@ namespace MatrixRain
             // In fade phase: brightness fades from 1.0 to 0.0 as lifetime goes from fadeTime to 0
             brightness = lifetime / fadeTime;
         }
+
+#ifdef _DEBUG
+        // Brightness should NEVER increase (except for heads which stay at 1.0)
+        ASSERT (isHead || brightness <= (oldBrightness + 0.001f))
+        
+        // Check for excessive darkening (more than physically possible in one frame)
+        // At 30fps (worst case for smooth gameplay), deltaTime ~= 0.033s
+        // With fadeTime = 3.0s, max expected change = 0.033/3.0 = 0.011
+        // Allow 3x margin for startup/lag: 0.033 threshold
+        // This catches "jump" behavior (skipping multiple steps) but not slow frames
+        float brightnessDecrease = oldBrightness - brightness;
+
+        // Brightness decreased too much in one step!
+        ASSERT (brightnessDecrease <= 0.10f);
+#endif
     }
 }

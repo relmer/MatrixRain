@@ -45,7 +45,9 @@ namespace MatrixRain
         void SetPosition(const Vector3& position) { m_position = position; }
         const Vector3& GetVelocity() const { return m_velocity; }
         size_t GetLength() const { return m_characters.size(); }
+        size_t GetCharacterCount() const { return m_characters.size(); }
         const std::vector<CharacterInstance>& GetCharacters() const { return m_characters; }
+        uint64_t GetID() const { return m_id; }
 
     private:
         Vector3 m_position{};               // Head position of the streak (in cells)
@@ -57,6 +59,7 @@ namespace MatrixRain
         float m_characterSpacing{ 32.0f };  // Vertical spacing between characters
         size_t m_maxLength{ 0 };            // Maximum number of characters in this streak
         bool m_isInFadingPhase{ false };    // True when head has reached bottom and final fade has started
+        uint64_t m_id{ 0 };                 // Unique ID for debug tracking
 
         static constexpr size_t MIN_LENGTH = 20; // Longer minimum for better visibility
         static constexpr size_t MAX_LENGTH = 40;

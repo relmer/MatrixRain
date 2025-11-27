@@ -12,6 +12,7 @@
 // C++ headers
 #include <algorithm>
 #include <array>
+#include <map>
 #include <memory>
 #include <optional>
 #include <random>

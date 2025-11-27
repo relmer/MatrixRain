@@ -1,4 +1,5 @@
 #include "pch.h"
+
 #include "MatrixRain/FPSCounter.h"
 
 namespace MatrixRain

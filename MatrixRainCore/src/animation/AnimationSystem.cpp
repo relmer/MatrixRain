@@ -84,8 +84,9 @@ namespace MatrixRain
             int currentCount = static_cast<int>(m_streaks.size());
             int targetCount  = m_densityController->GetTargetStreakCount();
             
-            // Remove excess streaks immediately if above target
-            if (currentCount > targetCount)
+            // Remove excess streaks only if significantly above target
+            // Small fluctuations (±5) are natural from spawning/despawning timing
+            if (currentCount > targetCount + 5)
             {
                 RemoveExcessStreaks(targetCount);
                 m_previousTargetCount = targetCount;
@@ -96,19 +97,23 @@ namespace MatrixRain
                 int deficit = targetCount - currentCount;
                 
                 // Detect density change: target increased from previous frame
-                bool densityChanged = (targetCount > m_previousTargetCount);
+                // BUT only spawn in-view if the percentage changed (not just viewport resize)
+                // Viewport resize changes target but shouldn't burst-spawn on screen
+                bool densityChanged = (targetCount > m_previousTargetCount) && 
+                                     (currentCount > 0) && 
+                                     (deficit > 10);  // Only burst if significant gap
                 
                 // Spawn ALL needed streaks immediately
                 for (int i = 0; i < deficit; i++)
                 {
                     if (densityChanged)
                     {
-                        // Density increased - spawn anywhere on screen
+                        // Density increased significantly - spawn anywhere on screen
                         SpawnStreakInView();
                     }
                     else
                     {
-                        // Replacing aged-off streaks - spawn at top
+                        // Replacing aged-off streaks or gradual fill - spawn at top
                         SpawnStreak();
                     }
                 }
@@ -126,6 +131,10 @@ namespace MatrixRain
                 SpawnStreak();
             }
         }
+
+#ifdef _DEBUG
+        DebugCheckFrameDiff();
+#endif
     }
 
     void AnimationSystem::SpawnStreak()
@@ -284,6 +293,125 @@ namespace MatrixRain
         m_streaks.clear();
         m_previousTargetCount = 0;
     }
+
+
+
+
+#ifdef _DEBUG
+    void AnimationSystem::DebugCheckFrameDiff()
+    {
+        // Compare current frame to previous frame to detect whole-streak changes
+        // Use unique IDs to track streaks across frames (position changes due to movement)
+        
+        // Build maps of streaks by ID
+        std::map<uint64_t, const CharacterStreak*> prevStreakMap;
+        std::map<uint64_t, const CharacterStreak*> currStreakMap;
+        
+        for (const CharacterStreak& streak : m_previousFrameStreaks)
+        {
+            prevStreakMap[streak.GetID()] = &streak;
+        }
+        
+        for (const CharacterStreak& streak : m_streaks)
+        {
+            currStreakMap[streak.GetID()] = &streak;
+        }
+        
+        // Check current streaks against previous
+        for (const CharacterStreak& currentStreak : m_streaks)
+        {
+            uint64_t id = currentStreak.GetID();
+            auto it = prevStreakMap.find (id);
+            
+            if (it == prevStreakMap.end())
+            {
+                // New streak appeared
+                size_t charCount = currentStreak.GetCharacterCount();
+                
+                if (charCount > 5)
+                {
+                    Vector3 pos = currentStreak.GetPosition();
+                    
+                    DEBUGMSG (L"NEW STREAK: ID=%llu, Count=%zu, Pos=(%.1f, %.1f, %.1f)\n",
+                              id, charCount, pos.x, pos.y, pos.z);
+                    
+                    ASSERT (charCount <= 10);  // Whole streak appeared instantly!
+                }
+            }
+            else
+            {
+                // Streak exists in both frames - check for sudden character count changes
+                const CharacterStreak* prevStreak = it->second;
+                
+                size_t prevCount = prevStreak->GetCharacterCount();
+                size_t currCount = currentStreak.GetCharacterCount();
+                int delta = abs (static_cast<int> (currCount) - static_cast<int> (prevCount));
+                
+                if (delta > 3)
+                {
+                    Vector3 pos = currentStreak.GetPosition();
+                    
+                    DEBUGMSG (L"COUNT JUMP: ID=%llu, %zu->%zu (delta=%d), Pos=(%.1f, %.1f, %.1f)\n",
+                              id, prevCount, currCount, delta, pos.x, pos.y, pos.z);
+                    
+                    ASSERT (delta <= 3);  // Character count shouldn't jump suddenly
+                }
+            }
+        }
+        
+        // Check for streaks that disappeared entirely
+        int removedStreakCount = 0;
+        for (const CharacterStreak& prevStreak : m_previousFrameStreaks)
+        {
+            uint64_t id = prevStreak.GetID();
+            
+            if (currStreakMap.find (id) == currStreakMap.end())
+            {
+                // Streak disappeared
+                size_t charCount = prevStreak.GetCharacterCount();
+                removedStreakCount++;
+                
+                if (charCount > 5)
+                {
+                    Vector3 pos = prevStreak.GetPosition();
+                    
+                    DEBUGMSG (L"REMOVED STREAK: ID=%llu, Count=%zu, Pos=(%.1f, %.1f, %.1f)\n",
+                              id, charCount, pos.x, pos.y, pos.z);
+                    
+                    // Only assert if we're NOT over target density
+                    // RemoveExcessStreaks legitimately removes whole streaks when density is reduced
+                    int prevCount = static_cast<int>(m_previousFrameStreaks.size());
+                    int targetCount = m_densityController ? m_densityController->GetTargetStreakCount() : prevCount;
+                    bool wasOverTarget = prevCount > targetCount;
+                    
+                    ASSERT (charCount <= 10 || wasOverTarget);  // Whole streak disappeared (allowed if over target)
+                }
+            }
+        }
+        
+        // Verify we didn't remove MORE streaks than necessary
+        if (m_densityController && removedStreakCount > 0)
+        {
+            int prevStreakCount = static_cast<int>(m_previousFrameStreaks.size());
+            int targetStreakCount = m_densityController->GetTargetStreakCount();
+            
+            // If we were over target, verify we didn't remove more than needed
+            if (prevStreakCount > targetStreakCount)
+            {
+                int expectedRemoval = prevStreakCount - targetStreakCount;
+                
+                // Allow some variance (e.g., offscreen despawns can happen at same time)
+                // But if we removed significantly more than expected, that's a bug
+                ASSERT (removedStreakCount <= expectedRemoval + 5);  // +5 tolerance for concurrent despawns
+            }
+        }
+        
+        // Save current frame as previous for next comparison
+        m_previousFrameStreaks = m_streaks;
+    }
+#endif
 }
+
+
 
 

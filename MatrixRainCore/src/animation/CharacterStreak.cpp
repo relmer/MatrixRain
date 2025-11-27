@@ -30,6 +30,9 @@ namespace MatrixRain
 
     void CharacterStreak::Spawn(const Vector3& position)
     {
+        static uint64_t s_nextID = 1;
+        m_id = s_nextID++;
+        
         m_position = position; // This is the head position where new characters spawn
 
         // Random length between 5 and 30

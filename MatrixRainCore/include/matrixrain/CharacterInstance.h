@@ -15,6 +15,10 @@ namespace MatrixRain
         bool isHead = false;                // True if this is the current head character (white)
         float lifetime = 0.0f;              // Total time remaining (bright time + fade time)
         float fadeTime = 3.0f;              // Duration of fade phase (constant)
+        
+#ifdef _DEBUG
+        float previousBrightness = 1.0f;    // Debug: track previous frame's brightness
+#endif
 
         // Default constructor
         CharacterInstance();

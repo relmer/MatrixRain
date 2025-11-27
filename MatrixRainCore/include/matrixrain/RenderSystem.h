@@ -132,6 +132,7 @@ namespace MatrixRain
         HRESULT CreateRenderTargetView();
         HRESULT CompileCharacterShaders();
         HRESULT CompileBloomShaders();
+        HRESULT CreateDummyVertexBuffer();
         HRESULT CreateInstanceBuffer();
         HRESULT CreateConstantBuffer();
         HRESULT CreateBlendState();
@@ -204,6 +205,7 @@ namespace MatrixRain
         Microsoft::WRL::ComPtr<ID3D11VertexShader> m_fullscreenQuadVS;
 
         // Buffers
+        Microsoft::WRL::ComPtr<ID3D11Buffer> m_dummyVertexBuffer;
         Microsoft::WRL::ComPtr<ID3D11Buffer> m_instanceBuffer;
         Microsoft::WRL::ComPtr<ID3D11Buffer> m_constantBuffer;
         UINT m_instanceBufferCapacity;

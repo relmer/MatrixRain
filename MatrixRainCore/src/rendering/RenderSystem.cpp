@@ -53,6 +53,9 @@ namespace MatrixRain
         hr = CompileCharacterShaders();
         CHR (hr);
 
+        hr = CreateDummyVertexBuffer();
+        CHR (hr);
+
         hr = CreateInstanceBuffer();
         CHR (hr);
 
@@ -286,12 +289,12 @@ namespace MatrixRain
         )";
 
     static const D3D11_INPUT_ELEMENT_DESC s_krgInputLayout[] = {
-        { "POSITION",   0, DXGI_FORMAT_R32G32B32_FLOAT,    0, 0,  D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-        { "TEXCOORD",   0, DXGI_FORMAT_R32G32_FLOAT,       0, 12, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-        { "TEXCOORD",   1, DXGI_FORMAT_R32G32_FLOAT,       0, 20, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-        { "COLOR",      0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 28, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-        { "BRIGHTNESS", 0, DXGI_FORMAT_R32_FLOAT,          0, 44, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-        { "SCALE",      0, DXGI_FORMAT_R32_FLOAT,          0, 48, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+        { "POSITION",   0, DXGI_FORMAT_R32G32B32_FLOAT,    1, 0,  D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+        { "TEXCOORD",   0, DXGI_FORMAT_R32G32_FLOAT,       1, 12, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+        { "TEXCOORD",   1, DXGI_FORMAT_R32G32_FLOAT,       1, 20, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+        { "COLOR",      0, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, 28, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+        { "BRIGHTNESS", 0, DXGI_FORMAT_R32_FLOAT,          1, 44, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+        { "SCALE",      0, DXGI_FORMAT_R32_FLOAT,          1, 48, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
     };
 
 
@@ -397,6 +400,33 @@ namespace MatrixRain
                                           &m_inputLayout);
         CHRA (hr);
 
+
+    Error:
+        return hr;
+    }
+
+
+
+
+
+    HRESULT RenderSystem::CreateDummyVertexBuffer()
+    {
+        HRESULT                hr       = S_OK;
+        D3D11_BUFFER_DESC      vbDesc   = {};
+        D3D11_SUBRESOURCE_DATA vbData   = {};
+        float                  dummyData[6] = { 0.0f, 1.0f, 2.0f, 3.0f, 4.0f, 5.0f };  // 6 dummy vertices (4-byte aligned)
+
+
+        // Create a dummy vertex buffer with 6 floats (4 bytes each, 24 bytes total)
+        // The shader generates vertices procedurally, but D3D11 requires a valid buffer
+        vbDesc.ByteWidth = sizeof (dummyData);
+        vbDesc.Usage     = D3D11_USAGE_IMMUTABLE;
+        vbDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+
+        vbData.pSysMem = dummyData;
+
+        hr = m_device->CreateBuffer (&vbDesc, &vbData, &m_dummyVertexBuffer);
+        CHRA (hr);
 
     Error:
         return hr;
@@ -1147,11 +1177,24 @@ namespace MatrixRain
 
         BAIL_OUT_IF (m_instanceData.empty(), S_OK);
 
+        // Resize buffer if needed (double capacity each time to reduce allocations)
+        if (m_instanceData.size() > m_instanceBufferCapacity)
+        {
+            UINT newCapacity = static_cast<UINT> (m_instanceData.size() * 2);
+            
+            
+            m_instanceBuffer.Reset();
+            m_instanceBufferCapacity = newCapacity;
+            
+            hr = CreateInstanceBuffer();
+            CHRA (hr);
+        }
+
         // Map instance buffer and upload data
         hr = m_context->Map (m_instanceBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
         CHRA (hr);
 
-        bytesToCopy = sizeof (CharacterInstanceData) * std::min (m_instanceData.size(), static_cast<size_t> (m_instanceBufferCapacity));
+        bytesToCopy = sizeof (CharacterInstanceData) * m_instanceData.size();
         memcpy (mappedResource.pData, m_instanceData.data(), bytesToCopy);
         m_context->Unmap (m_instanceBuffer.Get(), 0);
 
@@ -1216,9 +1259,13 @@ namespace MatrixRain
         m_context->IASetInputLayout (m_inputLayout.Get());
         m_context->IASetPrimitiveTopology (D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-        UINT stride = sizeof (CharacterInstanceData);
-        UINT offset = 0;
-        m_context->IASetVertexBuffers (0, 1, m_instanceBuffer.GetAddressOf(), &stride, &offset);
+        // Set vertex buffers: slot 0 = dummy (for vertex count), slot 1 = instance data
+        ID3D11Buffer* buffers[2]     = { m_dummyVertexBuffer.Get(), m_instanceBuffer.Get() };
+        UINT          strides[2]     = { 4, sizeof (CharacterInstanceData) };
+        UINT          offsets[2]     = { 0, 0 };
+        
+        
+        m_context->IASetVertexBuffers (0, 2, buffers, strides, offsets);
 
         m_context->VSSetShader (m_vertexShader.Get(), nullptr, 0);
         m_context->VSSetConstantBuffers (0, 1, m_constantBuffer.GetAddressOf());
