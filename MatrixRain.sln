@@ -11,19 +11,26 @@ EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
+		Release (PROFILER)|x64 = Release (PROFILER)|x64
 		Release|x64 = Release|x64
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{A7C9F1E3-2B4D-4F8C-9A1E-5D6B7C8E9F0A}.Debug|x64.ActiveCfg = Debug|x64
 		{A7C9F1E3-2B4D-4F8C-9A1E-5D6B7C8E9F0A}.Debug|x64.Build.0 = Debug|x64
+		{A7C9F1E3-2B4D-4F8C-9A1E-5D6B7C8E9F0A}.Release (PROFILER)|x64.ActiveCfg = Release (PROFILER)|x64
+		{A7C9F1E3-2B4D-4F8C-9A1E-5D6B7C8E9F0A}.Release (PROFILER)|x64.Build.0 = Release (PROFILER)|x64
 		{A7C9F1E3-2B4D-4F8C-9A1E-5D6B7C8E9F0A}.Release|x64.ActiveCfg = Release|x64
 		{A7C9F1E3-2B4D-4F8C-9A1E-5D6B7C8E9F0A}.Release|x64.Build.0 = Release|x64
 		{0207A3DC-C617-480F-9AFE-95B0FBC24654}.Debug|x64.ActiveCfg = Debug|x64
 		{0207A3DC-C617-480F-9AFE-95B0FBC24654}.Debug|x64.Build.0 = Debug|x64
+		{0207A3DC-C617-480F-9AFE-95B0FBC24654}.Release (PROFILER)|x64.ActiveCfg = Release (PROFILER)|x64
+		{0207A3DC-C617-480F-9AFE-95B0FBC24654}.Release (PROFILER)|x64.Build.0 = Release (PROFILER)|x64
 		{0207A3DC-C617-480F-9AFE-95B0FBC24654}.Release|x64.ActiveCfg = Release|x64
 		{0207A3DC-C617-480F-9AFE-95B0FBC24654}.Release|x64.Build.0 = Release|x64
 		{760038C6-D6B4-40E3-9FEA-6B1C959DE044}.Debug|x64.ActiveCfg = Debug|x64
 		{760038C6-D6B4-40E3-9FEA-6B1C959DE044}.Debug|x64.Build.0 = Debug|x64
+		{760038C6-D6B4-40E3-9FEA-6B1C959DE044}.Release (PROFILER)|x64.ActiveCfg = Release (PROFILER)|x64
+		{760038C6-D6B4-40E3-9FEA-6B1C959DE044}.Release (PROFILER)|x64.Build.0 = Release (PROFILER)|x64
 		{760038C6-D6B4-40E3-9FEA-6B1C959DE044}.Release|x64.ActiveCfg = Release|x64
 		{760038C6-D6B4-40E3-9FEA-6B1C959DE044}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection

@@ -9,6 +9,9 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     UNREFERENCED_PARAMETER(hPrevInstance);
     UNREFERENCED_PARAMETER(lpCmdLine);
 
+    // Set DPI awareness to per-monitor V2 for consistent physical pixel measurements
+    SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+
     MatrixRain::Application app;
     
     if (!app.Initialize(hInstance, nCmdShow))

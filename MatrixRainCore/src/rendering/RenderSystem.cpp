@@ -1224,9 +1224,9 @@ namespace MatrixRain
         {
             ConstantBufferData* cbData = reinterpret_cast<ConstantBufferData*> (mappedResource.pData);
             
-            // Copy projection matrix (4x4 = 16 floats)
-            memcpy (cbData->projection, &projection.m[0][0], sizeof (float) * 16);
-            
+            // Copy projection matrix (4x4 = 16 floats = 64 bytes)
+            memcpy (cbData->projection, projection.m, sizeof (projection.m));
+
             m_context->Unmap (m_constantBuffer.Get(), 0);
         }
 
