@@ -37,8 +37,9 @@ namespace MatrixRain
         /// <param name="fps">Current FPS for display (0 to hide)</param>
         /// <param name="rainPercentage">Current rain density percentage (0-100)</param>
         /// <param name="streakCount">Current number of active streaks</param>
+        /// <param name="activeHeadCount">Current number of active streak heads on screen</param>
         /// <param name="showDebugFadeTimes">True to show debug fade time overlay</param>
-        void Render(const AnimationSystem& animationSystem, const Viewport& viewport, ColorScheme colorScheme = ColorScheme::Green, float fps = 0.0f, int rainPercentage = 0, int streakCount = 0, bool showDebugFadeTimes = false);
+        void Render(const AnimationSystem& animationSystem, const Viewport& viewport, ColorScheme colorScheme = ColorScheme::Green, float fps = 0.0f, int rainPercentage = 0, int streakCount = 0, int activeHeadCount = 0, bool showDebugFadeTimes = false);
 
         /// <summary>
         /// Present the rendered frame to the screen.
@@ -144,7 +145,7 @@ namespace MatrixRain
         void SortStreaksByDepth(std::vector<const CharacterStreak*>& streaks);
         HRESULT UpdateInstanceBuffer(const AnimationSystem& animationSystem, ColorScheme colorScheme);
         void ClearRenderTarget();
-        void RenderFPSCounter(float fps, int rainPercentage, int streakCount);
+        void RenderFPSCounter(float fps, int rainPercentage, int streakCount, int activeHeadCount);
         void RenderDebugFadeTimes(const AnimationSystem& animationSystem);
         HRESULT ApplyBloom();
         void RenderFullscreenPass(ID3D11RenderTargetView* pRenderTarget, ID3D11PixelShader* pPixelShader, ID3D11ShaderResourceView* const* ppShaderResources, UINT numResources);

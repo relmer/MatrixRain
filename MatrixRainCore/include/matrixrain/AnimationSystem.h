@@ -54,7 +54,8 @@ namespace MatrixRain
         /// Removes oldest streaks (furthest from camera) first.
         /// </summary>
         /// <param name="targetCount">Target number of streaks to maintain</param>
-        void RemoveExcessStreaks(int targetCount);
+        /// <returns>Number of streaks actually removed</returns>
+        int RemoveExcessStreaks(int targetCount);
 
         /// <summary>
         /// Apply continuous zoom effect to all streaks.
@@ -81,6 +82,7 @@ namespace MatrixRain
         // Accessors
         const std::vector<CharacterStreak>& GetStreaks() const { return m_streaks; }
         size_t GetActiveStreakCount() const { return m_streaks.size(); }
+        size_t GetActiveHeadCount() const;
         float GetZoomVelocity() const { return m_zoomVelocity; }
         void SetZoomVelocity(float velocity) { m_zoomVelocity = velocity; }
 
@@ -103,6 +105,7 @@ namespace MatrixRain
 
 #ifdef _DEBUG
         std::vector<CharacterStreak> m_previousFrameStreaks;  // Previous frame snapshot for diff detection
+        int m_intentionalRemovalCount;            // Number of streaks intentionally removed this frame
 #endif
 
         static constexpr float DEFAULT_ZOOM_VELOCITY = 5.0f;  // Units per second

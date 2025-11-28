@@ -34,7 +34,7 @@ namespace MatrixRain
         // Max streaks = viewport width / (character horizontal spacing / 2)
         // At 100%, streaks fill the screen with double density (overlapping allowed)
         float viewportWidth = m_viewport.GetWidth();
-        int maxStreaks = static_cast<int>(viewportWidth / m_characterWidth * 8.0f);
+        int maxStreaks = static_cast<int>(viewportWidth / m_characterWidth * 4.0f);
         
         // Ensure at least minimum
         return std::max(maxStreaks, MIN_STREAKS);

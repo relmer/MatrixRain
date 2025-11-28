@@ -236,8 +236,9 @@ namespace MatrixRain
             ColorScheme scheme = m_appState->GetColorScheme();
             int rainPercentage = m_densityController ? m_densityController->GetPercentage() : 0;
             int streakCount = static_cast<int>(m_animationSystem->GetActiveStreakCount());
+            int activeHeadCount = static_cast<int>(m_animationSystem->GetActiveHeadCount());
             bool showDebugFadeTimes = m_appState->GetShowDebugFadeTimes();
-            m_renderSystem->Render(*m_animationSystem, *m_viewport, scheme, fps, rainPercentage, streakCount, showDebugFadeTimes);
+            m_renderSystem->Render(*m_animationSystem, *m_viewport, scheme, fps, rainPercentage, streakCount, activeHeadCount, showDebugFadeTimes);
             m_renderSystem->Present();
         }
     }

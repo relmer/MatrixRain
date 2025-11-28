@@ -186,6 +186,13 @@ namespace MatrixRain
         return m_characters.empty();
     }
 
+    bool CharacterStreak::IsHeadOffscreen(float viewportHeight) const
+    {
+        // Head is offscreen once it has passed the bottom of the viewport
+        // This allows new streaks to spawn while old ones are still fading
+        return m_position.y >= viewportHeight;
+    }
+
 
 
 

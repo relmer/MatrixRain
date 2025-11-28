@@ -1206,7 +1206,7 @@ namespace MatrixRain
 
 
 
-    void RenderSystem::Render (const AnimationSystem& animationSystem, const Viewport& viewport, ColorScheme colorScheme, float fps, int rainPercentage, int streakCount, bool showDebugFadeTimes)
+    void RenderSystem::Render (const AnimationSystem& animationSystem, const Viewport& viewport, ColorScheme colorScheme, float fps, int rainPercentage, int streakCount, int activeHeadCount, bool showDebugFadeTimes)
     {
         if (!m_device || !m_context)
         {
@@ -1315,7 +1315,7 @@ namespace MatrixRain
         // Render FPS counter overlay if fps > 0
         if (fps > 0.0f)
         {
-            RenderFPSCounter (fps, rainPercentage, streakCount);
+            RenderFPSCounter (fps, rainPercentage, streakCount, activeHeadCount);
         }
 
         // Debug: Render fade times when enabled and only one streak is visible
@@ -1341,7 +1341,7 @@ namespace MatrixRain
 
 
 
-    void RenderSystem::RenderFPSCounter (float fps, int rainPercentage, int streakCount)
+    void RenderSystem::RenderFPSCounter (float fps, int rainPercentage, int streakCount, int activeHeadCount)
     {
         if (!m_d2dContext || !m_fpsBrush || !m_fpsTextFormat || !m_fpsGlowBrush)
         {
@@ -1351,16 +1351,16 @@ namespace MatrixRain
         // Begin D2D rendering
         m_d2dContext->BeginDraw();
 
-        // Format FPS text with rain density info: "Rain xxx% (yyy), zz FPS"
-        wchar_t fpsText[64];
-        swprintf_s (fpsText, L"Rain %d%% (%d), %.0f FPS", rainPercentage, streakCount, fps);
+        // Format FPS text with rain density info: "Rain xxx% (yyy heads / zzz total), ww FPS"
+        wchar_t fpsText[128];
+        swprintf_s (fpsText, L"Rain %d%% (%d heads / %d total), %.0f FPS", rainPercentage, activeHeadCount, streakCount, fps);
 
         // Get render target size for positioning
         D2D1_SIZE_F size = m_d2dContext->GetSize();
 
         // Create text layout rect (bottom-right corner with 10px padding)
         D2D1_RECT_F textRect = D2D1::RectF (
-            size.width - 300.0f,    // Left (300px from right edge for longer text)
+            size.width - 450.0f,    // Left (450px from right edge for longer text)
             size.height - 40.0f,    // Top (40px from bottom)
             size.width - 10.0f,     // Right (10px padding)
             size.height - 10.0f     // Bottom (10px padding)

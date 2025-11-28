@@ -34,6 +34,14 @@ namespace MatrixRain
         bool ShouldDespawn(float viewportHeight) const;
 
         /// <summary>
+        /// Check if the streak's head has left the viewport.
+        /// Used to determine when a new streak can spawn to replace this one.
+        /// </summary>
+        /// <param name="viewportHeight">Height of the viewport in pixels</param>
+        /// <returns>True if the head has passed the bottom of the viewport</returns>
+        bool IsHeadOffscreen(float viewportHeight) const;
+
+        /// <summary>
         /// Rescale all character positions when viewport size changes.
         /// </summary>
         /// <param name="scaleX">X scale ratio (newWidth / oldWidth)</param>
@@ -61,8 +69,8 @@ namespace MatrixRain
         bool m_isInFadingPhase{ false };    // True when head has reached bottom and final fade has started
         uint64_t m_id{ 0 };                 // Unique ID for debug tracking
 
-        static constexpr size_t MIN_LENGTH = 20; // Longer minimum for better visibility
-        static constexpr size_t MAX_LENGTH = 40;
+        static constexpr size_t MIN_LENGTH = 15; // Longer minimum for better visibility
+        static constexpr size_t MAX_LENGTH = 30;
         static constexpr float MUTATION_PROBABILITY = 0.40f; // 40% per character per second (authentic Matrix feel)
         static constexpr float BASE_VELOCITY = 100.0f; // Base pixels per second
         static constexpr float BASE_DROP_INTERVAL = 0.3f; // Time between drops (in seconds)
