@@ -26,21 +26,6 @@ namespace MatrixRain
     {
     }
 
-    void AnimationSystem::Initialize(const Viewport& viewport)
-    {
-        m_viewport = &viewport;
-        m_streaks.clear();
-        m_spawnTimer = 0.0f;
-        
-        // Spawn initial set of streaks to fill the screen
-        // Reduced density for less cluttered appearance
-        size_t initialStreaks = 15;
-        for (size_t i = 0; i < initialStreaks; i++)
-        {
-            SpawnStreak();
-        }
-    }
-
     void AnimationSystem::Initialize(const Viewport& viewport, DensityController& densityController)
     {
         m_viewport = &viewport;
@@ -48,12 +33,15 @@ namespace MatrixRain
         m_streaks.clear();
         m_spawnTimer = 0.0f;
         
-        // Spawn small initial set - let automatic spawn logic reach target density over time
-        // This prevents overwhelming the screen at startup
-        size_t initialStreaks = 15;
-        for (size_t i = 0; i < initialStreaks; i++)
+        // Calculate initial streak count based on target density for this viewport
+        // Spawn them distributed throughout the viewport to prevent dark zone at top
+        int targetCount = m_densityController->GetTargetStreakCount();
+        m_previousTargetCount = targetCount;
+        
+        for (int i = 0; i < targetCount; i++)
         {
-            SpawnStreak();
+            // Every third streak spawns fully within view for better initial coverage
+            SpawnStreakInView();
         }
     }
 

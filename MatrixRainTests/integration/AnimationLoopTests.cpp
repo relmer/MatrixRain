@@ -2,6 +2,7 @@
 #include "MatrixRain/AnimationSystem.h"
 #include "MatrixRain/Viewport.h"
 #include "MatrixRain/CharacterSet.h"
+#include "MatrixRain/DensityController.h"
 
 
 
@@ -16,7 +17,7 @@ namespace MatrixRainTests
         {
             // This integration test verifies the complete animation loop:
             // 1. CharacterSet initialization
-            // 2. AnimationSystem initialization with Viewport
+            // 2. AnimationSystem initialization with Viewport and DensityController
             // 3. Streak spawning
             // 4. Character creation and updates
             // 5. Fade-out over 3 seconds
@@ -31,9 +32,12 @@ namespace MatrixRainTests
             Viewport viewport;
             viewport.Resize(1920.0f, 1080.0f);
 
+            // Create density controller
+            DensityController densityController(viewport, 32.0f);
+
             // Initialize AnimationSystem
             AnimationSystem animationSystem;
-            animationSystem.Initialize(viewport);
+            animationSystem.Initialize(viewport, densityController);
 
             // Simulate animation loop over 10 seconds
             // This should allow streaks to spawn, grow, fade, and despawn
@@ -67,8 +71,10 @@ namespace MatrixRainTests
             Viewport viewport;
             viewport.Resize(1920.0f, 1080.0f);
 
+            DensityController densityController(viewport, 32.0f);
+
             AnimationSystem animationSystem;
-            animationSystem.Initialize(viewport);
+            animationSystem.Initialize(viewport, densityController);
 
             // After initialization, run a few updates
             // Streaks should spawn during this time
@@ -94,8 +100,10 @@ namespace MatrixRainTests
             Viewport viewport;
             viewport.Resize(800.0f, 600.0f);
 
+            DensityController densityController(viewport, 32.0f);
+
             AnimationSystem animationSystem;
-            animationSystem.Initialize(viewport);
+            animationSystem.Initialize(viewport, densityController);
 
             // Run animation for 1 second
             for (int i = 0; i < 60; i++)
@@ -128,8 +136,10 @@ namespace MatrixRainTests
             Viewport viewport;
             viewport.Resize(1920.0f, 1080.0f);
 
+            DensityController densityController(viewport, 32.0f);
+
             AnimationSystem animationSystem;
-            animationSystem.Initialize(viewport);
+            animationSystem.Initialize(viewport, densityController);
 
             // Call Update with deltaTime = 0 multiple times
             for (int i = 0; i < 10; i++)
@@ -153,8 +163,10 @@ namespace MatrixRainTests
             Viewport viewport;
             viewport.Resize(1920.0f, 1080.0f);
 
+            DensityController densityController(viewport, 32.0f);
+
             AnimationSystem animationSystem;
-            animationSystem.Initialize(viewport);
+            animationSystem.Initialize(viewport, densityController);
 
             // Call Update with very large deltaTime (e.g., 10 seconds)
             // This simulates a massive frame drop or system suspend/resume

@@ -2,7 +2,7 @@
 
 
 #include "MatrixRain/AnimationSystem.h"
-
+#include "MatrixRain/DensityController.h"
 #include "MatrixRain/Viewport.h"
 
 
@@ -26,8 +26,9 @@ namespace MatrixRainTests
 			// Create animation system with viewport
 			Viewport viewport;
 			viewport.Resize(800, 600);
+			DensityController densityController(viewport, 32.0f);
 			AnimationSystem animationSystem;
-			animationSystem.Initialize(viewport);
+			animationSystem.Initialize(viewport, densityController);
 			
 			// Spawn a streak and manually set its position near Z=0
 			animationSystem.SpawnStreak();
@@ -58,8 +59,9 @@ namespace MatrixRainTests
 			// Create animation system with viewport
 			Viewport viewport;
 			viewport.Resize(800, 600);
+			DensityController densityController(viewport, 32.0f);
 			AnimationSystem animationSystem;
-			animationSystem.Initialize(viewport);
+			animationSystem.Initialize(viewport, densityController);
 			
 			// Spawn streak and set known position
 			animationSystem.SpawnStreak();
@@ -88,8 +90,9 @@ namespace MatrixRainTests
 			// Create animation system with viewport
 			Viewport viewport;
 			viewport.Resize(800, 600);
+			DensityController densityController(viewport, 32.0f);
 			AnimationSystem animationSystem;
-			animationSystem.Initialize(viewport);
+			animationSystem.Initialize(viewport, densityController);
 			
 			// Spawn streak and set known position
 			animationSystem.SpawnStreak();
@@ -120,8 +123,9 @@ namespace MatrixRainTests
 			// Create animation system with viewport
 			Viewport viewport;
 			viewport.Resize(800, 600);
+			DensityController densityController(viewport, 32.0f);
 			AnimationSystem animationSystem;
-			animationSystem.Initialize(viewport);
+			animationSystem.Initialize(viewport, densityController);
 			
 			// Spawn streak and set position
 			animationSystem.SpawnStreak();

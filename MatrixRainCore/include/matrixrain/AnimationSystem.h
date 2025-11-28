@@ -16,12 +16,6 @@ namespace MatrixRain
         AnimationSystem();
 
         /// <summary>
-        /// Initialize the animation system with viewport reference.
-        /// </summary>
-        /// <param name="viewport">Reference to the viewport for bounds checking</param>
-        void Initialize(const Viewport& viewport);
-
-        /// <summary>
         /// Initialize the animation system with viewport and density controller.
         /// </summary>
         /// <param name="viewport">Reference to the viewport for bounds checking</param>
