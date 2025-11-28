@@ -408,8 +408,9 @@ namespace MatrixRain
         case WM_NCHITTEST:
         {
             // Allow dragging the window by clicking anywhere in the client area
+            // but only in windowed mode (not in fullscreen)
             LRESULT hit = DefWindowProc(m_hwnd, uMsg, wParam, lParam);
-            if (hit == HTCLIENT)
+            if (hit == HTCLIENT && m_appState && m_appState->GetDisplayMode() == DisplayMode::Windowed)
             {
                 return HTCAPTION;  // Treat client area as title bar for dragging
             }
