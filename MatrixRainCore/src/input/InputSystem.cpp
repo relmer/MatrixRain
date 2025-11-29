@@ -2,35 +2,35 @@
 
 #include "MatrixRain/InputSystem.h"
 
-namespace MatrixRain
+
+
+
+
+void InputSystem::Initialize (DensityController & densityController, ApplicationState & appState)
 {
-    InputSystem::InputSystem()
-        : m_densityController(nullptr)
-        , m_appState(nullptr)
-    {
-    }
+    m_densityController = &densityController;
+    m_appState          = &appState;
+}
 
-    void InputSystem::Initialize(DensityController& densityController, ApplicationState& appState)
-    {
-        m_densityController = &densityController;
-        m_appState = &appState;
-    }
 
-    void InputSystem::ProcessKeyDown(int virtualKey)
+
+
+
+void InputSystem::ProcessKeyDown (int virtualKey)
+{
+    switch (virtualKey)
     {
-        switch (virtualKey)
-        {
-        case VK_ADD:        // Numpad +
-        case VK_OEM_PLUS:   // Main keyboard = (shift for +)
+        case VK_ADD:                // Numpad +
+        case VK_OEM_PLUS:           // Main keyboard = (shift for +)
             OnDensityIncrease();
             break;
 
-        case VK_SUBTRACT:   // Numpad -
-        case VK_OEM_MINUS:  // Main keyboard -
+        case VK_SUBTRACT:           // Numpad -
+        case VK_OEM_MINUS:          // Main keyboard -
             OnDensityDecrease();
             break;
 
-        case VK_OEM_3:      // Backtick/tilde key (`~)
+        case VK_OEM_3:              // Backtick/tilde key (`~)
             if (m_appState)
             {
                 m_appState->ToggleDebugFadeTimes();
@@ -39,38 +39,46 @@ namespace MatrixRain
 
         default:
             break;
-        }
     }
+}
 
-    void InputSystem::OnDensityIncrease()
+
+
+
+
+void InputSystem::OnDensityIncrease()
+{
+    if (m_densityController)
     {
-        if (m_densityController)
-        {
-            m_densityController->IncreaseLevel();
-        }
+        m_densityController->IncreaseLevel();
     }
+}
 
-    void InputSystem::OnDensityDecrease()
+
+
+
+
+void InputSystem::OnDensityDecrease()
+{
+    if (m_densityController)
     {
-        if (m_densityController)
-        {
-            m_densityController->DecreaseLevel();
-        }
+        m_densityController->DecreaseLevel();
     }
+}
 
 
+    
 
 
-    bool InputSystem::IsAltEnterPressed(int virtualKey) const
+bool InputSystem::IsAltEnterPressed (int virtualKey) const
+{
+    // Check if Enter key is pressed
+    if (virtualKey != VK_RETURN)
     {
-        // Check if Enter key is pressed
-        if (virtualKey != VK_RETURN)
-        {
-            return false;
-        }
-
-        // Check if Alt key is currently held down
-        // GetAsyncKeyState returns high-order bit set if key is down
-        return (GetAsyncKeyState(VK_MENU) & 0x8000) != 0;
+        return false;
     }
+
+    // Check if Alt key is currently held down
+    // GetAsyncKeyState returns high-order bit set if key is down
+    return (GetAsyncKeyState (VK_MENU) & 0x8000) != 0;
 }

@@ -2,16 +2,18 @@
 
 #include "MatrixRain/Application.h"
 #include "MatrixRain/ApplicationState.h"
+#include "MatrixRain/Math.h"
 
 
-using namespace MatrixRain;
 namespace MatrixRainTests
 {
-    TEST_CLASS(DisplayModeTests)
+
+
+    TEST_CLASS (DisplayModeTests)
     {
     public:
         // T122: Test animation state preservation during display mode switch
-        TEST_METHOD(TestAnimationStatePreservationDuringDisplayModeSwitch)
+        TEST_METHOD (TestAnimationStatePreservationDuringDisplayModeSwitch)
         {
             // Note: This integration test validates that display mode switching
             // preserves animation state (streak positions, brightness, etc.)
@@ -28,14 +30,14 @@ namespace MatrixRainTests
             appState.Initialize();
 
             // Verify initial state
-            Assert::AreEqual(static_cast<int>(DisplayMode::Windowed),
+            Assert::AreEqual (static_cast<int>(DisplayMode::Windowed),
                 static_cast<int>(appState.GetDisplayMode()),
                 L"Should start in Windowed mode");
 
             // Toggle display mode
             appState.ToggleDisplayMode();
 
-            Assert::AreEqual(static_cast<int>(DisplayMode::Fullscreen),
+            Assert::AreEqual (static_cast<int>(DisplayMode::Fullscreen),
                 static_cast<int>(appState.GetDisplayMode()),
                 L"Should transition to Fullscreen");
 
@@ -43,4 +45,8 @@ namespace MatrixRainTests
             // running without interruption during the swap chain recreation
         }
     };
-}
+
+
+
+}  // namespace MatrixRainTests
+

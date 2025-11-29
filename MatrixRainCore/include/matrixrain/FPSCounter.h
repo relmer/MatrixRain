@@ -5,38 +5,28 @@
 
 
 
-namespace MatrixRain
+/// <summary>
+/// FPS counter with rolling average calculation over 1-second window.
+/// </summary>
+class FPSCounter
 {
+public:
     /// <summary>
-    /// FPS counter with rolling average calculation over 1-second window.
+    /// Update the FPS counter with the current frame's delta time.
     /// </summary>
-    class FPSCounter
-    {
-    public:
-        FPSCounter();
+    /// <param name="deltaTime">Time elapsed since last frame in seconds</param>
+    void Update (float deltaTime);
 
-        /// <summary>
-        /// Update the FPS counter with the current frame's delta time.
-        /// </summary>
-        /// <param name="deltaTime">Time elapsed since last frame in seconds</param>
-        void Update (float deltaTime);
+    /// <summary>
+    /// Get the current FPS value (rolling average over 1 second).
+    /// </summary>
+    /// <returns>Current FPS value</returns>
+    float GetFPS() const { return m_currentFPS; }
 
-        /// <summary>
-        /// Get the current FPS value (rolling average over 1 second).
-        /// </summary>
-        /// <returns>Current FPS value</returns>
-        float GetFPS() const { return m_currentFPS; }
-
-    private:
-        float m_currentFPS;           // Current calculated FPS
-        float m_frameTimeAccumulator; // Accumulated frame time
-        int   m_frameCount;           // Frame count in current window
-        
-        static constexpr float UPDATE_INTERVAL = 1.0f; // Update FPS every second
-    };
-}
-
-
-
-
-
+private:
+    float m_currentFPS           { 0.0f };  // Current calculated FPS
+    float m_frameTimeAccumulator { 0.0f };  // Accumulated frame time
+    int   m_frameCount           { 0 };     // Frame count in current window
+    
+    static constexpr float UPDATE_INTERVAL = 1.0f; // Update FPS every second
+};

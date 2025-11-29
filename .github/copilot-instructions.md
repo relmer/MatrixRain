@@ -550,8 +550,15 @@ static constexpr SFileAttributeEntry s_krgAttrMap[] =
 - **Colon at end of constructor line**: `Constructor() :`
 - **Commas at end of each line**, not at the beginning of the next line
 - **Align member names in columns** for readability
-- **Use `= default` for default constructors** when all members have in-class initializers
+- **Prefer in-class initialization in headers** over constructor initialization lists when possible
+- **Only create constructors when necessary** - if all members have in-class initializers and you don't need custom initialization logic, omit the constructor entirely
+- **Only use `= default`** when the compiler-generated version wouldn't work (e.g., when you've declared other constructors and need to explicitly request the default one)
 - **Only initialize non-default values** in constructor initializer lists
+
+**Best practice order:**
+1. **Preferred**: In-class initialization in header, no constructor needed
+2. **Good**: In-class initialization for defaults, parameterized constructor only for custom values
+3. **Acceptable**: Constructor initialization list (only when in-class initialization won't work)
 
 Column-align member initializers:
 ```cpp
@@ -564,25 +571,36 @@ CDirectoryLister::CDirectoryLister (...) :
 {
 ```
 
-Example with `= default`:
+Example showing preference order:
 ```cpp
-// In header:
+// BEST: In-class initialization, no constructor needed
 class CharacterInstance
 {
 public:
     size_t glyphIndex = 0;
-    float brightness = 1.0f;
-    bool isHead = false;
+    float  brightness = 1.0f;
+    bool   isHead     = false;
+};
+// No constructor in .cpp - class is fully initialized by in-class initializers
+
+// GOOD: In-class defaults + parameterized constructor
+class CharacterInstance
+{
+public:
+    size_t glyphIndex = 0;
+    float  brightness = 1.0f;
+    bool   isHead     = false;
 };
 
-// In .cpp:
-CharacterInstance::CharacterInstance() = default;
-
+// In .cpp - ONLY when you need custom initialization:
 CharacterInstance::CharacterInstance (size_t glyphIndex, float brightness) :
     glyphIndex (glyphIndex),
     brightness (brightness)
 {
 }
+
+// AVOID: Using = default when not needed
+CharacterInstance::CharacterInstance() = default;  // Don't add this unless required
 ```
 
 ### Line Wrapping - Separator Placement
@@ -775,17 +793,20 @@ CMyClass::CMyClass()
 - Group related members together (constructors, methods, data members)
 
 ### Constructor Initialization
-- **Always prefer initialization lists** over assignments within constructor body when possible
-- **Even better**: Assign default values within the class declaration itself (C++11+)
+- **Always prefer in-class initialization in headers** over constructor initialization lists
+- **Only create constructors when you need custom initialization logic** - if all members have sensible defaults via in-class initializers, don't add a constructor at all
+- **Don't use `= default` unless required** - if you don't need a constructor, simply omit it; the compiler provides one automatically
+- **When you do need a constructor**, prefer initialization lists over assignments within constructor body
 - Example preference order:
 ```cpp
-// Best: In-class initialization
+// Best: In-class initialization, no constructor
 class MyClass
 {
     int m_value = 0;
 };
+// No .cpp constructor needed!
 
-// Good: Initialization list
+// Good: Initialization list (only when in-class won't work)
 MyClass::MyClass() :
     m_value (0)
 {
@@ -796,6 +817,9 @@ MyClass::MyClass()
 {
     m_value = 0;  // Avoid this pattern
 }
+
+// Avoid: Unnecessary = default
+MyClass::MyClass() = default;  // Don't add unless you've declared other constructors
 ```
 
 ### Function Parameter Alignment
