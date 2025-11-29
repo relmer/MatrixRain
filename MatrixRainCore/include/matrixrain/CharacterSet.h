@@ -1,6 +1,23 @@
 #pragma once
 #include "Math.h"
 
+
+
+
+
+using Microsoft::WRL::ComPtr;
+
+
+
+
+
+struct ID3D11Texture2D;
+struct ID3D11ShaderResourceView;
+
+
+
+
+
 namespace MatrixRain
 {
     // GlyphInfo: Information about a single glyph in the texture atlas
@@ -23,9 +40,10 @@ namespace MatrixRain
     // - Storing UV coordinates for each glyph
     class CharacterSet
     {
+
     public:
         // Get the singleton instance
-        static CharacterSet& GetInstance();
+        static CharacterSet & GetInstance();
 
         // Initialize the character set (without texture creation)
         // Must be called once before using any other methods
@@ -34,26 +52,26 @@ namespace MatrixRain
 
         // Create the texture atlas using the provided D3D11 device
         // Must be called after Initialize() and after D3D11 device is created
-        // Returns true on success, false on failure
-        bool CreateTextureAtlas(void* d3dDevice);
+        // Returns HRESULT indicating success or failure
+        HRESULT CreateTextureAtlas (void * d3dDevice);
 
         // Get a random glyph from the set (uniform distribution)
         // Returns the index into the glyphs array
         size_t GetRandomGlyphIndex() const;
 
         // Get glyph information by index
-        const GlyphInfo& GetGlyph(size_t index) const;
+        const GlyphInfo& GetGlyph (size_t index) const;
 
         // Get total number of glyphs (should be 266: 133 normal + 133 mirrored)
         size_t GetGlyphCount() const;
 
         // Get the texture atlas (for binding to GPU)
         // Returns nullptr if not initialized
-        void* GetTextureResource() const;
+        void * GetTextureResource() const;
 
         // Get the shader resource view for the texture atlas
         // Returns nullptr if texture not created
-        void* GetTextureResourceView() const;
+        void * GetTextureResourceView() const;
 
         // Cleanup resources
         void Shutdown();
@@ -64,17 +82,17 @@ namespace MatrixRain
         ~CharacterSet();
 
         // Prevent copying
-        CharacterSet(const CharacterSet&) = delete;
-        CharacterSet& operator=(const CharacterSet&) = delete;
+        CharacterSet             (const CharacterSet &) = delete;
+        CharacterSet & operator= (const CharacterSet &) = delete;
 
         // Internal initialization helpers
-        bool RenderGlyphsToAtlas(void* d3dDevice);
-        void CalculateUVCoordinates();
+        HRESULT RenderGlyphsToAtlas    (void * d3dDevice);
+        void    CalculateUVCoordinates ();
 
         // Member data
-        std::vector<GlyphInfo> m_glyphs;  // Array of all 268 glyphs
-        void* m_textureResource;          // DirectX texture resource (ID3D11Texture2D*)
-        void* m_textureResourceView;      // DirectX shader resource view (ID3D11ShaderResourceView*)
-        bool m_initialized;
+        std::vector<GlyphInfo>           m_glyphs;               // Array of all 268 glyphs
+        ComPtr<ID3D11Texture2D>          m_textureResource;      // DirectX texture resource
+        ComPtr<ID3D11ShaderResourceView> m_textureResourceView;  // DirectX shader resource view
+        bool                             m_initialized = false;
     };
 }

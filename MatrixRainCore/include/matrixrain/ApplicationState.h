@@ -19,8 +19,6 @@ namespace MatrixRain
     class ApplicationState
     {
     public:
-        ApplicationState();
-
         /// <summary>
         /// Initialize application state with default values.
         /// Starts in Windowed display mode with Green color scheme.
@@ -57,12 +55,15 @@ namespace MatrixRain
         void SetColorScheme(ColorScheme scheme) { m_colorScheme = scheme; }
         bool GetShowDebugFadeTimes() const { return m_showDebugFadeTimes; }
         float GetElapsedTime() const { return m_elapsedTime; }
+        bool GetShowStatistics() const { return m_showStatistics; }
+        void ToggleStatistics() { m_showStatistics = !m_showStatistics; }
 
     private:
-        DisplayMode m_displayMode;       // Current display mode
-        ColorScheme m_colorScheme;       // Current color scheme
-        bool        m_showDebugFadeTimes; // Show debug fade time overlay
-        float       m_elapsedTime;       // Elapsed time for color cycling animation
+        DisplayMode m_displayMode        = DisplayMode::Fullscreen; // Current display mode
+        ColorScheme m_colorScheme        = ColorScheme::Green;      // Current color scheme
+        bool        m_showDebugFadeTimes = false;                   // Show debug fade time overlay
+        bool        m_showStatistics     = false;                   // Show FPS and density statistics
+        float       m_elapsedTime        = 0.0f;                    // Elapsed time for color cycling animation
     };
 }
 

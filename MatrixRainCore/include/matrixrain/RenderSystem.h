@@ -26,7 +26,7 @@ namespace MatrixRain
         /// <param name="width">Initial viewport width</param>
         /// <param name="height">Initial viewport height</param>
         /// <returns>True on success, false on failure</returns>
-        bool Initialize(HWND hwnd, UINT width, UINT height);
+        HRESULT Initialize(HWND hwnd, UINT width, UINT height);
 
         /// <summary>
         /// Render all character streaks from the animation system.

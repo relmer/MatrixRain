@@ -1,27 +1,31 @@
 #include "pch.h"
+
 #include "MatrixRain/ApplicationState.h"
+
+
+
+
 
 namespace MatrixRain
 {
-    ApplicationState::ApplicationState()
-        : m_displayMode(DisplayMode::Windowed)
-        , m_colorScheme(ColorScheme::Green)
-        , m_showDebugFadeTimes(false)
-        , m_elapsedTime(0.0f)
-    {
-    }
-
     void ApplicationState::Initialize()
     {
-        // Start in windowed mode (FR-019)
-        m_displayMode = DisplayMode::Windowed;
+        // Start in fullscreen mode by default
+        m_displayMode = DisplayMode::Fullscreen;
         
         // Start with green color scheme (classic Matrix)
         m_colorScheme = ColorScheme::Green;
         
         // Debug fade times off by default
         m_showDebugFadeTimes = false;
+        
+        // Statistics hidden by default
+        m_showStatistics = false;
     }
+
+
+
+
 
     void ApplicationState::ToggleDisplayMode()
     {
@@ -36,10 +40,14 @@ namespace MatrixRain
         }
     }
 
+
+
+
+
     void ApplicationState::CycleColorScheme()
     {
         // Cycle to next color scheme
-        m_colorScheme = GetNextColorScheme(m_colorScheme);
+        m_colorScheme = GetNextColorScheme (m_colorScheme);
     }
 
 
@@ -51,7 +59,11 @@ namespace MatrixRain
         m_showDebugFadeTimes = !m_showDebugFadeTimes;
     }
 
-    void ApplicationState::Update(float deltaTime)
+
+
+
+
+    void ApplicationState::Update (float deltaTime)
     {
         m_elapsedTime += deltaTime;
     }

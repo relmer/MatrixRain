@@ -18,7 +18,7 @@ namespace MatrixRain
         ~Application();
 
         // Main application lifecycle
-        bool Initialize(HINSTANCE hInstance, int nCmdShow);
+        HRESULT Initialize (HINSTANCE hInstance, int nCmdShow);
         int Run();
         void Shutdown();
 
@@ -39,15 +39,15 @@ namespace MatrixRain
         std::unique_ptr<FPSCounter> m_fpsCounter;
 
         // Win32 window
-        HWND m_hwnd;
-        HINSTANCE m_hInstance;
-        bool m_isRunning;
-        bool m_isPaused;
-        bool m_inDisplayModeTransition;
+        HWND      m_hwnd                    = nullptr;
+        HINSTANCE m_hInstance               = nullptr;
+        bool      m_isRunning               = false;
+        bool      m_isPaused                = false;
+        bool      m_inDisplayModeTransition = false;
 
         // Internal methods
-        bool CreateApplicationWindow(int nCmdShow);
-        void Update(float deltaTime);
+        HRESULT CreateApplicationWindow (int nCmdShow);
+        void Update (float deltaTime);
         void Render();
         
         // Window procedure

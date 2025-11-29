@@ -31,7 +31,7 @@ namespace MatrixRain
 
 
 
-    bool RenderSystem::Initialize (HWND hwnd, UINT width, UINT height)
+    HRESULT RenderSystem::Initialize (HWND hwnd, UINT width, UINT height)
     {
         HRESULT        hr       = S_OK;
         D3D11_VIEWPORT viewport = {};
@@ -85,7 +85,7 @@ namespace MatrixRain
         m_context->RSSetViewports (1, &viewport);
 
     Error:
-        return SUCCEEDED (hr);
+        return hr;
     }
 
 
