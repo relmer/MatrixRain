@@ -23,14 +23,19 @@ namespace MatrixRain
     // GlyphInfo: Information about a single glyph in the texture atlas
     struct GlyphInfo
     {
-        Vector2 uvMin;       // Top-left UV coordinate in texture atlas (0.0 to 1.0)
-        Vector2 uvMax;       // Bottom-right UV coordinate in texture atlas (0.0 to 1.0)
+        Vector2  uvMin;      // Top-left UV coordinate in texture atlas (0.0 to 1.0)
+        Vector2  uvMax;      // Bottom-right UV coordinate in texture atlas (0.0 to 1.0)
         uint32_t codepoint;  // Unicode codepoint (e.g., 0x30A0 for katakana)
-        bool mirrored;       // True if this is a horizontally mirrored variant
+        bool     mirrored;   // True if this is a horizontally mirrored variant
 
-        GlyphInfo() : uvMin(), uvMax(), codepoint(0), mirrored(false) {}
-        GlyphInfo(Vector2 uvMin, Vector2 uvMax, uint32_t codepoint, bool mirrored)
-            : uvMin(uvMin), uvMax(uvMax), codepoint(codepoint), mirrored(mirrored) {}
+        GlyphInfo() : uvMin(), uvMax(), codepoint (0), mirrored (false) { }
+        GlyphInfo (Vector2 uvMin, Vector2 uvMax, uint32_t codepoint, bool mirrored) :
+            uvMin     (uvMin),
+            uvMax     (uvMax),
+            codepoint (codepoint),
+            mirrored  (mirrored)
+        {
+        }
     };
 
     // CharacterSet: Singleton managing the texture atlas and glyph information
@@ -48,7 +53,7 @@ namespace MatrixRain
         // Initialize the character set (without texture creation)
         // Must be called once before using any other methods
         // Returns true on success, false on failure
-        bool Initialize();
+        bool    Initialize();
 
         // Create the texture atlas using the provided D3D11 device
         // Must be called after Initialize() and after D3D11 device is created
@@ -60,7 +65,7 @@ namespace MatrixRain
         size_t GetRandomGlyphIndex() const;
 
         // Get glyph information by index
-        const GlyphInfo& GetGlyph (size_t index) const;
+        const GlyphInfo & GetGlyph (size_t index) const;
 
         // Get total number of glyphs (should be 266: 133 normal + 133 mirrored)
         size_t GetGlyphCount() const;
@@ -90,9 +95,14 @@ namespace MatrixRain
         void    CalculateUVCoordinates ();
 
         // Member data
-        std::vector<GlyphInfo>           m_glyphs;               // Array of all 268 glyphs
-        ComPtr<ID3D11Texture2D>          m_textureResource;      // DirectX texture resource
-        ComPtr<ID3D11ShaderResourceView> m_textureResourceView;  // DirectX shader resource view
-        bool                             m_initialized = false;
+        std::vector<GlyphInfo>           m_glyphs;                         // Array of all 268 glyphs
+        ComPtr<ID3D11Texture2D>          m_textureResource;                // DirectX texture resource
+        ComPtr<ID3D11ShaderResourceView> m_textureResourceView;            // DirectX shader resource view
+        bool                             m_initialized          = false;   // Initialization state
     };
 }
+
+
+
+
+

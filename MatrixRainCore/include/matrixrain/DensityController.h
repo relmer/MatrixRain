@@ -1,5 +1,10 @@
 #pragma once
 
+
+
+
+
+
 namespace MatrixRain
 {
     class Viewport;
@@ -13,7 +18,7 @@ namespace MatrixRain
     class DensityController
     {
     public:
-        DensityController(const Viewport& viewport, float characterWidth);
+        DensityController (const Viewport & viewport, float characterWidth);
 
         /// <summary>
         /// Increase density percentage by step amount (max 100%).
@@ -30,7 +35,7 @@ namespace MatrixRain
         /// Formula: max(1, (viewportWidth / characterWidth / 2) * percentage / 100)
         /// </summary>
         /// <returns>Target streak count for current percentage</returns>
-        int GetTargetStreakCount() const;
+        int  GetTargetStreakCount() const;
 
         /// <summary>
         /// Determine if a new streak should spawn based on current active count.
@@ -38,21 +43,26 @@ namespace MatrixRain
         /// </summary>
         /// <param name="currentActiveCount">Current number of active streaks</param>
         /// <returns>True if should spawn, false otherwise</returns>
-        bool ShouldSpawnStreak(int currentActiveCount) const;
+        bool ShouldSpawnStreak (int currentActiveCount) const;
 
         // Accessors
-        int GetPercentage() const { return m_percentage; }
+        int GetPercentage()         const { return m_percentage; }
         int GetMaxPossibleStreaks() const;
 
-private:
-        int m_percentage;                           // Current density percentage (0-100)
-        const Viewport& m_viewport;                 // Reference to viewport for width calculations
-        float m_characterWidth;                     // Width of one character in pixels (horizontal spacing)
+    private:
+        int                m_percentage;     // Current density percentage (0-100)
+        const Viewport &   m_viewport;       // Reference to viewport for width calculations
+        float              m_characterWidth; // Width of one character in pixels (horizontal spacing)
         
-        static constexpr int MIN_PERCENTAGE = 0;
-        static constexpr int MAX_PERCENTAGE = 100;
-        static constexpr int DEFAULT_PERCENTAGE = 80;  // Start at 80% density
-        static constexpr int PERCENTAGE_STEP = 5;      // Change by 5% per +/- press
-        static constexpr int MIN_STREAKS = 1;          // Always show at least one streak
+        static constexpr int MIN_PERCENTAGE     = 0;
+        static constexpr int MAX_PERCENTAGE     = 100;
+        static constexpr int DEFAULT_PERCENTAGE = 80; // Start at 80% density
+        static constexpr int PERCENTAGE_STEP    = 5;  // Change by 5% per +/- press
+        static constexpr int MIN_STREAKS        = 1;  // Always show at least one streak
     };
 }
+
+
+
+
+

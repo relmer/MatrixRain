@@ -1,6 +1,15 @@
 #pragma once
+
+
+
+
+
 #include "MatrixRain/CharacterStreak.h"
 #include "MatrixRain/Viewport.h"
+
+
+
+
 
 namespace MatrixRain
 {
@@ -20,13 +29,13 @@ namespace MatrixRain
         /// </summary>
         /// <param name="viewport">Reference to the viewport for bounds checking</param>
         /// <param name="densityController">Reference to density controller for spawn management</param>
-        void Initialize(const Viewport& viewport, DensityController& densityController);
+        void Initialize (const Viewport & viewport, DensityController & densityController);
 
         /// <summary>
         /// Update all active streaks and camera zoom.
         /// </summary>
         /// <param name="deltaTime">Time elapsed since last frame in seconds</param>
-        void Update(float deltaTime);
+        void Update (float deltaTime);
 
         /// <summary>
         /// Spawn a new streak at a random position.
@@ -55,14 +64,14 @@ namespace MatrixRain
         /// </summary>
         /// <param name="targetCount">Target number of streaks to maintain</param>
         /// <returns>Number of streaks actually removed</returns>
-        int RemoveExcessStreaks(int targetCount);
+        int RemoveExcessStreaks (int targetCount);
 
         /// <summary>
         /// Apply continuous zoom effect to all streaks.
         /// Moves camera forward (decreases Z), wraps at Z=0 boundary.
         /// </summary>
         /// <param name="deltaTime">Time elapsed since last frame in seconds</param>
-        void ApplyZoom(float deltaTime);
+        void ApplyZoom (float deltaTime);
 
         /// <summary>
         /// Rescale streak positions when viewport size changes.
@@ -72,7 +81,7 @@ namespace MatrixRain
         /// <param name="newWidth">New viewport width</param>
         /// <param name="oldHeight">Previous viewport height</param>
         /// <param name="newHeight">New viewport height</param>
-        void RescaleStreaksForViewport(float oldWidth, float newWidth, float oldHeight, float newHeight);
+        void RescaleStreaksForViewport (float oldWidth, float newWidth, float oldHeight, float newHeight);
 
         /// <summary>
         /// Clear all active streaks (used when switching display modes).
@@ -80,11 +89,12 @@ namespace MatrixRain
         void ClearAllStreaks();
 
         // Accessors
-        const std::vector<CharacterStreak>& GetStreaks() const { return m_streaks; }
-        size_t GetActiveStreakCount() const { return m_streaks.size(); }
-        size_t GetActiveHeadCount() const;
-        float GetZoomVelocity() const { return m_zoomVelocity; }
-        void SetZoomVelocity(float velocity) { m_zoomVelocity = velocity; }
+        const std::vector<CharacterStreak> & GetStreaks()            const { return m_streaks;        }
+        size_t                               GetActiveStreakCount()  const { return m_streaks.size(); }
+        size_t                               GetActiveHeadCount()    const;
+        float                                GetZoomVelocity()       const { return m_zoomVelocity;   }
+
+        void SetZoomVelocity (float velocity) { m_zoomVelocity = velocity; }
 
 #ifdef _DEBUG
         /// <summary>
@@ -95,21 +105,26 @@ namespace MatrixRain
 #endif
 
     private:
-        std::vector<CharacterStreak> m_streaks;  // All active character streaks
-        const Viewport* m_viewport;               // Reference to viewport for bounds
-        DensityController* m_densityController;   // Reference to density controller (optional)
-        float m_zoomVelocity;                     // Camera zoom speed (units per second)
-        float m_spawnTimer;                       // Timer for automatic spawning
-        float m_spawnInterval;                    // Time between automatic spawns
-        int m_previousTargetCount;                // Previous frame's target count (to detect density changes)
+        std::vector<CharacterStreak>   m_streaks;             // All active character streaks
+        const Viewport               * m_viewport;            // Reference to viewport for bounds
+        DensityController            * m_densityController;   // Reference to density controller (optional)
+        float                          m_zoomVelocity;        // Camera zoom speed (units per second)
+        float                          m_spawnTimer;          // Timer for automatic spawning
+        float                          m_spawnInterval;       // Time between automatic spawns
+        int                            m_previousTargetCount; // Previous frame's target count (to detect density changes)
 
 #ifdef _DEBUG
-        std::vector<CharacterStreak> m_previousFrameStreaks;  // Previous frame snapshot for diff detection
-        int m_intentionalRemovalCount;            // Number of streaks intentionally removed this frame
+        std::vector<CharacterStreak>   m_previousFrameStreaks;    // Previous frame snapshot for diff detection
+        int                            m_intentionalRemovalCount; // Number of streaks intentionally removed this frame
 #endif
 
-        static constexpr float DEFAULT_ZOOM_VELOCITY = 5.0f;  // Units per second
-        static constexpr float MAX_DEPTH = 100.0f;            // Far plane
-        static constexpr float SPAWN_INTERVAL = 0.05f;        // Spawn every 50ms (fast response)
+        static constexpr float DEFAULT_ZOOM_VELOCITY = 5.0f;   // Units per second
+        static constexpr float MAX_DEPTH             = 100.0f; // Far plane
+        static constexpr float SPAWN_INTERVAL        = 0.05f;  // Spawn every 50ms (fast response)
     };
 }
+
+
+
+
+

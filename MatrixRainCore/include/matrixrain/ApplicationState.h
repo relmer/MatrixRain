@@ -1,5 +1,14 @@
 #pragma once
+
+
+
+
+
 #include "MatrixRain/ColorScheme.h"
+
+
+
+
 
 namespace MatrixRain
 {
@@ -46,17 +55,18 @@ namespace MatrixRain
         /// Used for color cycling animation.
         /// </summary>
         /// <param name="deltaTime">Time elapsed since last update in seconds</param>
-        void Update(float deltaTime);
+        void Update (float deltaTime);
 
         // Accessors
-        DisplayMode GetDisplayMode() const { return m_displayMode; }
-        void SetDisplayMode(DisplayMode mode) { m_displayMode = mode; }
-        ColorScheme GetColorScheme() const { return m_colorScheme; }
-        void SetColorScheme(ColorScheme scheme) { m_colorScheme = scheme; }
-        bool GetShowDebugFadeTimes() const { return m_showDebugFadeTimes; }
-        float GetElapsedTime() const { return m_elapsedTime; }
-        bool GetShowStatistics() const { return m_showStatistics; }
-        void ToggleStatistics() { m_showStatistics = !m_showStatistics; }
+        DisplayMode GetDisplayMode()         const { return m_displayMode;         }
+        ColorScheme GetColorScheme()         const { return m_colorScheme;         }
+        bool        GetShowDebugFadeTimes()  const { return m_showDebugFadeTimes;  }
+        float       GetElapsedTime()         const { return m_elapsedTime;         }
+        bool        GetShowStatistics()      const { return m_showStatistics;      }
+
+        void SetDisplayMode    (DisplayMode mode)   { m_displayMode = mode;                 }
+        void SetColorScheme    (ColorScheme scheme) { m_colorScheme = scheme;               }
+        void ToggleStatistics()                     { m_showStatistics = !m_showStatistics; }
 
     private:
         DisplayMode m_displayMode        = DisplayMode::Fullscreen; // Current display mode
@@ -66,4 +76,7 @@ namespace MatrixRain
         float       m_elapsedTime        = 0.0f;                    // Elapsed time for color cycling animation
     };
 }
+
+
+
 

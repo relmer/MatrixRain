@@ -1,6 +1,15 @@
 #pragma once
+
+
+
+
+
 #include "MatrixRain/DensityController.h"
 #include "MatrixRain/ApplicationState.h"
+
+
+
+
 
 namespace MatrixRain
 {
@@ -18,13 +27,13 @@ namespace MatrixRain
         /// </summary>
         /// <param name="densityController">Reference to density controller for +/- keys</param>
         /// <param name="appState">Reference to application state for debug toggle</param>
-        void Initialize(DensityController& densityController, ApplicationState& appState);
+        void Initialize (DensityController & densityController, ApplicationState & appState);
 
         /// <summary>
         /// Process a keyboard key-down event.
         /// </summary>
         /// <param name="virtualKey">Virtual key code (VK_*)</param>
-        void ProcessKeyDown(int virtualKey);
+        void ProcessKeyDown (int virtualKey);
 
         /// <summary>
         /// Check if Alt+Enter keys are currently pressed.
@@ -32,7 +41,7 @@ namespace MatrixRain
         /// </summary>
         /// <param name="virtualKey">The virtual key code to check (should be VK_RETURN)</param>
         /// <returns>True if Enter is pressed while Alt is held down</returns>
-        bool IsAltEnterPressed(int virtualKey) const;
+        bool IsAltEnterPressed (int virtualKey) const;
 
     private:
         void OnDensityIncrease();
@@ -42,3 +51,8 @@ namespace MatrixRain
         ApplicationState  * m_appState;
     };
 }
+
+
+
+
+

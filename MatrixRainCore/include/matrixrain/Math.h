@@ -1,5 +1,10 @@
 #pragma once
 
+
+
+
+
+
 namespace MatrixRain
 {
     // Vector2: 2D floating-point vector
@@ -100,3 +105,8 @@ namespace MatrixRain
         float Lerp  (float a, float b, float t);
     }
 }
+
+
+
+
+

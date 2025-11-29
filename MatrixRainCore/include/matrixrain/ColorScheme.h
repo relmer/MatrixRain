@@ -1,4 +1,9 @@
 #pragma once
+
+
+
+
+
 #include "MatrixRain/Math.h"
 
 
@@ -13,12 +18,12 @@ namespace MatrixRain
     /// </summary>
     enum class ColorScheme
     {
-        Green = 0,      // Classic Matrix green (0, 255, 100)
-        Blue = 1,       // Cool blue (0, 100, 255)
-        Red = 2,        // Danger red (255, 50, 50)
-        Amber = 3,      // Warm amber (255, 191, 0)
-        __StaticColorCount,  // Number of static colors (not including ColorCycle)
-        ColorCycle = __StaticColorCount  // Continuously cycles through all colors smoothly
+        Green              = 0,                     // Classic Matrix green (0, 255, 100)
+        Blue               = 1,                     // Cool blue (0, 100, 255)
+        Red                = 2,                     // Danger red (255, 50, 50)
+        Amber              = 3,                     // Warm amber (255, 191, 0)
+        __StaticColorCount,                         // Number of static colors (not including ColorCycle)
+        ColorCycle         = __StaticColorCount     // Continuously cycles through all colors smoothly
     };
 
     /// <summary>
@@ -38,3 +43,8 @@ namespace MatrixRain
     /// <returns>Color4 with RGB values (0-1 range)</returns>
     Color4 GetColorRGB (ColorScheme scheme, float elapsedTime = 0.0f);
 }
+
+
+
+
+

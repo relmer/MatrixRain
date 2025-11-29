@@ -219,6 +219,43 @@ g_pConsole->Printf (CConfig::Error, L"Error: %s\n", msg);
   - Return types
   - Type casts
 
+### Column Alignment for Pointer/Reference Symbols - CRITICAL
+When aligning function declarations or accessor functions with different return types containing `*` or `&`:
+
+**The `*` or `&` symbol must align VERTICALLY at the same column position across all functions in a contiguous group.**
+
+**Step-by-step process:**
+1. **Identify the longest return type** in the contiguous block (e.g., `const std::vector<CharacterInstance>`)
+2. **Calculate where the `&` or `*` appears** after that longest type (with one space after the type)
+3. **For ALL other functions in the block**, add enough spaces after their return type so their `&` or `*` aligns at that SAME column position
+4. **The spacing goes BEFORE the symbol**, not after it
+
+**Correct** (& symbols vertically aligned at column 42):
+```cpp
+const Vector3                        & GetPosition()   const { return m_position;   }
+const Vector3                        & GetVelocity()   const { return m_velocity;   }
+const std::vector<CharacterInstance> & GetCharacters() const { return m_characters; }
+```
+
+**Wrong** (& symbols at different column positions):
+```cpp
+const Vector3 &                        GetPosition()   const { return m_position;   }
+const Vector3 &                        GetVelocity()   const { return m_velocity;   }
+const std::vector<CharacterInstance> & GetCharacters() const { return m_characters; }
+```
+
+**How to calculate spacing:**
+- Count characters in longest type: `const std::vector<CharacterInstance>` = 37 characters
+- Add 1 space after type, then `&` appears at column 39 (assuming type starts at column 9)
+- For `const Vector3` (13 characters): need 37 - 13 = 24 additional spaces to push `&` to same column
+- Result: `const Vector3` + 24 spaces + `&`
+
+**This applies to:**
+- Function return types with `*` or `&`
+- Member variable declarations with `*` or `&`
+- Parameter lists with `*` or `&`
+- Any contiguous block where pointer/reference symbols appear
+
 ---
 
 ## File Modification Rules
