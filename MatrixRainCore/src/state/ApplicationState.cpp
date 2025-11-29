@@ -7,6 +7,7 @@ namespace MatrixRain
         : m_displayMode(DisplayMode::Windowed)
         , m_colorScheme(ColorScheme::Green)
         , m_showDebugFadeTimes(false)
+        , m_elapsedTime(0.0f)
     {
     }
 
@@ -48,6 +49,11 @@ namespace MatrixRain
     void ApplicationState::ToggleDebugFadeTimes()
     {
         m_showDebugFadeTimes = !m_showDebugFadeTimes;
+    }
+
+    void ApplicationState::Update(float deltaTime)
+    {
+        m_elapsedTime += deltaTime;
     }
 }
 

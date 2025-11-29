@@ -39,7 +39,8 @@ namespace MatrixRain
         /// <param name="streakCount">Current number of active streaks</param>
         /// <param name="activeHeadCount">Current number of active streak heads on screen</param>
         /// <param name="showDebugFadeTimes">True to show debug fade time overlay</param>
-        void Render(const AnimationSystem& animationSystem, const Viewport& viewport, ColorScheme colorScheme = ColorScheme::Green, float fps = 0.0f, int rainPercentage = 0, int streakCount = 0, int activeHeadCount = 0, bool showDebugFadeTimes = false);
+        /// <param name="elapsedTime">Elapsed time in seconds for color cycling</param>
+        void Render(const AnimationSystem& animationSystem, const Viewport& viewport, ColorScheme colorScheme = ColorScheme::Green, float fps = 0.0f, int rainPercentage = 0, int streakCount = 0, int activeHeadCount = 0, bool showDebugFadeTimes = false, float elapsedTime = 0.0f);
 
         /// <summary>
         /// Present the rendered frame to the screen.
@@ -143,7 +144,7 @@ namespace MatrixRain
 
         // Rendering helpers
         void SortStreaksByDepth(std::vector<const CharacterStreak*>& streaks);
-        HRESULT UpdateInstanceBuffer(const AnimationSystem& animationSystem, ColorScheme colorScheme);
+        HRESULT UpdateInstanceBuffer(const AnimationSystem& animationSystem, ColorScheme colorScheme, float elapsedTime);
         void ClearRenderTarget();
         void RenderFPSCounter(float fps, int rainPercentage, int streakCount, int activeHeadCount);
         void RenderDebugFadeTimes(const AnimationSystem& animationSystem);

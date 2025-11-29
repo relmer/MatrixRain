@@ -222,6 +222,11 @@ namespace MatrixRain
 
     void Application::Update(float deltaTime)
     {
+        if (m_appState)
+        {
+            m_appState->Update(deltaTime);
+        }
+        
         if (m_animationSystem && !m_isPaused)
         {
             m_animationSystem->Update(deltaTime);
@@ -238,7 +243,8 @@ namespace MatrixRain
             int streakCount = static_cast<int>(m_animationSystem->GetActiveStreakCount());
             int activeHeadCount = static_cast<int>(m_animationSystem->GetActiveHeadCount());
             bool showDebugFadeTimes = m_appState->GetShowDebugFadeTimes();
-            m_renderSystem->Render(*m_animationSystem, *m_viewport, scheme, fps, rainPercentage, streakCount, activeHeadCount, showDebugFadeTimes);
+            float elapsedTime = m_appState->GetElapsedTime();
+            m_renderSystem->Render(*m_animationSystem, *m_viewport, scheme, fps, rainPercentage, streakCount, activeHeadCount, showDebugFadeTimes, elapsedTime);
             m_renderSystem->Present();
         }
     }

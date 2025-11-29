@@ -200,6 +200,25 @@ struct VSInput
 g_pConsole->Printf (CConfig::Error, L"Error: %s\n", msg);
 ```
 
+### Pointer and Reference Spacing
+- **Space before AND after pointer/reference symbols** (`*`, `&`)
+- Examples:
+  - `int * ptr` (not `int* ptr` or `int *ptr`)
+  - `const Type & ref` (not `const Type& ref`)
+  - `LPWSTR * ppszEnd` (not `LPWSTR* ppszEnd`)
+- **When column-aligned**, pointer/reference symbols form their own column:
+  ```cpp
+  HRESULT              hr       = S_OK;
+  LPWSTR       *       ppszEnd  = nullptr;
+  const WCHAR  *       pszName  = L"test";
+  int          * const pInt     = &value;
+  ```
+- This spacing rule applies to:
+  - Variable declarations
+  - Function parameters
+  - Return types
+  - Type casts
+
 ---
 
 ## File Modification Rules
@@ -491,6 +510,12 @@ static constexpr SFileAttributeEntry s_krgAttrMap[] =
 ```
 
 ### Constructor Initialization Lists
+- **Colon at end of constructor line**: `Constructor() :`
+- **Commas at end of each line**, not at the beginning of the next line
+- **Align member names in columns** for readability
+- **Use `= default` for default constructors** when all members have in-class initializers
+- **Only initialize non-default values** in constructor initializer lists
+
 Column-align member initializers:
 ```cpp
 CDirectoryLister::CDirectoryLister (...) :
@@ -500,6 +525,27 @@ CDirectoryLister::CDirectoryLister (...) :
     m_cFilesFound       (0),
     m_cDirectoriesFound (0)
 {
+```
+
+Example with `= default`:
+```cpp
+// In header:
+class CharacterInstance
+{
+public:
+    size_t glyphIndex = 0;
+    float brightness = 1.0f;
+    bool isHead = false;
+};
+
+// In .cpp:
+CharacterInstance::CharacterInstance() = default;
+
+CharacterInstance::CharacterInstance (size_t glyphIndex, float brightness) :
+    glyphIndex (glyphIndex),
+    brightness (brightness)
+{
+}
 ```
 
 ### Line Wrapping - Separator Placement

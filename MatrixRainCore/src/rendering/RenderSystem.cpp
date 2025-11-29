@@ -1141,10 +1141,10 @@ namespace MatrixRain
 
 
 
-    HRESULT RenderSystem::UpdateInstanceBuffer (const AnimationSystem& animationSystem, ColorScheme colorScheme)
+    HRESULT RenderSystem::UpdateInstanceBuffer (const AnimationSystem& animationSystem, ColorScheme colorScheme, float elapsedTime)
     {
         HRESULT                  hr = S_OK;
-        Color4                   schemeColor = GetColorRGB (colorScheme);
+        Color4                   schemeColor = GetColorRGB (colorScheme, elapsedTime);
         D3D11_MAPPED_SUBRESOURCE mappedResource;
         size_t                   bytesToCopy;
 
@@ -1206,7 +1206,7 @@ namespace MatrixRain
 
 
 
-    void RenderSystem::Render (const AnimationSystem& animationSystem, const Viewport& viewport, ColorScheme colorScheme, float fps, int rainPercentage, int streakCount, int activeHeadCount, bool showDebugFadeTimes)
+    void RenderSystem::Render (const AnimationSystem& animationSystem, const Viewport& viewport, ColorScheme colorScheme, float fps, int rainPercentage, int streakCount, int activeHeadCount, bool showDebugFadeTimes, float elapsedTime)
     {
         if (!m_device || !m_context)
         {
@@ -1231,7 +1231,7 @@ namespace MatrixRain
         }
 
         // Update instance buffer with character data
-        (void)UpdateInstanceBuffer (animationSystem, colorScheme);  // Ignore return - errors already handled within
+        (void)UpdateInstanceBuffer (animationSystem, colorScheme, elapsedTime);  // Ignore return - errors already handled within
 
         // Count total characters to render
         size_t totalCharacters = 0;

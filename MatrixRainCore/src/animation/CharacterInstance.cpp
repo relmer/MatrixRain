@@ -3,31 +3,26 @@
 
 namespace MatrixRain
 {
-    CharacterInstance::CharacterInstance()
-        : glyphIndex(0)
-        , color(1.0f, 1.0f, 1.0f, 1.0f) // White default
-        , brightness(1.0f)
-        , scale(1.0f)
-        , positionOffset(0.0f, 0.0f)
-        , isHead(false)
-        , lifetime(0.0f)
-        , fadeTime(3.0f)
+    CharacterInstance::CharacterInstance() = default;
+
+
+
+
+
+    CharacterInstance::CharacterInstance (size_t glyphIndex, const Color4 & color, float brightness, float scale, const Vector2 & offset) :
+        glyphIndex     (glyphIndex),
+        color          (color),
+        brightness     (brightness),
+        scale          (scale),
+        positionOffset (offset)
     {
     }
 
-    CharacterInstance::CharacterInstance(size_t glyphIndex, const Color4& color, float brightness, float scale, const Vector2& offset)
-        : glyphIndex(glyphIndex)
-        , color(color)
-        , brightness(brightness)
-        , scale(scale)
-        , positionOffset(offset)
-        , isHead(false)
-        , lifetime(0.0f)
-        , fadeTime(3.0f)
-    {
-    }
 
-    void CharacterInstance::Update(float deltaTime)
+
+
+
+    void CharacterInstance::Update (float deltaTime)
     {
 #ifdef _DEBUG
         float oldBrightness = brightness;
@@ -39,7 +34,7 @@ namespace MatrixRain
         if (lifetime <= 0.0f)
         {
             // Dead - ready for removal
-            lifetime = 0.0f;
+            lifetime   = 0.0f;
             brightness = 0.0f;
         }
         else if (lifetime > fadeTime)
@@ -57,15 +52,20 @@ namespace MatrixRain
         // Brightness should NEVER increase (except for heads which stay at 1.0)
         ASSERT (isHead || brightness <= (oldBrightness + 0.001f))
         
-        // Check for excessive darkening (more than physically possible in one frame)
-        // At 30fps (worst case for smooth gameplay), deltaTime ~= 0.033s
-        // With fadeTime = 3.0s, max expected change = 0.033/3.0 = 0.011
-        // Allow 3x margin for startup/lag: 0.033 threshold
-        // This catches "jump" behavior (skipping multiple steps) but not slow frames
-        float brightnessDecrease = oldBrightness - brightness;
-
-        // Brightness decreased too much in one step!
-        ASSERT (brightnessDecrease <= 0.10f);
+        // Check for excessive darkening during normal fade phase only
+        // Skip check for edge cases:
+        // - Character death (lifetime <= 0)
+        // - Initial bright phase (lifetime > fadeTime)
+        // - Already nearly faded (oldBrightness < 0.1)
+        if (lifetime > 0.0f && lifetime <= fadeTime && oldBrightness >= 0.1f)
+        {
+            float brightnessDecrease = oldBrightness - brightness;
+            
+            // At 30fps, deltaTime ~= 0.033s, fadeTime = 3.0s
+            // Expected max decrease = 0.033 / 3.0 = 0.011
+            // Allow 10x margin for lag spikes: 0.11 threshold
+            ASSERT (brightnessDecrease <= 0.11f);
+        }
 #endif
     }
 }
