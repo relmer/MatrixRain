@@ -7,8 +7,6 @@
 
 namespace MatrixRainTests
 {
-
-
     TEST_CLASS (DisplayModeTests)
     {
     public:
@@ -30,23 +28,20 @@ namespace MatrixRainTests
             appState.Initialize();
 
             // Verify initial state
-            Assert::AreEqual (static_cast<int>(DisplayMode::Windowed),
-                static_cast<int>(appState.GetDisplayMode()),
-                L"Should start in Windowed mode");
+            Assert::AreEqual (static_cast<int>(DisplayMode::Fullscreen),
+                              static_cast<int>(appState.GetDisplayMode()),
+                              L"Should start in Fullscreen mode");
 
             // Toggle display mode
             appState.ToggleDisplayMode();
 
-            Assert::AreEqual (static_cast<int>(DisplayMode::Fullscreen),
-                static_cast<int>(appState.GetDisplayMode()),
-                L"Should transition to Fullscreen");
+            Assert::AreEqual (static_cast<int>(DisplayMode::Windowed),
+                              static_cast<int>(appState.GetDisplayMode()),
+                              L"Should transition to Windowed");
 
             // In actual implementation, animation systems would continue
             // running without interruption during the swap chain recreation
         }
     };
-
-
-
 }  // namespace MatrixRainTests
 

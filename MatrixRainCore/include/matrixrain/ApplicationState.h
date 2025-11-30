@@ -28,7 +28,7 @@ class ApplicationState
 public:
     /// <summary>
     /// Initialize application state with default values.
-    /// Starts in Windowed display mode with Green color scheme.
+    /// Starts in Fullscreen display mode with Green color scheme.
     /// </summary>
     void Initialize();
 
@@ -39,7 +39,7 @@ public:
 
     /// <summary>
     /// Cycle to the next color scheme.
-    /// Green → Blue → Red → Amber → Green
+    /// Green → Blue → Red → Amber → ColorCycle → Green
     /// </summary>
     void CycleColorScheme();
 

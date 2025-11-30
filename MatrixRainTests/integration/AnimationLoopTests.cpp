@@ -133,8 +133,14 @@ namespace MatrixRainTests
                 animationSystem.Update (1.0f / 60.0f);
             }
 
-            // Resize viewport mid-animation
-            viewport.Resize (1920.0f, 1080.0f);
+            // Resize viewport mid-animation and rescale streaks
+            float oldWidth  = 800.0f;
+            float oldHeight = 600.0f;
+            float newWidth  = 1920.0f;
+            float newHeight = 1080.0f;
+            
+            viewport.Resize (newWidth, newHeight);
+            animationSystem.RescaleStreaksForViewport (oldWidth, newWidth, oldHeight, newHeight);
 
             // Continue animation for another second
             for (int i = 0; i < 60; i++)

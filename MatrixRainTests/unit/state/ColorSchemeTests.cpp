@@ -6,8 +6,6 @@
 
 namespace MatrixRainTests
 {
-
-
     TEST_CLASS (ColorSchemeTests)
     {
         public:
@@ -26,6 +24,10 @@ namespace MatrixRainTests
                 Assert::AreNotEqual (static_cast<int>(red), static_cast<int>(amber));
             }
 
+
+
+
+
             // T176: Test ColorScheme cycling sequence
             TEST_METHOD (TestColorSchemeCyclingSequence)
             {
@@ -43,10 +45,18 @@ namespace MatrixRainTests
                 current = GetNextColorScheme(current);
                 Assert::IsTrue (current == ColorScheme::Amber, L"Red should cycle to Amber");
 
-                // Amber → Green (wraps around)
+                // Amber → ColorCycle
                 current = GetNextColorScheme(current);
-                Assert::IsTrue (current == ColorScheme::Green, L"Amber should cycle back to Green");
+                Assert::IsTrue (current == ColorScheme::ColorCycle, L"Amber should cycle to ColorCycle");
+
+                // ColorCycle → Green (wraps around)
+                current = GetNextColorScheme(current);
+                Assert::IsTrue (current == ColorScheme::Green, L"ColorCycle should cycle back to Green");
             }
+
+
+
+
 
             // T178: Test color scheme RGB values
             TEST_METHOD (TestColorSchemeRGBValues)
@@ -82,8 +92,5 @@ namespace MatrixRainTests
                 Assert::IsTrue (color.g > 0.9f, L"Default scheme should be predominantly green");
             }
     };
-
-
-
 }  // namespace MatrixRainTests
 

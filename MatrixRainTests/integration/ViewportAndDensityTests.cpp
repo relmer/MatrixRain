@@ -9,8 +9,6 @@
 
 namespace MatrixRainTests
 {
-
-
     TEST_CLASS (ViewportRescalingTests)
     {
     public:
@@ -29,20 +27,20 @@ namespace MatrixRainTests
             // Spawn several streaks
             for (int i = 0; i < 10; ++i)
             {
-                animationSystem.SpawnStreak();
+                animationSystem.SpawnStreak ();
             }
 
             // Record original positions
             std::vector<Vector3> originalPositions;
-            for (const auto & streak : animationSystem.GetStreaks())
+            for (const auto & streak : animationSystem.GetStreaks ())
             {
-                originalPositions.push_back (streak.GetPosition());
+                originalPositions.push_back (streak.GetPosition ());
             }
 
             // When: Rescale viewport (simulate fullscreen)
-            float oldWidth  = 1440.0f;
+            float oldWidth = 1440.0f;
             float oldHeight = 900.0f;
-            float newWidth  = 1920.0f;
+            float newWidth = 1920.0f;
             float newHeight = 1080.0f;
 
             animationSystem.RescaleStreaksForViewport (oldWidth, newWidth, oldHeight, newHeight);
@@ -51,15 +49,15 @@ namespace MatrixRainTests
             float expectedScaleX = newWidth / oldWidth;  // 1.333...
             float expectedScaleY = newHeight / oldHeight;  // 1.2
 
-            const auto & streaks = animationSystem.GetStreaks();
-            for (size_t i = 0; i < streaks.size(); ++i)
+            const auto & streaks = animationSystem.GetStreaks ();
+            for (size_t i = 0; i < streaks.size (); ++i)
             {
-                Vector3 newPos = streaks[i].GetPosition();
+                Vector3 newPos = streaks[i].GetPosition ();
                 Vector3 oldPos = originalPositions[i];
 
                 // X should be scaled (with some jitter tolerance)
                 float expectedX = oldPos.x * expectedScaleX;
-                Assert::IsTrue (abs(newPos.x - expectedX) < 20.0f, L"X position should be approximately scaled");
+                Assert::IsTrue (abs (newPos.x - expectedX) < 20.0f, L"X position should be approximately scaled");
 
                 // Y should be scaled exactly (no jitter)
                 float expectedY = oldPos.y * expectedScaleY;
@@ -88,24 +86,24 @@ namespace MatrixRainTests
             // Spawn streaks across the viewport
             for (int i = 0; i < 20; ++i)
             {
-                animationSystem.SpawnStreakInView();  // Spawns anywhere on screen
+                animationSystem.SpawnStreakInView ();  // Spawns anywhere on screen
             }
 
             // When: Rescale to larger viewport
-            float oldWidth  = 1000.0f;
+            float oldWidth = 1000.0f;
             float oldHeight = 800.0f;
-            float newWidth  = 2000.0f;
+            float newWidth = 2000.0f;
             float newHeight = 1600.0f;
 
             animationSystem.RescaleStreaksForViewport (oldWidth, newWidth, oldHeight, newHeight);
 
             // Then: All streaks should still be within new bounds (approximately)
-            for (const auto & streak : animationSystem.GetStreaks())
+            for (const auto & streak : animationSystem.GetStreaks ())
             {
-                Vector3 pos = streak.GetPosition();
+                Vector3 pos = streak.GetPosition ();
 
                 // X should be within new width (with jitter tolerance)
-                Assert::IsTrue (pos.x >= -50.0f && pos.x <= newWidth + 50.0f, 
+                Assert::IsTrue (pos.x >= -50.0f && pos.x <= newWidth + 50.0f,
                     L"X should be within new viewport bounds (with jitter)");
             }
         }
@@ -127,21 +125,21 @@ namespace MatrixRainTests
 
             for (int i = 0; i < 15; ++i)
             {
-                animationSystem.SpawnStreak();
+                animationSystem.SpawnStreak ();
             }
 
             // When: Rescale down to windowed mode
-            float oldWidth  = 1920.0f;
+            float oldWidth = 1920.0f;
             float oldHeight = 1080.0f;
-            float newWidth  = 1440.0f;
+            float newWidth = 1440.0f;
             float newHeight = 900.0f;
 
             animationSystem.RescaleStreaksForViewport (oldWidth, newWidth, oldHeight, newHeight);
 
             // Then: Streaks should be scaled proportionally smaller
-            for (const auto & streak : animationSystem.GetStreaks())
+            for (const auto & streak : animationSystem.GetStreaks ())
             {
-                Vector3 pos = streak.GetPosition();
+                Vector3 pos = streak.GetPosition ();
 
                 // Positions should be within scaled-down bounds (with jitter)
                 Assert::IsTrue (pos.x >= -50.0f && pos.x <= newWidth + 50.0f,
@@ -152,11 +150,12 @@ namespace MatrixRainTests
 
 
 
+
         TEST_METHOD (Viewport_CharacterPositions_ScaleWithStreak)
         {
             // Given: A streak with multiple characters
             CharacterStreak streak;
-            Vector3         startPos(500.0f, 200.0f, 50.0f);
+            Vector3         startPos (500.0f, 200.0f, 50.0f);
 
             streak.Spawn (startPos);
 
@@ -166,31 +165,34 @@ namespace MatrixRainTests
                 streak.Update (0.3f, 1000.0f);
             }
 
-            // Record original character positions
-            std::vector<float> originalYPositions;
-            for (const auto & ch : streak.GetCharacters())
-            {
-                originalYPositions.push_back (ch.positionOffset.y);
-            }
+            // Record original streak head position
+            Vector3 originalHeadPos = streak.GetPosition ();
 
             // When: Rescale
             float scaleX = 1.5f;
             float scaleY = 1.2f;
             streak.RescalePositions (scaleX, scaleY);
 
-            // Then: Character Y positions should be scaled
-            const auto & characters = streak.GetCharacters();
-            for (size_t i = 0; i < characters.size(); ++i)
+            // Then: Character Y positions should be recalculated based on scaled head position
+            // RescalePositions recalculates character positions using: newHeadY - (distanceFromHead * spacing)
+            Vector3 newHeadPos = streak.GetPosition ();
+            Assert::AreEqual (originalHeadPos.y * scaleY, newHeadPos.y, 0.01f,
+                L"Streak head Y position should be scaled");
+
+            const auto & characters = streak.GetCharacters ();
+            const float characterSpacing = 32.0f;
+
+            for (size_t i = 0; i < characters.size (); ++i)
             {
-                float expectedY = originalYPositions[i] * scaleY;
+                // Characters are stored tail-first, head-last
+                size_t distanceFromHead = characters.size () - 1 - i;
+                float expectedY = newHeadPos.y - (distanceFromHead * characterSpacing);
+
                 Assert::AreEqual (expectedY, characters[i].positionOffset.y, 0.01f,
-                    L"Character Y position should scale with viewport");
+                    L"Character Y position should be recalculated from scaled head position");
             }
         }
     };
-
-
-
 }  // namespace MatrixRainTests
 
 
@@ -199,11 +201,9 @@ namespace MatrixRainTests
 
 namespace MatrixRainTests
 {
-
-
     TEST_CLASS (DensityChangeTests)
     {
-        public:
+    public:
 
         TEST_METHOD (Density_Increase_SpawnsNewStreaks)
         {
@@ -223,7 +223,7 @@ namespace MatrixRainTests
                 animationSystem.Update (0.016f);
             }
 
-            size_t countAtLowDensity = animationSystem.GetActiveStreakCount();
+            size_t countAtLowDensity = animationSystem.GetActiveStreakCount ();
 
             // When: Increase density to 80%
             densityController.SetPercentage (80);  // 80% = 96 streaks
@@ -235,7 +235,7 @@ namespace MatrixRainTests
             }
 
             // Then: Should have more streaks
-            size_t countAtHighDensity = animationSystem.GetActiveStreakCount();
+            size_t countAtHighDensity = animationSystem.GetActiveStreakCount ();
             Assert::IsTrue (countAtHighDensity > countAtLowDensity,
                 L"Increasing density should add streaks");
         }
@@ -262,7 +262,7 @@ namespace MatrixRainTests
                 animationSystem.Update (0.016f);
             }
 
-            size_t countAtHighDensity = animationSystem.GetActiveStreakCount();
+            size_t countAtHighDensity = animationSystem.GetActiveStreakCount ();
 
             // When: Decrease density
             densityController.SetPercentage (20);  // 20%
@@ -271,7 +271,7 @@ namespace MatrixRainTests
             animationSystem.Update (0.016f);
 
             // Then: Should have fewer streaks
-            size_t countAtLowDensity = animationSystem.GetActiveStreakCount();
+            size_t countAtLowDensity = animationSystem.GetActiveStreakCount ();
             Assert::IsTrue (countAtLowDensity < countAtHighDensity,
                 L"Decreasing density should remove streaks immediately");
         }
@@ -298,14 +298,14 @@ namespace MatrixRainTests
                 animationSystem.Update (0.016f);
             }
 
-            size_t beforeCount = animationSystem.GetActiveStreakCount();
+            size_t beforeCount = animationSystem.GetActiveStreakCount ();
 
             // When: Large density increase
             densityController.SetPercentage (90);
 
             // Update ONCE
             animationSystem.Update (0.016f);
-            size_t afterOneFrame = animationSystem.GetActiveStreakCount();
+            size_t afterOneFrame = animationSystem.GetActiveStreakCount ();
 
             // Then: Should spawn most/all needed streaks in one frame (burst)
             size_t increase = afterOneFrame - beforeCount;
@@ -337,17 +337,14 @@ namespace MatrixRainTests
             }
 
             // Then: Streak count should be reasonable (not duplicated/accumulated)
-            size_t finalCount = animationSystem.GetActiveStreakCount();
-            int targetCount = densityController.GetTargetStreakCount();
+            size_t finalCount = animationSystem.GetActiveStreakCount ();
+            int targetCount = densityController.GetTargetStreakCount ();
 
             // Should be close to target (within reasonable tolerance)
             int diff = abs (static_cast<int>(finalCount) - targetCount);
             Assert::IsTrue (diff < 50, L"Streak count should match target after density changes");
         }
     };
-
-
-
 }  // namespace MatrixRainTests
 
 
