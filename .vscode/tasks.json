@@ -1,0 +1,136 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build MatrixRain Debug",
+            "type": "process",
+            "command": "pwsh",
+            "args": [
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                "${workspaceFolder}\\scripts\\Invoke-MatrixRainBuild.ps1",
+                "-Target",
+                "Build",
+                "-Configuration",
+                "Debug",
+                "-Platform",
+                "x64"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": "$msCompile",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "detail": "Invoke MatrixRain build script (Debug, x64)."
+        },
+        {
+            "label": "Build MatrixRain Release",
+            "type": "process",
+            "command": "pwsh",
+            "args": [
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                "${workspaceFolder}\\scripts\\Invoke-MatrixRainBuild.ps1",
+                "-Target",
+                "Build",
+                "-Configuration",
+                "Release",
+                "-Platform",
+                "x64"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": "$msCompile",
+            "group": {
+                "kind": "build",
+                "isDefault": false
+            },
+            "detail": "Invoke MatrixRain build script (Release, x64)."
+        },
+        {
+            "label": "Clean MatrixRain Debug",
+            "type": "process",
+            "command": "pwsh",
+            "args": [
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                "${workspaceFolder}\\scripts\\Invoke-MatrixRainBuild.ps1",
+                "-Target",
+                "Clean",
+                "-Configuration",
+                "Debug",
+                "-Platform",
+                "x64"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": "$msCompile",
+            "group": "none",
+            "detail": "Invoke MatrixRain build script for Clean (Debug, x64)."
+        },
+        {
+            "label": "Clean MatrixRain Release",
+            "type": "process",
+            "command": "pwsh",
+            "args": [
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                "${workspaceFolder}\\scripts\\Invoke-MatrixRainBuild.ps1",
+                "-Target",
+                "Clean",
+                "-Configuration",
+                "Release",
+                "-Platform",
+                "x64"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": "$msCompile",
+            "group": "none",
+            "detail": "Invoke MatrixRain build script for Clean (Release, x64)."
+        },
+        {
+            "label": "Run MatrixRain Tests",
+            "type": "process",
+            "command": "pwsh",
+            "args": [
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                "${workspaceFolder}\\scripts\\Invoke-MatrixRainTests.ps1",
+                "-Configuration",
+                "Debug",
+                "-Platform",
+                "x64",
+                "-RunSettings",
+                "MatrixRainTests.runsettings",
+                "-Parallel"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "dependsOn": "Build MatrixRain Debug",
+            "problemMatcher": [],
+            "group": {
+                "kind": "test",
+                "isDefault": true
+            },
+            "detail": "Invoke MatrixRain test script (Debug, x64)."
+        }
+    ]
+}

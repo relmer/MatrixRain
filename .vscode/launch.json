@@ -1,0 +1,27 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Launch MatrixRain (Debug x64)",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}\\x64\\Debug\\MatrixRain.exe",
+            "args": [],
+            "cwd": "${workspaceFolder}\\MatrixRain",
+            "preLaunchTask": "Build MatrixRain Debug",
+            "stopAtEntry": false,
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Launch MatrixRain (Release x64)",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}\\x64\\Release\\MatrixRain.exe",
+            "args": [],
+            "cwd": "${workspaceFolder}\\MatrixRain",
+            "preLaunchTask": "Build MatrixRain Release",
+            "stopAtEntry": false,
+            "console": "integratedTerminal"
+        }
+    ]
+}
