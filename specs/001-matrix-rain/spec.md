@@ -55,20 +55,56 @@ A user wants to customize the visual intensity by adjusting how many character s
 
 ---
 
-### User Story 3 - Toggle Display Mode (Priority: P3)
+### User Story 3 - Customize Color Schemes (Priority: P3)
+
+A user wants to personalize the visual aesthetic by choosing from different color schemes beyond the classic green. They can press the C key to cycle through various color options including blue, red, amber, or a continuously cycling rainbow effect, allowing them to match their mood or preference.
+
+**Why this priority**: Color customization enhances personalization and visual variety without affecting core functionality. This builds on the complete animation experience by adding aesthetic options.
+
+**Independent Test**: Can be tested by launching the app and pressing C repeatedly to verify colors change through all schemes in the correct sequence.
+
+**Acceptance Scenarios**:
+
+1. **Given** the application starts with green color scheme, **When** user presses C key, **Then** the color scheme changes to blue and all visible characters update immediately
+2. **Given** the application is displaying any static color scheme, **When** user cycles through all schemes, **Then** the sequence is Green → Blue → Red → Amber → ColorCycle → Green
+3. **Given** the ColorCycle scheme is active, **When** observing over 30+ seconds, **Then** characters smoothly transition through all color schemes continuously
+4. **Given** any color scheme is active, **When** new character streaks spawn, **Then** they use the current active color scheme
+5. **Given** the user changes color schemes, **When** characters are fading, **Then** fade progression continues unaffected by color changes
+
+---
+
+### User Story 4 - Toggle Display Mode (Priority: P4)
 
 A user wants to switch between windowed mode for casual viewing while multitasking, and full-screen mode for an immersive experience. They can press Alt-Enter to instantly toggle between these modes.
 
-**Why this priority**: Display mode flexibility enhances usability but the core effect works fine in either mode. This is a quality-of-life feature that builds on the complete animation experience.
+**Why this priority**: Display mode flexibility enhances usability but the core effect works fine in either mode. This is a quality-of-life feature that builds on the complete animation experience. Lower priority than color customization as it's purely a viewing mode preference.
 
 **Independent Test**: Can be tested by launching the app and pressing Alt-Enter to verify the window switches between windowed and full-screen modes without disrupting the animation.
 
 **Acceptance Scenarios**:
 
-1. **Given** the application starts in windowed mode, **When** user presses Alt-Enter, **Then** the application switches to full-screen mode and the animation continues uninterrupted
-2. **Given** the application is in full-screen mode, **When** user presses Alt-Enter, **Then** the application switches to windowed mode and the animation continues uninterrupted
+1. **Given** the application starts in fullscreen mode, **When** user presses Alt-Enter, **Then** the application switches to windowed mode and the animation continues uninterrupted
+2. **Given** the application is in windowed mode, **When** user presses Alt-Enter, **Then** the application switches to fullscreen mode and the animation continues uninterrupted
 3. **Given** the application switches display modes, **When** the transition completes, **Then** all character streaks maintain their positions and fade progression
 4. **Given** the application is in either mode, **When** toggling multiple times rapidly, **Then** the application remains stable and responsive
+
+---
+
+### User Story 5 - Monitor Performance Statistics (Priority: P5)
+
+A user wants to understand how well the application is performing and how dense the rain effect currently is. They can press the S key to toggle an on-screen statistics overlay showing FPS, density percentage, and active streak counts.
+
+**Why this priority**: Performance monitoring is useful for debugging and optimization but not essential for the core experience. This is primarily a diagnostic feature for power users.
+
+**Independent Test**: Can be tested by launching the app and pressing S to verify statistics overlay appears and updates in real-time.
+
+**Acceptance Scenarios**:
+
+1. **Given** the application is running with statistics hidden, **When** user presses S key, **Then** the statistics overlay appears showing FPS, density %, streak count, and head count
+2. **Given** the statistics overlay is visible, **When** user presses S key again, **Then** the statistics overlay is hidden
+3. **Given** the statistics overlay is visible, **When** user changes density with +/- keys, **Then** the displayed density percentage and streak count update accordingly
+4. **Given** the statistics overlay is visible, **When** observing during animation, **Then** the FPS counter updates continuously showing current frame rate
+5. **Given** the statistics overlay is visible, **When** user changes color scheme or display mode, **Then** the statistics overlay remains visible and functional
 
 ---
 
@@ -91,7 +127,12 @@ A user wants to switch between windowed mode for casual viewing while multitaski
   - 52 Latin letters: uppercase A-Z (U+0041 to U+005A), lowercase a-z (U+0061 to U+007A)
   - 10 numerals: 0-9 (U+0030 to U+0039)
 - **FR-003**: System MUST render all characters mirrored/flipped left-to-right
-- **FR-004**: System MUST render characters in a green color reminiscent of vintage phosphor CRT monitors. Exact color: RGB(0, 255, 100).
+- **FR-004**: System MUST support multiple color schemes for rendering characters:
+  - **Green** (default): RGB(0, 255, 100) - Classic bright Matrix green reminiscent of vintage phosphor CRT monitors
+  - **Blue**: RGB(0, 100, 255) - Cool blue variant
+  - **Red**: RGB(255, 50, 50) - Danger red variant
+  - **Amber**: RGB(255, 191, 0) - Warm amber variant
+  - **ColorCycle**: Continuously cycles through all color schemes smoothly based on elapsed time
 - **FR-005**: System MUST render the head character (leading/frontmost character) of each streak in white color, not green
 - **FR-006**: System MUST add a new white head character when the streak descends one additional character position, and simultaneously change the previous head character from white to green. The streak grows by adding new characters at the head while maintaining existing characters in their positions. Streaks advance at base interval of 0.3 seconds per character cell, with variation applied per streak based on depth.
 - **FR-007**: System MUST fade each character from its initial brightness to black over exactly 3 seconds using linear interpolation. Fade begins when a character position is beyond the streak's maximum length from the head. Brightness calculation: `brightness = 1.0 - (fadeTimer / 3.0)` where fadeTimer accumulates delta time in seconds. Characters are removed when brightness reaches 0.0.
@@ -106,22 +147,30 @@ A user wants to switch between windowed mode for casual viewing while multitaski
 - **FR-016**: System MUST enforce a maximum number of character streaks (density ceiling). Maximum: 500 active streaks at density level 10.
 - **FR-017**: System MUST adjust density by changing the spawn frequency of new streaks, not by altering fade-out rates. Density levels 1-10 map to target active streak counts using formula: `targetStreaks = 10 + (level - 1) * 54` (produces range 10 to 496, rounded to 10-500). Spawn frequency increases when current count < target.
 - **FR-018**: Users MUST be able to toggle between windowed and full-screen display modes by pressing Alt-Enter
-- **FR-019**: System MUST start in windowed mode by default
+- **FR-019**: System MUST start in fullscreen mode by default
 - **FR-020**: System MUST preserve animation state (character positions, brightness levels, density setting) when switching display modes
 - **FR-021**: Users MUST be able to reposition the window in windowed mode by clicking and dragging anywhere within the window client area (borderless window drag)
 - **FR-022**: System MUST center the window horizontally and vertically on the primary monitor when the application is initially created and shown
 - **FR-023**: Users MUST be able to close the application by pressing the ESC key
 - **FR-024**: Users MUST be able to pause the animation by pressing the Space key. Pressing Space again MUST resume the animation. Pausing freezes all character movement, fade progression, and zoom but maintains current visual state.
+- **FR-025**: Users MUST be able to cycle through color schemes by pressing the C key. Cycling order: Green → Blue → Red → Amber → ColorCycle → Green. Color changes apply immediately to all visible characters.
+- **FR-026**: Users MUST be able to toggle statistics display by pressing the S key. Statistics overlay shows: current FPS, density percentage (0-100%), active streak count, and active head character count. Statistics are hidden by default.
+- **FR-027**: Users MUST be able to toggle debug fade times display by pressing the backtick/tilde key (`~). Debug overlay shows fade progression timing information for character instances. Debug display is hidden by default.
 
 ### Assumptions
 
 - Default starting density will be set to a moderate level (density level 5, approximately 262 target streaks)
+- Default color scheme is Green (classic Matrix phosphor green)
+- Application starts in fullscreen mode by default
+- Statistics overlay is hidden by default
+- Debug fade times display is hidden by default
 - Character size will scale based on window resolution to maintain readability
 - Zoom speed: 2.0 units/second (50 second cycle at Z=100 wrap, noticeable growth over 60 seconds)
 - The 5% character mutation chance applies per frame, assuming ~60fps (approximately 3 mutations per second per visible character)
-- Window starts at default size of 1280x720 in windowed mode, centered on primary monitor
+- When toggling to windowed mode, window defaults to size of 1280x720, centered on primary monitor
 - Streak length randomized between 10 and 30 characters per streak
 - Pausing freezes all animations but maintains current rendering (not a black screen)
+- ColorCycle mode cycles through all color schemes with a smooth transition period
 
 ### Key Entities
 
@@ -129,6 +178,22 @@ A user wants to switch between windowed mode for casual viewing while multitaski
 - **Character Instance**: Represents a single character in a streak, with properties for: character glyph, position, brightness level, time since appearance, color (white/green)
 - **Viewport**: Represents the rendering surface dimensions and camera zoom level
 - **Density Controller**: Tracks current density level, minimum/maximum bounds, and spawn frequency timing
+- **Color Scheme**: Defines color palette for character rendering, supporting static colors and animated color cycling
+- **FPS Counter**: Tracks and calculates frame rate using rolling average over recent frame times
+- **Application State**: Manages global application settings including display mode, color scheme, and debug/statistics display flags
+
+### Key Bindings
+
+| Key | Action | Functional Requirement |
+|-----|--------|------------------------|
+| **ESC** | Close application | FR-023 |
+| **Space** | Toggle pause/resume animation | FR-024 |
+| **+** or **=** | Increase rain density | FR-013 |
+| **-** | Decrease rain density | FR-014 |
+| **Alt+Enter** | Toggle windowed/fullscreen mode | FR-018 |
+| **C** | Cycle through color schemes | FR-025 |
+| **S** | Toggle statistics display (FPS, density, streak count) | FR-026 |
+| **`** (backtick) | Toggle debug fade times display | FR-027 |
 
 ## Success Criteria *(mandatory)*
 
@@ -143,3 +208,6 @@ A user wants to switch between windowed mode for casual viewing while multitaski
 - **SC-007**: Character glyphs render clearly and are recognizable at default window size
 - **SC-008**: Depth effect is perceivable with some character streaks appearing at least 2x larger than others
 - **SC-009**: Application launches to visible animation within 1 second on reference hardware
+- **SC-010**: Color scheme changes (C key press) apply immediately to all visible characters without visual artifacts or performance impact
+- **SC-011**: Statistics overlay (when enabled) updates in real-time with FPS counter showing values within ±5 FPS of actual frame rate
+- **SC-012**: ColorCycle mode completes a full transition through all color schemes within 60 seconds (±5 seconds tolerance)

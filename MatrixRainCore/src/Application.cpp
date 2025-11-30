@@ -126,6 +126,8 @@ HRESULT Application::CreateApplicationWindow (int nCmdShow)
     wcex.style          = CS_HREDRAW | CS_VREDRAW;
     wcex.lpfnWndProc    = Application::WindowProc;
     wcex.hInstance      = m_hInstance;
+    wcex.hIcon          = LoadIconW (m_hInstance, MAKEINTRESOURCEW (101));  // IDI_MATRIXRAIN
+    wcex.hIconSm        = LoadIconW (m_hInstance, MAKEINTRESOURCEW (101));  // IDI_MATRIXRAIN
     wcex.hCursor        = LoadCursor (nullptr, IDC_ARROW);
     wcex.hbrBackground  = (HBRUSH)GetStockObject (BLACK_BRUSH);
     wcex.lpszClassName  = L"MatrixRainWindowClass";

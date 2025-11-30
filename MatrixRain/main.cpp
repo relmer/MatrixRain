@@ -1,5 +1,7 @@
 #include "pch.h"
+
 #include "MatrixRain/Application.h"
+#include "resource.h"
 
 
 
