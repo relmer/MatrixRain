@@ -5,6 +5,8 @@
 #include "MatrixRain/CharacterSet.h"
 #include "MatrixRain/ColorScheme.h"
 
+using Microsoft::WRL::ComPtr;
+
 
 
 
@@ -116,11 +118,12 @@ Error:
 
 HRESULT RenderSystem::CreateSwapChain (HWND hwnd, UINT width, UINT height)
 {
-    HRESULT                                 hr          = S_OK;
-    Microsoft::WRL::ComPtr<IDXGIDevice>     dxgiDevice;
-    Microsoft::WRL::ComPtr<IDXGIAdapter>    dxgiAdapter;
-    Microsoft::WRL::ComPtr<IDXGIFactory>    dxgiFactory;
-    DXGI_SWAP_CHAIN_DESC                    swapChainDesc = {};
+    HRESULT               hr          = S_OK;
+    ComPtr<IDXGIDevice>   dxgiDevice;
+    ComPtr<IDXGIAdapter>  dxgiAdapter;
+    ComPtr<IDXGIFactory>  dxgiFactory;
+    DXGI_SWAP_CHAIN_DESC  swapChainDesc = {};
+
 
 
     // Get DXGI factory from device
@@ -165,8 +168,9 @@ Error:
 
 HRESULT RenderSystem::CreateRenderTargetView()
 {
-    HRESULT                                 hr = S_OK;
-    Microsoft::WRL::ComPtr<ID3D11Texture2D> backBuffer;
+    HRESULT                 hr         = S_OK;
+    ComPtr<ID3D11Texture2D> backBuffer;
+
 
 
     hr = m_swapChain->GetBuffer (0, __uuidof (ID3D11Texture2D), &backBuffer);
@@ -314,8 +318,8 @@ struct RenderSystem::ShaderCompileEntry
 
 HRESULT RenderSystem::CompileShadersFromTable (const ShaderCompileEntry* pTable, size_t cEntries)
 {
-    HRESULT                          hr = S_OK;
-    Microsoft::WRL::ComPtr<ID3DBlob> errorBlob;
+    HRESULT          hr        = S_OK;
+    ComPtr<ID3DBlob> errorBlob;
 
 
     for (size_t i = 0; i < cEntries; ++i)
@@ -351,21 +355,20 @@ Error:
 
 HRESULT RenderSystem::CompileCharacterShaders()
 {
-    HRESULT                          hr = S_OK;
-    Microsoft::WRL::ComPtr<ID3DBlob> vsBlob;
-    Microsoft::WRL::ComPtr<ID3DBlob> psBlob;
-    ShaderCompileEntry               shaderTable[] = {
+    HRESULT             hr            = S_OK;
+    ComPtr<ID3DBlob>    vsBlob;
+    ComPtr<ID3DBlob>    psBlob;
+    ShaderCompileEntry  shaderTable[] = {
         { s_kszVertexShaderSource, "VS", "main", "vs_5_0",  L"D3DCompile failed for vertex shader", vsBlob.GetAddressOf() },
         { s_kszPixelShaderSource,  "PS", "main", "ps_5_0",  L"D3DCompile failed for pixel shader",  psBlob.GetAddressOf() }
     };
-
-
-
     
+
 
     // Compile shaders from table
     hr = CompileShadersFromTable (shaderTable, _countof (shaderTable));
     CHR (hr);        // Create vertex shader
+
     hr = m_device->CreateVertexShader (vsBlob->GetBufferPointer(),
                                         vsBlob->GetBufferSize(),
                                         nullptr,
@@ -404,6 +407,7 @@ HRESULT RenderSystem::CreateDummyVertexBuffer()
     float                  dummyData[6] = { 0.0f, 1.0f, 2.0f, 3.0f, 4.0f, 5.0f };  // 6 dummy vertices (4-byte aligned)
 
 
+
     // Create a dummy vertex buffer with 6 floats (4 bytes each, 24 bytes total)
     // The shader generates vertices procedurally, but D3D11 requires a valid buffer
     vbDesc.ByteWidth = sizeof (dummyData);
@@ -429,6 +433,7 @@ HRESULT RenderSystem::CreateInstanceBuffer()
     D3D11_BUFFER_DESC bufferDesc = {};
 
 
+
     bufferDesc.ByteWidth      = sizeof (CharacterInstanceData) * m_instanceBufferCapacity;
     bufferDesc.Usage          = D3D11_USAGE_DYNAMIC;
     bufferDesc.BindFlags      = D3D11_BIND_VERTEX_BUFFER;
@@ -449,6 +454,7 @@ HRESULT RenderSystem::CreateConstantBuffer()
 {
     HRESULT           hr         = S_OK;
     D3D11_BUFFER_DESC bufferDesc = {};
+
 
     
     bufferDesc.ByteWidth      = sizeof (ConstantBufferData);
@@ -473,6 +479,7 @@ HRESULT RenderSystem::CreateBlendState()
     D3D11_BLEND_DESC blendDesc = {};
 
     
+
     blendDesc.AlphaToCoverageEnable                  = FALSE;
     blendDesc.IndependentBlendEnable                 = FALSE;
     blendDesc.RenderTarget[0].BlendEnable            = TRUE;
@@ -501,6 +508,7 @@ HRESULT RenderSystem::CreateSamplerState()
     D3D11_SAMPLER_DESC samplerDesc = {};
 
 
+
     samplerDesc.Filter         = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
     samplerDesc.AddressU       = D3D11_TEXTURE_ADDRESS_CLAMP;
     samplerDesc.AddressV       = D3D11_TEXTURE_ADDRESS_CLAMP;
@@ -522,9 +530,10 @@ Error:
 
 HRESULT RenderSystem::CreateDirect2DResources()
 {
-    HRESULT                             hr = S_OK;
-    D2D1_FACTORY_OPTIONS                options = {};
-    Microsoft::WRL::ComPtr<IDXGIDevice> dxgiDevice;
+    HRESULT              hr         = S_OK;
+    D2D1_FACTORY_OPTIONS options    = {};
+    ComPtr<IDXGIDevice>  dxgiDevice;
+
 
 
 #ifdef _DEBUG
@@ -555,8 +564,9 @@ HRESULT RenderSystem::CreateDirect2DResources()
     CHRA (hr);
 
     // Create DirectWrite factory
-    hr = DWriteCreateFactory (DWRITE_FACTORY_TYPE_SHARED, __uuidof (IDWriteFactory),
-                                reinterpret_cast<IUnknown**> (m_dwriteFactory.GetAddressOf()));
+    hr = DWriteCreateFactory (DWRITE_FACTORY_TYPE_SHARED, 
+                              __uuidof (IDWriteFactory),
+                              reinterpret_cast<IUnknown**> (m_dwriteFactory.GetAddressOf()));
     CHRA (hr);
 
     // Create text format for FPS display (small, top-right aligned)
@@ -595,7 +605,7 @@ Error:
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-static const char* s_kszQuadVertexShaderSource = R"(
+static const char * s_kszQuadVertexShaderSource = R"(
         struct VSInput
         {
             float3 position : POSITION;
@@ -617,7 +627,7 @@ static const char* s_kszQuadVertexShaderSource = R"(
         }
     )";
 
-static const char* s_kszBlurHorizontalShaderSource = R"(
+static const char * s_kszBlurHorizontalShaderSource = R"(
         Texture2D inputTexture : register(t0);
         SamplerState samplerState : register(s0);
 
@@ -648,7 +658,7 @@ static const char* s_kszBlurHorizontalShaderSource = R"(
         }
     )";
 
-static const char* s_kszBlurVerticalShaderSource = R"(
+static const char * s_kszBlurVerticalShaderSource = R"(
         Texture2D inputTexture : register(t0);
         SamplerState samplerState : register(s0);
 
@@ -679,7 +689,7 @@ static const char* s_kszBlurVerticalShaderSource = R"(
         }
     )";
 
-static const char* s_kszBloomExtractShaderSource = R"(
+static const char * s_kszBloomExtractShaderSource = R"(
         Texture2D inputTexture : register(t0);
         SamplerState samplerState : register(s0);
 
@@ -709,7 +719,7 @@ static const char* s_kszBloomExtractShaderSource = R"(
         }
     )";
 
-static const char* s_kszBloomCompositeShaderSource = R"(
+static const char * s_kszBloomCompositeShaderSource = R"(
         Texture2D sceneTexture : register(t0);
         Texture2D bloomTexture : register(t1);
         SamplerState samplerState : register(s0);
@@ -738,6 +748,7 @@ static const D3D11_INPUT_ELEMENT_DESC s_krgQuadInputLayout[] = {
 
 
 
+
 ////////////////////////////////////////////////////////////////////////////////
 //
 //  RenderSystem::CompileBloomShaders
@@ -746,18 +757,19 @@ static const D3D11_INPUT_ELEMENT_DESC s_krgQuadInputLayout[] = {
 
 HRESULT RenderSystem::CompileBloomShaders()
 {
-    HRESULT                          hr = S_OK;
-    Microsoft::WRL::ComPtr<ID3DBlob> quadVSBlob;
-    Microsoft::WRL::ComPtr<ID3DBlob> extractPSBlob;
-    Microsoft::WRL::ComPtr<ID3DBlob> blurHPSBlob;
-    Microsoft::WRL::ComPtr<ID3DBlob> blurVPSBlob;
-    Microsoft::WRL::ComPtr<ID3DBlob> compositePSBlob;
     struct QuadVertex
     {
         float pos[3];
         float uv[2];
     };
-    QuadVertex             quadVertices[] = {
+
+    HRESULT                hr                 = S_OK;
+    ComPtr<ID3DBlob>       quadVSBlob;
+    ComPtr<ID3DBlob>       extractPSBlob;
+    ComPtr<ID3DBlob>       blurHPSBlob;
+    ComPtr<ID3DBlob>       blurVPSBlob;
+    ComPtr<ID3DBlob>       compositePSBlob;
+    QuadVertex             quadVertices[]     = {
         { {-1, -1, 0}, {0, 1} },
         { {-1,  1, 0}, {0, 0} },
         { { 1,  1, 0}, {1, 0} },
@@ -765,8 +777,8 @@ HRESULT RenderSystem::CompileBloomShaders()
         { { 1,  1, 0}, {1, 0} },
         { { 1, -1, 0}, {1, 1} }
     };
-    D3D11_BUFFER_DESC      vbDesc = {};
-    D3D11_SUBRESOURCE_DATA vbData = {};
+    D3D11_BUFFER_DESC      vbDesc             = { };
+    D3D11_SUBRESOURCE_DATA vbData             = { };
     ShaderCompileEntry     bloomShaderTable[] = {
         { s_kszQuadVertexShaderSource,         "QuadVS",    "main", "vs_5_0", L"D3DCompile failed for quad vertex shader",     quadVSBlob.GetAddressOf() },
         { s_kszBloomExtractShaderSource,       "Extract",   "main", "ps_5_0", L"D3DCompile failed for bloom extract shader",   extractPSBlob.GetAddressOf() },
@@ -819,11 +831,12 @@ Error:
 
 HRESULT RenderSystem::CreateBloomResources (UINT width, UINT height)
 {
-    HRESULT              hr         = S_OK;
+    HRESULT              hr           = S_OK;
     UINT                 bloomWidth;
     UINT                 bloomHeight;
-    D3D11_TEXTURE2D_DESC sceneTexDesc = {};
-    D3D11_TEXTURE2D_DESC texDesc      = {};
+    D3D11_TEXTURE2D_DESC sceneTexDesc = { };
+    D3D11_TEXTURE2D_DESC texDesc      = { };
+
 
 
     // Safety check - don't create bloom resources with invalid dimensions
@@ -901,14 +914,15 @@ Error:
 ////////////////////////////////////////////////////////////////////////////////
 
 void RenderSystem::SetRenderPipelineState(ID3D11InputLayout* pInputLayout,
-                                            D3D11_PRIMITIVE_TOPOLOGY topology,
-                                            ID3D11Buffer* pVertexBuffer,
-                                            UINT stride,
-                                            ID3D11VertexShader* pVertexShader,
-                                            ID3D11Buffer* pConstantBuffer,
-                                            ID3D11PixelShader* pPixelShader)
+                                          D3D11_PRIMITIVE_TOPOLOGY topology,
+                                          ID3D11Buffer* pVertexBuffer,
+                                          UINT stride,
+                                          ID3D11VertexShader* pVertexShader,
+                                          ID3D11Buffer* pConstantBuffer,
+                                          ID3D11PixelShader* pPixelShader)
 {
     UINT offset = 0;
+
 
 
     m_context->IASetInputLayout       (pInputLayout);
@@ -945,9 +959,9 @@ void RenderSystem::SetRenderPipelineState(ID3D11InputLayout* pInputLayout,
 ////////////////////////////////////////////////////////////////////////////////
 
 void RenderSystem::RenderFullscreenPass(ID3D11RenderTargetView* pRenderTarget,
-                                            ID3D11PixelShader* pPixelShader,
-                                            ID3D11ShaderResourceView* const* ppShaderResources,
-                                            UINT numResources)
+                                        ID3D11PixelShader* pPixelShader,
+                                        ID3D11ShaderResourceView* const* ppShaderResources,
+                                        UINT numResources)
 {
     m_context->OMSetRenderTargets   (1, &pRenderTarget, nullptr);
     m_context->PSSetShader          (pPixelShader, nullptr, 0);
@@ -976,6 +990,7 @@ void RenderSystem::SetViewport(UINT width, UINT height)
     D3D11_VIEWPORT viewport = {};
 
 
+
     viewport.Width    = static_cast<float> (width);
     viewport.Height   = static_cast<float> (height);
     viewport.MinDepth = 0.0f;
@@ -992,6 +1007,7 @@ HRESULT RenderSystem::ApplyBloom()
 {
     HRESULT                    hr      = S_OK;
     ID3D11ShaderResourceView * srvs[2];
+
 
 
     // Safety check - if bloom resources failed to create, skip
@@ -1088,6 +1104,7 @@ void RenderSystem::BuildCharacterInstanceData (const CharacterInstance & charact
     CharacterSet & charSet = CharacterSet::GetInstance();
 
 
+
     // Position - character stores its absolute Y, streak provides X and Z
     data.position[0] = streakPos.x + character.positionOffset.x;
     data.position[1] = character.positionOffset.y; // Absolute Y position
@@ -1130,10 +1147,11 @@ void RenderSystem::BuildCharacterInstanceData (const CharacterInstance & charact
 
 HRESULT RenderSystem::UpdateInstanceBuffer (const AnimationSystem& animationSystem, ColorScheme colorScheme, float elapsedTime)
 {
-    HRESULT                  hr = S_OK;
-    Color4                   schemeColor = GetColorRGB (colorScheme, elapsedTime);
+    HRESULT                  hr             = S_OK;
+    Color4                   schemeColor    = GetColorRGB (colorScheme, elapsedTime);
     D3D11_MAPPED_SUBRESOURCE mappedResource;
     size_t                   bytesToCopy;
+
 
 
     // Clear working data from previous frame (reuse allocated capacity)
@@ -1145,6 +1163,7 @@ HRESULT RenderSystem::UpdateInstanceBuffer (const AnimationSystem& animationSyst
     {
         m_streakPtrs.push_back (&streak);
     }
+
     SortStreaksByDepth (m_streakPtrs);
 
     // Build instance data
@@ -1193,7 +1212,7 @@ Error:
 
 
 
-void RenderSystem::Render (const AnimationSystem& animationSystem, const Viewport& viewport, ColorScheme colorScheme, float fps, int rainPercentage, int streakCount, int activeHeadCount, bool showDebugFadeTimes, float elapsedTime)
+void RenderSystem::Render (const AnimationSystem & animationSystem, const Viewport & viewport, ColorScheme colorScheme, float fps, int rainPercentage, int streakCount, int activeHeadCount, bool showDebugFadeTimes, float elapsedTime)
 {
     if (!m_device || !m_context)
     {
@@ -1204,7 +1223,7 @@ void RenderSystem::Render (const AnimationSystem& animationSystem, const Viewpor
     ClearRenderTarget();
 
     // Update constant buffer with projection matrix
-    const Matrix4x4& projection = viewport.GetProjectionMatrix();
+    const Matrix4x4 & projection = viewport.GetProjectionMatrix();
     D3D11_MAPPED_SUBRESOURCE mappedResource;
     HRESULT hr = m_context->Map (m_constantBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
     if (SUCCEEDED (hr))
@@ -1218,7 +1237,7 @@ void RenderSystem::Render (const AnimationSystem& animationSystem, const Viewpor
     }
 
     // Update instance buffer with character data
-    (void)UpdateInstanceBuffer (animationSystem, colorScheme, elapsedTime);  // Ignore return - errors already handled within
+    (void) UpdateInstanceBuffer (animationSystem, colorScheme, elapsedTime);  // Ignore return - errors already handled within
 
     // Count total characters to render
     size_t totalCharacters = 0;
@@ -1330,32 +1349,93 @@ void RenderSystem::Present()
 
 void RenderSystem::RenderFPSCounter (float fps, int rainPercentage, int streakCount, int activeHeadCount)
 {
-    if (!m_d2dContext || !m_fpsBrush || !m_fpsTextFormat || !m_fpsGlowBrush)
-    {
-        return;
-    }
+    HRESULT                   hr           = S_OK;
+    bool                      drawing      = false;
+    wchar_t                   fpsText[128];
+    D2D1_SIZE_F               size         = { 0 };
+    ComPtr<IDWriteTextLayout> textLayout;
+    UINT32                    textLength   = 0; 
+    DWRITE_TEXT_METRICS       metrics      = { };
+    D2D1_RECT_F               textRect     = { };
+
+
+
+    CBRAEx (m_d2dContext && m_fpsBrush && m_fpsTextFormat && m_fpsGlowBrush, E_UNEXPECTED);
 
     // Begin D2D rendering
     m_d2dContext->BeginDraw();
+    drawing = true;
 
     // Format FPS text with rain density info: "Rain xxx% (yyy heads / zzz total), ww FPS"
-    wchar_t fpsText[128];
     swprintf_s (fpsText, L"Rain %d%% (%d heads / %d total), %.0f FPS", rainPercentage, activeHeadCount, streakCount, fps);
 
     // Get render target size for positioning
-    D2D1_SIZE_F size = m_d2dContext->GetSize();
+    size = m_d2dContext->GetSize();
 
-    // Create text layout rect (bottom-right corner with 10px padding)
-    D2D1_RECT_F textRect = D2D1::RectF (
-        size.width - 450.0f,    // Left (450px from right edge for longer text)
-        size.height - 40.0f,    // Top (40px from bottom)
-        size.width - 10.0f,     // Right (10px padding)
-        size.height - 10.0f     // Bottom (10px padding)
-    );
+    // Create a DirectWrite text layout to measure the text and avoid wrapping.
+    textLength = static_cast<UINT32> (wcslen (fpsText));
+    hr = m_dwriteFactory->CreateTextLayout (fpsText,
+                                            textLength,
+                                            m_fpsTextFormat.Get(),
+                                            10000.0f,   // large max width to prevent wrapping
+                                            1000.0f,    // large max height
+                                            &textLayout);
+    CHRA (hr);
+    CBRAEx (textLayout != nullptr, E_UNEXPECTED);
 
-    // Draw feathered glow effect by rendering text multiple times with offsets and decreasing opacity
-    // This creates a letter-shaped shadow that fades from opaque to transparent
+    hr = textLayout->GetMetrics (&metrics);
+    CHRA (hr);
+
+    // Create text rect sized to measured width to prevent wrapping, anchored bottom-right
+    textRect.left   = size.width  - metrics.widthIncludingTrailingWhitespace - 10.0f;
+    textRect.top    = size.height - metrics.height - 10.0f;
+    textRect.right  = size.width  - 10.0f;
+    textRect.bottom = size.height - 10.0f;
+    
+    if (textRect.left < 10.0f) 
+    {
+        textRect.left = 10.0f;
+    }
+
+    DrawFeatheredGlow (fpsText, textLength, textRect);
+
+    // Draw main text
+    m_d2dContext->DrawText (fpsText,
+                            textLength,
+                            m_fpsTextFormat.Get(),
+                            textRect,
+                            m_fpsBrush.Get());
+
+    
+Error:
+    if (drawing)
+    {
+        // End D2D rendering
+        m_d2dContext->EndDraw();
+    }
+
+    return;
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  RenderSystem::DrawFeatheredGlow
+//
+//  Draw feathered glow effect by rendering text multiple times with offsets 
+//  and decreasing opacity
+//
+////////////////////////////////////////////////////////////////////////////////
+
+void RenderSystem::DrawFeatheredGlow (const wchar_t * fpsText, UINT32 textLength, const D2D1_RECT_F & textRect)
+{
     const int glowLayers = 10;
+
+
+
     for (int i = glowLayers; i > 0; --i)
     {
         float offset  = static_cast<float> (i);
@@ -1363,7 +1443,7 @@ void RenderSystem::RenderFPSCounter (float fps, int rainPercentage, int streakCo
 
         m_fpsGlowBrush->SetColor (D2D1::ColorF (D2D1::ColorF::Black, opacity));
 
-        // Draw text at 8 different offsets to create uniform glow
+        // Draw text at offsets to create uniform glow
         for (int dx = -1; dx <= 1; ++dx)
         {
             for (int dy = -1; dy <= 1; ++dy)
@@ -1373,35 +1453,19 @@ void RenderSystem::RenderFPSCounter (float fps, int rainPercentage, int streakCo
                     continue;
                 }
 
-                D2D1_RECT_F glowRect = D2D1::RectF (
-                    textRect.left + offset * dx,
-                    textRect.top + offset * dy,
-                    textRect.right + offset * dx,
-                    textRect.bottom + offset * dy
-                );
+                D2D1_RECT_F glowRect = D2D1::RectF (textRect.left   + offset * dx,
+                                                    textRect.top    + offset * dy,
+                                                    textRect.right  + offset * dx,
+                                                    textRect.bottom + offset * dy);
 
-                m_d2dContext->DrawText (
-                    fpsText,
-                    static_cast<UINT32> (wcslen (fpsText)),
-                    m_fpsTextFormat.Get(),
-                    glowRect,
-                    m_fpsGlowBrush.Get()
-                );
+                m_d2dContext->DrawText (fpsText,
+                                        textLength,
+                                        m_fpsTextFormat.Get(),
+                                        glowRect,
+                                        m_fpsGlowBrush.Get());
             }
         }
     }
-
-    // Draw text
-    m_d2dContext->DrawText (
-        fpsText,
-        static_cast<UINT32> (wcslen (fpsText)),
-        m_fpsTextFormat.Get(),
-        textRect,
-        m_fpsBrush.Get()
-    );
-
-    // End D2D rendering
-    m_d2dContext->EndDraw();
 }
 
 

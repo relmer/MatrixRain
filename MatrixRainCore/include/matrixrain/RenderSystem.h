@@ -159,6 +159,7 @@ private:
     HRESULT UpdateInstanceBuffer     (const AnimationSystem & animationSystem, ColorScheme colorScheme, float elapsedTime);
     void    ClearRenderTarget();
     void    RenderFPSCounter         (float fps, int rainPercentage, int streakCount, int activeHeadCount);
+    void    DrawFeatheredGlow        (const wchar_t * fpsText, UINT32 textLength, const D2D1_RECT_F & textRect);
     void    RenderDebugFadeTimes     (const AnimationSystem & animationSystem);
     HRESULT ApplyBloom();
     void    RenderFullscreenPass     (ID3D11RenderTargetView * pRenderTarget, ID3D11PixelShader * pPixelShader, ID3D11ShaderResourceView * const * ppShaderResources, UINT numResources);
