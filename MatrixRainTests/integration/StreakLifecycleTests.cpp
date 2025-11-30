@@ -1,7 +1,5 @@
 #include "pch.h"
 
-#include <set>
-
 #include "MatrixRain/CharacterStreak.h"
 #include "MatrixRain/AnimationSystem.h"
 #include "MatrixRain/Viewport.h"

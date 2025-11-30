@@ -8,6 +8,7 @@
 
 // Additional C++ headers for testing
 #include <chrono>
+#include <set>
 #include <thread>
 
 using namespace Microsoft::VisualStudio::CppUnitTestFramework;
