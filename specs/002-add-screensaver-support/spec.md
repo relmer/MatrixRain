@@ -88,7 +88,7 @@ A user previews MatrixRain inside the Windows screensaver dialog (`/p <HWND>`) a
 - **FR-002**: Screensaver entry point MUST recognize standard Windows arguments (`/s`, `/c`, `/p <HWND>`, `/a <HWND> <data>`) and route to the corresponding behaviors.
 - **FR-003**: When launched with `/s`, the application MUST open full screen on the active display, hide the mouse cursor, suppress all hotkeys, and exit immediately on user keyboard or mouse input.
 - **FR-004**: When launched with `/p <HWND>`, the application MUST render within the provided preview window, retain the mouse cursor, and ignore input meant to dismiss full-screen sessions.
-- **FR-005**: When launched with `/c`, the application MUST present a configuration dialog that exposes screensaver-ready options (density, color scheme, animation speed, brightness, fullscreen preference) and allows saving or cancelling changes.
+- **FR-005**: When launched with `/c`, the application MUST present a configuration dialog that exposes screensaver-ready options (density, color scheme, animation speed, glow intensity, glow size, fullscreen preference) and allows saving or cancelling changes.
 - **FR-006**: Configuration dialog MUST persist selections to a dedicated registry location scoped per user and return success/failure feedback to the caller.
 - **FR-007**: At startup in any mode, the application MUST load registry values and apply them, overriding built-in defaults only for settings explicitly stored.
 - **FR-008**: While running without screensaver arguments, the application MUST behave exactly as the current desktop app, including honoring hotkeys, debug helpers, and window dragging where permitted, and persisting resulting changes back to the registry.
@@ -100,15 +100,16 @@ A user previews MatrixRain inside the Windows screensaver dialog (`/p <HWND>`) a
 
 ### Key Entities *(include if feature involves data)*
 
-- **ScreensaverSettings**: Logical collection of user-configurable options (density, color scheme, animation speed, brightness, fullscreen preference, debug helper enable flags) stored per user in the registry with validation and default values.
+- **ScreenSaverSettings**: Logical collection of user-configurable options (density, color scheme, animation speed, glow intensity, glow size, fullscreen preference, debug helper enable flags) stored per user in the registry with validation and default values.
 - **RuntimeModeContext**: In-memory state describing how the application was launched (normal exe, `/s`, `/p`, `/c`, `/a`), including rules for input handling, cursor visibility, feature enablement, and exit criteria.
 - **DistributionArtifacts**: Representation of the deliverables created by the build (exe and scr), including metadata required for installers, documentation, and automated copying.
 
 ## Assumptions
 
-- Configuration dialog will expose the same visual controls currently manipulated via hotkeys (density, speed, color, brightness) plus fullscreen/windowed preference; additional options can be added later without changing scope.
+- Configuration dialog will expose the same visual controls currently manipulated via hotkeys (density, speed, color) plus new glow intensity/size sliders and fullscreen/windowed preference; additional options can be added later without changing scope.
 - Registry storage will reside under the current user's hive and does not require administrative elevation for read/write operations.
 - Multi-monitor support will mirror the application's existing fullscreen behavior (span if already supported; otherwise primary monitor only) and this behavior will be documented if unchanged.
+- Naming convention: when creating symbols or files, combine the words as `ScreenSaver` (PascalCase) to keep terminology consistent with Windows conventions.
 
 ## Success Criteria *(mandatory)*
 
