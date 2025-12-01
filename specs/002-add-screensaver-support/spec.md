@@ -5,6 +5,12 @@
 **Status**: Draft  
 **Input**: User description: "We're going to turn this app into a full-fledged Windows 11 screen saver. It will support all of the required cmdline args that screensavers handle. We're going to continue to build it as an exe, but we'll need an additional step that copies the exe to an scr, so we'll have both. This will make it easy for people to run as a regular app or install as a screensaver without requiring the user to understand how to use an scr outside of the screensaver scenario, nor understand that they would have to rename the exe to scr for use in that scenario. When run without any of the screensaver args, the program will function just as it does today. It won't treat mouse/keyboard input as a signal to exit (other than the esc key which exits today). It will need a configuration dialog to allow configuring options for screensaver usage. The state of these options will be stored in the registry. When the app opens (both normally and as a screensaver), it will read the registry settings and use them, overriding the defaults. When run in normal mode, any configuration changes made via the keyboard hotkeys will be preserved in the registry. Configuration settings related to debug helpers (statistics display, character fade timers) will not have any effect when running in screensaver mode. The setting to run in windowed mode will not have any effect in screensaver mode. The ability to drag the window to reposition it will not have any effect in screensaver mode nor in standard mode if in fullscreen mode. In screensaver mode, the mouse cursor will be hidden and restored when the app closes. When running in screensaver demo mode (windowed within the screensaver control panel), the mouse cursor will not be hidden, and keyboard/mouse input will not exit the screensaver demo mode. In any screensaver mode, none of the hotkeys will be functional--configuration of screensaver mode is restricted solely to the settings stored by the config dialog."
 
+## Clarifications
+
+### Session 2025-11-30
+
+- Q: How should the `/a` password change argument be handled? → A: Show an unsupported password-change message and exit immediately.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Launch Screensaver From Windows (Priority: P1)
@@ -90,6 +96,7 @@ A user previews MatrixRain inside the Windows screensaver dialog (`/p <HWND>`) a
 - **FR-010**: Upon exit from any screensaver mode, the application MUST restore the mouse cursor state and release any system resources acquired solely for screensaver operation.
 - **FR-011**: The build process MUST fail clearly if the `.scr` copy step cannot complete, ensuring releases never omit the screensaver artifact.
 - **FR-012**: Error conditions (registry write failure, invalid arguments, permission issues) MUST be surfaced via user-friendly dialogs or logged events so administrators can diagnose issues.
+- **FR-013**: When invoked with `/a`, the application MUST display a clear message that MatrixRain does not support Windows password changes and exit without showing the animation.
 
 ### Key Entities *(include if feature involves data)*
 
