@@ -19,8 +19,8 @@
 
 **Purpose**: Validate the existing solution before introducing screensaver changes.
 
-- [ ] T001 Run baseline debug build via `scripts/Invoke-MatrixRainBuild.ps1` to snapshot current compiler state
-- [ ] T002 Run baseline test suite with `scripts/Invoke-MatrixRainTests.ps1` to capture pre-change failures
+- [X] T001 Run baseline debug build via `scripts/Invoke-MatrixRainBuild.ps1` to snapshot current compiler state
+- [X] T002 Run baseline test suite with `scripts/Invoke-MatrixRainTests.ps1` to capture pre-change failures
 
 ---
 
