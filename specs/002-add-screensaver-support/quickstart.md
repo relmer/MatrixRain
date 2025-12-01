@@ -45,13 +45,14 @@ Per-user options are stored under `HKCU\Software\relmer\MatrixRain`. Deleting th
 & "scripts/Invoke-MatrixRainTests.ps1" -Configuration Debug -Platform x64 -Parallel
 ```
 
-New tests cover argument parsing, registry persistence, mode flags, and configuration dialog validation. Ensure tests are run (and fail) before adding implementation, per project TDD requirements.
+New tests cover argument parsing, registry persistence, mode flags, multi-monitor rendering in both screensaver and normal fullscreen modes, and configuration dialog validation. Ensure tests are run (and fail) before adding implementation, per project TDD requirements.
 
 ## Manual QA Checklist
 
 1. Launch `.scr /s`, verify cursor hides and exit occurs on key press or meaningful mouse movement.
-2. Use `/p <HWND>` from the control panel preview and confirm the animation stays within the preview window and ignores hotkeys.
-3. Change options in the configuration dialog (`/c`), including density, color, animation speed, glow intensity, and glow size; reopen the saver and confirm the applied visuals match the new settings.
-4. Run the normal `.exe`, adjust settings with hotkeys, restart, and verify registry persistence.
-5. Confirm `.scr` artifact regenerates after every build configuration (Debug/Release) and matches the `.exe` timestamp.
+2. With at least two monitors attached, run `.scr /s` and confirm both displays render synchronized MatrixRain visuals without letterboxing or unused screens.
+3. Use `/p <HWND>` from the control panel preview and confirm the animation stays within the preview window and ignores hotkeys.
+4. Change options in the configuration dialog (`/c`), including density, color, animation speed, glow intensity, and glow size; reopen the saver and confirm the applied visuals match the new settings.
+5. In normal mode, toggle fullscreen, verify it spans all monitors, then adjust settings with hotkeys, restart, and confirm registry persistence.
+6. Confirm `.scr` artifact regenerates after every build configuration (Debug/Release) and matches the `.exe` timestamp.
 ```}]}၎

@@ -29,3 +29,9 @@
 - **Decision**: In `/s` mode, track initial mouse position and dismiss the saver only after detecting either keyboard input or mouse movement exceeding a small threshold (e.g., 5 px) to avoid exiting on synthetic `WM_MOUSEMOVE`. Cursor visibility is managed via `ShowCursor` with balanced calls.
 - **Rationale**: Built-in savers guard against spurious messages; implementing the same threshold prevents immediate exit while honoring quick user intent.
 - **Alternatives considered**: Polling raw input (unnecessary complexity); ignoring mouse movement (breaks expected exit behavior).
+
+## Multi-Monitor Rendering
+
+- **Decision**: Drive MatrixRain across all attached monitors in both `/s` screensaver mode and normal fullscreen sessions by enumerating IDXGI outputs and presenting synchronized swap chains per display.
+- **Rationale**: Native Windows savers blanket every monitor; leaving secondary displays idle breaks immersion and fails enterprise signage scenarios.
+- **Alternatives considered**: Restricting to the primary monitor (violates spec); cloning the primary view via OS display settings (hands control to the user and complicates support).

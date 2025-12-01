@@ -52,6 +52,12 @@
 - [ ] T013 [US1] Implement `InputExitState` handling within `MatrixRainCore/include/matrixrain/input/InputSystem.h` and `MatrixRainCore/src/input/InputSystem.cpp`
 - [ ] T014 [P] [US1] Add integration coverage for `/s` mode (cursor hide, hotkey suppression, exit-on-input) in `MatrixRainTests/integration/DisplayModeTests.cpp`
 - [ ] T015 [US1] Propagate `ScreenSaverModeContext` through `MatrixRainCore/include/matrixrain/Application.h`, `MatrixRainCore/src/Application.cpp`, and `MatrixRainCore/src/state/ApplicationState.cpp` to enforce `/s` runtime rules
+- [ ] T032 [P] [US1] Add failing error-handling tests covering invalid screensaver arguments and DirectX initialization failures in `MatrixRainTests/unit/app/ScreenSaverErrorHandlingTests.cpp`
+- [ ] T033 [US1] Surface descriptive message dialogs/log events for invalid arguments and initialization failures in `MatrixRain/ScreenSaverModeParser.cpp` and `MatrixRain/main.cpp`
+- [ ] T038 [P] [US1] Add failing tests ensuring a second `/s` launch while the saver is active exits immediately with a diagnostic in `MatrixRainTests/integration/DisplayModeTests.cpp`
+- [ ] T039 [US1] Implement single-instance detection and diagnostic messaging for concurrent saver launches in `MatrixRain/main.cpp` and `MatrixRainCore/src/state/ApplicationState.cpp`
+- [ ] T045 [P] [US1] Add failing multi-monitor integration tests confirming `/s` sessions cover all displays in `MatrixRainTests/integration/DisplayModeTests.cpp`
+- [ ] T046 [US1] Implement multi-monitor rendering support across `MatrixRainCore/src/Application.cpp` and `MatrixRainCore/src/rendering/RenderSystem.cpp`
 
 **Checkpoint**: MatrixRain operates as a Windows screensaver via `/s`, satisfying FR-002, FR-003, and FR-010 without regressing normal mode startup.
 
@@ -72,6 +78,10 @@
 - [ ] T020 [US2] Implement `ConfigDialogController` in `MatrixRainCore/include/matrixrain/ui/ConfigDialogController.h` and `MatrixRainCore/src/ui/ConfigDialogController.cpp`
 - [ ] T021 [US2] Define `IDD_MATRIXRAIN_SAVER_CONFIG` and control IDs in `MatrixRain/MatrixRain.rc` and `MatrixRain/resource.h`
 - [ ] T022 [US2] Handle `/c` argument in `MatrixRain/main.cpp` by invoking `ConfigDialogController` with registry-backed settings
+- [ ] T034 [P] [US2] Add failing tests for registry read/write failure paths and user-facing diagnostics in `MatrixRainTests/unit/state/RegistrySettingsProviderTests.cpp`
+- [ ] T035 [US2] Implement registry error propagation and user-facing feedback in `MatrixRainCore/src/state/RegistrySettingsProvider.cpp` and `MatrixRainCore/src/ui/ConfigDialogController.cpp`
+- [ ] T040 [P] [US2] Add failing tests verifying the configuration dialog refuses changes while a screensaver session is active in `MatrixRainTests/unit/ui/ConfigDialogControllerTests.cpp`
+- [ ] T041 [US2] Implement dialog concurrency safeguards and user feedback in `MatrixRainCore/src/ui/ConfigDialogController.cpp` and `MatrixRainCore/src/state/ApplicationState.cpp`
 
 **Checkpoint**: Users can configure screensaver options via the dialog, and registry persistence functions for both read and write paths.
 
@@ -88,6 +98,8 @@
 - [ ] T023 [P] [US3] Add regression coverage for normal-mode hotkeys and persistence in `MatrixRainTests/integration/AnimationLoopTests.cpp`
 - [ ] T024 [US3] Ensure normal-mode branches retain hotkeys and debug overlays by conditioning mode checks in `MatrixRainCore/src/state/ApplicationState.cpp` and `MatrixRainCore/src/input/InputSystem.cpp`
 - [ ] T025 [US3] Persist hotkey-driven adjustments through `MatrixRainCore/src/state/ApplicationState.cpp` and `MatrixRainCore/src/state/DensityController.cpp`
+- [ ] T047 [P] [US3] Add failing integration tests verifying normal-mode fullscreen spans all monitors in `MatrixRainTests/integration/DisplayModeTests.cpp`
+- [ ] T048 [US3] Implement normal-mode multi-monitor fullscreen behavior in `MatrixRainCore/src/Application.cpp` and `MatrixRainCore/src/rendering/RenderSystem.cpp`
 
 **Checkpoint**: Desktop users retain full functionality, and registry persistence works across both modes without leaking screensaver restrictions.
 
@@ -104,6 +116,8 @@
 - [ ] T026 [P] [US4] Add failing preview viewport tests in `MatrixRainTests/unit/rendering/RenderSystemPreviewTests.cpp`
 - [ ] T027 [US4] Implement preview rendering path across `MatrixRainCore/src/rendering/RenderSystem.cpp` and `MatrixRainCore/src/state/Viewport.cpp`
 - [ ] T028 [US4] Finalize `/p` handling in `MatrixRain/main.cpp` and `MatrixRainCore/src/Application.cpp` so preview mode omits cursor hiding and exit-on-input
+- [ ] T036 [P] [US4] Add failing tests verifying `/a` password-change requests surface the unsupported message in `MatrixRainTests/unit/app/ScreenSaverModeParserTests.cpp`
+- [ ] T037 [US4] Implement `/a` handling with unsupported password-change dialog in `MatrixRain/ScreenSaverModeParser.cpp` and `MatrixRain/main.cpp`
 
 **Checkpoint**: Control panel preview operates reliably without impacting full-screen or desktop modes.
 
@@ -116,6 +130,9 @@
 - [ ] T029 Update screensaver guidance in `specs/002-add-screensaver-support/quickstart.md` with final QA and deployment instructions
 - [ ] T030 Refresh `README.md` to document `.scr` distribution and installation steps
 - [ ] T031 Run release build validation via `scripts/Invoke-MatrixRainBuild.ps1 -Target Build -Configuration Release -Platform x64` confirming `.scr` and `.exe` parity
+- [ ] T042 [P] Instrument startup profiling to verify <500 ms launch time in `MatrixRainTests/perf/StartupPerformanceTests.cpp`
+- [ ] T043 [P] Capture frame-time metrics for `/s` sessions hitting 60 FPS in `MatrixRainTests/perf/RenderPerformanceTests.cpp`
+- [ ] T044 Incorporate manual QA timing checklist (exit-on-input under 1 second, registry persistence verification) into `specs/002-add-screensaver-support/quickstart.md`
 
 ---
 

@@ -23,8 +23,9 @@ A Windows user selects MatrixRain as their active screensaver and expects it to 
 
 **Acceptance Scenarios**:
 
-1. **Given** Windows launches `MatrixRain.scr` with `/s`, **When** the screensaver starts, **Then** it renders full screen using the latest saved configuration and hides the mouse cursor.
+1. **Given** Windows launches `MatrixRain.scr` with `/s`, **When** the screensaver starts, **Then** it renders full screen across all connected monitors using the latest saved configuration and hides the mouse cursor.
 2. **Given** the screensaver is running full screen, **When** the user presses any key or moves the mouse, **Then** the screensaver exits and the cursor is restored without leaving artifacts.
+3. **Given** multiple monitors are active, **When** the screensaver runs in `/s` mode, **Then** every display presents synchronized MatrixRain visuals without letterboxing or leaving monitors unpainted.
 
 ---
 
@@ -55,6 +56,7 @@ An enthusiast launches `MatrixRain.exe` directly for interactive enjoyment, expe
 
 1. **Given** MatrixRain is launched without screensaver arguments, **When** the user toggles density, color, or debug overlays via hotkeys, **Then** the current session behaves exactly as before and changes persist in the registry for the next launch.
 2. **Given** MatrixRain is running in normal mode, **When** the user attempts screensaver-only actions (e.g., toggling window mode while fullscreen), **Then** the application maintains current behavior and communicates any ignored setting gracefully.
+3. **Given** multiple monitors are connected, **When** the user toggles fullscreen in normal mode, **Then** the application fills all displays with synchronized MatrixRain visuals.
 
 ---
 
@@ -76,7 +78,7 @@ A user previews MatrixRain inside the Windows screensaver dialog (`/p <HWND>`) a
 
 - Missing or corrupted registry settings must fall back to documented defaults without blocking startup.
 - Unsupported or malformed command-line arguments must yield a graceful error message and exit without launching the animation.
-- Running the screensaver on multi-monitor setups must either span all monitors consistently or document single-monitor limitations.
+- Running the screensaver on multi-monitor setups must span all monitors consistently; the primary-monitor-only fallback is not permitted.
 - When both `.exe` and `.scr` are present, double-launch detection must prevent multiple concurrent full-screen sessions.
 - If the configuration dialog is opened while a screensaver instance is already active, the dialog must refuse changes or queue them to avoid conflicting writes.
 
@@ -86,12 +88,12 @@ A user previews MatrixRain inside the Windows screensaver dialog (`/p <HWND>`) a
 
 - **FR-001**: Application MUST provide both `MatrixRain.exe` and `MatrixRain.scr` artifacts in the distribution output, with `.scr` reflecting the same binary as the executable.
 - **FR-002**: Screensaver entry point MUST recognize standard Windows arguments (`/s`, `/c`, `/p <HWND>`, `/a <HWND> <data>`) and route to the corresponding behaviors.
-- **FR-003**: When launched with `/s`, the application MUST open full screen on the active display, hide the mouse cursor, suppress all hotkeys, and exit immediately on user keyboard or mouse input.
+- **FR-003**: When launched with `/s`, the application MUST open full screen across all connected monitors, hide the mouse cursor, suppress all hotkeys, and exit immediately on user keyboard or mouse input.
 - **FR-004**: When launched with `/p <HWND>`, the application MUST render within the provided preview window, retain the mouse cursor, and ignore input meant to dismiss full-screen sessions.
 - **FR-005**: When launched with `/c`, the application MUST present a configuration dialog that exposes screensaver-ready options (density, color scheme, animation speed, glow intensity, glow size, fullscreen preference) and allows saving or cancelling changes.
 - **FR-006**: Configuration dialog MUST persist selections to a dedicated registry location scoped per user and return success/failure feedback to the caller.
 - **FR-007**: At startup in any mode, the application MUST load registry values and apply them, overriding built-in defaults only for settings explicitly stored.
-- **FR-008**: While running without screensaver arguments, the application MUST behave exactly as the current desktop app, including honoring hotkeys, debug helpers, and window dragging where permitted, and persisting resulting changes back to the registry.
+- **FR-008**: While running without screensaver arguments, the application MUST behave exactly as the current desktop app, including honoring hotkeys, debug helpers, and window dragging where permitted, expanding to all monitors when entering fullscreen, and persisting resulting changes back to the registry.
 - **FR-009**: While running with any screensaver argument, the application MUST disable debug overlays, windowed-mode toggles, and window dragging regardless of stored preference.
 - **FR-010**: Upon exit from any screensaver mode, the application MUST restore the mouse cursor state and release any system resources acquired solely for screensaver operation.
 - **FR-011**: The build process MUST fail clearly if the `.scr` copy step cannot complete, ensuring releases never omit the screensaver artifact.
@@ -108,7 +110,7 @@ A user previews MatrixRain inside the Windows screensaver dialog (`/p <HWND>`) a
 
 - Configuration dialog will expose the same visual controls currently manipulated via hotkeys (density, speed, color) plus new glow intensity/size sliders and fullscreen/windowed preference; additional options can be added later without changing scope.
 - Registry storage will reside under the current user's hive and does not require administrative elevation for read/write operations.
-- Multi-monitor support will mirror the application's existing fullscreen behavior (span if already supported; otherwise primary monitor only) and this behavior will be documented if unchanged.
+- Multi-monitor support will extend both screensaver and normal fullscreen sessions across all connected displays, matching Windows expectations for native savers and immersive apps.
 - Naming convention: when creating symbols or files, combine the words as `ScreenSaver` (PascalCase) to keep terminology consistent with Windows conventions.
 
 ## Success Criteria *(mandatory)*
@@ -117,5 +119,5 @@ A user previews MatrixRain inside the Windows screensaver dialog (`/p <HWND>`) a
 
 - **SC-001**: Installing a new build produces both `.exe` and `.scr` assets in the release folder on 100% of build runs.
 - **SC-002**: In usability testing, 90% of users can configure settings via the dialog and observe their changes in the next screensaver run without assistance.
-- **SC-003**: During QA, the screensaver exits within 1 second of user input in `/s` mode and never exits unexpectedly during `/p` preview sessions across five consecutive test runs.
+- **SC-003**: During QA, the screensaver exits within 1 second of user input in `/s` mode, renders seamlessly across all connected monitors, and never exits unexpectedly during `/p` preview sessions across five consecutive test runs.
 - **SC-004**: Normal application mode retains all existing hotkey functionality with zero regressions reported in regression testing compared to the previous release.

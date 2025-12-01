@@ -103,7 +103,8 @@ All research uncertainties resolved; no outstanding clarification items remain.
 
 - Introduce a `ScreenSaverMode` enum (`Normal`, `ScreenSaverFull`, `ScreenSaverPreview`, `SettingsDialog`, `PasswordChangeUnsupported`).
 - Add a `ScreenSaverModeContext` struct carrying launch arguments, preview parent HWND, and feature flags (hotkeys enabled, cursor hidden, exit-on-input).
-- Extend `ApplicationState` to accept an injected mode context; screensaver modes disable debug overlays, force fullscreen, and prevent drag repositioning.
+- Extend `ApplicationState` to accept an injected mode context; screensaver modes disable debug overlays, force fullscreen, and prevent drag repositioning, while normal mode fullscreen expands across all monitors using the same swap chain orchestration.
+- Ensure screensaver fullscreen mode enumerates all attached monitors and expands the render surface across every display, keeping animations synchronized.
 - For preview mode, create a child render target sized to the control panel window; reuse the existing rendering pipeline with a constrained viewport.
 
 ### Configuration Persistence
@@ -127,6 +128,7 @@ All research uncertainties resolved; no outstanding clarification items remain.
 
 - Add unit tests covering argument parsing, registry round-trips, and mode-specific feature suppression.
 - Add integration tests simulating transitions between modes using high-level application APIs, verifying cursor state requests and exit signals.
+ - Validate multi-monitor rendering by exercising `/s` sessions and normal fullscreen toggles across dual-display configurations.
 - Document manual QA checklist (to be included in `quickstart.md`) covering Windows screen saver control panel flows, preview embedding, cursor hide/restore, and `.scr` deployment.
 
 ### Constitution Re-check
@@ -147,8 +149,9 @@ Post-design, all gates remain satisfied: logic continues to reside in the core l
 
 3. **Screensaver Runtime Adjustments**
 
-- Add tests ensuring debug features and window dragging respect mode flags, plus coverage that glow controls propagate to the rendering pipeline.
-- Implement cursor hide/show, exit-on-input threshold, preview viewport sizing, and dynamic bloom parameter updates within the render loop/application state.
+ - Add tests ensuring debug features and window dragging respect mode flags, plus coverage that glow controls propagate to the rendering pipeline.
+ - Implement cursor hide/show, exit-on-input threshold, preview viewport sizing, and dynamic bloom parameter updates within the render loop/application state.
+ - Detect and drive multi-monitor swap chains so `/s` sessions cover every attached display and normal mode fullscreen mirrors that behavior when toggled.
 
 4. **Configuration Dialog**
 
