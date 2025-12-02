@@ -164,6 +164,7 @@
     <ClCompile Include="unit\MathTests.cpp" />
     <ClCompile Include="unit\rendering\DepthSortingTests.cpp" />
     <ClCompile Include="unit\rendering\SwapChainTests.cpp" />
+    <ClCompile Include="unit\app\ScreenSaverModeParserTests.cpp" />
     <ClCompile Include="unit\state\ApplicationStateTests.cpp" />
     <ClCompile Include="unit\state\ColorSchemeTests.cpp" />
     <ClCompile Include="unit\state\DensityControllerTests.cpp" />
