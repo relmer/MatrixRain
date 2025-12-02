@@ -33,8 +33,8 @@
 - [X] T005 Introduce `InputExitState` helpers in `MatrixRainCore/include/matrixrain/input/InputExitState.h` for tracking mouse thresholds and input triggers
 - [X] T006 Author `ScreenSaverSettings` data contract with defaults and clamp helpers in `MatrixRainCore/include/matrixrain/state/ScreenSaverSettings.h`
 - [X] T007 Add failing unit coverage for `ScreenSaverSettings` defaults/clamps in `MatrixRainTests/unit/state/ScreenSaverSettingsTests.cpp`
-- [ ] T008 Add `.scr` copy `AfterBuild` target to `MatrixRain/MatrixRain.vcxproj` mirroring the executable each configuration
-- [ ] T009 Update `scripts/Invoke-MatrixRainBuild.ps1` to assert both `MatrixRain.exe` and `MatrixRain.scr` exist post-build
+- [X] T008 Add `.scr` copy `AfterBuild` target to `MatrixRain/MatrixRain.vcxproj` mirroring the executable each configuration
+- [X] T009 Update `scripts/Invoke-MatrixRainBuild.ps1` to assert both `MatrixRain.exe` and `MatrixRain.scr` exist post-build
 
 ---
 

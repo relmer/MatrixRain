@@ -73,6 +73,31 @@ try
     {
         exit $LASTEXITCODE
     }
+
+    # T009: Verify build artifacts exist (both .exe and .scr)
+    if ($Target -eq 'Build' -or $Target -eq 'Rebuild')
+    {
+        $outputDir      = Join-Path -Path $repositoryRoot -ChildPath "$Platform\$Configuration"
+        $exePath        = Join-Path -Path $outputDir -ChildPath 'MatrixRain.exe'
+        $scrPath        = Join-Path -Path $outputDir -ChildPath 'MatrixRain.scr'
+
+        Write-Host "Verifying build artifacts..." -ForegroundColor Cyan
+
+        if (-not (Test-Path -Path $exePath))
+        {
+            Write-Error "Build artifact missing: $exePath"
+            exit 1
+        }
+        Write-Host "  [OK] $exePath" -ForegroundColor Green
+
+        if (-not (Test-Path -Path $scrPath))
+        {
+            Write-Error "Build artifact missing: $scrPath"
+            exit 1
+        }
+        
+        Write-Host "  [OK] $scrPath" -ForegroundColor Green
+    }
 }
 finally
 {

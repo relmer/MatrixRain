@@ -164,4 +164,8 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
+  <Target Name="AfterBuild">
+    <Copy SourceFiles="$(TargetPath)" DestinationFiles="$(TargetDir)$(TargetName).scr" />
+    <Message Text="Created screensaver artifact: $(TargetDir)$(TargetName).scr" Importance="high" />
+  </Target>
 </Project>
