@@ -167,6 +167,7 @@
     <ClCompile Include="unit\state\ApplicationStateTests.cpp" />
     <ClCompile Include="unit\state\ColorSchemeTests.cpp" />
     <ClCompile Include="unit\state\DensityControllerTests.cpp" />
+    <ClCompile Include="unit\state\ScreenSaverSettingsTests.cpp" />
     <ClCompile Include="unit\state\ViewportTests.cpp" />
     <ClCompile Include="unit\TimerTests.cpp" />
     <ClCompile Include="unit\ui\FPSCounterTests.cpp" />

@@ -28,11 +28,11 @@
 
 **Purpose**: Establish shared enums, state structures, and build outputs required by all user stories. **All tasks in this phase must complete before story work begins.**
 
-- [ ] T003 Define `ScreenSaverMode` enum in `MatrixRainCore/include/matrixrain/state/ScreenSaverMode.h`
-- [ ] T004 Create `ScreenSaverModeContext` struct in `MatrixRainCore/include/matrixrain/state/ScreenSaverModeContext.h` with flags for hotkeys, cursor, and exit rules
-- [ ] T005 Introduce `InputExitState` helpers in `MatrixRainCore/include/matrixrain/input/InputExitState.h` for tracking mouse thresholds and input triggers
-- [ ] T006 Author `ScreenSaverSettings` data contract with defaults and clamp helpers in `MatrixRainCore/include/matrixrain/state/ScreenSaverSettings.h`
-- [ ] T007 Add failing unit coverage for `ScreenSaverSettings` defaults/clamps in `MatrixRainTests/unit/state/ScreenSaverSettingsTests.cpp`
+- [X] T003 Define `ScreenSaverMode` enum in `MatrixRainCore/include/matrixrain/state/ScreenSaverMode.h`
+- [X] T004 Create `ScreenSaverModeContext` struct in `MatrixRainCore/include/matrixrain/state/ScreenSaverModeContext.h` with flags for hotkeys, cursor, and exit rules
+- [X] T005 Introduce `InputExitState` helpers in `MatrixRainCore/include/matrixrain/input/InputExitState.h` for tracking mouse thresholds and input triggers
+- [X] T006 Author `ScreenSaverSettings` data contract with defaults and clamp helpers in `MatrixRainCore/include/matrixrain/state/ScreenSaverSettings.h`
+- [X] T007 Add failing unit coverage for `ScreenSaverSettings` defaults/clamps in `MatrixRainTests/unit/state/ScreenSaverSettingsTests.cpp`
 - [ ] T008 Add `.scr` copy `AfterBuild` target to `MatrixRain/MatrixRain.vcxproj` mirroring the executable each configuration
 - [ ] T009 Update `scripts/Invoke-MatrixRainBuild.ps1` to assert both `MatrixRain.exe` and `MatrixRain.scr` exist post-build
 
