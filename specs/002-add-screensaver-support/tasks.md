@@ -48,8 +48,8 @@
 
 - [X] T010 [P] [US1] Add failing CLI parsing tests for `/s`, `/p`, `/c`, `/a`, and default execution in `MatrixRainTests/unit/app/ScreenSaverModeParserTests.cpp`
 - [X] T011 [US1] Implement argument parsing and context construction in `MatrixRain/ScreenSaverModeParser.cpp` and wire usage inside `MatrixRain/main.cpp`
-- [ ] T012 [P] [US1] Add failing exit-threshold unit tests covering cursor visibility and input triggers in `MatrixRainTests/unit/input/InputExitStateTests.cpp`
-- [ ] T013 [US1] Implement `InputExitState` handling within `MatrixRainCore/include/matrixrain/input/InputSystem.h` and `MatrixRainCore/src/input/InputSystem.cpp`
+- [X] T012 [P] [US1] Add failing exit-threshold unit tests covering cursor visibility and input triggers in `MatrixRainTests/unit/input/InputExitStateTests.cpp`
+- [X] T013 [US1] Implement `InputExitState` handling within `MatrixRainCore/include/matrixrain/input/InputSystem.h` and `MatrixRainCore/src/input/InputSystem.cpp`
 - [ ] T014 [P] [US1] Add integration coverage for `/s` mode (cursor hide, hotkey suppression, exit-on-input) in `MatrixRainTests/integration/DisplayModeTests.cpp`
 - [ ] T015 [US1] Propagate `ScreenSaverModeContext` through `MatrixRainCore/include/matrixrain/Application.h`, `MatrixRainCore/src/Application.cpp`, and `MatrixRainCore/src/state/ApplicationState.cpp` to enforce `/s` runtime rules
 - [ ] T032 [P] [US1] Add failing error-handling tests covering invalid screensaver arguments and DirectX initialization failures in `MatrixRainTests/unit/app/ScreenSaverErrorHandlingTests.cpp`

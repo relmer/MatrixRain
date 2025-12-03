@@ -6,6 +6,7 @@
 
 #include "MatrixRain/DensityController.h"
 #include "MatrixRain/ApplicationState.h"
+#include "MatrixRain/InputExitState.h"
 
 
 
@@ -39,6 +40,29 @@ public:
     /// <returns>True if Enter is pressed while Alt is held down</returns>
     bool IsAltEnterPressed (int virtualKey) const;
 
+    /// <summary>
+    /// Initialize exit state tracking for screensaver mode.
+    /// Captures the initial mouse position to establish threshold baseline.
+    /// </summary>
+    void InitializeExitState();
+
+    /// <summary>
+    /// Process mouse movement to determine if exit threshold has been exceeded.
+    /// </summary>
+    /// <param name="currentPosition">Current mouse position</param>
+    void ProcessMouseMove (const POINT & currentPosition);
+
+    /// <summary>
+    /// Check if screensaver exit conditions have been met.
+    /// </summary>
+    /// <returns>True if keyboard input or significant mouse movement detected</returns>
+    bool ShouldExit() const;
+
+    /// <summary>
+    /// Reset exit state tracking (e.g., when resuming after pause).
+    /// </summary>
+    void ResetExitState();
+
     
 private:
     void OnDensityIncrease();
@@ -46,6 +70,7 @@ private:
 
     DensityController * m_densityController { nullptr };
     ApplicationState  * m_appState          { nullptr };
+    InputExitState      m_exitState;
 };
 
 

@@ -160,6 +160,7 @@
     <ClCompile Include="unit\animation\ZoomTests.cpp" />
     <ClCompile Include="unit\characters\CharacterConstantsTests.cpp" />
     <ClCompile Include="unit\characters\CharacterSetTests.cpp" />
+    <ClCompile Include="unit\input\InputExitStateTests.cpp" />
     <ClCompile Include="unit\input\InputSystemTests.cpp" />
     <ClCompile Include="unit\MathTests.cpp" />
     <ClCompile Include="unit\rendering\DepthSortingTests.cpp" />
