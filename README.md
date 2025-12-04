@@ -90,13 +90,10 @@ vstest.console.exe .\x64\Debug\MatrixRainTests.dll
 - `MatrixRain/` — Top-level app project (Win32 entry, resources, and launcher).
   - `main.cpp`, `MatrixRain.rc`, and project file `MatrixRain.vcxproj`.
 - `MatrixRainCore/` — Core engine and subsystems (preferred place for unit-testing).
-  - `include/MatrixRain/` — Public headers for core subsystems:
-    - `AnimationSystem.h`, `Application.h`, `ApplicationState.h`, `CharacterSet.h`, `RenderSystem.h`, `Timer.h`, `Viewport.h`, etc.
-  - `src/` — Implementation files organized by feature:
-    - `animation/` (systems that drive streaks and characters)
-    - `characters/` (character data, sets, constants)
-    - `rendering/` (render loop, draw routines)
-    - `input/`, `state/`, `ui/` — supporting systems
+  - All headers and source files in flat structure at root level:
+    - `AnimationSystem.h/.cpp`, `Application.h/.cpp`, `ApplicationState.h/.cpp`, `CharacterSet.h/.cpp`, `RenderSystem.h/.cpp`, `Timer.h/.cpp`, `Viewport.h/.cpp`, etc.
+  - `pch.h`/`pch.cpp` — Precompiled headers for faster builds
+  - `Ehm.h`/`Ehm.cpp` — Error handling macros and utilities
 - `MatrixRainTests/` — Unit and integration tests.
 - `specs/` — Human-readable specification files (generated/managed with SpecKit in our workflow).
 

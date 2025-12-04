@@ -258,7 +258,7 @@ MatrixRain/
    - Check `research.md` for technical decisions (DirectX 11, texture atlas strategy)
 
 2. **Run Example Tests**:
-   - Open `MatrixRainTests/unit/characters/CharacterSetTests.cpp`
+   - Open `MatrixRainTests/unit/CharacterSetTests.cpp`
    - Run tests in Test Explorer
    - Observe assertion patterns (`Assert::AreEqual`, `Assert::IsTrue`)
 

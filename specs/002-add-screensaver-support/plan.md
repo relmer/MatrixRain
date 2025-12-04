@@ -61,8 +61,7 @@ MatrixRain/                  # Executable shell (WinMain dispatch)
 └── resource files (icons, .rc)
 
 MatrixRainCore/              # Core library (logic + rendering)
-├── include/matrixrain/      # Public headers
-├── src/                     # Implementation (animation, rendering, state, ui)
+├── All .h and .cpp files at root level (flat structure)
 ├── pch.h / pch.cpp
 └── MatrixRainCore.vcxproj
 
@@ -75,7 +74,7 @@ scripts/                     # Build/test scripts (PowerShell)
 assets/                      # Shared media resources
 ```
 
-**Structure Decision**: Continue leveraging the existing Visual Studio solution structure (core static library + thin exe + test project). New screensaver configuration logic will be implemented inside `MatrixRainCore` (with headers under `include/matrixrain/state/` or `ui/` as appropriate) while the executable gains only minimal command-line routing.
+**Structure Decision**: Continue leveraging the existing Visual Studio solution structure (core static library + thin exe + test project). New screensaver configuration logic will be implemented inside `MatrixRainCore` (all headers and sources at root level in flat structure) while the executable gains only minimal command-line routing.
 
 ## Complexity Tracking
 

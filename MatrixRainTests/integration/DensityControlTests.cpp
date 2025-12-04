@@ -1,10 +1,10 @@
 #include "pch.h"
 
-#include "MatrixRain/DensityController.h"
-#include "MatrixRain/InputSystem.h"
-#include "MatrixRain/AnimationSystem.h"
-#include "MatrixRain/ApplicationState.h"
-#include "MatrixRain/Viewport.h"
+#include "../../MatrixRainCore/DensityController.h"
+#include "../../MatrixRainCore/InputSystem.h"
+#include "../../MatrixRainCore/AnimationSystem.h"
+#include "../../MatrixRainCore/ApplicationState.h"
+#include "../../MatrixRainCore/Viewport.h"
 
 
 namespace MatrixRainTests

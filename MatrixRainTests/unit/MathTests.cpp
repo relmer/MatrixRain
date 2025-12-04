@@ -1,7 +1,9 @@
 #include "pch.h"
 
+#include "../../MatrixRainCore/Math.h"
 
-#include "MatrixRain/Math.h"
+
+
 
 
 namespace MatrixRainTests

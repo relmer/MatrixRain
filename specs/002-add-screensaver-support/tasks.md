@@ -28,11 +28,11 @@
 
 **Purpose**: Establish shared enums, state structures, and build outputs required by all user stories. **All tasks in this phase must complete before story work begins.**
 
-- [X] T003 Define `ScreenSaverMode` enum in `MatrixRainCore/include/matrixrain/state/ScreenSaverMode.h`
-- [X] T004 Create `ScreenSaverModeContext` struct in `MatrixRainCore/include/matrixrain/state/ScreenSaverModeContext.h` with flags for hotkeys, cursor, and exit rules
-- [X] T005 Introduce `InputExitState` helpers in `MatrixRainCore/include/matrixrain/input/InputExitState.h` for tracking mouse thresholds and input triggers
-- [X] T006 Author `ScreenSaverSettings` data contract with defaults and clamp helpers in `MatrixRainCore/include/matrixrain/state/ScreenSaverSettings.h`
-- [X] T007 Add failing unit coverage for `ScreenSaverSettings` defaults/clamps in `MatrixRainTests/unit/state/ScreenSaverSettingsTests.cpp`
+- [X] T003 Define `ScreenSaverMode` enum in `MatrixRainCore/ScreenSaverMode.h`
+- [X] T004 Create `ScreenSaverModeContext` struct in `MatrixRainCore/ScreenSaverModeContext.h` with flags for hotkeys, cursor, and exit rules
+- [X] T005 Introduce `InputExitState` helpers in `MatrixRainCore/InputExitState.h` for tracking mouse thresholds and input triggers
+- [X] T006 Author `ScreenSaverSettings` data contract with defaults and clamp helpers in `MatrixRainCore/ScreenSaverSettings.h`
+- [X] T007 Add failing unit coverage for `ScreenSaverSettings` defaults/clamps in `MatrixRainTests/unit/ScreenSaverSettingsTests.cpp`
 - [X] T008 Add `.scr` copy `AfterBuild` target to `MatrixRain/MatrixRain.vcxproj` mirroring the executable each configuration
 - [X] T009 Update `scripts/Invoke-MatrixRainBuild.ps1` to assert both `MatrixRain.exe` and `MatrixRain.scr` exist post-build
 
@@ -46,18 +46,18 @@
 
 ### Implementation & Tests for User Story 1 (write tests first)
 
-- [X] T010 [P] [US1] Add failing CLI parsing tests for `/s`, `/p`, `/c`, `/a`, and default execution in `MatrixRainTests/unit/app/ScreenSaverModeParserTests.cpp`
+- [X] T010 [P] [US1] Add failing CLI parsing tests for `/s`, `/p`, `/c`, `/a`, and default execution in `MatrixRainTests/unit/ScreenSaverModeParserTests.cpp`
 - [X] T011 [US1] Implement argument parsing and context construction in `MatrixRain/ScreenSaverModeParser.cpp` and wire usage inside `MatrixRain/main.cpp`
-- [X] T012 [P] [US1] Add failing exit-threshold unit tests covering cursor visibility and input triggers in `MatrixRainTests/unit/input/InputExitStateTests.cpp`
-- [X] T013 [US1] Implement `InputExitState` handling within `MatrixRainCore/include/matrixrain/input/InputSystem.h` and `MatrixRainCore/src/input/InputSystem.cpp`
+- [X] T012 [P] [US1] Add failing exit-threshold unit tests covering cursor visibility and input triggers in `MatrixRainTests/unit/InputExitStateTests.cpp`
+- [X] T013 [US1] Implement `InputExitState` handling within `MatrixRainCore/InputSystem.h` and `MatrixRainCore/InputSystem.cpp`
 - [X] T014 [P] [US1] Add integration coverage for `/s` mode (cursor hide, hotkey suppression, exit-on-input) in `MatrixRainTests/integration/DisplayModeTests.cpp`
-- [X] T015 [US1] Propagate `ScreenSaverModeContext` through `MatrixRainCore/include/matrixrain/Application.h`, `MatrixRainCore/src/Application.cpp`, and `MatrixRainCore/src/state/ApplicationState.cpp` to enforce `/s` runtime rules
-- [ ] T032 [P] [US1] Add failing error-handling tests covering invalid screensaver arguments and DirectX initialization failures in `MatrixRainTests/unit/app/ScreenSaverErrorHandlingTests.cpp`
+- [X] T015 [US1] Propagate `ScreenSaverModeContext` through `MatrixRainCore/include/matrixrain/Application.h`, `MatrixRainCore/src/Application.cpp`, and `MatrixRainCore/ApplicationState.cpp` to enforce `/s` runtime rules
+- [ ] T032 [P] [US1] Add failing error-handling tests covering invalid screensaver arguments and DirectX initialization failures in `MatrixRainTests/unit/ScreenSaverErrorHandlingTests.cpp`
 - [ ] T033 [US1] Surface descriptive message dialogs/log events for invalid arguments and initialization failures in `MatrixRain/ScreenSaverModeParser.cpp` and `MatrixRain/main.cpp`
 - [ ] T038 [P] [US1] Add failing tests ensuring a second `/s` launch while the saver is active exits immediately with a diagnostic in `MatrixRainTests/integration/DisplayModeTests.cpp`
-- [ ] T039 [US1] Implement single-instance detection and diagnostic messaging for concurrent saver launches in `MatrixRain/main.cpp` and `MatrixRainCore/src/state/ApplicationState.cpp`
+- [ ] T039 [US1] Implement single-instance detection and diagnostic messaging for concurrent saver launches in `MatrixRain/main.cpp` and `MatrixRainCore/ApplicationState.cpp`
 - [ ] T045 [P] [US1] Add failing multi-monitor integration tests confirming `/s` sessions cover all displays in `MatrixRainTests/integration/DisplayModeTests.cpp`
-- [ ] T046 [US1] Implement multi-monitor rendering support across `MatrixRainCore/src/Application.cpp` and `MatrixRainCore/src/rendering/RenderSystem.cpp`
+- [ ] T046 [US1] Implement multi-monitor rendering support across `MatrixRainCore/src/Application.cpp` and `MatrixRainCore/RenderSystem.cpp`
 
 **Checkpoint**: MatrixRain operates as a Windows screensaver via `/s`, satisfying FR-002, FR-003, and FR-010 without regressing normal mode startup.
 
@@ -71,17 +71,17 @@
 
 ### Implementation & Tests for User Story 2 (write tests first)
 
-- [ ] T016 [P] [US2] Add failing load/save tests for `RegistrySettingsProvider` in `MatrixRainTests/unit/state/RegistrySettingsProviderTests.cpp`
-- [ ] T017 [US2] Implement `RegistrySettingsProvider` in `MatrixRainCore/include/matrixrain/state/RegistrySettingsProvider.h` and `MatrixRainCore/src/state/RegistrySettingsProvider.cpp`
-- [ ] T018 [US2] Integrate registry loading/saving flows into `MatrixRainCore/src/state/ApplicationState.cpp` using the provider
-- [ ] T019 [P] [US2] Add failing presenter logic tests for the settings dialog in `MatrixRainTests/unit/ui/ConfigDialogControllerTests.cpp`
-- [ ] T020 [US2] Implement `ConfigDialogController` in `MatrixRainCore/include/matrixrain/ui/ConfigDialogController.h` and `MatrixRainCore/src/ui/ConfigDialogController.cpp`
+- [ ] T016 [P] [US2] Add failing load/save tests for `RegistrySettingsProvider` in `MatrixRainTests/unit/RegistrySettingsProviderTests.cpp`
+- [ ] T017 [US2] Implement `RegistrySettingsProvider` in `MatrixRainCore/RegistrySettingsProvider.h` and `MatrixRainCore/RegistrySettingsProvider.cpp`
+- [ ] T018 [US2] Integrate registry loading/saving flows into `MatrixRainCore/ApplicationState.cpp` using the provider
+- [ ] T019 [P] [US2] Add failing presenter logic tests for the settings dialog in `MatrixRainTests/unit/ConfigDialogControllerTests.cpp`
+- [ ] T020 [US2] Implement `ConfigDialogController` in `MatrixRainCore/ConfigDialogController.h` and `MatrixRainCore/ConfigDialogController.cpp`
 - [ ] T021 [US2] Define `IDD_MATRIXRAIN_SAVER_CONFIG` and control IDs in `MatrixRain/MatrixRain.rc` and `MatrixRain/resource.h`
 - [ ] T022 [US2] Handle `/c` argument in `MatrixRain/main.cpp` by invoking `ConfigDialogController` with registry-backed settings
-- [ ] T034 [P] [US2] Add failing tests for registry read/write failure paths and user-facing diagnostics in `MatrixRainTests/unit/state/RegistrySettingsProviderTests.cpp`
-- [ ] T035 [US2] Implement registry error propagation and user-facing feedback in `MatrixRainCore/src/state/RegistrySettingsProvider.cpp` and `MatrixRainCore/src/ui/ConfigDialogController.cpp`
-- [ ] T040 [P] [US2] Add failing tests verifying the configuration dialog refuses changes while a screensaver session is active in `MatrixRainTests/unit/ui/ConfigDialogControllerTests.cpp`
-- [ ] T041 [US2] Implement dialog concurrency safeguards and user feedback in `MatrixRainCore/src/ui/ConfigDialogController.cpp` and `MatrixRainCore/src/state/ApplicationState.cpp`
+- [ ] T034 [P] [US2] Add failing tests for registry read/write failure paths and user-facing diagnostics in `MatrixRainTests/unit/RegistrySettingsProviderTests.cpp`
+- [ ] T035 [US2] Implement registry error propagation and user-facing feedback in `MatrixRainCore/RegistrySettingsProvider.cpp` and `MatrixRainCore/ConfigDialogController.cpp`
+- [ ] T040 [P] [US2] Add failing tests verifying the configuration dialog refuses changes while a screensaver session is active in `MatrixRainTests/unit/ConfigDialogControllerTests.cpp`
+- [ ] T041 [US2] Implement dialog concurrency safeguards and user feedback in `MatrixRainCore/ConfigDialogController.cpp` and `MatrixRainCore/ApplicationState.cpp`
 
 **Checkpoint**: Users can configure screensaver options via the dialog, and registry persistence functions for both read and write paths.
 
@@ -96,10 +96,10 @@
 ### Implementation & Tests for User Story 3 (write tests first)
 
 - [ ] T023 [P] [US3] Add regression coverage for normal-mode hotkeys and persistence in `MatrixRainTests/integration/AnimationLoopTests.cpp`
-- [ ] T024 [US3] Ensure normal-mode branches retain hotkeys and debug overlays by conditioning mode checks in `MatrixRainCore/src/state/ApplicationState.cpp` and `MatrixRainCore/src/input/InputSystem.cpp`
-- [ ] T025 [US3] Persist hotkey-driven adjustments through `MatrixRainCore/src/state/ApplicationState.cpp` and `MatrixRainCore/src/state/DensityController.cpp`
+- [ ] T024 [US3] Ensure normal-mode branches retain hotkeys and debug overlays by conditioning mode checks in `MatrixRainCore/ApplicationState.cpp` and `MatrixRainCore/InputSystem.cpp`
+- [ ] T025 [US3] Persist hotkey-driven adjustments through `MatrixRainCore/ApplicationState.cpp` and `MatrixRainCore/DensityController.cpp`
 - [ ] T047 [P] [US3] Add failing integration tests verifying normal-mode fullscreen spans all monitors in `MatrixRainTests/integration/DisplayModeTests.cpp`
-- [ ] T048 [US3] Implement normal-mode multi-monitor fullscreen behavior in `MatrixRainCore/src/Application.cpp` and `MatrixRainCore/src/rendering/RenderSystem.cpp`
+- [ ] T048 [US3] Implement normal-mode multi-monitor fullscreen behavior in `MatrixRainCore/src/Application.cpp` and `MatrixRainCore/RenderSystem.cpp`
 
 **Checkpoint**: Desktop users retain full functionality, and registry persistence works across both modes without leaking screensaver restrictions.
 
@@ -113,10 +113,10 @@
 
 ### Implementation & Tests for User Story 4 (write tests first)
 
-- [ ] T026 [P] [US4] Add failing preview viewport tests in `MatrixRainTests/unit/rendering/RenderSystemPreviewTests.cpp`
-- [ ] T027 [US4] Implement preview rendering path across `MatrixRainCore/src/rendering/RenderSystem.cpp` and `MatrixRainCore/src/state/Viewport.cpp`
+- [ ] T026 [P] [US4] Add failing preview viewport tests in `MatrixRainTests/unit/RenderSystemPreviewTests.cpp`
+- [ ] T027 [US4] Implement preview rendering path across `MatrixRainCore/RenderSystem.cpp` and `MatrixRainCore/Viewport.cpp`
 - [ ] T028 [US4] Finalize `/p` handling in `MatrixRain/main.cpp` and `MatrixRainCore/src/Application.cpp` so preview mode omits cursor hiding and exit-on-input
-- [ ] T036 [P] [US4] Add failing tests verifying `/a` password-change requests surface the unsupported message in `MatrixRainTests/unit/app/ScreenSaverModeParserTests.cpp`
+- [ ] T036 [P] [US4] Add failing tests verifying `/a` password-change requests surface the unsupported message in `MatrixRainTests/unit/ScreenSaverModeParserTests.cpp`
 - [ ] T037 [US4] Implement `/a` handling with unsupported password-change dialog in `MatrixRain/ScreenSaverModeParser.cpp` and `MatrixRain/main.cpp`
 
 **Checkpoint**: Control panel preview operates reliably without impacting full-screen or desktop modes.

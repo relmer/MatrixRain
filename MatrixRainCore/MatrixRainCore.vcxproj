@@ -82,7 +82,7 @@
       <ConformanceMode>true</ConformanceMode>
       <TreatWarningAsError>true</TreatWarningAsError>
       <LanguageStandard>stdcpplatest</LanguageStandard>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -101,7 +101,7 @@
       <ConformanceMode>true</ConformanceMode>
       <TreatWarningAsError>true</TreatWarningAsError>
       <LanguageStandard>stdcpplatest</LanguageStandard>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -122,7 +122,7 @@
       <ConformanceMode>true</ConformanceMode>
       <TreatWarningAsError>true</TreatWarningAsError>
       <LanguageStandard>stdcpplatest</LanguageStandard>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -133,22 +133,22 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="Ehm.h" />
-    <ClInclude Include="include\matrixrain\AnimationSystem.h" />
-    <ClInclude Include="include\matrixrain\Application.h" />
-    <ClInclude Include="include\matrixrain\ApplicationState.h" />
-    <ClInclude Include="include\matrixrain\CharacterConstants.h" />
-    <ClInclude Include="include\matrixrain\CharacterInstance.h" />
-    <ClInclude Include="include\matrixrain\CharacterSet.h" />
-    <ClInclude Include="include\matrixrain\CharacterStreak.h" />
-    <ClInclude Include="include\matrixrain\ColorScheme.h" />
-    <ClInclude Include="include\matrixrain\DensityController.h" />
-    <ClInclude Include="include\matrixrain\FPSCounter.h" />
-    <ClInclude Include="include\matrixrain\InputSystem.h" />
-    <ClInclude Include="include\matrixrain\Math.h" />
-    <ClInclude Include="include\matrixrain\RenderSystem.h" />
-    <ClInclude Include="include\matrixrain\ScreenSaverModeParser.h" />
-    <ClInclude Include="include\matrixrain\Timer.h" />
-    <ClInclude Include="include\matrixrain\Viewport.h" />
+    <ClInclude Include="AnimationSystem.h" />
+    <ClInclude Include="Application.h" />
+    <ClInclude Include="ApplicationState.h" />
+    <ClInclude Include="CharacterConstants.h" />
+    <ClInclude Include="CharacterInstance.h" />
+    <ClInclude Include="CharacterSet.h" />
+    <ClInclude Include="CharacterStreak.h" />
+    <ClInclude Include="ColorScheme.h" />
+    <ClInclude Include="DensityController.h" />
+    <ClInclude Include="FPSCounter.h" />
+    <ClInclude Include="InputSystem.h" />
+    <ClInclude Include="Math.h" />
+    <ClInclude Include="RenderSystem.h" />
+    <ClInclude Include="ScreenSaverModeParser.h" />
+    <ClInclude Include="Timer.h" />
+    <ClInclude Include="Viewport.h" />
     <ClInclude Include="pch.h" />
   </ItemGroup>
   <ItemGroup>
@@ -158,22 +158,22 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release (PROFILER)|x64'">Create</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="src\animation\AnimationSystem.cpp" />
-    <ClCompile Include="src\animation\CharacterInstance.cpp" />
-    <ClCompile Include="src\animation\CharacterStreak.cpp" />
-    <ClCompile Include="src\Application.cpp" />
-    <ClCompile Include="src\characters\CharacterConstants.cpp" />
-    <ClCompile Include="src\characters\CharacterSet.cpp" />
-    <ClCompile Include="src\input\InputSystem.cpp" />
-    <ClCompile Include="src\Math.cpp" />
-    <ClCompile Include="src\rendering\RenderSystem.cpp" />
-    <ClCompile Include="src\ScreenSaverModeParser.cpp" />
-    <ClCompile Include="src\state\ApplicationState.cpp" />
-    <ClCompile Include="src\state\ColorScheme.cpp" />
-    <ClCompile Include="src\state\DensityController.cpp" />
-    <ClCompile Include="src\state\Viewport.cpp" />
-    <ClCompile Include="src\Timer.cpp" />
-    <ClCompile Include="src\ui\FPSCounter.cpp" />
+    <ClCompile Include="AnimationSystem.cpp" />
+    <ClCompile Include="CharacterInstance.cpp" />
+    <ClCompile Include="CharacterStreak.cpp" />
+    <ClCompile Include="Application.cpp" />
+    <ClCompile Include="CharacterConstants.cpp" />
+    <ClCompile Include="CharacterSet.cpp" />
+    <ClCompile Include="InputSystem.cpp" />
+    <ClCompile Include="Math.cpp" />
+    <ClCompile Include="RenderSystem.cpp" />
+    <ClCompile Include="ScreenSaverModeParser.cpp" />
+    <ClCompile Include="ApplicationState.cpp" />
+    <ClCompile Include="ColorScheme.cpp" />
+    <ClCompile Include="DensityController.cpp" />
+    <ClCompile Include="Viewport.cpp" />
+    <ClCompile Include="Timer.cpp" />
+    <ClCompile Include="FPSCounter.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

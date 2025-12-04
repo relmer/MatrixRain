@@ -135,11 +135,11 @@ MatrixRainTests/                  # Native Unit Test Project
 
 **MatrixRainTests modules**:
 
-- `unit/animation/` - Tests for streak lifecycle, fade calculations, mutation probability
-- `unit/rendering/` - Tests for depth sorting, viewport transformations, glow intensity calculations
-- `unit/input/` - Tests for keyboard event handling, density adjustments, mode toggling
-- `unit/state/` - Tests for state transitions, boundary enforcement (min/max density)
-- `unit/characters/` - Tests for character set completeness, random distribution, mirroring logic
+- `unit/` - Tests for streak lifecycle, fade calculations, mutation probability
+- `unit/` - Tests for depth sorting, viewport transformations, glow intensity calculations
+- `unit/` - Tests for keyboard event handling, density adjustments, mode toggling
+- `unit/` - Tests for state transitions, boundary enforcement (min/max density)
+- `unit/` - Tests for character set completeness, random distribution, mirroring logic
 - `integration/` - End-to-end animation flow tests, display mode switching with state preservation
 
 ## Complexity Tracking

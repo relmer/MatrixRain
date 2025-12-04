@@ -1,9 +1,9 @@
 #include "pch.h"
 
-#include "MatrixRain/CharacterStreak.h"
-#include "MatrixRain/AnimationSystem.h"
-#include "MatrixRain/Viewport.h"
-#include "MatrixRain/DensityController.h"
+#include "../../MatrixRainCore/CharacterStreak.h"
+#include "../../MatrixRainCore/AnimationSystem.h"
+#include "../../MatrixRainCore/Viewport.h"
+#include "../../MatrixRainCore/DensityController.h"
 
 
 namespace MatrixRainTests

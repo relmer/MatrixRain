@@ -46,11 +46,11 @@
 - [x] T017 [P] Create directory structure MatrixRainCore/src/animation/ for streak animation
 - [x] T018 [P] Create directory structure MatrixRainCore/src/input/ for keyboard input
 - [x] T019 [P] Create directory structure MatrixRainCore/src/state/ for application state
-- [x] T020 [P] Create directory structure MatrixRainTests/unit/characters/ for character tests
-- [x] T021 [P] Create directory structure MatrixRainTests/unit/rendering/ for rendering tests
-- [x] T022 [P] Create directory structure MatrixRainTests/unit/animation/ for animation tests
-- [x] T023 [P] Create directory structure MatrixRainTests/unit/input/ for input tests
-- [x] T024 [P] Create directory structure MatrixRainTests/unit/state/ for state tests
+- [x] T020 [P] Create directory structure MatrixRainTests/unit/ for character tests
+- [x] T021 [P] Create directory structure MatrixRainTests/unit/ for rendering tests
+- [x] T022 [P] Create directory structure MatrixRainTests/unit/ for animation tests
+- [x] T023 [P] Create directory structure MatrixRainTests/unit/ for input tests
+- [x] T024 [P] Create directory structure MatrixRainTests/unit/ for state tests
 - [x] T025 [P] Create directory structure MatrixRainTests/integration/ for integration tests
 
 ---
@@ -87,17 +87,17 @@
 
 > **NOTE: Write these tests FIRST, ensure they FAIL before implementation**
 
-- [x] T037 [P] [US1] Test CharacterInstance initialization in MatrixRainTests/unit/characters/CharacterInstanceTests.cpp
-- [x] T038 [P] [US1] Test CharacterInstance brightness fade over 3 seconds in MatrixRainTests/unit/characters/CharacterInstanceTests.cpp
-- [x] T039 [P] [US1] Test CharacterStreak initialization with random length 10-30 in MatrixRainTests/unit/animation/CharacterStreakTests.cpp
-- [x] T040 [P] [US1] Test CharacterStreak velocity scaling by depth in MatrixRainTests/unit/animation/CharacterStreakTests.cpp
-- [x] T041 [P] [US1] Test CharacterStreak update with delta time in MatrixRainTests/unit/animation/CharacterStreakTests.cpp
-- [x] T042 [P] [US1] Test CharacterStreak character mutation 5% probability in MatrixRainTests/unit/animation/CharacterStreakTests.cpp
-- [x] T043 [P] [US1] Test Viewport projection matrix generation in MatrixRainTests/unit/state/ViewportTests.cpp
-- [x] T044 [P] [US1] Test Viewport resize handling in MatrixRainTests/unit/state/ViewportTests.cpp
-- [x] T045 [P] [US1] Test depth sorting back-to-front order in MatrixRainTests/unit/rendering/DepthSortingTests.cpp
-- [x] T046 [P] [US1] Test zoom wrapping at Z=100 boundary in MatrixRainTests/unit/animation/ZoomTests.cpp
-- [x] T047 [P] [US1] Test character color transitions white→green for leading character in MatrixRainTests/unit/animation/ColorTransitionTests.cpp
+- [x] T037 [P] [US1] Test CharacterInstance initialization in MatrixRainTests/unit/CharacterInstanceTests.cpp
+- [x] T038 [P] [US1] Test CharacterInstance brightness fade over 3 seconds in MatrixRainTests/unit/CharacterInstanceTests.cpp
+- [x] T039 [P] [US1] Test CharacterStreak initialization with random length 10-30 in MatrixRainTests/unit/CharacterStreakTests.cpp
+- [x] T040 [P] [US1] Test CharacterStreak velocity scaling by depth in MatrixRainTests/unit/CharacterStreakTests.cpp
+- [x] T041 [P] [US1] Test CharacterStreak update with delta time in MatrixRainTests/unit/CharacterStreakTests.cpp
+- [x] T042 [P] [US1] Test CharacterStreak character mutation 5% probability in MatrixRainTests/unit/CharacterStreakTests.cpp
+- [x] T043 [P] [US1] Test Viewport projection matrix generation in MatrixRainTests/unit/ViewportTests.cpp
+- [x] T044 [P] [US1] Test Viewport resize handling in MatrixRainTests/unit/ViewportTests.cpp
+- [x] T045 [P] [US1] Test depth sorting back-to-front order in MatrixRainTests/unit/DepthSortingTests.cpp
+- [x] T046 [P] [US1] Test zoom wrapping at Z=100 boundary in MatrixRainTests/unit/ZoomTests.cpp
+- [x] T047 [P] [US1] Test character color transitions white→green for leading character in MatrixRainTests/unit/ColorTransitionTests.cpp
 
 ### Implementation for User Story 1
 
@@ -177,15 +177,15 @@
 
 ### Tests for User Story 2 (TDD - Write FIRST)
 
-- [X] T092 [P] [US2] Test DensityController initialization with level 5 default (target 262 streaks) in MatrixRainTests/unit/state/DensityControllerTests.cpp
-- [X] T093 [P] [US2] Test DensityController level increase to max 10 (target 496 streaks) using formula: targetStreaks = 10 + (level-1)*54 in MatrixRainTests/unit/state/DensityControllerTests.cpp
-- [X] T094 [P] [US2] Test DensityController level decrease to min 1 (target 10 streaks) using formula: targetStreaks = 10 + (level-1)*54 in MatrixRainTests/unit/state/DensityControllerTests.cpp
-- [X] T095 [P] [US2] Test DensityController spawn probability calculation based on current streak count vs target in MatrixRainTests/unit/state/DensityControllerTests.cpp
-- [X] T096 [P] [US2] Test DensityController bounds enforcement in MatrixRainTests/unit/state/DensityControllerTests.cpp
-- [X] T097 [P] [US2] Test InputSystem keyboard event processing for VK_ADD in MatrixRainTests/unit/input/InputSystemTests.cpp
-- [X] T098 [P] [US2] Test InputSystem keyboard event processing for VK_SUBTRACT in MatrixRainTests/unit/input/InputSystemTests.cpp
-- [X] T099 [P] [US2] Test InputSystem keyboard event processing for VK_OEM_PLUS in MatrixRainTests/unit/input/InputSystemTests.cpp
-- [X] T100 [P] [US2] Test InputSystem keyboard event processing for VK_OEM_MINUS in MatrixRainTests/unit/input/InputSystemTests.cpp
+- [X] T092 [P] [US2] Test DensityController initialization with level 5 default (target 262 streaks) in MatrixRainTests/unit/DensityControllerTests.cpp
+- [X] T093 [P] [US2] Test DensityController level increase to max 10 (target 496 streaks) using formula: targetStreaks = 10 + (level-1)*54 in MatrixRainTests/unit/DensityControllerTests.cpp
+- [X] T094 [P] [US2] Test DensityController level decrease to min 1 (target 10 streaks) using formula: targetStreaks = 10 + (level-1)*54 in MatrixRainTests/unit/DensityControllerTests.cpp
+- [X] T095 [P] [US2] Test DensityController spawn probability calculation based on current streak count vs target in MatrixRainTests/unit/DensityControllerTests.cpp
+- [X] T096 [P] [US2] Test DensityController bounds enforcement in MatrixRainTests/unit/DensityControllerTests.cpp
+- [X] T097 [P] [US2] Test InputSystem keyboard event processing for VK_ADD in MatrixRainTests/unit/InputSystemTests.cpp
+- [X] T098 [P] [US2] Test InputSystem keyboard event processing for VK_SUBTRACT in MatrixRainTests/unit/InputSystemTests.cpp
+- [X] T099 [P] [US2] Test InputSystem keyboard event processing for VK_OEM_PLUS in MatrixRainTests/unit/InputSystemTests.cpp
+- [X] T100 [P] [US2] Test InputSystem keyboard event processing for VK_OEM_MINUS in MatrixRainTests/unit/InputSystemTests.cpp
 
 ### Implementation for User Story 2
 
@@ -217,12 +217,12 @@
 
 ### Tests for User Story 3 (TDD - Write FIRST)
 
-- [X] T116 [P] [US3] Test ApplicationState display mode initialization to Windowed in MatrixRainTests/unit/state/ApplicationStateTests.cpp
-- [X] T117 [P] [US3] Test ApplicationState ToggleDisplayMode transition Windowed→Fullscreen in MatrixRainTests/unit/state/ApplicationStateTests.cpp
-- [X] T118 [P] [US3] Test ApplicationState ToggleDisplayMode transition Fullscreen→Windowed in MatrixRainTests/unit/state/ApplicationStateTests.cpp
-- [X] T119 [P] [US3] Test RenderSystem swap chain recreation for fullscreen in MatrixRainTests/unit/rendering/SwapChainTests.cpp
-- [X] T120 [P] [US3] Test RenderSystem swap chain recreation for windowed in MatrixRainTests/unit/rendering/SwapChainTests.cpp
-- [X] T121 [P] [US3] Test InputSystem Alt+Enter key combination detection in MatrixRainTests/unit/input/InputSystemTests.cpp
+- [X] T116 [P] [US3] Test ApplicationState display mode initialization to Windowed in MatrixRainTests/unit/ApplicationStateTests.cpp
+- [X] T117 [P] [US3] Test ApplicationState ToggleDisplayMode transition Windowed→Fullscreen in MatrixRainTests/unit/ApplicationStateTests.cpp
+- [X] T118 [P] [US3] Test ApplicationState ToggleDisplayMode transition Fullscreen→Windowed in MatrixRainTests/unit/ApplicationStateTests.cpp
+- [X] T119 [P] [US3] Test RenderSystem swap chain recreation for fullscreen in MatrixRainTests/unit/SwapChainTests.cpp
+- [X] T120 [P] [US3] Test RenderSystem swap chain recreation for windowed in MatrixRainTests/unit/SwapChainTests.cpp
+- [X] T121 [P] [US3] Test InputSystem Alt+Enter key combination detection in MatrixRainTests/unit/InputSystemTests.cpp
 - [X] T122 [P] [US3] Test animation state preservation during display mode switch in MatrixRainTests/integration/DisplayModeTests.cpp
 
 ### Implementation for User Story 3
@@ -250,12 +250,12 @@
 
 ### Tests for Additional Controls (TDD - Write FIRST)
 
-- [x] T135 [P] Test window centering on primary monitor at startup in MatrixRainTests/unit/ui/WindowTests.cpp (RETROACTIVE - written after T141 implementation)
-- [x] T136 [P] Test WM_NCHITTEST handling for borderless window drag in MatrixRainTests/unit/ui/WindowTests.cpp (RETROACTIVE - written after T142 implementation)
-- [ ] T137 [P] Test ESC key handling for application exit in MatrixRainTests/unit/input/InputSystemTests.cpp
-- [ ] T138 [P] Test Space key handling for pause/resume in MatrixRainTests/unit/input/InputSystemTests.cpp
-- [ ] T139 [P] Test pause state freezes animation updates in MatrixRainTests/unit/animation/AnimationSystemTests.cpp
-- [ ] T140 [P] Test pause state preserves rendering in MatrixRainTests/unit/rendering/RenderSystemTests.cpp
+- [x] T135 [P] Test window centering on primary monitor at startup in MatrixRainTests/unit/WindowTests.cpp (RETROACTIVE - written after T141 implementation)
+- [x] T136 [P] Test WM_NCHITTEST handling for borderless window drag in MatrixRainTests/unit/WindowTests.cpp (RETROACTIVE - written after T142 implementation)
+- [ ] T137 [P] Test ESC key handling for application exit in MatrixRainTests/unit/InputSystemTests.cpp
+- [ ] T138 [P] Test Space key handling for pause/resume in MatrixRainTests/unit/InputSystemTests.cpp
+- [ ] T139 [P] Test pause state freezes animation updates in MatrixRainTests/unit/AnimationSystemTests.cpp
+- [ ] T140 [P] Test pause state preserves rendering in MatrixRainTests/unit/RenderSystemTests.cpp
 
 ### Implementation for Additional Controls
 
@@ -309,12 +309,12 @@
 
 ### Tests for Enhanced Features (TDD - Write FIRST)
 
-- [X] T173 [P] Test FPSCounter initialization and update logic in MatrixRainTests/unit/ui/FPSCounterTests.cpp
-- [X] T174 [P] Test FPSCounter calculates average FPS over 1-second window in MatrixRainTests/unit/ui/FPSCounterTests.cpp
-- [X] T175 [P] Test ColorScheme enum values (Green, Blue, Red, Amber) in MatrixRainTests/unit/state/ColorSchemeTests.cpp
-- [X] T176 [P] Test ColorScheme cycling Green→Blue→Red→Amber→Green in MatrixRainTests/unit/state/ColorSchemeTests.cpp
-- [X] T177 [P] Test InputSystem keyboard event processing for VK_C (color cycle) in MatrixRainTests/unit/input/InputSystemTests.cpp
-- [X] T178 [P] Test color scheme RGB values: Green(0,255,100), Blue(0,100,255), Red(255,50,50), Amber(255,191,0) in MatrixRainTests/unit/state/ColorSchemeTests.cpp
+- [X] T173 [P] Test FPSCounter initialization and update logic in MatrixRainTests/unit/FPSCounterTests.cpp
+- [X] T174 [P] Test FPSCounter calculates average FPS over 1-second window in MatrixRainTests/unit/FPSCounterTests.cpp
+- [X] T175 [P] Test ColorScheme enum values (Green, Blue, Red, Amber) in MatrixRainTests/unit/ColorSchemeTests.cpp
+- [X] T176 [P] Test ColorScheme cycling Green→Blue→Red→Amber→Green in MatrixRainTests/unit/ColorSchemeTests.cpp
+- [X] T177 [P] Test InputSystem keyboard event processing for VK_C (color cycle) in MatrixRainTests/unit/InputSystemTests.cpp
+- [X] T178 [P] Test color scheme RGB values: Green(0,255,100), Blue(0,100,255), Red(255,50,50), Amber(255,191,0) in MatrixRainTests/unit/ColorSchemeTests.cpp
 
 ### Implementation for Enhanced Features
 
