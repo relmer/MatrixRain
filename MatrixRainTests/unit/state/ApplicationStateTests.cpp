@@ -13,7 +13,7 @@ namespace MatrixRainTests
         TEST_METHOD (TestApplicationStateInitializesToFullscreen)
         {
             ApplicationState appState;
-            appState.Initialize ();
+            appState.Initialize (nullptr);
 
             DisplayMode mode = appState.GetDisplayMode ();
             Assert::AreEqual (static_cast<int>(DisplayMode::Fullscreen), 
@@ -29,7 +29,7 @@ namespace MatrixRainTests
         TEST_METHOD (TestToggleDisplayModeFullscreenToWindowed)
         {
             ApplicationState appState;
-            appState.Initialize ();
+            appState.Initialize (nullptr);
 
             // Verify starts in fullscreen
             Assert::AreEqual (static_cast<int>(DisplayMode::Fullscreen),
@@ -52,7 +52,7 @@ namespace MatrixRainTests
         TEST_METHOD (TestToggleDisplayModeWindowedToFullscreen)
         {
             ApplicationState appState;
-            appState.Initialize ();
+            appState.Initialize (nullptr);
 
             // Toggle to windowed
             appState.ToggleDisplayMode ();

@@ -10,6 +10,7 @@
 #include "MatrixRain/DensityController.h"
 #include "MatrixRain/InputSystem.h"
 #include "MatrixRain/FPSCounter.h"
+#include "MatrixRain/ScreenSaverModeContext.h"
 
 
 
@@ -34,7 +35,7 @@ Application::~Application()
 
 
 
-HRESULT Application::Initialize (HINSTANCE hInstance, int nCmdShow)
+HRESULT Application::Initialize (HINSTANCE hInstance, int nCmdShow, const ScreenSaverModeContext * pScreenSaverContext)
 {
     HRESULT        hr           = S_OK;
     CharacterSet & charSet      = CharacterSet::GetInstance();
@@ -43,7 +44,8 @@ HRESULT Application::Initialize (HINSTANCE hInstance, int nCmdShow)
     int            screenHeight = 0;
 
 
-    m_hInstance = hInstance;
+    m_hInstance           = hInstance;
+    m_pScreenSaverContext = pScreenSaverContext;
 
     // Create window
     hr = CreateApplicationWindow (nCmdShow);
@@ -81,8 +83,8 @@ HRESULT Application::Initialize (HINSTANCE hInstance, int nCmdShow)
 
     // Initialize application state
     m_appState = std::make_unique<ApplicationState>();
-    m_appState->Initialize();
-    
+    m_appState->Initialize (pScreenSaverContext);
+
     // Now initialize input system with both dependencies
     m_inputSystem->Initialize (*m_densityController, *m_appState);
 
@@ -91,6 +93,21 @@ HRESULT Application::Initialize (HINSTANCE hInstance, int nCmdShow)
 
     // Initialize timer
     m_timer = std::make_unique<Timer>();
+    
+    if (m_pScreenSaverContext)
+    {
+        // Hide cursor if in screensaver mode
+        if (m_pScreenSaverContext->m_hideCursor)
+        {
+            ShowCursor (FALSE);
+        }
+    
+        // Initialize exit state if in screensaver mode with exit-on-input
+        if (m_pScreenSaverContext->m_exitOnInput)
+        {
+            m_inputSystem->InitializeExitState();
+        }
+    }
 
     m_isRunning = true;
 
@@ -99,8 +116,6 @@ HRESULT Application::Initialize (HINSTANCE hInstance, int nCmdShow)
 Error:
     return hr;
 }
-
-
 
 
 
@@ -268,6 +283,31 @@ void Application::Render()
 
 
 
+bool Application::ShouldExitScreenSaverOnKey (WPARAM wParam)
+{
+    HRESULT hr         = S_OK;
+    bool    shouldExit = false;
+
+
+
+    // In screensaver mode with exit-on-input, any key triggers exit
+
+    BAIL_OUT_IF (!m_pScreenSaverContext || !m_pScreenSaverContext->m_exitOnInput, S_OK);
+    BAIL_OUT_IF (!m_inputSystem, S_OK);
+
+    m_inputSystem->ProcessKeyDown (static_cast<int> (wParam));
+
+    shouldExit = m_inputSystem->ShouldExit();
+        
+
+Error:
+    return shouldExit;
+}
+
+
+
+
+
 void Application::Shutdown()
 {
     m_timer.reset();
@@ -338,6 +378,10 @@ LRESULT Application::HandleMessage (UINT uMsg, WPARAM wParam, LPARAM lParam)
             OnSysKeyDown (wParam);
             return 0;
 
+        case WM_MOUSEMOVE:
+            OnMouseMove (lParam);
+            return 0;
+
         case WM_SIZE:
             OnSize (lParam);
             return 0;
@@ -364,7 +408,7 @@ LRESULT Application::HandleMessage (UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 void Application::OnKeyDown (WPARAM wParam)
 {
-    if (wParam == VK_ESCAPE)
+    if (wParam == VK_ESCAPE || ShouldExitScreenSaverOnKey (wParam))
     {
         // ESC key pressed - exit application
         PostQuitMessage (0);
@@ -397,6 +441,13 @@ void Application::OnKeyDown (WPARAM wParam)
 
 void Application::OnSysKeyDown (WPARAM wParam)
 {
+    // In screensaver mode with exit-on-input, suppress all hotkeys including Alt+Enter
+    if (ShouldExitScreenSaverOnKey (wParam))
+    {
+        PostQuitMessage (0);
+        return;  // Suppress Alt+Enter and other system keys when exit-on-input is enabled
+    }
+    
     // Handle Alt+key combinations (Alt causes SYSKEYDOWN instead of KEYDOWN)
     if (m_inputSystem && m_inputSystem->IsAltEnterPressed (static_cast<int> (wParam)))
     {
@@ -464,6 +515,35 @@ void Application::OnSysKeyDown (WPARAM wParam)
 
 
 
+void Application::OnMouseMove (LPARAM lParam)
+{
+    HRESULT hr         = S_OK;
+    POINT   currentPos;
+
+
+
+    // In screensaver mode with exit-on-input, check for meaningful mouse movement
+    BAIL_OUT_IF (!m_pScreenSaverContext || !m_pScreenSaverContext->m_exitOnInput, S_OK);
+    BAIL_OUT_IF (!m_inputSystem, S_OK);
+
+    currentPos.x = static_cast<LONG> (static_cast<short> (LOWORD (lParam)));
+    currentPos.y = static_cast<LONG> (static_cast<short> (HIWORD (lParam)));
+
+    m_inputSystem->ProcessMouseMove (currentPos);
+    if (m_inputSystem->ShouldExit())
+    {
+        PostQuitMessage (0);
+    }
+
+
+Error:
+    return;
+}
+
+
+
+
+
 void Application::OnSize (LPARAM lParam)
 {
     // Skip redundant resize if we're in the middle of a display mode transition
@@ -471,10 +551,10 @@ void Application::OnSize (LPARAM lParam)
     {
         return;
     }
-    
+
     UINT width  = LOWORD (lParam);
     UINT height = HIWORD (lParam);
-    
+
     if (width > 0 && height > 0 && m_renderSystem && m_viewport)
     {
         m_renderSystem->Resize (width, height);

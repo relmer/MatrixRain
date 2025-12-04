@@ -1,10 +1,10 @@
 #pragma once
 
-
-
-
-
 #include "MatrixRain/ColorScheme.h"
+
+
+
+struct ScreenSaverModeContext;
 
 
 
@@ -29,8 +29,10 @@ public:
     /// <summary>
     /// Initialize application state with default values.
     /// Starts in Fullscreen display mode with Green color scheme.
+    /// If screensaver context is provided, may suppress statistics and other runtime features.
     /// </summary>
-    void Initialize();
+    /// <param name="pScreenSaverContext">Screensaver mode context for runtime behavior (nullptr for normal mode)</param>
+    void Initialize (const ScreenSaverModeContext * pScreenSaverContext);
 
     /// <summary>
     /// Toggle between Windowed and Fullscreen display modes.

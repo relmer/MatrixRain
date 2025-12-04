@@ -51,7 +51,7 @@
 - [X] T012 [P] [US1] Add failing exit-threshold unit tests covering cursor visibility and input triggers in `MatrixRainTests/unit/input/InputExitStateTests.cpp`
 - [X] T013 [US1] Implement `InputExitState` handling within `MatrixRainCore/include/matrixrain/input/InputSystem.h` and `MatrixRainCore/src/input/InputSystem.cpp`
 - [X] T014 [P] [US1] Add integration coverage for `/s` mode (cursor hide, hotkey suppression, exit-on-input) in `MatrixRainTests/integration/DisplayModeTests.cpp`
-- [ ] T015 [US1] Propagate `ScreenSaverModeContext` through `MatrixRainCore/include/matrixrain/Application.h`, `MatrixRainCore/src/Application.cpp`, and `MatrixRainCore/src/state/ApplicationState.cpp` to enforce `/s` runtime rules
+- [X] T015 [US1] Propagate `ScreenSaverModeContext` through `MatrixRainCore/include/matrixrain/Application.h`, `MatrixRainCore/src/Application.cpp`, and `MatrixRainCore/src/state/ApplicationState.cpp` to enforce `/s` runtime rules
 - [ ] T032 [P] [US1] Add failing error-handling tests covering invalid screensaver arguments and DirectX initialization failures in `MatrixRainTests/unit/app/ScreenSaverErrorHandlingTests.cpp`
 - [ ] T033 [US1] Surface descriptive message dialogs/log events for invalid arguments and initialization failures in `MatrixRain/ScreenSaverModeParser.cpp` and `MatrixRain/main.cpp`
 - [ ] T038 [P] [US1] Add failing tests ensuring a second `/s` launch while the saver is active exits immediately with a diagnostic in `MatrixRainTests/integration/DisplayModeTests.cpp`

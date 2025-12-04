@@ -31,7 +31,7 @@ namespace MatrixRainTests
             // This is tested in manual/automated UI tests due to window requirements
 
             ApplicationState appState;
-            appState.Initialize();
+            appState.Initialize (nullptr);
 
             // Verify initial state
             Assert::AreEqual (static_cast<int>(DisplayMode::Fullscreen),
@@ -64,7 +64,7 @@ namespace MatrixRainTests
 
 
 
-            appState.Initialize();
+            appState.Initialize (nullptr);
             inputSystem.Initialize (densityController, appState);
             inputSystem.InitializeExitState();
 
@@ -89,9 +89,9 @@ namespace MatrixRainTests
 
 
 
-            appState.Initialize();
+            appState.Initialize (nullptr);
             inputSystem.Initialize (densityController, appState);
-            
+
             // Initialize exit state to capture baseline (note: this uses GetCursorPos internally,
             // so we can't control the initial position in a unit test. This test verifies the
             // threshold logic works correctly given arbitrary starting position.)
@@ -120,7 +120,7 @@ namespace MatrixRainTests
 
 
 
-            appState.Initialize();
+            appState.Initialize (nullptr);
             inputSystem.Initialize (densityController, appState);
             inputSystem.InitializeExitState();
 
@@ -151,7 +151,7 @@ namespace MatrixRainTests
 
 
 
-            appState.Initialize();
+            appState.Initialize (nullptr);
             inputSystem.Initialize (densityController, appState);
             inputSystem.InitializeExitState();
 

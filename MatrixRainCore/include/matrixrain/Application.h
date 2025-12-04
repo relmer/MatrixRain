@@ -12,6 +12,7 @@ class DensityController;
 class InputSystem;
 class ApplicationState;
 class FPSCounter;
+struct ScreenSaverModeContext;
 
 
 
@@ -24,7 +25,7 @@ public:
     ~Application();
 
     // Main application lifecycle
-    HRESULT Initialize (HINSTANCE hInstance, int nCmdShow);
+    HRESULT Initialize (HINSTANCE hInstance, int nCmdShow, const ScreenSaverModeContext * pScreenSaverContext);
     int     Run();
     void    Shutdown();
 
@@ -50,17 +51,22 @@ private:
     bool      m_isRunning               { false   };
     bool      m_isPaused                { false   };
     bool      m_inDisplayModeTransition { false   };
+    
+    // Screensaver mode
+    const ScreenSaverModeContext * m_pScreenSaverContext { nullptr };
 
     // Internal methods
-    HRESULT CreateApplicationWindow (int nCmdShow);
-    void    Update                  (float deltaTime);
+    HRESULT CreateApplicationWindow    (int nCmdShow);
+    void    Update                     (float deltaTime);
     void    Render();
+    bool    ShouldExitScreenSaverOnKey (WPARAM wParam);
     
     // Message handlers
-    void OnKeyDown      (WPARAM wParam);
-    void OnSysKeyDown   (WPARAM wParam);
-    void OnSize         (LPARAM lParam);
-    void OnNcHitTest    (LRESULT & result);
+    void OnKeyDown                  (WPARAM wParam);
+    void OnSysKeyDown               (WPARAM wParam);
+    void OnMouseMove                (LPARAM lParam);
+    void OnSize                     (LPARAM lParam);
+    void OnNcHitTest                (LRESULT & result);
     
     // Window procedure
     static LRESULT CALLBACK WindowProc    (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);

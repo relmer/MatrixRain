@@ -24,7 +24,7 @@ int APIENTRY wWinMain(_In_     HINSTANCE hInstance,
     // Set DPI awareness to per-monitor V2 for consistent physical pixel measurements
     SetProcessDpiAwarenessContext (DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
 
-    hr = app.Initialize (hInstance, nCmdShow);
+    hr = app.Initialize (hInstance, nCmdShow, nullptr);  // TODO: Parse lpCmdLine and pass ScreenSaverModeContext
     CHR (hr);
     
     retval = app.Run();

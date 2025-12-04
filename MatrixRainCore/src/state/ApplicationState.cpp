@@ -1,13 +1,16 @@
 #include "pch.h"
 
 #include "MatrixRain/ApplicationState.h"
+#include "MatrixRain/ScreenSaverModeContext.h"
 
 
 
 
 
-void ApplicationState::Initialize()
+void ApplicationState::Initialize (const ScreenSaverModeContext * pScreenSaverContext)
 {
+    UNREFERENCED_PARAMETER (pScreenSaverContext);  // Reserved for future use (e.g., suppress statistics in /s mode)
+    
     // Start in fullscreen mode by default
     m_displayMode = DisplayMode::Fullscreen;
     

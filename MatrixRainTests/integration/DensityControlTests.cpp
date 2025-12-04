@@ -31,6 +31,7 @@ namespace MatrixRainTests
 
             DensityController densityController (viewport, 32.0f); // 80% of 240 = 192 streaks
             ApplicationState  appState;
+            appState.Initialize (nullptr);
 
             InputSystem inputSystem;
             inputSystem.Initialize (densityController, appState);
