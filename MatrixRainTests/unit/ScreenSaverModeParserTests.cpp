@@ -20,7 +20,11 @@ namespace MatrixRainTests
             // T010: Verify /s launches screensaver full-screen mode
             TEST_METHOD (ParseCommandLine_SlashS_ReturnsScreenSaverFullMode)
             {
-                ScreenSaverModeContext context = ParseCommandLine (L"/s");
+                HRESULT                hr;
+                ScreenSaverModeContext context;
+
+
+                hr = ParseCommandLine (L"/s", context);
 
 
 
@@ -38,8 +42,13 @@ namespace MatrixRainTests
             // T010: Verify /S (uppercase) works identically to /s
             TEST_METHOD (ParseCommandLine_SlashS_CaseInsensitive)
             {
-                ScreenSaverModeContext contextLower = ParseCommandLine (L"/s");
-                ScreenSaverModeContext contextUpper = ParseCommandLine (L"/S");
+                HRESULT                hr;
+                ScreenSaverModeContext contextLower;
+                ScreenSaverModeContext contextUpper;
+
+
+                hr = ParseCommandLine (L"/s", contextLower);
+                hr = ParseCommandLine (L"/S", contextUpper);
 
 
 
@@ -52,10 +61,13 @@ namespace MatrixRainTests
             // T010: Verify /p <HWND> launches preview mode
             TEST_METHOD (ParseCommandLine_SlashP_ReturnsPreviewMode)
             {
-                HWND         testHwnd = reinterpret_cast<HWND>(static_cast<uintptr_t>(0x12345678));
-                std::wstring cmdLine  = std::format (L"/p {}", reinterpret_cast<uintptr_t>(testHwnd));
+                HRESULT                hr;
+                ScreenSaverModeContext context;
+                HWND                   testHwnd = reinterpret_cast<HWND>(static_cast<uintptr_t>(0x12345678));
+                std::wstring           cmdLine  = std::format (L"/p {}", reinterpret_cast<uintptr_t>(testHwnd));
 
-                ScreenSaverModeContext context = ParseCommandLine (cmdLine.c_str());
+
+                hr = ParseCommandLine (cmdLine.c_str(), context);
 
 
 
@@ -73,7 +85,11 @@ namespace MatrixRainTests
             // T010: Verify /c launches settings dialog mode
             TEST_METHOD (ParseCommandLine_SlashC_ReturnsSettingsDialogMode)
             {
-                ScreenSaverModeContext context = ParseCommandLine (L"/c");
+                HRESULT                hr;
+                ScreenSaverModeContext context;
+
+
+                hr = ParseCommandLine (L"/c", context);
 
 
 
@@ -89,10 +105,13 @@ namespace MatrixRainTests
             // T010: Verify /c with optional HWND parameter
             TEST_METHOD (ParseCommandLine_SlashC_WithHwnd_ParsesParentWindow)
             {
-                HWND         testHwnd = reinterpret_cast<HWND>(static_cast<uintptr_t>(0xABCDEF00));
-                std::wstring cmdLine  = std::format (L"/c:{}", reinterpret_cast<uintptr_t>(testHwnd));
+                HRESULT                hr;
+                ScreenSaverModeContext context;
+                HWND                   testHwnd = reinterpret_cast<HWND>(static_cast<uintptr_t>(0xABCDEF00));
+                std::wstring           cmdLine  = std::format (L"/c:{}", reinterpret_cast<uintptr_t>(testHwnd));
 
-                ScreenSaverModeContext context = ParseCommandLine (cmdLine.c_str());
+
+                hr = ParseCommandLine (cmdLine.c_str(), context);
 
 
 
@@ -106,7 +125,11 @@ namespace MatrixRainTests
             // T010: Verify /a launches password-change-unsupported mode
             TEST_METHOD (ParseCommandLine_SlashA_ReturnsPasswordChangeUnsupported)
             {
-                ScreenSaverModeContext context = ParseCommandLine (L"/a");
+                HRESULT                hr;
+                ScreenSaverModeContext context;
+
+
+                hr = ParseCommandLine (L"/a", context);
 
 
 
@@ -119,7 +142,11 @@ namespace MatrixRainTests
             // T010: Verify no arguments defaults to Normal mode
             TEST_METHOD (ParseCommandLine_NoArguments_ReturnsNormalMode)
             {
-                ScreenSaverModeContext context = ParseCommandLine (L"");
+                HRESULT                hr;
+                ScreenSaverModeContext context;
+
+
+                hr = ParseCommandLine (L"", context);
 
 
 
@@ -136,9 +163,13 @@ namespace MatrixRainTests
             // T010: Verify nullptr command line defaults to Normal mode
             TEST_METHOD (ParseCommandLine_Nullptr_ReturnsNormalMode)
             {
-                ScreenSaverModeContext context = ParseCommandLine (nullptr);
+                HRESULT                hr;
+                ScreenSaverModeContext context;
 
 
+                hr = ParseCommandLine (nullptr, context);
+                Assert::IsTrue (SUCCEEDED (hr), L"ParseCommandLine should return success HRESULT");
+                Assert::IsTrue (context.m_errorMessage.empty(), L"Error message should not be populated");
 
                 Assert::AreEqual (static_cast<int>(ScreenSaverMode::Normal), static_cast<int>(context.m_mode), L"mode should be Normal");
             }
@@ -149,7 +180,11 @@ namespace MatrixRainTests
             // T010: Verify whitespace-only command line defaults to Normal
             TEST_METHOD (ParseCommandLine_WhitespaceOnly_ReturnsNormalMode)
             {
-                ScreenSaverModeContext context = ParseCommandLine (L"   \t  ");
+                HRESULT                hr;
+                ScreenSaverModeContext context;
+
+
+                hr = ParseCommandLine (L"   \t  ", context);
 
 
 
@@ -162,7 +197,11 @@ namespace MatrixRainTests
             // T010: Verify invalid /p without HWND is handled gracefully
             TEST_METHOD (ParseCommandLine_SlashP_MissingHwnd_DefaultsToNormalMode)
             {
-                ScreenSaverModeContext context = ParseCommandLine (L"/p");
+                HRESULT                hr;
+                ScreenSaverModeContext context;
+
+                hr = ParseCommandLine (L"/p", context);
+                hr = ParseCommandLine (L"/p", context);
 
 
 
@@ -175,7 +214,11 @@ namespace MatrixRainTests
             // T010: Verify invalid /p with non-numeric HWND is handled
             TEST_METHOD (ParseCommandLine_SlashP_InvalidHwnd_DefaultsToNormalMode)
             {
-                ScreenSaverModeContext context = ParseCommandLine (L"/p invalid");
+                HRESULT                hr;
+                ScreenSaverModeContext context;
+
+
+                hr = ParseCommandLine (L"/p invalid", context);
 
 
 
@@ -188,7 +231,11 @@ namespace MatrixRainTests
             // T010: Verify unknown arguments default to Normal mode
             TEST_METHOD (ParseCommandLine_UnknownArgument_DefaultsToNormalMode)
             {
-                ScreenSaverModeContext context = ParseCommandLine (L"/x");
+                HRESULT                hr;
+                ScreenSaverModeContext context;
+
+
+                hr = ParseCommandLine (L"/x", context);
 
 
 

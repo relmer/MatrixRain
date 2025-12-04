@@ -5,4 +5,4 @@
 
 
 
-ScreenSaverModeContext ParseCommandLine (LPCWSTR pszCommandLine);
+HRESULT ParseCommandLine (LPCWSTR pszCommandLine, ScreenSaverModeContext & context);

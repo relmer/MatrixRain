@@ -1,6 +1,7 @@
 #include "pch.h"
 
 #include "../MatrixRainCore/Application.h"
+#include "../MatrixRainCore/ScreenSaverModeParser.h"
 #include "resource.h"
 
 
@@ -13,18 +14,22 @@ int APIENTRY wWinMain(_In_     HINSTANCE hInstance,
                       _In_     int       nCmdShow)
 {
     UNREFERENCED_PARAMETER (hPrevInstance);
-    UNREFERENCED_PARAMETER (lpCmdLine);
     
-    Application app;
-    HRESULT     hr     = S_OK;
-    int         retval = 0;
+    Application            app;
+    HRESULT                hr      = S_OK;
+    int                    retval  = 0;
+    ScreenSaverModeContext context;
 
 
 
     // Set DPI awareness to per-monitor V2 for consistent physical pixel measurements
     SetProcessDpiAwarenessContext (DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
 
-    hr = app.Initialize (hInstance, nCmdShow, nullptr);  // TODO: Parse lpCmdLine and pass ScreenSaverModeContext
+    // Parse command-line arguments
+    hr = ParseCommandLine (lpCmdLine, context);
+    CHR (hr);
+
+    hr = app.Initialize (hInstance, nCmdShow, &context);
     CHR (hr);
     
     retval = app.Run();
@@ -33,7 +38,14 @@ int APIENTRY wWinMain(_In_     HINSTANCE hInstance,
 Error:
     if (FAILED (hr))
     {
-        MessageBoxW (nullptr, L"Failed to initialize MatrixRain", L"Initialization Error", MB_OK | MB_ICONERROR);
+        LPCWSTR errorMsg = L"Failed to initialize MatrixRain";
+
+        if (context.m_errorMessage.empty() == false)
+        {
+            errorMsg = context.m_errorMessage.c_str();
+        }
+
+        MessageBoxW (nullptr, errorMsg, L"Error", MB_OK | MB_ICONERROR);
         retval = -1;
     }
 

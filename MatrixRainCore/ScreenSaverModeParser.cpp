@@ -94,10 +94,9 @@ static void SetContextFlagsFromMode (ScreenSaverModeContext & context, HWND hwnd
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-ScreenSaverModeContext ParseCommandLine (LPCWSTR pszCommandLine)
+HRESULT ParseCommandLine (LPCWSTR pszCommandLine, ScreenSaverModeContext & context)
 {
     HRESULT                hr        = S_OK;
-    ScreenSaverModeContext context;
     bool                   hasSwitch = false;   
     wchar_t                cmd       = L'\0';    // To store the command character
     HWND                   hwnd      = nullptr;  // To store parsed HWND value for /p and /c commands
@@ -156,9 +155,17 @@ ScreenSaverModeContext ParseCommandLine (LPCWSTR pszCommandLine)
             context.m_mode = ScreenSaverMode::PasswordChangeUnsupported;
             break;
 
-        default:  // Unknown argument, default to Normal
-            context.m_mode = ScreenSaverMode::Normal;
-            break;
+        default:  // Unknown argument - return error
+        {
+            wchar_t errorMsg[256];
+            
+            
+
+            StringCchPrintfW (errorMsg, _countof (errorMsg), L"Unrecognized command-line switch: /%lc", cmd);
+            context.m_errorMessage = errorMsg;
+            
+            CHR (E_INVALIDARG);
+        }
     }
 
 
@@ -166,5 +173,5 @@ ScreenSaverModeContext ParseCommandLine (LPCWSTR pszCommandLine)
 Error:
     SetContextFlagsFromMode (context, hwnd);
 
-    return context;
+    return hr;
 }
