@@ -56,10 +56,14 @@ private:
     const ScreenSaverModeContext * m_pScreenSaverContext { nullptr };
 
     // Internal methods
-    HRESULT CreateApplicationWindow    (int nCmdShow);
-    void    Update                     (float deltaTime);
+    void    InitializeApplicationState    (const ScreenSaverModeContext * pScreenSaverContext);
+    void    InitializeApplicationWindow();
+    HRESULT CreateApplicationWindow       (POINT & position, SIZE & size);
+    void    Update                        (float deltaTime);
     void    Render();
-    bool    ShouldExitScreenSaverOnKey (WPARAM wParam);
+    void    GetWindowSizeForCurrentMode   (POINT & position, SIZE & size);
+    void    ResizeWindowForCurrentMode();
+    bool    ShouldExitScreenSaverOnKey    (WPARAM wParam);
     
     // Message handlers
     void OnKeyDown                  (WPARAM wParam);

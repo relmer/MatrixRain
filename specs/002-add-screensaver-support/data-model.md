@@ -6,7 +6,7 @@
 
 | Field | Type | Description | Validation / Defaults |
 |-------|------|-------------|------------------------|
-| density | `float` | Character density multiplier relative to base configuration | Clamped to `[0.0f, 1.0f]` (0.0f renders exactly one streak head), default `1.0f` |
+| densityPercent | `int` | Character density percentage relative to base configuration | Clamped to `[0, 100]` (0 renders exactly one streak head), default `100`. Stored in registry as `REG_DWORD` and used directly by `DensityController`. |
 | colorSchemeKey | `std::wstring` | Stable identifier for configured color palette | Must match a key in `ColorSchemeRepository`; defaults to current application default |
 | animationSpeedPercent | `int` | Percentage applied to streak drop cadence relative to historical default | Clamped to `[1, 100]`, default `75` |
 | glowIntensityPercent | `int` | Percentage applied to bloom composite intensity (controls overall glow brightness) | Clamped to `[0, 200]`, default `100` |

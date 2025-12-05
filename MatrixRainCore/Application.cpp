@@ -40,59 +40,58 @@ HRESULT Application::Initialize (HINSTANCE hInstance, int nCmdShow, const Screen
     HRESULT        hr           = S_OK;
     CharacterSet & charSet      = CharacterSet::GetInstance();
     BOOL           fInitialized = FALSE;
-    int            screenWidth  = 0;
-    int            screenHeight = 0;
+    
+    
+    UNREFERENCED_PARAMETER (nCmdShow);
 
 
-    m_hInstance           = hInstance;
-    m_pScreenSaverContext = pScreenSaverContext;
+    m_hInstance         = hInstance;
+    m_appState          = std::make_unique<ApplicationState>();
+    m_viewport          = std::make_unique<Viewport>();
+    m_densityController = std::make_unique<DensityController> (*m_viewport, 32.0f);  // Character width matches horizontal spacing
+    m_animationSystem   = std::make_unique<AnimationSystem>();
+    m_renderSystem      = std::make_unique<RenderSystem>();
+    m_inputSystem       = std::make_unique<InputSystem>();
+    m_fpsCounter        = std::make_unique<FPSCounter>();
+    m_timer             = std::make_unique<Timer>();
 
-    // Create window
-    hr = CreateApplicationWindow (nCmdShow);
-    CHR (hr);
 
-    // Initialize CharacterSet (singleton) - must be first
+    InitializeApplicationState (pScreenSaverContext);
+    InitializeApplicationWindow();
+    
+
     fInitialized = charSet.Initialize();
     CBR (fInitialized);
 
-    // Initialize viewport with full screen size (starting in fullscreen)
-    screenWidth  = GetSystemMetrics (SM_CXSCREEN);
-    screenHeight = GetSystemMetrics (SM_CYSCREEN);
-    
-    m_viewport = std::make_unique<Viewport>();
-    m_viewport->Resize (static_cast<float> (screenWidth), static_cast<float> (screenHeight));
-
-    // Initialize density controller (before AnimationSystem) with viewport reference
-    m_densityController = std::make_unique<DensityController> (*m_viewport, 32.0f);  // Character width matches horizontal spacing
-    
-    // Initialize animation system with density controller
-    m_animationSystem = std::make_unique<AnimationSystem>();
     m_animationSystem->Initialize (*m_viewport, *m_densityController);
 
-    // Initialize render system
-    m_renderSystem = std::make_unique<RenderSystem>();
-    hr = m_renderSystem->Initialize (m_hwnd, screenWidth, screenHeight);
-    CHR (hr);
-
-    // Create texture atlas now that we have a D3D11 device
     hr = charSet.CreateTextureAtlas (m_renderSystem->GetDevice());
     CHR (hr);
 
-    // Initialize input system (after density controller and app state)
-    m_inputSystem = std::make_unique<InputSystem>();
 
-    // Initialize application state
-    m_appState = std::make_unique<ApplicationState>();
-    m_appState->Initialize (pScreenSaverContext);
+    m_isRunning = true;
 
+
+    
+Error:
+    return hr;
+}
+
+
+
+
+
+void Application::InitializeApplicationState (const ScreenSaverModeContext * pScreenSaverContext)
+{
+    m_pScreenSaverContext = pScreenSaverContext;
+
+    m_appState->Initialize (m_pScreenSaverContext);
+    
+    // Apply loaded density from settings to controller
+    m_densityController->SetPercentage (m_appState->GetSettings().m_densityPercent);
+    
     // Now initialize input system with both dependencies
     m_inputSystem->Initialize (*m_densityController, *m_appState);
-
-    // Initialize FPS counter
-    m_fpsCounter = std::make_unique<FPSCounter>();
-
-    // Initialize timer
-    m_timer = std::make_unique<Timer>();
     
     if (m_pScreenSaverContext)
     {
@@ -108,29 +107,46 @@ HRESULT Application::Initialize (HINSTANCE hInstance, int nCmdShow, const Screen
             m_inputSystem->InitializeExitState();
         }
     }
-
-    m_isRunning = true;
-
-
-    
-Error:
-    return hr;
 }
 
 
 
-HRESULT Application::CreateApplicationWindow (int nCmdShow)
+
+
+void Application::InitializeApplicationWindow()
 {
-    HRESULT      hr            = S_OK;
-    WNDCLASSEXW  wcex          = {};
-    DWORD        error         = 0;
-    int          screenWidth   = 0;
-    int          screenHeight  = 0;
-    ATOM         classAtom     = 0;
-    BOOL         fSuccess      = FALSE;
+    HRESULT hr       = S_OK;
+    POINT   position = { 0 };
+    SIZE    size     = { 0 };
+
+
+
+    GetWindowSizeForCurrentMode (position, size);
+
+    hr = CreateApplicationWindow (position, size);
+    CHR (hr);
+
+    hr = m_renderSystem->Initialize (m_hwnd, size.cx, size.cy);
+    CHR (hr);
+
+
+
+Error:
+    return;
+}
+
+
+
+
+
+HRESULT Application::CreateApplicationWindow (POINT & position, SIZE & size)
+{
+    HRESULT      hr        = S_OK;
+    WNDCLASSEXW  wcex      = {};
+    DWORD        error     = 0;
+    ATOM         classAtom = 0;
+    BOOL         fSuccess  = FALSE;
     
-    
-    UNREFERENCED_PARAMETER (nCmdShow);  // Starting in fullscreen, so nCmdShow is ignored
     
     
     // Verify HINSTANCE
@@ -144,7 +160,7 @@ HRESULT Application::CreateApplicationWindow (int nCmdShow)
     wcex.hIcon          = LoadIconW (m_hInstance, MAKEINTRESOURCEW (101));  // IDI_MATRIXRAIN
     wcex.hIconSm        = LoadIconW (m_hInstance, MAKEINTRESOURCEW (101));  // IDI_MATRIXRAIN
     wcex.hCursor        = LoadCursor (nullptr, IDC_ARROW);
-    wcex.hbrBackground  = (HBRUSH)GetStockObject (BLACK_BRUSH);
+    wcex.hbrBackground  = (HBRUSH) GetStockObject (BLACK_BRUSH);
     wcex.lpszClassName  = L"MatrixRainWindowClass";
 
     classAtom = RegisterClassExW (&wcex);
@@ -159,18 +175,15 @@ HRESULT Application::CreateApplicationWindow (int nCmdShow)
         // Class already registered - continue
     }
 
-    // Start in fullscreen mode by default
-    screenWidth  = GetSystemMetrics (SM_CXSCREEN);
-    screenHeight = GetSystemMetrics (SM_CYSCREEN);
-
     // Create window (fullscreen borderless)
     m_hwnd = CreateWindowExW (0,
                               L"MatrixRainWindowClass",
                               WINDOW_TITLE,
                               WS_POPUP | WS_VISIBLE,  // Borderless window, visible
-                              0, 0,
-                              screenWidth,
-                              screenHeight,
+                              position.x, 
+                              position.y,
+                              size.cx,
+                              size.cy,
                               nullptr,
                               nullptr,
                               m_hInstance,
@@ -183,6 +196,8 @@ HRESULT Application::CreateApplicationWindow (int nCmdShow)
     
     fSuccess = UpdateWindow (m_hwnd);
     CWRA (fSuccess);
+
+    
 
 Error:
     return hr;
@@ -255,6 +270,101 @@ void Application::Update (float deltaTime)
     {
         m_animationSystem->Update (deltaTime);
     }
+}
+
+
+
+
+
+void Application::GetWindowSizeForCurrentMode (POINT & position, SIZE & size)
+{
+    HRESULT hr           = S_OK;
+    int     screenWidth  = GetSystemMetrics (SM_CXSCREEN);
+    int     screenHeight = GetSystemMetrics (SM_CYSCREEN);
+
+
+
+    CBRAEx (m_appState != nullptr, E_UNEXPECTED);
+
+    if (m_appState->GetDisplayMode() == DisplayMode::Fullscreen)
+    {
+        // Fullscreen mode
+        position = { 0, 0 };
+        size     = { screenWidth, screenHeight };
+    }
+    else
+    {
+        // Windowed mode (75% of screen, centered)
+        int windowWidth  = screenWidth  * 3 / 4;
+        int windowHeight = screenHeight * 3 / 4;
+
+        position.x = (screenWidth  - windowWidth)  / 2;
+        position.y = (screenHeight - windowHeight) / 2;
+        size       = { windowWidth, windowHeight };
+    }
+
+
+
+Error:
+    return;
+}
+
+
+
+
+
+void Application::ResizeWindowForCurrentMode()
+{
+    HRESULT hr         = S_OK;
+    float   oldWidth   = { 0 };
+    float   oldHeight  = { 0 };
+    POINT   position   = { 0 };
+    SIZE    windowSize = { 0 };
+    
+
+    
+    CBRAEx (m_appState && m_viewport && m_renderSystem, E_UNEXPECTED);
+
+
+    oldWidth  = m_viewport->GetWidth();
+    oldHeight = m_viewport->GetHeight();
+
+    GetWindowSizeForCurrentMode (position, windowSize);
+
+    SetWindowLongPtr (m_hwnd, GWL_STYLE, WS_POPUP | WS_VISIBLE);
+
+
+    SetWindowPos (m_hwnd, 
+                  HWND_TOP, 
+                  position.x, 
+                  position.y, 
+                  windowSize.cx, 
+                  windowSize.cy, 
+                  SWP_FRAMECHANGED | SWP_SHOWWINDOW);
+    
+    m_viewport->Resize     (static_cast<float> (windowSize.cx), static_cast<float> (windowSize.cy));
+    m_renderSystem->Resize (windowSize.cx, windowSize.cy);
+                    
+    // Rescale existing streaks to fill new viewport dimensions
+    if (oldWidth > 0 && oldHeight > 0)
+    {
+        m_animationSystem->RescaleStreaksForViewport (oldWidth, 
+                                                      oldHeight, 
+                                                      static_cast<float> (windowSize.cx), 
+                                                      static_cast<float> (windowSize.cy));
+    }
+
+
+    // Reset timer to prevent accumulated deltaTime from causing animation jump
+    if (m_timer)
+    {
+        m_timer->Reset();
+    }
+
+
+
+Error:
+    return;
 }
 
 
@@ -456,57 +566,8 @@ void Application::OnSysKeyDown (WPARAM wParam)
         {
             m_inDisplayModeTransition = true;
             m_appState->ToggleDisplayMode();
-            DisplayMode newMode = m_appState->GetDisplayMode();
-            
-            // Save old viewport dimensions for rescaling streaks
-            float oldWidth  = m_viewport->GetWidth();
-            float oldHeight = m_viewport->GetHeight();
-            
-            if (newMode == DisplayMode::Fullscreen)
-            {
-                // Switch to borderless fullscreen windowed mode
-                int screenWidth  = GetSystemMetrics (SM_CXSCREEN);
-                int screenHeight = GetSystemMetrics (SM_CYSCREEN);
-                
-                SetWindowLongPtr (m_hwnd, GWL_STYLE, WS_POPUP | WS_VISIBLE);
-                SetWindowPos (m_hwnd, HWND_TOP, 0, 0, screenWidth, screenHeight, 
-                                SWP_FRAMECHANGED | SWP_SHOWWINDOW);
-                
-                m_viewport->Resize (static_cast<float> (screenWidth), static_cast<float> (screenHeight));
-                m_renderSystem->Resize (screenWidth, screenHeight);
-                
-                // Rescale existing streaks to fill new viewport dimensions
-                m_animationSystem->RescaleStreaksForViewport (oldWidth, static_cast<float> (screenWidth), 
-                                                                oldHeight, static_cast<float> (screenHeight));
-            }
-            else
-            {
-                // Return to windowed mode (75% of screen)
-                int screenWidth  = GetSystemMetrics (SM_CXSCREEN);
-                int screenHeight = GetSystemMetrics (SM_CYSCREEN);
-                int windowWidth  = static_cast<int> (screenWidth * 0.75f);
-                int windowHeight = static_cast<int> (screenHeight * 0.75f);
-                int posX         = (screenWidth - windowWidth) / 2;
-                int posY         = (screenHeight - windowHeight) / 2;
-                
-                SetWindowLongPtr (m_hwnd, GWL_STYLE, WS_POPUP | WS_VISIBLE);
-                SetWindowPos (m_hwnd, HWND_TOP, posX, posY, windowWidth, windowHeight,
-                                SWP_FRAMECHANGED | SWP_SHOWWINDOW);
-                
-                m_viewport->Resize (static_cast<float> (windowWidth), static_cast<float> (windowHeight));
-                m_renderSystem->Resize (windowWidth, windowHeight);
-                
-                // Rescale existing streaks to fit new viewport dimensions
-                m_animationSystem->RescaleStreaksForViewport (oldWidth, static_cast<float> (windowWidth),
-                                                                oldHeight, static_cast<float> (windowHeight));
-            }
+            ResizeWindowForCurrentMode();
             m_inDisplayModeTransition = false;
-            
-            // Reset timer to prevent accumulated deltaTime from causing animation jump
-            if (m_timer)
-            {
-                m_timer->Reset();
-            }
         }
     }
 }

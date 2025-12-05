@@ -1,6 +1,7 @@
 #include "pch.h"
 
 #include "../../MatrixRainCore/ApplicationState.h"
+#include "../../MatrixRainCore/RegistrySettingsProvider.h"
 
 
 
@@ -10,7 +11,32 @@ namespace MatrixRainTests
 {
     TEST_CLASS (ApplicationStateTests)
     {
+    private:
+        static constexpr LPCWSTR TEST_REGISTRY_KEY_PATH = L"Software\\relmer\\MatrixRain_AppStateTest";
+        
+        static void DeleteTestRegistryKey()
+        {
+            RegDeleteTreeW (HKEY_CURRENT_USER, TEST_REGISTRY_KEY_PATH);
+        }
+        
     public:
+        TEST_CLASS_INITIALIZE (Initialize)
+        {
+            RegistrySettingsProvider::SetRegistryKeyPath (TEST_REGISTRY_KEY_PATH);
+        }
+        
+        TEST_CLASS_CLEANUP (Cleanup)
+        {
+            DeleteTestRegistryKey();
+            RegistrySettingsProvider::ResetRegistryKeyPath();
+        }
+        
+        TEST_METHOD_INITIALIZE (MethodSetup)
+        {
+            // Ensure clean registry state before each test
+            DeleteTestRegistryKey();
+        }
+        
         // T116: Test ApplicationState display mode initialization to Fullscreen
         TEST_METHOD (TestApplicationStateInitializesToFullscreen)
         {

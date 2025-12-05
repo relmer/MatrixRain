@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ColorScheme.h"
+#include "ScreenSaverSettings.h"
 
 
 
@@ -49,6 +50,12 @@ public:
     /// Toggle debug fade times display.
     /// </summary>
     void ToggleDebugFadeTimes();
+    
+    /// <summary>
+    /// Called when density changes to update and save settings.
+    /// </summary>
+    /// <param name="densityPercent">New density percentage (0-100)</param>
+    void OnDensityChanged (int densityPercent);
 
     /// <summary>
     /// Update application state with elapsed time.
@@ -58,22 +65,30 @@ public:
     void Update (float deltaTime);
 
     // Accessors
-    DisplayMode GetDisplayMode()         const { return m_displayMode;         }
-    ColorScheme GetColorScheme()         const { return m_colorScheme;         }
-    bool        GetShowDebugFadeTimes()  const { return m_showDebugFadeTimes;  }
-    float       GetElapsedTime()         const { return m_elapsedTime;         }
-    bool        GetShowStatistics()      const { return m_showStatistics;      }
+    DisplayMode               GetDisplayMode()         const { return m_displayMode;         }
+    ColorScheme               GetColorScheme()         const { return m_colorScheme;         }
+    bool                      GetShowDebugFadeTimes()  const { return m_showDebugFadeTimes;  }
+    float                     GetElapsedTime()         const { return m_elapsedTime;         }
+    bool                      GetShowStatistics()      const { return m_showStatistics;      }
+    const ScreenSaverSettings GetSettings()            const { return m_settings;            }
 
     void SetDisplayMode    (DisplayMode mode)   { m_displayMode = mode;                 }
     void SetColorScheme    (ColorScheme scheme) { m_colorScheme = scheme;               }
-    void ToggleStatistics()                     { m_showStatistics = !m_showStatistics; }
+    void ToggleStatistics();
+    
+    /// <summary>
+    /// Save current settings to registry.
+    /// </summary>
+    /// <returns>S_OK on success, error HRESULT otherwise</returns>
+    HRESULT SaveSettings();
 
 private:
-    DisplayMode m_displayMode        = DisplayMode::Fullscreen; // Current display mode
-    ColorScheme m_colorScheme        = ColorScheme::Green;      // Current color scheme
-    bool        m_showDebugFadeTimes = false;                   // Show debug fade time overlay
-    bool        m_showStatistics     = false;                   // Show FPS and density statistics
-    float       m_elapsedTime        = 0.0f;                    // Elapsed time for color cycling animation
+    DisplayMode         m_displayMode        = DisplayMode::Fullscreen; // Current display mode
+    ColorScheme         m_colorScheme        = ColorScheme::Green;      // Current color scheme
+    bool                m_showDebugFadeTimes = false;                   // Show debug fade time overlay
+    bool                m_showStatistics     = false;                   // Show FPS and density statistics
+    float               m_elapsedTime        = 0.0f;                    // Elapsed time for color cycling animation
+    ScreenSaverSettings m_settings;                                     // User-configurable settings
 };
 
 

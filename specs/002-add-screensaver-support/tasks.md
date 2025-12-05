@@ -54,8 +54,8 @@
 - [X] T015 [US1] Propagate `ScreenSaverModeContext` through `MatrixRainCore/include/matrixrain/Application.h`, `MatrixRainCore/src/Application.cpp`, and `MatrixRainCore/ApplicationState.cpp` to enforce `/s` runtime rules
 - [X] T032 [P] [US1] Add failing error-handling tests covering invalid screensaver arguments and DirectX initialization failures in `MatrixRainTests/unit/ScreenSaverErrorHandlingTests.cpp`
 - [X] T033 [US1] Surface descriptive message dialogs/log events for invalid arguments and initialization failures in `MatrixRain/ScreenSaverModeParser.cpp` and `MatrixRain/main.cpp`
-- [ ] T038 [P] [US1] Add failing tests ensuring a second `/s` launch while the saver is active exits immediately with a diagnostic in `MatrixRainTests/integration/DisplayModeTests.cpp`
-- [ ] T039 [US1] Implement single-instance detection and diagnostic messaging for concurrent saver launches in `MatrixRain/main.cpp` and `MatrixRainCore/ApplicationState.cpp`
+- [~] T038 [P] [US1] ~~Add failing tests ensuring a second `/s` launch while the saver is active exits immediately with a diagnostic in `MatrixRainTests/integration/DisplayModeTests.cpp`~~ **SKIPPED** - Windows OS already manages screensaver instance lifecycle; mutex-based detection unnecessary and risks leaked locks
+- [~] T039 [US1] ~~Implement single-instance detection and diagnostic messaging for concurrent saver launches in `MatrixRain/main.cpp` and `MatrixRainCore/ApplicationState.cpp`~~ **SKIPPED** - Not needed; see T038
 - [ ] T045 [P] [US1] Add failing multi-monitor integration tests confirming `/s` sessions cover all displays in `MatrixRainTests/integration/DisplayModeTests.cpp`
 - [ ] T046 [US1] Implement multi-monitor rendering support across `MatrixRainCore/src/Application.cpp` and `MatrixRainCore/RenderSystem.cpp`
 
@@ -71,8 +71,8 @@
 
 ### Implementation & Tests for User Story 2 (write tests first)
 
-- [ ] T016 [P] [US2] Add failing load/save tests for `RegistrySettingsProvider` in `MatrixRainTests/unit/RegistrySettingsProviderTests.cpp`
-- [ ] T017 [US2] Implement `RegistrySettingsProvider` in `MatrixRainCore/RegistrySettingsProvider.h` and `MatrixRainCore/RegistrySettingsProvider.cpp`
+- [X] T016 [P] [US2] Add failing load/save tests for `RegistrySettingsProvider` in `MatrixRainTests/unit/RegistrySettingsProviderTests.cpp`
+- [X] T017 [US2] Implement `RegistrySettingsProvider` in `MatrixRainCore/RegistrySettingsProvider.h` and `MatrixRainCore/RegistrySettingsProvider.cpp`
 - [ ] T018 [US2] Integrate registry loading/saving flows into `MatrixRainCore/ApplicationState.cpp` using the provider
 - [ ] T019 [P] [US2] Add failing presenter logic tests for the settings dialog in `MatrixRainTests/unit/ConfigDialogControllerTests.cpp`
 - [ ] T020 [US2] Implement `ConfigDialogController` in `MatrixRainCore/ConfigDialogController.h` and `MatrixRainCore/ConfigDialogController.cpp`

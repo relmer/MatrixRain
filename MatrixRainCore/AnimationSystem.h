@@ -77,7 +77,7 @@ public:
     /// <param name="newWidth">New viewport width</param>
     /// <param name="oldHeight">Previous viewport height</param>
     /// <param name="newHeight">New viewport height</param>
-    void RescaleStreaksForViewport (float oldWidth, float newWidth, float oldHeight, float newHeight);
+    void RescaleStreaksForViewport (float oldWidth, float oldHeight, float newWidth, float newHeight);
 
     /// <summary>
     /// Clear all active streaks (used when switching display modes).

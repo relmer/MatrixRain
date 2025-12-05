@@ -145,6 +145,7 @@
     <ClInclude Include="FPSCounter.h" />
     <ClInclude Include="InputSystem.h" />
     <ClInclude Include="Math.h" />
+    <ClInclude Include="RegistrySettingsProvider.h" />
     <ClInclude Include="RenderSystem.h" />
     <ClInclude Include="ScreenSaverModeParser.h" />
     <ClInclude Include="Timer.h" />
@@ -166,6 +167,7 @@
     <ClCompile Include="CharacterSet.cpp" />
     <ClCompile Include="InputSystem.cpp" />
     <ClCompile Include="Math.cpp" />
+    <ClCompile Include="RegistrySettingsProvider.cpp" />
     <ClCompile Include="RenderSystem.cpp" />
     <ClCompile Include="ScreenSaverModeParser.cpp" />
     <ClCompile Include="ApplicationState.cpp" />

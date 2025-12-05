@@ -306,7 +306,7 @@ void AnimationSystem::ApplyZoom (float deltaTime)
 
 
 
-void AnimationSystem::RescaleStreaksForViewport (float oldWidth, float newWidth, float oldHeight, float newHeight)
+void AnimationSystem::RescaleStreaksForViewport (float oldWidth, float oldHeight, float newWidth, float newHeight)
 {
     if (oldWidth <= 0.0f || newWidth <= 0.0f || oldHeight <= 0.0f || newHeight <= 0.0f)
     {

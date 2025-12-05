@@ -57,6 +57,12 @@ void InputSystem::OnDensityIncrease()
     if (m_densityController)
     {
         m_densityController->IncreaseLevel();
+        
+        // Notify app state to save new density
+        if (m_appState)
+        {
+            m_appState->OnDensityChanged (m_densityController->GetPercentage());
+        }
     }
 }
 
@@ -69,6 +75,12 @@ void InputSystem::OnDensityDecrease()
     if (m_densityController)
     {
         m_densityController->DecreaseLevel();
+        
+        // Notify app state to save new density
+        if (m_appState)
+        {
+            m_appState->OnDensityChanged (m_densityController->GetPercentage());
+        }
     }
 }
 

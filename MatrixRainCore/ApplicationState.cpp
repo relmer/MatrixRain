@@ -1,6 +1,7 @@
 #include "pch.h"
 
 #include "ApplicationState.h"
+#include "RegistrySettingsProvider.h"
 #include "ScreenSaverModeContext.h"
 
 
@@ -11,17 +12,45 @@ void ApplicationState::Initialize (const ScreenSaverModeContext * pScreenSaverCo
 {
     UNREFERENCED_PARAMETER (pScreenSaverContext);  // Reserved for future use (e.g., suppress statistics in /s mode)
     
-    // Start in fullscreen mode by default
-    m_displayMode = DisplayMode::Fullscreen;
+    // Load settings from registry (falls back to defaults if key doesn't exist)
+    HRESULT hr = RegistrySettingsProvider::Load (m_settings);
     
-    // Start with green color scheme (classic Matrix)
-    m_colorScheme = ColorScheme::Green;
+    // hr == S_FALSE means key didn't exist, used defaults (not an error)
+    // hr == S_OK means loaded from registry successfully
+    // Any other HRESULT is an actual error, but we continue with defaults
+    UNREFERENCED_PARAMETER (hr);
     
-    // Debug fade times off by default
-    m_showDebugFadeTimes = false;
+    // Apply settings to runtime state
+    m_displayMode        = m_settings.m_startFullscreen ? DisplayMode::Fullscreen : DisplayMode::Windowed;
+    m_showDebugFadeTimes = m_settings.m_showFadeTimers;
+    m_showStatistics     = m_settings.m_showDebugStats;
     
-    // Statistics hidden by default
-    m_showStatistics = false;
+    // Map color scheme key to enum
+    if (m_settings.m_colorSchemeKey == L"green")
+    {
+        m_colorScheme = ColorScheme::Green;
+    }
+    else if (m_settings.m_colorSchemeKey == L"blue")
+    {
+        m_colorScheme = ColorScheme::Blue;
+    }
+    else if (m_settings.m_colorSchemeKey == L"red")
+    {
+        m_colorScheme = ColorScheme::Red;
+    }
+    else if (m_settings.m_colorSchemeKey == L"amber")
+    {
+        m_colorScheme = ColorScheme::Amber;
+    }
+    else if (m_settings.m_colorSchemeKey == L"cycle")
+    {
+    m_colorScheme = ColorScheme::ColorCycle;
+    }
+    else
+    {
+        // Default to green if unknown
+        m_colorScheme = ColorScheme::Green;
+    }
 }
 
 
@@ -39,6 +68,10 @@ void ApplicationState::ToggleDisplayMode()
     {
         m_displayMode = DisplayMode::Windowed;
     }
+    
+    // Update settings and save
+    m_settings.m_startFullscreen = (m_displayMode == DisplayMode::Fullscreen);
+    SaveSettings();
 }
 
 
@@ -49,6 +82,18 @@ void ApplicationState::CycleColorScheme()
 {
     // Cycle to next color scheme
     m_colorScheme = GetNextColorScheme (m_colorScheme);
+    
+    // Update settings and save
+    switch (m_colorScheme)
+    {
+        case ColorScheme::Green:      m_settings.m_colorSchemeKey = L"green";  break;
+        case ColorScheme::Blue:       m_settings.m_colorSchemeKey = L"blue";   break;
+        case ColorScheme::Red:        m_settings.m_colorSchemeKey = L"red";    break;
+        case ColorScheme::Amber:      m_settings.m_colorSchemeKey = L"amber";  break;
+        case ColorScheme::ColorCycle: m_settings.m_colorSchemeKey = L"cycle";  break;
+    }
+    
+    SaveSettings();
 }
 
 
@@ -58,7 +103,23 @@ void ApplicationState::CycleColorScheme()
 void ApplicationState::ToggleDebugFadeTimes()
 {
     m_showDebugFadeTimes = !m_showDebugFadeTimes;
+    
+    // Update settings and save
+    m_settings.m_showFadeTimers = m_showDebugFadeTimes;
+    SaveSettings();
 }
+
+
+
+
+
+
+void ApplicationState::OnDensityChanged (int densityPercent)
+{
+    m_settings.m_densityPercent = densityPercent;
+    SaveSettings();
+}
+
 
 
 
@@ -67,5 +128,38 @@ void ApplicationState::ToggleDebugFadeTimes()
 void ApplicationState::Update (float deltaTime)
 {
     m_elapsedTime += deltaTime;
+}
+
+
+
+
+
+
+void ApplicationState::ToggleStatistics()
+{
+    m_showStatistics = !m_showStatistics;
+    
+    // Update settings and save
+    m_settings.m_showDebugStats = m_showStatistics;
+    SaveSettings();
+}
+
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  ApplicationState::SaveSettings
+//
+//  Persist current settings to registry
+//
+////////////////////////////////////////////////////////////////////////////////
+
+HRESULT
+ApplicationState::SaveSettings()
+{
+    return RegistrySettingsProvider::Save (m_settings);
 }
 
