@@ -141,6 +141,7 @@
     <ClInclude Include="CharacterSet.h" />
     <ClInclude Include="CharacterStreak.h" />
     <ClInclude Include="ColorScheme.h" />
+    <ClInclude Include="ConfigDialogController.h" />
     <ClInclude Include="DensityController.h" />
     <ClInclude Include="FPSCounter.h" />
     <ClInclude Include="InputSystem.h" />
@@ -165,6 +166,7 @@
     <ClCompile Include="Application.cpp" />
     <ClCompile Include="CharacterConstants.cpp" />
     <ClCompile Include="CharacterSet.cpp" />
+    <ClCompile Include="ConfigDialogController.cpp" />
     <ClCompile Include="InputSystem.cpp" />
     <ClCompile Include="Math.cpp" />
     <ClCompile Include="RegistrySettingsProvider.cpp" />

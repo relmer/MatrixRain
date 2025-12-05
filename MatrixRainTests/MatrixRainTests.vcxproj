@@ -169,6 +169,7 @@
     <ClCompile Include="unit\ScreenSaverErrorHandlingTests.cpp" />
     <ClCompile Include="unit\ApplicationStateTests.cpp" />
     <ClCompile Include="unit\ColorSchemeTests.cpp" />
+    <ClCompile Include="unit\ConfigDialogControllerTests.cpp" />
     <ClCompile Include="unit\DensityControllerTests.cpp" />
     <ClCompile Include="unit\RegistrySettingsProviderTests.cpp" />
     <ClCompile Include="unit\ScreenSaverSettingsTests.cpp" />

@@ -140,7 +140,7 @@ namespace MatrixRainTests
             float newHeight = 1080.0f;
             
             viewport.Resize (newWidth, newHeight);
-            animationSystem.RescaleStreaksForViewport (oldWidth, newWidth, oldHeight, newHeight);
+            animationSystem.RescaleStreaksForViewport (oldWidth, oldHeight, newWidth, newHeight);
 
             // Continue animation for another second
             for (int i = 0; i < 60; i++)

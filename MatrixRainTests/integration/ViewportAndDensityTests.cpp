@@ -43,7 +43,7 @@ namespace MatrixRainTests
             float newWidth = 1920.0f;
             float newHeight = 1080.0f;
 
-            animationSystem.RescaleStreaksForViewport (oldWidth, newWidth, oldHeight, newHeight);
+            animationSystem.RescaleStreaksForViewport (oldWidth, oldHeight, newWidth, newHeight);
 
             // Then: Positions should be scaled proportionally
             float expectedScaleX = newWidth / oldWidth;  // 1.333...
@@ -95,7 +95,7 @@ namespace MatrixRainTests
             float newWidth = 2000.0f;
             float newHeight = 1600.0f;
 
-            animationSystem.RescaleStreaksForViewport (oldWidth, newWidth, oldHeight, newHeight);
+            animationSystem.RescaleStreaksForViewport (oldWidth, oldHeight, newWidth, newHeight);
 
             // Then: All streaks should still be within new bounds (approximately)
             for (const auto & streak : animationSystem.GetStreaks ())
@@ -134,7 +134,7 @@ namespace MatrixRainTests
             float newWidth = 1440.0f;
             float newHeight = 900.0f;
 
-            animationSystem.RescaleStreaksForViewport (oldWidth, newWidth, oldHeight, newHeight);
+            animationSystem.RescaleStreaksForViewport (oldWidth, oldHeight, newWidth, newHeight);
 
             // Then: Streaks should be scaled proportionally smaller
             for (const auto & streak : animationSystem.GetStreaks ())

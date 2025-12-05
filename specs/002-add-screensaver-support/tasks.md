@@ -73,9 +73,9 @@
 
 - [X] T016 [P] [US2] Add failing load/save tests for `RegistrySettingsProvider` in `MatrixRainTests/unit/RegistrySettingsProviderTests.cpp`
 - [X] T017 [US2] Implement `RegistrySettingsProvider` in `MatrixRainCore/RegistrySettingsProvider.h` and `MatrixRainCore/RegistrySettingsProvider.cpp`
-- [ ] T018 [US2] Integrate registry loading/saving flows into `MatrixRainCore/ApplicationState.cpp` using the provider
-- [ ] T019 [P] [US2] Add failing presenter logic tests for the settings dialog in `MatrixRainTests/unit/ConfigDialogControllerTests.cpp`
-- [ ] T020 [US2] Implement `ConfigDialogController` in `MatrixRainCore/ConfigDialogController.h` and `MatrixRainCore/ConfigDialogController.cpp`
+- [X] T018 [US2] Integrate registry loading/saving flows into `MatrixRainCore/ApplicationState.cpp` using the provider
+- [X] T019 [P] [US2] Add failing presenter logic tests for the settings dialog in `MatrixRainTests/unit/ConfigDialogControllerTests.cpp`
+- [X] T020 [US2] Implement `ConfigDialogController` in `MatrixRainCore/ConfigDialogController.h` and `MatrixRainCore/ConfigDialogController.cpp`
 - [ ] T021 [US2] Define `IDD_MATRIXRAIN_SAVER_CONFIG` and control IDs in `MatrixRain/MatrixRain.rc` and `MatrixRain/resource.h`
 - [ ] T022 [US2] Handle `/c` argument in `MatrixRain/main.cpp` by invoking `ConfigDialogController` with registry-backed settings
 - [ ] T034 [P] [US2] Add failing tests for registry read/write failure paths and user-facing diagnostics in `MatrixRainTests/unit/RegistrySettingsProviderTests.cpp`

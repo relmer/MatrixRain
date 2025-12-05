@@ -10,18 +10,25 @@ struct ScreenSaverSettings
 {
     static constexpr int MIN_DENSITY_PERCENT         = 0;
     static constexpr int MAX_DENSITY_PERCENT         = 100;
+    static constexpr int DEFAULT_DENSITY_PERCENT     = 100;
+    
     static constexpr int MIN_ANIMATION_SPEED_PERCENT = 1;
     static constexpr int MAX_ANIMATION_SPEED_PERCENT = 100;
+    static constexpr int DEFAULT_ANIMATION_SPEED_PERCENT = 75;
+    
     static constexpr int MIN_GLOW_INTENSITY_PERCENT  = 0;
     static constexpr int MAX_GLOW_INTENSITY_PERCENT  = 200;
+    static constexpr int DEFAULT_GLOW_INTENSITY_PERCENT = 100;
+    
     static constexpr int MIN_GLOW_SIZE_PERCENT       = 50;
     static constexpr int MAX_GLOW_SIZE_PERCENT       = 200;
+    static constexpr int DEFAULT_GLOW_SIZE_PERCENT   = 100;
 
-    int                                 m_densityPercent        { 100   };
+    int                                 m_densityPercent        { DEFAULT_DENSITY_PERCENT         };
     std::wstring                        m_colorSchemeKey;
-    int                                 m_animationSpeedPercent { 75    };
-    int                                 m_glowIntensityPercent  { 100   };
-    int                                 m_glowSizePercent       { 100   };
+    int                                 m_animationSpeedPercent { DEFAULT_ANIMATION_SPEED_PERCENT };
+    int                                 m_glowIntensityPercent  { DEFAULT_GLOW_INTENSITY_PERCENT  };
+    int                                 m_glowSizePercent       { DEFAULT_GLOW_SIZE_PERCENT       };
     bool                                m_startFullscreen       { true  };
     bool                                m_showDebugStats        { false };
     bool                                m_showFadeTimers        { false };
