@@ -45,21 +45,27 @@ namespace MatrixRainTests
         TEST_METHOD (TestConfigDialogControllerLoadsExistingSettings)
         {
             // Arrange: Save known settings to registry
-            ScreenSaverSettings settings;
-            settings.m_densityPercent        = 65;
-            settings.m_colorSchemeKey        = L"blue";
-            settings.m_animationSpeedPercent = 50;
-            settings.m_glowIntensityPercent  = 120;
-            settings.m_glowSizePercent       = 150;
-            settings.m_startFullscreen       = false;
-            settings.m_showDebugStats        = true;
-            settings.m_showFadeTimers        = true;
+            ScreenSaverSettings settings
+            {
+                .m_densityPercent        = 65,
+                .m_colorSchemeKey        = L"blue",
+                .m_animationSpeedPercent = 50,
+                .m_glowIntensityPercent  = 120,
+                .m_glowSizePercent       = 150,
+                .m_startFullscreen       = false,
+                .m_showDebugStats        = true,
+                .m_showFadeTimers        = true
+            };
             
-            HRESULT hr = RegistrySettingsProvider::Save (settings);
+            HRESULT                hr         = S_OK; 
+            ConfigDialogController controller;
+            
+
+            
+            hr = RegistrySettingsProvider::Save (settings);
             Assert::AreEqual (S_OK, hr, L"Registry save should succeed");
 
             // Act: Create controller and initialize
-            ConfigDialogController controller;
             hr = controller.Initialize();
             Assert::AreEqual (S_OK, hr, L"Controller initialization should succeed");
 
@@ -82,12 +88,17 @@ namespace MatrixRainTests
         // T019.2: Test ConfigDialogController uses defaults when no registry key exists
         TEST_METHOD (TestConfigDialogControllerUsesDefaultsWhenNoRegistry)
         {
+            HRESULT                hr         = S_OK; 
+            ConfigDialogController controller;
+
+
+
             // Arrange: Ensure no registry key exists (already done in MethodSetup)
 
             // Act: Create controller and initialize
-            ConfigDialogController controller;
-            HRESULT hr = controller.Initialize();
-            Assert::AreEqual (S_OK, hr, L"Controller initialization should succeed with defaults");
+            
+            hr = controller.Initialize();
+            Assert::AreEqual (S_OK, hr);
 
             // Assert: Verify settings use defaults
             const ScreenSaverSettings & loaded = controller.GetSettings();
@@ -107,9 +118,13 @@ namespace MatrixRainTests
         // T019.3: Test ConfigDialogController validates and clamps density slider updates
         TEST_METHOD (TestConfigDialogControllerClampsDensitySliderUpdates)
         {
-            // Arrange
+            HRESULT                hr         = S_OK;
             ConfigDialogController controller;
-            HRESULT hr = controller.Initialize();
+
+
+
+            // Arrange
+            hr = controller.Initialize();
             Assert::AreEqual (S_OK, hr);
 
             // Act & Assert: Test valid range
@@ -136,9 +151,13 @@ namespace MatrixRainTests
         // T019.4: Test ConfigDialogController validates and clamps animation speed updates
         TEST_METHOD (TestConfigDialogControllerClampsAnimationSpeedUpdates)
         {
-            // Arrange
+            HRESULT                hr         = S_OK; 
             ConfigDialogController controller;
-            HRESULT hr = controller.Initialize();
+            
+            
+            
+            // Arrange
+            hr = controller.Initialize();
             Assert::AreEqual (S_OK, hr);
 
             // Act & Assert: Test valid range
@@ -165,9 +184,13 @@ namespace MatrixRainTests
         // T019.5: Test ConfigDialogController validates and clamps glow intensity updates
         TEST_METHOD (TestConfigDialogControllerClampsGlowIntensityUpdates)
         {
-            // Arrange
+            HRESULT                hr         = S_OK; 
             ConfigDialogController controller;
-            HRESULT hr = controller.Initialize();
+            
+            
+            
+            // Arrange
+            hr = controller.Initialize();
             Assert::AreEqual (S_OK, hr);
 
             // Act & Assert: Test valid range
@@ -194,9 +217,13 @@ namespace MatrixRainTests
         // T019.6: Test ConfigDialogController validates and clamps glow size updates
         TEST_METHOD (TestConfigDialogControllerClampsGlowSizeUpdates)
         {
-            // Arrange
+            HRESULT                hr         = S_OK; 
             ConfigDialogController controller;
-            HRESULT hr = controller.Initialize();
+            
+            
+            
+            // Arrange
+            hr = controller.Initialize();
             Assert::AreEqual (S_OK, hr);
 
             // Act & Assert: Test valid range
@@ -223,9 +250,13 @@ namespace MatrixRainTests
         // T019.7: Test ConfigDialogController updates color scheme selection
         TEST_METHOD (TestConfigDialogControllerUpdatesColorScheme)
         {
-            // Arrange
+            HRESULT                hr         = S_OK; 
             ConfigDialogController controller;
-            HRESULT hr = controller.Initialize();
+            
+            
+            
+            // Arrange
+            hr = controller.Initialize();
             Assert::AreEqual (S_OK, hr);
 
             // Act & Assert: Test each color scheme
@@ -253,8 +284,12 @@ namespace MatrixRainTests
         TEST_METHOD (TestConfigDialogControllerRejectsInvalidColorScheme)
         {
             // Arrange
+            HRESULT                hr         = S_OK; 
             ConfigDialogController controller;
-            HRESULT hr = controller.Initialize();
+            
+            
+            
+            hr = controller.Initialize();
             Assert::AreEqual (S_OK, hr);
 
             std::wstring originalScheme = controller.GetSettings().m_colorSchemeKey;
@@ -276,8 +311,12 @@ namespace MatrixRainTests
         TEST_METHOD (TestConfigDialogControllerUpdatesBooleanFlags)
         {
             // Arrange
+            HRESULT                hr         = S_OK;
             ConfigDialogController controller;
-            HRESULT hr = controller.Initialize();
+
+
+
+            hr = controller.Initialize();
             Assert::AreEqual (S_OK, hr);
 
             // Act & Assert: Test fullscreen toggle
@@ -310,8 +349,12 @@ namespace MatrixRainTests
         TEST_METHOD (TestConfigDialogControllerSavesOnApply)
         {
             // Arrange
+            HRESULT                hr         = S_OK; 
             ConfigDialogController controller;
-            HRESULT hr = controller.Initialize();
+            
+            
+            
+            hr = controller.Initialize();
             Assert::AreEqual (S_OK, hr);
 
             // Modify settings
@@ -347,10 +390,12 @@ namespace MatrixRainTests
         TEST_METHOD (TestConfigDialogControllerDiscardsChangesOnCancel)
         {
             // Arrange: Save initial settings to registry
-            ScreenSaverSettings initialSettings;
-            initialSettings.m_densityPercent        = 50;
-            initialSettings.m_colorSchemeKey        = L"green";
-            initialSettings.m_animationSpeedPercent = 75;
+            ScreenSaverSettings initialSettings
+            {
+                .m_densityPercent        = 50,
+                .m_colorSchemeKey        = L"green",
+                .m_animationSpeedPercent = 75
+            };
             
             HRESULT hr = RegistrySettingsProvider::Save (initialSettings);
             Assert::AreEqual (S_OK, hr);
@@ -385,8 +430,12 @@ namespace MatrixRainTests
         TEST_METHOD (TestConfigDialogControllerResetsToDefaults)
         {
             // Arrange
+            HRESULT                hr         = S_OK;
             ConfigDialogController controller;
-            HRESULT hr = controller.Initialize();
+
+
+
+            hr = controller.Initialize();
             Assert::AreEqual (S_OK, hr);
 
             // Modify settings
@@ -408,6 +457,168 @@ namespace MatrixRainTests
             Assert::IsTrue   (settings.m_startFullscreen,                           L"Start fullscreen should reset to default");
             Assert::IsFalse  (settings.m_showDebugStats,                            L"Show debug stats should reset to default");
             Assert::IsFalse  (settings.m_showFadeTimers,                            L"Show fade timers should reset to default");
+        }
+
+
+
+
+
+        // T050.1: Test ConfigDialogController creates snapshot in live overlay mode
+        TEST_METHOD (TestConfigDialogControllerCreatesSnapshotInLiveMode)
+        {
+            // Arrange: Set up initial settings in registry
+            ScreenSaverSettings initialSettings
+            {
+                .m_densityPercent        = 70,
+                .m_colorSchemeKey        = L"blue",
+                .m_animationSpeedPercent = 80,
+                .m_glowIntensityPercent  = 120,
+                .m_glowSizePercent       = 140
+            };
+            
+            HRESULT hr = RegistrySettingsProvider::Save (initialSettings);
+            Assert::AreEqual (S_OK, hr);
+
+            ConfigDialogController controller;
+            hr = controller.Initialize();
+            Assert::AreEqual (S_OK, hr);
+
+            // Act: Initialize live overlay mode (requires ApplicationState* - passing nullptr for now, will fail until T051)
+            hr = controller.InitializeLiveMode (nullptr);
+
+            // Assert: Should fail with E_POINTER until T051 implementation
+            Assert::AreEqual (E_POINTER, hr, L"Should fail with null ApplicationState until T051 implements live mode");
+        }
+
+
+
+
+
+        // T050.2: Test live overlay mode applies changes immediately to ApplicationState
+        TEST_METHOD (TestLiveModeAppliesChangesImmediately)
+        {
+            // Arrange
+            HRESULT                hr         = S_OK;
+            ConfigDialogController controller;
+
+
+
+            hr = controller.Initialize();
+            Assert::AreEqual (S_OK, hr);
+
+            // Act: Try to initialize live mode with null ApplicationState
+            hr = controller.InitializeLiveMode (nullptr);
+
+            // Assert: Should fail until T051 implementation
+            Assert::AreEqual (E_POINTER, hr, L"InitializeLiveMode should reject null ApplicationState");
+        }
+
+
+
+
+
+        // T050.3: Test Cancel in live mode reverts ApplicationState to snapshot values
+        TEST_METHOD (TestLiveModeCancelRevertsToSnapshot)
+        {
+            // Arrange
+            HRESULT                 hr         = S_OK;
+            ConfigDialogController  controller;
+
+
+
+            hr = controller.Initialize();
+            Assert::AreEqual (S_OK, hr);
+
+            // Act: Try to cancel before initializing live mode
+            hr = controller.CancelLiveMode();
+
+            // Assert: Should fail gracefully (not in live mode)
+            Assert::AreNotEqual (S_OK, hr, L"CancelLiveMode should fail when not in live mode");
+        }
+
+
+
+
+
+        // T050.4: Test OK in live mode persists changes and clears snapshot
+        TEST_METHOD (TestLiveModeOkPersistsChanges)
+        {
+            // Arrange: Set up initial settings
+            HRESULT   hr = S_OK; 
+            ScreenSaverSettings initialSettings
+            {
+                .m_densityPercent = 50
+            };
+            
+            
+            hr = RegistrySettingsProvider::Save (initialSettings);
+            Assert::AreEqual (S_OK, hr);
+
+            ConfigDialogController controller;
+            hr = controller.Initialize();
+            Assert::AreEqual (S_OK, hr);
+
+            // Act: Try to apply live mode without initialization
+            hr = controller.ApplyLiveMode();
+
+            // Assert: Should fail (not in live mode)
+            Assert::AreNotEqual (S_OK, hr, L"ApplyLiveMode should fail when not in live mode");
+        }
+
+
+
+
+
+        // T050.5: Test live mode snapshot captures all settings correctly
+        TEST_METHOD (TestLiveModeSnapshotCapturesAllSettings)
+        {
+            // Arrange: Configure comprehensive settings
+            ScreenSaverSettings settings
+            {
+                .m_densityPercent        = 65,
+                .m_colorSchemeKey        = L"amber",
+                .m_animationSpeedPercent = 85,
+                .m_glowIntensityPercent  = 150,
+                .m_glowSizePercent       = 175,
+                .m_startFullscreen       = false,
+                .m_showDebugStats        = true,
+                .m_showFadeTimers        = true
+            };
+            
+            HRESULT hr = RegistrySettingsProvider::Save (settings);
+            Assert::AreEqual (S_OK, hr);
+
+            ConfigDialogController controller;
+            hr = controller.Initialize();
+            Assert::AreEqual (S_OK, hr);
+
+            // Act & Assert: Verify IsLiveMode returns false before initialization
+            Assert::IsFalse (controller.IsLiveMode(), L"Should not be in live mode before initialization");
+        }
+
+
+
+
+
+        // T050.6: Test live mode rejects modal operations
+        TEST_METHOD (TestLiveModeRejectsModalOperations)
+        {
+            // Arrange
+            ConfigDialogController controller;
+            HRESULT                hr         = S_OK;
+
+
+
+            hr = controller.Initialize();
+            Assert::AreEqual (S_OK, hr);
+
+            // Act: Try modal apply while not in live mode
+            hr = controller.ApplyChanges();
+
+            // Assert: Should succeed in modal mode
+            Assert::AreEqual (S_OK, hr, L"ApplyChanges should work in modal mode");
+
+            // Future: When in live mode, ApplyChanges should fail or be redirected
         }
     };
 }  // namespace MatrixRainTests

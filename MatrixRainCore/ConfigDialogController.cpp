@@ -173,3 +173,110 @@ bool ConfigDialogController::m_isValidColorScheme (const std::wstring & key) con
            lowerKey == L"amber"  ||
            lowerKey == L"cycle";
 }
+
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  ConfigDialogController::InitializeLiveMode
+//
+//  Initializes live overlay mode with ApplicationState reference for immediate
+//  updates. Creates snapshot for Cancel rollback capability.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+HRESULT ConfigDialogController::InitializeLiveMode (ApplicationState * appState)
+{
+    HRESULT hr = S_OK;
+    
+    
+    
+    // Validate ApplicationState pointer
+    CBRAEx (appState != nullptr, E_POINTER);
+    
+    // Create snapshot of current settings for Cancel rollback
+    m_snapshot.snapshotSettings     = m_settings;
+    m_snapshot.isLiveMode           = true;
+    m_snapshot.applicationStateRef  = appState;  // Stored for use in T052
+    
+    
+Error:
+    return hr;
+}
+
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  ConfigDialogController::ApplyLiveMode
+//
+//  Persists current settings to registry and clears live mode snapshot.
+//  Called when user clicks OK in live overlay dialog.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+HRESULT ConfigDialogController::ApplyLiveMode()
+{
+    HRESULT hr = S_OK;
+    
+    
+    
+    // Verify we're in live mode
+    CBRA (m_snapshot.isLiveMode);
+    
+    // Persist settings to registry
+    hr = RegistrySettingsProvider::Save (m_settings);
+    CHR (hr);
+    
+    // Clear live mode state
+    m_snapshot.isLiveMode          = false;
+    m_snapshot.applicationStateRef = nullptr;
+    
+    
+Error:
+    return hr;
+}
+
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  ConfigDialogController::CancelLiveMode
+//
+//  Reverts ApplicationState to snapshot values and clears live mode state.
+//  Called when user clicks Cancel in live overlay dialog.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+HRESULT ConfigDialogController::CancelLiveMode()
+{
+    HRESULT hr = S_OK;
+    
+    
+    
+    // Verify we're in live mode
+    CBRA (m_snapshot.isLiveMode);
+    
+    // Revert current settings to snapshot (undoing live preview changes)
+    m_settings = m_snapshot.snapshotSettings;
+    
+    // TODO T052: Propagate snapshot settings back to ApplicationState
+    // to visually revert animation to pre-dialog state
+    
+    // Clear live mode state
+    m_snapshot.isLiveMode          = false;
+    m_snapshot.applicationStateRef = nullptr;
+    
+    
+Error:
+    return hr;
+}

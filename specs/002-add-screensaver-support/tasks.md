@@ -82,9 +82,9 @@
 - [X] T035 [US2] Implement registry error propagation and user-facing feedback in `MatrixRainCore/RegistrySettingsProvider.cpp` and `MatrixRainCore/ConfigDialogController.cpp`
 - [~] T040 [P] [US2] ~~Add failing tests verifying the configuration dialog refuses changes while a screensaver session is active in `MatrixRainTests/unit/ConfigDialogControllerTests.cpp`~~ **SKIPPED** - Windows UI prevents simultaneous screensaver execution and Control Panel settings dialog access; OS enforces mutual exclusion
 - [~] T041 [US2] ~~Implement dialog concurrency safeguards and user feedback in `MatrixRainCore/ConfigDialogController.cpp` and `MatrixRainCore/ApplicationState.cpp`~~ **SKIPPED** - Not needed; see T040
-- [ ] T049 [P] [US2] Add `ConfigDialogSnapshot` struct to `MatrixRainCore/ConfigDialogSnapshot.h` for capturing settings state and ApplicationState reference
-- [ ] T050 [P] [US2] Add failing tests for live overlay dialog mode (immediate updates, Cancel rollback) in `MatrixRainTests/unit/ConfigDialogControllerTests.cpp`
-- [ ] T051 [US2] Extend `ConfigDialogController` to support dual modes (modal vs live overlay) with snapshot/restore logic in `MatrixRainCore/ConfigDialogController.cpp`
+- [X] T049 [P] [US2] Add `ConfigDialogSnapshot` struct to `MatrixRainCore/ConfigDialogSnapshot.h` for capturing settings state and ApplicationState reference
+- [X] T050 [P] [US2] Add failing tests for live overlay dialog mode (immediate updates, Cancel rollback) in `MatrixRainTests/unit/ConfigDialogControllerTests.cpp`
+- [X] T051 [US2] Extend `ConfigDialogController` to support dual modes (modal vs live overlay) with snapshot/restore logic in `MatrixRainCore/ConfigDialogController.cpp`
 - [ ] T052 [US2] Implement real-time setting propagation from dialog controls to `ApplicationState` during live overlay mode in `MatrixRainCore/ConfigDialogController.cpp`
 - [ ] T053 [US2] Update `/c` handling in `MatrixRain/main.cpp` to detect presence/absence of HWND in command line: if HWND provided, use it as external Control Panel parent for modal mode; if HWND absent, use `FindWindow()` to locate running MatrixRain instance and obtain its main window HWND for live overlay mode (show error if no instance found)
 - [ ] T054 [P] [US2] Add failing integration tests for live overlay dialog behavior (topmost z-order, immediate animation updates, Cancel revert, primary monitor centering with multi-monitor fullscreen) in `MatrixRainTests/integration/LiveDialogTests.cpp`

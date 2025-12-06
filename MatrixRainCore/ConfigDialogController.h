@@ -1,6 +1,13 @@
 #pragma once
 
+#include "ConfigDialogSnapshot.h"
 #include "ScreenSaverSettings.h"
+
+
+
+
+
+class ApplicationState;
 
 
 
@@ -91,10 +98,37 @@ public:
     /// <returns>Current settings structure</returns>
     const ScreenSaverSettings & GetSettings() const { return m_settings; }
 
+    /// <summary>
+    /// Initialize live overlay mode with ApplicationState reference.
+    /// Creates snapshot for Cancel rollback and enables immediate updates.
+    /// </summary>
+    /// <param name="appState">Non-null ApplicationState pointer for real-time updates</param>
+    /// <returns>S_OK on success, E_POINTER if appState is null, error HRESULT otherwise</returns>
+    HRESULT InitializeLiveMode (ApplicationState * appState);
+
+    /// <summary>
+    /// Apply live mode changes (persist to registry and clear snapshot).
+    /// </summary>
+    /// <returns>S_OK on success, E_FAIL if not in live mode, error HRESULT otherwise</returns>
+    HRESULT ApplyLiveMode();
+
+    /// <summary>
+    /// Cancel live mode changes (revert ApplicationState to snapshot and clear).
+    /// </summary>
+    /// <returns>S_OK on success, E_FAIL if not in live mode</returns>
+    HRESULT CancelLiveMode();
+
+    /// <summary>
+    /// Check if controller is in live overlay mode.
+    /// </summary>
+    /// <returns>True if live mode active, false for modal mode</returns>
+    bool IsLiveMode() const { return m_snapshot.isLiveMode; }
+
 private:
-    ScreenSaverSettings m_settings;                    // Current settings (may include pending changes)
-    ScreenSaverSettings m_originalSettings;            // Original settings loaded from registry
-    bool                m_isValidColorScheme (const std::wstring & key) const;
+    ScreenSaverSettings  m_settings;                    // Current settings (may include pending changes)
+    ScreenSaverSettings  m_originalSettings;            // Original settings loaded from registry
+    ConfigDialogSnapshot m_snapshot;                    // Snapshot for live mode Cancel rollback
+    bool                 m_isValidColorScheme (const std::wstring & key) const;
 };
 
 
