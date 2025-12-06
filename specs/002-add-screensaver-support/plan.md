@@ -116,7 +116,13 @@ All research uncertainties resolved; no outstanding clarification items remain.
 
 - Add resource script entries for `IDD_MATRIXRAIN_SAVER_CONFIG` with standard controls (sliders or spin controls for density, speed, glow intensity, glow size; combobox for color scheme; checkbox for fullscreen; informational text showing that debug toggles are ignored in screensaver mode).
 - Implement a `ConfigDialogController` class that loads current settings, populates UI controls, and commits changes on OK. The dialog procedure delegated to the controller to keep Win32 message handling minimal and testable.
-- When invoked via `/c`, dialog runs modally and exits the process after user action. When invoked from normal mode hotkey, reuse the same controller but stay modeless if the existing UX expects it.
+- **Dual Dialog Modes**:
+  - **Modal Control Panel Mode** (`/c:<HWND>` with external Control Panel window handle): Dialog runs modally as child of Control Panel screensaver settings window. Changes apply only when user clicks OK. Process exits after dialog closes.
+  - **Live Overlay Mode** (`/c` without HWND, requires running MatrixRain instance): Dialog appears parented to MatrixRain's own main window with WS_EX_TOPMOST extended style, keeping it above MatrixRain's fullscreen rendering while allowing other applications (accessed via Alt-Tab or taskbar) to appear above the dialog per normal Windows z-order. Setting changes apply immediately to running animation as user adjusts controls. OK persists changes to registry and closes dialog. Cancel reverts animation to pre-dialog state and closes dialog without persistence. Requires snapshot of settings on dialog open and `ApplicationState` reference for real-time updates.
+- **Threading Model**: Both modal and live overlay dialogs run on the main UI thread (Win32 requirement - all UI operations must be on the thread that created the window). Settings updates to `ApplicationState` occur synchronously during control message handling (WM_HSCROLL, WM_COMMAND) with changes reflected in the next render frame. No worker threads, no cross-thread marshaling, no additional synchronization primitives required.
+- **Instance Detection**: Live overlay mode uses `FindWindow()` with MatrixRain's window class name to locate the running instance's main window HWND. If not found, displays error dialog "MatrixRain must be running to use live settings mode. Launch MatrixRain.exe first, then invoke /c without HWND parameter."
+- **ApplicationState Reference**: In live overlay mode, dialog receives non-null `ApplicationState*` via constructor parameter, validated before use. Reference remains valid for dialog lifetime as dialog and ApplicationState share the same process/thread.
+- The controller must support both modes: buffered changes (modal) and immediate propagation (live overlay with rollback capability).
 
 ### Build & Distribution
 
@@ -154,8 +160,10 @@ Post-design, all gates remain satisfied: logic continues to reside in the core l
 
 4. **Configuration Dialog**
 
-- Create dialog resource and controller unit tests (logic separated from Win32 message pump) covering new glow sliders.
-- Wire `/c` path and in-app hotkey to shared controller ensuring registry persistence on confirmation and real-time preview updates for glow intensity/size where feasible.
+- Create dialog resource and controller unit tests (logic separated from Win32 message pump) covering new glow sliders and dual-mode operation (buffered vs immediate updates).
+- Wire `/c:<HWND>` path for modal Control Panel integration (external Control Panel window HWND, changes apply on OK only, process exits after close).
+- Wire `/c` without HWND path for live overlay mode: use `FindWindow()` to detect running MatrixRain instance and obtain main window HWND, show error if not found, dialog appears parented to MatrixRain's own window with WS_EX_TOPMOST style, requires `ApplicationState` reference passed via constructor, applies changes immediately as user adjusts controls (synchronous on main thread during message handling), snapshots initial state for Cancel rollback, persists to registry only on OK.
+- Dialog positioning for multi-monitor fullscreen: When MatrixRain is fullscreen across multiple monitors, live overlay dialog centers on the primary monitor (where taskbar typically resides) with WS_EX_TOPMOST ensuring visibility above the fullscreen render surface.
 
 5. **Build Artifact Duplication & CI Check**
 

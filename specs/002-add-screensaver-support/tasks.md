@@ -78,12 +78,22 @@
 - [X] T020 [US2] Implement `ConfigDialogController` in `MatrixRainCore/ConfigDialogController.h` and `MatrixRainCore/ConfigDialogController.cpp`
 - [X] T021 [US2] Define `IDD_MATRIXRAIN_SAVER_CONFIG` and control IDs in `MatrixRain/MatrixRain.rc` and `MatrixRain/resource.h`
 - [X] T022 [US2] Handle `/c` argument in `MatrixRain/main.cpp` by invoking `ConfigDialogController` with registry-backed settings
-- [ ] T034 [P] [US2] Add failing tests for registry read/write failure paths and user-facing diagnostics in `MatrixRainTests/unit/RegistrySettingsProviderTests.cpp`
-- [ ] T035 [US2] Implement registry error propagation and user-facing feedback in `MatrixRainCore/RegistrySettingsProvider.cpp` and `MatrixRainCore/ConfigDialogController.cpp`
-- [ ] T040 [P] [US2] Add failing tests verifying the configuration dialog refuses changes while a screensaver session is active in `MatrixRainTests/unit/ConfigDialogControllerTests.cpp`
-- [ ] T041 [US2] Implement dialog concurrency safeguards and user feedback in `MatrixRainCore/ConfigDialogController.cpp` and `MatrixRainCore/ApplicationState.cpp`
+- [X] T034 [P] [US2] Add failing tests for registry read/write failure paths and user-facing diagnostics in `MatrixRainTests/unit/RegistrySettingsProviderTests.cpp`
+- [X] T035 [US2] Implement registry error propagation and user-facing feedback in `MatrixRainCore/RegistrySettingsProvider.cpp` and `MatrixRainCore/ConfigDialogController.cpp`
+- [~] T040 [P] [US2] ~~Add failing tests verifying the configuration dialog refuses changes while a screensaver session is active in `MatrixRainTests/unit/ConfigDialogControllerTests.cpp`~~ **SKIPPED** - Windows UI prevents simultaneous screensaver execution and Control Panel settings dialog access; OS enforces mutual exclusion
+- [~] T041 [US2] ~~Implement dialog concurrency safeguards and user feedback in `MatrixRainCore/ConfigDialogController.cpp` and `MatrixRainCore/ApplicationState.cpp`~~ **SKIPPED** - Not needed; see T040
+- [ ] T049 [P] [US2] Add `ConfigDialogSnapshot` struct to `MatrixRainCore/ConfigDialogSnapshot.h` for capturing settings state and ApplicationState reference
+- [ ] T050 [P] [US2] Add failing tests for live overlay dialog mode (immediate updates, Cancel rollback) in `MatrixRainTests/unit/ConfigDialogControllerTests.cpp`
+- [ ] T051 [US2] Extend `ConfigDialogController` to support dual modes (modal vs live overlay) with snapshot/restore logic in `MatrixRainCore/ConfigDialogController.cpp`
+- [ ] T052 [US2] Implement real-time setting propagation from dialog controls to `ApplicationState` during live overlay mode in `MatrixRainCore/ConfigDialogController.cpp`
+- [ ] T053 [US2] Update `/c` handling in `MatrixRain/main.cpp` to detect presence/absence of HWND in command line: if HWND provided, use it as external Control Panel parent for modal mode; if HWND absent, use `FindWindow()` to locate running MatrixRain instance and obtain its main window HWND for live overlay mode (show error if no instance found)
+- [ ] T054 [P] [US2] Add failing integration tests for live overlay dialog behavior (topmost z-order, immediate animation updates, Cancel revert, primary monitor centering with multi-monitor fullscreen) in `MatrixRainTests/integration/LiveDialogTests.cpp`
+- [ ] T055 [US2] Implement WS_EX_TOPMOST dialog styling and parent-to-app-window logic for live overlay mode in `MatrixRainCore/ConfigDialogController.cpp` and `MatrixRain/main.cpp`
+- [ ] T056 [P] [US2] Add failing error handling tests for `/c` without HWND when app not running (FindWindow returns NULL) or during screensaver sessions (FindWindow finds /s or /p mode window) in `MatrixRainTests/unit/ScreenSaverModeParserTests.cpp`
+- [ ] T057 [US2] Implement error dialogs for invalid live overlay mode invocations (no app running, screensaver active) in `MatrixRain/ScreenSaverModeParser.cpp`
+- [ ] T058 [P] [US2] Add failing tests for dialog behavior when MatrixRain application exits while live overlay dialog is open (dialog detects parent window destruction via WM_PARENTNOTIFY or window validation and closes gracefully) in `MatrixRainTests/unit/ConfigDialogControllerTests.cpp`
 
-**Checkpoint**: Users can configure screensaver options via the dialog, and registry persistence functions for both read and write paths.
+**Checkpoint**: Users can configure screensaver options via the dialog (modal Control Panel or live overlay), and registry persistence functions for both read and write paths with immediate visual feedback in live mode.
 
 ---
 

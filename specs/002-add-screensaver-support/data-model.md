@@ -22,6 +22,7 @@
 |-------|------|-------------|
 | mode | `ScreenSaverMode` enum | Indicates runtime intent: `Normal`, `ScreenSaverFull`, `ScreenSaverPreview`, `SettingsDialog`, `PasswordChangeUnsupported` |
 | previewParentHwnd | `HWND` | Parent window handle for preview mode (`nullptr` otherwise) |
+| configDialogParentHwnd | `HWND` | Parent window handle for config dialog: Control Panel screensaver settings window HWND (external to MatrixRain) for modal mode when invoked with `/c:<HWND>`, or MatrixRain's own main window HWND for live overlay mode when invoked with `/c` without HWND parameter |
 | commandLine | `std::wstring` | Original command-line string for logging/troubleshooting |
 | enableHotkeys | `bool` | Determines whether runtime keyboard shortcuts remain active |
 | hideCursor | `bool` | Whether the cursor must be hidden while session is active |
@@ -36,6 +37,14 @@
 | exitThresholdPixels | `int` | Movement threshold before treating mouse motion as exit signal |
 | keyboardTriggered | `bool` | Tracks whether keyboard input triggered exit |
 | mouseTriggered | `bool` | Tracks whether mouse movement triggered exit |
+
+### ConfigDialogSnapshot
+
+| Field | Type | Description |
+|-------|------|-------------|
+| snapshotSettings | `ScreenSaverSettings` | Copy of settings state captured when dialog opens (used for Cancel rollback in live overlay mode) |
+| isLiveMode | `bool` | Indicates whether dialog operates in live overlay mode (`true`) or modal Control Panel mode (`false`) |
+| applicationStateRef | `ApplicationState*` | Pointer to running application state for immediate updates (only non-null in live overlay mode) |
 
 ### DistributionArtifacts
 
@@ -54,8 +63,10 @@
 
 ## State Transitions
 
-1. **Launch → Mode Detection**: `WinMain` constructs `ScreenSaverModeContext` based on command-line arguments. If mode equals `PasswordChangeUnsupported`, the executable shows the unsupported dialog and exits without touching the rendering pipeline.
+1. **Launch → Mode Detection**: `WinMain` constructs `ScreenSaverModeContext` based on command-line arguments. If mode equals `PasswordChangeUnsupported`, the executable shows the unsupported dialog and exits without touching the rendering pipeline. For `/c` invocations, `configDialogParentHwnd` is set based on whether HWND was provided in command line.
 2. **Mode Detection → Settings Load**: When the core application starts, it loads `ScreenSaverSettings` from the registry (falling back to defaults if missing) and applies overrides according to `ScreenSaverModeContext` (e.g., forcing fullscreen, disabling debug overlays).
 3. **Settings Load → Runtime**: `ApplicationState` initializes subsystems with the resolved settings. If `hideCursor` is `true`, the input system hides the cursor and initializes `InputExitState` for movement tracking.
 4. **Runtime → Exit**: While in screensaver modes, either keyboard input or mouse movement beyond `exitThresholdPixels` sets the corresponding flag in `InputExitState` and dispatches an exit event, causing the main loop to terminate and restore the cursor.
-5. **Configuration Dialog → Persistence**: When the dialog controller receives confirmation, it updates `ScreenSaverSettings` in memory, persists them via `RegistrySettingsProvider`, and raises an event prompting running sessions to reload if necessary.
+5. **Configuration Dialog → Persistence**:
+   - **Modal Control Panel Mode** (`configDialogParentHwnd` contains external Control Panel window HWND from `/c:<HWND>` command): Dialog controller buffers changes in memory. On OK, persists via `RegistrySettingsProvider` and exits process. On Cancel, discards changes and exits process.
+   - **Live Overlay Mode** (`configDialogParentHwnd` contains MatrixRain's own main window HWND, obtained when `/c` invoked without HWND parameter): Dialog controller creates `ConfigDialogSnapshot` capturing current settings state. As user adjusts controls, immediately applies changes to `ApplicationState` (via captured reference) for real-time animation preview on the main thread (synchronous updates during WM_HSCROLL/WM_COMMAND message handling). On OK, persists changes to registry via `RegistrySettingsProvider` and closes dialog (application continues running). On Cancel, restores settings from `snapshotSettings` to `ApplicationState` (reverting animation to pre-dialog state) and closes dialog without persistence.
