@@ -46,7 +46,8 @@ void CharacterStreak::Spawn (const Vector3 & position)
     // This ensures constant speed throughout the streak's lifetime
     float velocityScale   = GetVelocityScale (m_position.z);
     
-    m_dropInterval        = BASE_DROP_INTERVAL / velocityScale;
+    m_baseDropInterval    = BASE_DROP_INTERVAL / velocityScale;
+    m_dropInterval        = m_baseDropInterval; // Will be adjusted by speed multiplier if set
     m_mutationTimer       = 0.0f;
     m_dropTimer           = 0.0f;
     m_isInFadingPhase     = false;
@@ -238,3 +239,11 @@ void CharacterStreak::RescalePositions (float scaleX, float scaleY)
 
 
 
+
+void CharacterStreak::SetSpeedMultiplier (int speedPercent)
+{
+    // Speed multiplier: 100 = normal, 50 = half speed, 200 = double speed
+    // Lower speed percentage = longer drop interval (slower)
+    // Higher speed percentage = shorter drop interval (faster)
+    m_dropInterval = m_baseDropInterval * (100.0f / static_cast<float>(speedPercent));
+}

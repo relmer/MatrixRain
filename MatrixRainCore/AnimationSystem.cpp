@@ -125,10 +125,6 @@ void AnimationSystem::Update (float deltaTime)
             SpawnStreak ();
         }
     }
-
-#ifdef _DEBUG
-    DebugCheckFrameDiff ();
-#endif
 }
 
 
@@ -158,6 +154,7 @@ void AnimationSystem::SpawnStreak()
 
     CharacterStreak streak;
     streak.Spawn (position);
+    streak.SetSpeedMultiplier (m_animationSpeedPercent);
     m_streaks.push_back (std::move (streak));
 }
 
@@ -188,6 +185,7 @@ void AnimationSystem::SpawnStreakInView()
 
     CharacterStreak streak;
     streak.Spawn (position);
+    streak.SetSpeedMultiplier (m_animationSpeedPercent);
     m_streaks.push_back (std::move (streak));
 }
 
@@ -336,6 +334,22 @@ void AnimationSystem::ClearAllStreaks()
 
 
 
+void AnimationSystem::SetAnimationSpeed (int speedPercent)
+{
+    // Store for application to newly spawned streaks
+    m_animationSpeedPercent = speedPercent;
+    
+    // Update speed multiplier for all active streaks
+    for (CharacterStreak & streak : m_streaks)
+    {
+        streak.SetSpeedMultiplier (speedPercent);
+    }
+}
+
+
+
+
+
 size_t AnimationSystem::GetActiveHeadCount() const
 {
     if (!m_viewport)
@@ -356,156 +370,6 @@ size_t AnimationSystem::GetActiveHeadCount() const
 
     return activeHeadCount;
 }
-
-
-
-
-#ifdef _DEBUG
-void AnimationSystem::DebugCheckFrameDiff()
-{
-    // Compare current frame to previous frame to detect whole-streak changes
-    // Use unique IDs to track streaks across frames (position changes due to movement)
-    
-    // Build maps of streaks by ID
-    std::map<uint64_t, const CharacterStreak *> prevStreakMap;
-    std::map<uint64_t, const CharacterStreak *> currStreakMap;
-    
-    for (const CharacterStreak & streak : m_previousFrameStreaks)
-    {
-        prevStreakMap[streak.GetID ()] = &streak;
-    }
-    
-    for (const CharacterStreak & streak : m_streaks)
-    {
-        currStreakMap[streak.GetID ()] = &streak;
-    }
-    
-    // Check current streaks against previous
-    for (const CharacterStreak & currentStreak : m_streaks)
-    {
-        uint64_t id = currentStreak.GetID ();
-        auto it = prevStreakMap.find (id);
-        
-        if (it == prevStreakMap.end ())
-        {
-            // New streak appeared
-            size_t charCount = currentStreak.GetCharacterCount ();
-            
-            if (charCount > 5)
-            {
-                Vector3 pos = currentStreak.GetPosition ();
-                
-                DEBUGMSG (L"NEW STREAK: ID=%llu, Count=%zu, Pos=(%.1f, %.1f, %.1f)\n",
-                            id, charCount, pos.x, pos.y, pos.z);
-                
-                ASSERT (charCount <= 5);  // Whole streak appeared instantly!
-            }
-        }
-        else
-        {
-            // Streak exists in both frames - check for sudden character count changes
-            const CharacterStreak * prevStreak = it->second;
-            
-            size_t prevCount = prevStreak->GetCharacterCount ();
-            size_t currCount = currentStreak.GetCharacterCount ();
-            int delta = abs (static_cast<int> (currCount) - static_cast<int> (prevCount));
-            
-            if (delta > 3)
-            {
-                Vector3 pos = currentStreak.GetPosition ();
-                
-                DEBUGMSG (L"COUNT JUMP: ID=%llu, %zu->%zu (delta=%d), Pos=(%.1f, %.1f, %.1f)\n",
-                            id, prevCount, currCount, delta, pos.x, pos.y, pos.z);
-                
-                ASSERT (delta <= 3);  // Character count shouldn't jump suddenly
-            }
-        }
-    }
-    
-    // Check for streaks that disappeared entirely
-    // Calculate wasOverTarget ONCE for all removals (not per-streak)
-    float viewportHeight = m_viewport ? m_viewport->GetHeight () : 1080.0f;
-    int prevActiveHeads = 0;
-    for (const CharacterStreak & streak : m_previousFrameStreaks)
-    {
-        if (!streak.IsHeadOffscreen (viewportHeight))
-        {
-            prevActiveHeads++;
-        }
-    }
-    
-    int targetCount = m_densityController ? m_densityController->GetTargetStreakCount () : prevActiveHeads;
-    bool wasOverTarget = prevActiveHeads > targetCount;
-    
-    // Also check if we intentionally removed streaks this frame - that's definitive proof we were over target
-    bool hadIntentionalRemovals = false;
-#ifdef _DEBUG
-    hadIntentionalRemovals = (m_intentionalRemovalCount > 0);
-#endif
-    
-    int removedStreakCount = 0;
-    for (const CharacterStreak & prevStreak : m_previousFrameStreaks)
-    {
-        uint64_t id = prevStreak.GetID ();
-        
-        if (currStreakMap.find (id) == currStreakMap.end ())
-        {
-            // Streak disappeared
-            size_t charCount = prevStreak.GetCharacterCount ();
-            removedStreakCount++;
-            
-            if (charCount > 5)
-            {
-                Vector3 pos = prevStreak.GetPosition ();
-                
-                DEBUGMSG (L"REMOVED STREAK: ID=%llu, Count=%zu, Pos=(%.1f, %.1f, %.1f)\n",
-                            id, charCount, pos.x, pos.y, pos.z);
-                
-                ASSERT (charCount <= 10 || wasOverTarget || hadIntentionalRemovals);  // Whole streak disappeared (allowed if over target or intentionally removed)
-            }
-        }
-    }
-    
-    // Verify we didn't remove MORE streaks than necessary
-    if (m_densityController && removedStreakCount > 0)
-    {
-        // Get current target (may have changed due to viewport resize or density adjustment)
-        int currentTargetCount = m_densityController->GetTargetStreakCount ();
-        
-        // During viewport resize or density changes, the target can change dramatically
-        // If target decreased significantly, we expect large-scale removal
-        bool targetDecreased = currentTargetCount < m_previousTargetCount;
-        
-        // If we intentionally removed streaks, verify it was reasonable
-        if (m_intentionalRemovalCount > 0)
-        {
-            if (targetDecreased)
-            {
-                // Target decreased (viewport shrink or density drop) - expect many removals
-                // Just verify we didn't remove MORE than all previous active heads
-                ASSERT (m_intentionalRemovalCount <= prevActiveHeads);
-            }
-            else
-            {
-                // Normal case OR target already updated before this check runs
-                // During viewport resize, m_previousTargetCount gets updated in Update()
-                // before DebugCheckFrameDiff runs, so we can't reliably detect the decrease.
-                // Use a generous tolerance to allow for viewport resize scenarios.
-                int expectedRemoval = prevActiveHeads > currentTargetCount 
-                                      ? prevActiveHeads - currentTargetCount 
-                                      : 0;
-                ASSERT (m_intentionalRemovalCount <= expectedRemoval + 100);  // Large tolerance for resize
-            }
-        }
-        
-        // Also verify total removals (intentional + natural) aren't absurd
-        ASSERT (removedStreakCount <= prevActiveHeads + 50);  // Can't remove more than existed + some fading tails
-    }
-    
-    // Save current frame as previous for next comparison
-    m_previousFrameStreaks = m_streaks;
-}
-#endif
 
 
 

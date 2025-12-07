@@ -66,6 +66,12 @@ public:
     void RegisterDensityChangeCallback (std::function<void(int)> callback);
 
     /// <summary>
+    /// Register a callback to be notified when animation speed changes.
+    /// </summary>
+    /// <param name="callback">Function to call with new animation speed percentage</param>
+    void RegisterAnimationSpeedCallback (std::function<void(int)> callback);
+
+    /// <summary>
     /// Update animation speed setting.
     /// </summary>
     /// <param name="speedPercent">Animation speed percentage (1-100)</param>
@@ -115,13 +121,14 @@ public:
     HRESULT SaveSettings();
 
 private:
-    DisplayMode                  m_displayMode           = DisplayMode::Fullscreen; // Current display mode
-    ColorScheme                  m_colorScheme           = ColorScheme::Green;      // Current color scheme
-    bool                         m_showDebugFadeTimes    = false;                   // Show debug fade time overlay
-    bool                         m_showStatistics        = false;                   // Show FPS and density statistics
-    float                        m_elapsedTime           = 0.0f;                    // Elapsed time for color cycling animation
+    DisplayMode                  m_displayMode                  = DisplayMode::Fullscreen; // Current display mode
+    ColorScheme                  m_colorScheme                  = ColorScheme::Green;      // Current color scheme
+    bool                         m_showDebugFadeTimes           = false;                   // Show debug fade time overlay
+    bool                         m_showStatistics               = false;                   // Show FPS and density statistics
+    float                        m_elapsedTime                  = 0.0f;     // Elapsed time for color cycling animation
     ScreenSaverSettings          m_settings;                                        // User-configurable settings
-    std::function<void(int)>     m_densityChangeCallback = nullptr;                // Callback for density changes
+    std::function<void(int)>     m_densityChangeCallback        = nullptr;           // Callback for density changes
+    std::function<void(int)>     m_animationSpeedChangeCallback = nullptr;           // Callback for animation speed changes
 };
 
 

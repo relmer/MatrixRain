@@ -83,6 +83,12 @@ public:
     /// Clear all active streaks (used when switching display modes).
     /// </summary>
     void ClearAllStreaks();
+    
+    /// <summary>
+    /// Update animation speed for all active streaks.
+    /// </summary>
+    /// <param name="speedPercent">Animation speed percentage (1-100)</param>
+    void SetAnimationSpeed (int speedPercent);
 
     // Accessors
     const std::vector<CharacterStreak> & GetStreaks()            const { return m_streaks;        }
@@ -92,22 +98,15 @@ public:
 
     void SetZoomVelocity (float velocity) { m_zoomVelocity = velocity; }
 
-#ifdef _DEBUG
-    /// <summary>
-    /// Check for whole-streak appearance/disappearance by comparing current frame to previous.
-    /// Detects if entire streaks blink in/out rather than individual characters fading.
-    /// </summary>
-    void DebugCheckFrameDiff();
-#endif
-
 private:
     std::vector<CharacterStreak>   m_streaks;                            // All active character streaks
-    const Viewport               * m_viewport            = nullptr;      // Reference to viewport for bounds
-    DensityController            * m_densityController   = nullptr;      // Reference to density controller (optional)
-    float                          m_zoomVelocity        = DEFAULT_ZOOM_VELOCITY; // Camera zoom speed (units per second)
-    float                          m_spawnTimer          = 0.0f;         // Timer for automatic spawning
-    float                          m_spawnInterval       = SPAWN_INTERVAL; // Time between automatic spawns
-    int                            m_previousTargetCount = 0;            // Previous frame's target count (to detect density changes)
+    const Viewport               * m_viewport              = nullptr;      // Reference to viewport for bounds
+    DensityController            * m_densityController     = nullptr;      // Reference to density controller (optional)
+    float                          m_zoomVelocity          = DEFAULT_ZOOM_VELOCITY; // Camera zoom speed (units per second)
+    float                          m_spawnTimer            = 0.0f;         // Timer for automatic spawning
+    float                          m_spawnInterval         = SPAWN_INTERVAL; // Time between automatic spawns
+    int                            m_previousTargetCount   = 0;            // Previous frame's target count (to detect density changes)
+    int                            m_animationSpeedPercent = 100;        // Current animation speed percentage (1-100)
     
     // Random number generation
     std::random_device             m_randomDevice;

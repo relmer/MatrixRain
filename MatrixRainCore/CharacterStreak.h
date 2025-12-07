@@ -63,7 +63,8 @@ public:
     const std::vector<CharacterInstance> & GetCharacters()     const { return m_characters;        }
     uint64_t                               GetID()             const { return m_id;                }
 
-    void SetPosition (const Vector3 & position) { m_position = position; }
+    void SetPosition        (const Vector3 & position) { m_position = position; }
+    void SetSpeedMultiplier (int speedPercent);
 
 private:
     Vector3                        m_position         {};       // Head position of the streak (in cells)
@@ -72,6 +73,7 @@ private:
     float                          m_mutationTimer    { 0.0f }; // Timer for character mutation
     float                          m_dropTimer        { 0.0f }; // Timer for discrete cell dropping
     float                          m_dropInterval     { 0.3f }; // Cached drop interval (set at spawn, constant for streak lifetime)
+    float                          m_baseDropInterval { 0.3f }; // Base drop interval before speed multiplier applied
     float                          m_characterSpacing { 32.0f };// Vertical spacing between characters
     size_t                         m_maxLength        { 0 };    // Maximum number of characters in this streak
     bool                           m_isInFadingPhase  { false };// True when head has reached bottom and final fade has started

@@ -139,9 +139,26 @@ void ApplicationState::RegisterDensityChangeCallback (std::function<void(int)> c
 
 
 
+void ApplicationState::RegisterAnimationSpeedCallback (std::function<void(int)> callback)
+{
+    m_animationSpeedChangeCallback = callback;
+}
+
+
+
+
+
 void ApplicationState::SetAnimationSpeed (int speedPercent)
 {
     m_settings.m_animationSpeedPercent = speedPercent;
+    
+    // Notify registered listener (e.g., AnimationSystem)
+    if (m_animationSpeedChangeCallback)
+    {
+        m_animationSpeedChangeCallback (speedPercent);
+    }
+    
+    SaveSettings();
 }
 
 

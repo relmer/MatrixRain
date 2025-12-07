@@ -87,13 +87,13 @@ void Application::InitializeApplicationState (const ScreenSaverModeContext * pSc
 
     m_appState->Initialize (m_pScreenSaverContext);
     
-    // Register density controller to receive change notifications
-    m_appState->RegisterDensityChangeCallback ([this](int densityPercent) {
-        m_densityController->SetPercentage (densityPercent);
-    });
+    // Register for settings change notifications
+    m_appState->RegisterDensityChangeCallback  ([this](int densityPercent) { m_densityController->SetPercentage   (densityPercent); });
+    m_appState->RegisterAnimationSpeedCallback ([this](int speedPercent)   { m_animationSystem->SetAnimationSpeed (speedPercent);   });
     
-    // Apply loaded density from settings to controller
-    m_densityController->SetPercentage (m_appState->GetSettings().m_densityPercent);
+    // Apply settings to controller
+    m_densityController->SetPercentage   (m_appState->GetSettings().m_densityPercent);
+    m_animationSystem->SetAnimationSpeed (m_appState->GetSettings().m_animationSpeedPercent);
     
     // Now initialize input system with both dependencies
     m_inputSystem->Initialize (*m_densityController, *m_appState);

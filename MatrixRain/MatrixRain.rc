@@ -41,7 +41,7 @@ BEGIN
     CONTROL         "",IDC_DENSITY_SLIDER,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,50,7,130,15
     LTEXT           "100%",IDC_DENSITY_LABEL,185,10,40,8
     
-    LTEXT           "Animation Speed:",IDC_STATIC,7,30,40,8
+    LTEXT           "Speed:",IDC_STATIC,7,30,40,8
     CONTROL         "",IDC_ANIMSPEED_SLIDER,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,50,27,130,15
     LTEXT           "75%",IDC_ANIMSPEED_LABEL,185,30,40,8
     
