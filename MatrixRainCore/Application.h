@@ -29,6 +29,11 @@ public:
     int     Run();
     void    Shutdown();
 
+    // Accessors for live overlay configuration dialog
+    HWND               GetMainWindowHwnd()   const                { return m_hwnd;                   }
+    ApplicationState * GetApplicationState() const                { return m_appState.get();         }
+    void               SetConfigDialog       (HWND hConfigDialog) { m_hConfigDialog = hConfigDialog; }
+
     // Window dimensions
     static constexpr UINT            DEFAULT_WIDTH  = 1280;
     static constexpr UINT            DEFAULT_HEIGHT = 720;
@@ -52,8 +57,19 @@ private:
     bool      m_isPaused                { false   };
     bool      m_inDisplayModeTransition { false   };
     
+    // Live overlay configuration dialog (modeless)
+    HWND      m_hConfigDialog           { nullptr };
+    
     // Screensaver mode
     const ScreenSaverModeContext * m_pScreenSaverContext { nullptr };
+    
+    // Render thread
+    static constexpr int RENDER_FPS = 60;
+    static constexpr std::chrono::milliseconds RENDER_FRAME_TIME { 1000 / RENDER_FPS };
+    
+    std::thread       m_renderThread;
+    std::atomic<bool> m_renderThreadShouldStop { false };
+    std::mutex        m_renderMutex;  // Protects shared state during config updates
 
     // Internal methods
     void    InitializeApplicationState    (const ScreenSaverModeContext * pScreenSaverContext);
@@ -64,6 +80,9 @@ private:
     void    GetWindowSizeForCurrentMode   (POINT & position, SIZE & size);
     void    ResizeWindowForCurrentMode();
     bool    ShouldExitScreenSaverOnKey    (WPARAM wParam);
+    
+    // Render thread
+    void    RenderThreadProc();
     
     // Message handlers
     void OnKeyDown                  (WPARAM wParam);

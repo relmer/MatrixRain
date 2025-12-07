@@ -113,11 +113,26 @@ void ApplicationState::ToggleDebugFadeTimes()
 
 
 
-
 void ApplicationState::OnDensityChanged (int densityPercent)
 {
     m_settings.m_densityPercent = densityPercent;
+    
+    // Notify registered listener (e.g., DensityController)
+    if (m_densityChangeCallback)
+    {
+        m_densityChangeCallback (densityPercent);
+    }
+    
     SaveSettings();
+}
+
+
+
+
+
+void ApplicationState::RegisterDensityChangeCallback (std::function<void(int)> callback)
+{
+    m_densityChangeCallback = callback;
 }
 
 

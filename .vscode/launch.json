@@ -2,6 +2,17 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Launch MatrixRain with config dialog (Debug x64)",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}\\x64\\Debug\\MatrixRain.exe",
+            "args": ["/c"],
+            "cwd": "${workspaceFolder}\\MatrixRain",
+            "preLaunchTask": "Build MatrixRain Debug",
+            "stopAtEntry": false,
+            "console": "integratedTerminal"
+        },
+        {
             "name": "Launch MatrixRain (Debug x64)",
             "type": "cppvsdbg",
             "request": "launch",

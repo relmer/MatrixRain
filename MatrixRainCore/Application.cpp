@@ -87,6 +87,11 @@ void Application::InitializeApplicationState (const ScreenSaverModeContext * pSc
 
     m_appState->Initialize (m_pScreenSaverContext);
     
+    // Register density controller to receive change notifications
+    m_appState->RegisterDensityChangeCallback ([this](int densityPercent) {
+        m_densityController->SetPercentage (densityPercent);
+    });
+    
     // Apply loaded density from settings to controller
     m_densityController->SetPercentage (m_appState->GetSettings().m_densityPercent);
     
@@ -211,45 +216,34 @@ int Application::Run()
 {
     MSG msg = {};
 
+    // Start the render thread
+    m_renderThread = std::thread (&Application::RenderThreadProc, this);
+
+    // Main thread only processes messages
     while (m_isRunning)
     {
-        // Process all pending messages
-        while (PeekMessage (&msg, nullptr, 0, 0, PM_REMOVE))
+        // Wait for messages (no busy-wait)
+        BOOL hasMessage = GetMessage (&msg, nullptr, 0, 0);
+        
+        if (hasMessage == 0)  // WM_QUIT
         {
-            if (msg.message == WM_QUIT)
-            {
-                m_isRunning = false;
-                break;
-            }
-
-            TranslateMessage (&msg);
-            DispatchMessage (&msg);
+            m_isRunning = false;
+            break;
         }
-
-        if (!m_isRunning)
+        
+        if (hasMessage == -1)  // Error
         {
             break;
         }
 
-        // Calculate delta time
-        float deltaTime = static_cast<float> (m_timer->GetElapsedSeconds());
-        m_timer->Reset();
-
-        // Skip updates/rendering during display mode transitions
-        if (m_inDisplayModeTransition)
+        // If live overlay dialog is active, let it handle dialog messages
+        if (m_hConfigDialog && IsDialogMessage (m_hConfigDialog, &msg))
         {
             continue;
         }
 
-        // Update FPS counter
-        if (m_fpsCounter)
-        {
-            m_fpsCounter->Update (deltaTime);
-        }
-
-        // Update and render
-        Update (deltaTime);
-        Render();
+        TranslateMessage (&msg);
+        DispatchMessage (&msg);
     }
 
     return static_cast<int> (msg.wParam);
@@ -420,6 +414,13 @@ Error:
 
 void Application::Shutdown()
 {
+    // Signal render thread to stop and wait for it
+    if (m_renderThread.joinable())
+    {
+        m_renderThreadShouldStop = true;
+        m_renderThread.join();
+    }
+
     m_timer.reset();
     m_renderSystem.reset();
     m_animationSystem.reset();
@@ -518,6 +519,12 @@ LRESULT Application::HandleMessage (UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 void Application::OnKeyDown (WPARAM wParam)
 {
+    // If live overlay dialog is active, don't process exit keys
+    if (m_hConfigDialog && (wParam == VK_ESCAPE || ShouldExitScreenSaverOnKey (wParam)))
+    {
+        return;
+    }
+
     if (wParam == VK_ESCAPE || ShouldExitScreenSaverOnKey (wParam))
     {
         // ESC key pressed - exit application
@@ -584,7 +591,9 @@ void Application::OnMouseMove (LPARAM lParam)
 
 
     // In screensaver mode with exit-on-input, check for meaningful mouse movement
+    // Skip exit detection if live overlay config dialog is active
     BAIL_OUT_IF (!m_pScreenSaverContext || !m_pScreenSaverContext->m_exitOnInput, S_OK);
+    BAIL_OUT_IF (m_hConfigDialog != nullptr, S_OK);  // Dialog active - don't exit on mouse
     BAIL_OUT_IF (!m_inputSystem, S_OK);
 
     currentPos.x = static_cast<LONG> (static_cast<short> (LOWORD (lParam)));
@@ -634,5 +643,54 @@ void Application::OnNcHitTest (LRESULT & result)
     if (result == HTCLIENT && m_appState && m_appState->GetDisplayMode() == DisplayMode::Windowed)
     {
         result = HTCAPTION;  // Treat client area as title bar for dragging
+    }
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  Application::RenderThreadProc
+//
+//  Dedicated render thread that runs independently of the message loop.
+//  Maintains fixed 60 FPS animation even during modal operations (dialog drag,
+//  resize, menus, etc.).
+//
+////////////////////////////////////////////////////////////////////////////////
+
+void Application::RenderThreadProc()
+{
+    using namespace std::chrono;
+    
+    auto lastFrameTime = steady_clock::now();
+    
+    while (!m_renderThreadShouldStop)
+    {
+        auto currentTime = steady_clock::now();
+        auto deltaTime   = duration_cast<duration<float>> (currentTime - lastFrameTime).count();
+        lastFrameTime    = currentTime;
+        
+        // Skip updates/rendering during display mode transitions
+        if (!m_inDisplayModeTransition)
+        {
+            // Update FPS counter
+            if (m_fpsCounter)
+            {
+                m_fpsCounter->Update (deltaTime);
+            }
+            
+            // Update and render (with mutex protection for config changes)
+            {
+                std::lock_guard<std::mutex> lock (m_renderMutex);
+                Update (deltaTime);
+            }
+            
+            Render();
+        }
+        
+        // Sleep to maintain target framerate
+        std::this_thread::sleep_for (RENDER_FRAME_TIME);
     }
 }

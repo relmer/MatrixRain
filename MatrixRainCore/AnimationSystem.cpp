@@ -398,7 +398,7 @@ void AnimationSystem::DebugCheckFrameDiff()
                 DEBUGMSG (L"NEW STREAK: ID=%llu, Count=%zu, Pos=(%.1f, %.1f, %.1f)\n",
                             id, charCount, pos.x, pos.y, pos.z);
                 
-                ASSERT (charCount <= 10);  // Whole streak appeared instantly!
+                ASSERT (charCount <= 5);  // Whole streak appeared instantly!
             }
         }
         else

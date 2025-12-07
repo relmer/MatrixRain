@@ -12,13 +12,17 @@
 // C++ headers
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <chrono>
+#include <functional>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <random>
 #include <stdexcept>
 #include <string>
+#include <thread>
 #include <vector>
 
 

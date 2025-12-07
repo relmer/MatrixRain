@@ -9,7 +9,57 @@
 
 
 
-static ConfigDialogController * g_pController = nullptr;
+struct DialogContext
+{
+    std::unique_ptr<ConfigDialogController> m_controller;
+    Application                           * m_pApp              = nullptr;
+    bool                                    m_ownsContextMemory = false;
+};
+
+
+
+
+
+static DialogContext * GetDialogContext (HWND hDlg)
+{
+    return reinterpret_cast<DialogContext *> (GetWindowLongPtr (hDlg, DWLP_USER));
+}
+
+
+
+
+
+static ConfigDialogController * GetControllerFromDialog (HWND hDlg)
+{
+    ConfigDialogController * pController = nullptr;
+    DialogContext          * pContext    = GetDialogContext (hDlg);
+
+
+    if (pContext)
+    {
+        pController = pContext->m_controller.get();
+    }
+
+    return pController;
+}
+
+
+
+
+
+static Application * GetApplicationFromDialog (HWND hDlg)
+{
+    Application   * pApp     = nullptr;
+    DialogContext * pContext = GetDialogContext (hDlg);
+
+
+    if (pContext)
+    {
+        pApp = pContext->m_pApp;
+    }
+
+    return pApp;
+}
 
 
 
@@ -67,38 +117,100 @@ static void InitializeColorSchemeCombo (HWND hDlg, const std::wstring & currentS
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-static BOOL OnInitDialog (HWND hDlg)
+static BOOL OnInitDialog (HWND hDlg, LPARAM initParam)
 {
-    if (g_pController == nullptr)
-    {
-        return FALSE;
-    }
+    HRESULT                     hr           = S_OK;
+    BOOL                        fSuccess     = FALSE;
+    HWND                        parentHwnd   = GetParent (hDlg);
+    RECT                        dialogRect   = {};
+    RECT                        centerRect   = {};
+    int                         dialogWidth  = 0;
+    int                         dialogHeight = 0;
+    int                         centerX      = 0;
+    int                         centerY      = 0;
+    POINT                       dialogPos    = {};
+    DialogContext             * pContext     = reinterpret_cast<DialogContext *> (initParam);
+    const ScreenSaverSettings * pSettings    = nullptr;
+    WINDOWPLACEMENT             wp           = { sizeof (WINDOWPLACEMENT) };
 
-    const ScreenSaverSettings & settings = g_pController->GetSettings();
+
+
+    CBRAEx (pContext != nullptr && pContext->m_controller != nullptr, E_UNEXPECTED);
+
+    SetWindowLongPtr (hDlg, DWLP_USER, reinterpret_cast<LONG_PTR> (pContext));
+
+    // Center dialog on parent window or primary monitor
+    GetWindowRect (hDlg, &dialogRect);
+    dialogWidth  = dialogRect.right  - dialogRect.left;
+    dialogHeight = dialogRect.bottom - dialogRect.top;
+
+    if (parentHwnd)
+    {
+        GetWindowRect (parentHwnd, &centerRect);       
+    }
+    else
+    {
+        // No parent - center on primary monitor
+        centerRect.left   = 0;
+        centerRect.top    = 0;
+        centerRect.right  = GetSystemMetrics (SM_CXSCREEN);
+        centerRect.bottom = GetSystemMetrics (SM_CYSCREEN);
+    }
+    
+    GetWindowRect (hDlg, &dialogRect);
+    dialogWidth  = dialogRect.right  - dialogRect.left;
+    dialogHeight = dialogRect.bottom - dialogRect.top;
+    
+    // Calculate centered position
+    centerX = (centerRect.left + centerRect.right  - dialogWidth)  / 2;
+    centerY = (centerRect.top  + centerRect.bottom - dialogHeight) / 2;
+    
+    dialogPos.x = centerX;
+    dialogPos.y = centerY;
+    
+    SetWindowPos (hDlg, nullptr, dialogPos.x, dialogPos.y, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
+
+#ifndef _DEBUG
+    if (pContext->m_controller->IsLiveMode())
+    {
+        if (parentHwnd)
+        {
+            if (GetWindowPlacement (parentHwnd, &wp) && wp.showCmd == SW_SHOWMAXIMIZED)
+            {
+                SetWindowPos (hDlg, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+            }
+        }
+    }
+#endif
+
+    pSettings = &pContext->m_controller->GetSettings();
     
     InitializeSlider (hDlg, IDC_DENSITY_SLIDER, IDC_DENSITY_LABEL, 
                       ScreenSaverSettings::MIN_DENSITY_PERCENT, ScreenSaverSettings::MAX_DENSITY_PERCENT, 
-                      settings.m_densityPercent);
+                      pSettings->m_densityPercent);
     
     InitializeSlider (hDlg, IDC_ANIMSPEED_SLIDER, IDC_ANIMSPEED_LABEL,
                       ScreenSaverSettings::MIN_ANIMATION_SPEED_PERCENT, ScreenSaverSettings::MAX_ANIMATION_SPEED_PERCENT,
-                      settings.m_animationSpeedPercent);
+                      pSettings->m_animationSpeedPercent);
     
     InitializeSlider (hDlg, IDC_GLOWINTENSITY_SLIDER, IDC_GLOWINTENSITY_LABEL,
                       ScreenSaverSettings::MIN_GLOW_INTENSITY_PERCENT, ScreenSaverSettings::MAX_GLOW_INTENSITY_PERCENT,
-                      settings.m_glowIntensityPercent);
+                      pSettings->m_glowIntensityPercent);
     
     InitializeSlider (hDlg, IDC_GLOWSIZE_SLIDER, IDC_GLOWSIZE_LABEL,
                       ScreenSaverSettings::MIN_GLOW_SIZE_PERCENT, ScreenSaverSettings::MAX_GLOW_SIZE_PERCENT,
-                      settings.m_glowSizePercent);
+                      pSettings->m_glowSizePercent);
     
-    InitializeColorSchemeCombo (hDlg, settings.m_colorSchemeKey);
+    InitializeColorSchemeCombo (hDlg, pSettings->m_colorSchemeKey);
     
-    CheckDlgButton (hDlg, IDC_STARTFULLSCREEN_CHECK, settings.m_startFullscreen ? BST_CHECKED : BST_UNCHECKED);
-    CheckDlgButton (hDlg, IDC_SHOWDEBUG_CHECK, settings.m_showDebugStats ? BST_CHECKED : BST_UNCHECKED);
-    CheckDlgButton (hDlg, IDC_SHOWFADETIMERS_CHECK, settings.m_showFadeTimers ? BST_CHECKED : BST_UNCHECKED);
+    CheckDlgButton (hDlg, IDC_STARTFULLSCREEN_CHECK, pSettings->m_startFullscreen ? BST_CHECKED : BST_UNCHECKED);
+    CheckDlgButton (hDlg, IDC_SHOWDEBUG_CHECK,       pSettings->m_showDebugStats  ? BST_CHECKED : BST_UNCHECKED);
+    CheckDlgButton (hDlg, IDC_SHOWFADETIMERS_CHECK,  pSettings->m_showFadeTimers  ? BST_CHECKED : BST_UNCHECKED);
     
-    return TRUE;
+    fSuccess = TRUE;
+
+Error:
+    return fSuccess;
 }
 
 
@@ -113,39 +225,48 @@ static BOOL OnInitDialog (HWND hDlg)
 
 static BOOL OnHScroll (HWND hDlg, LPARAM lParam)
 {
-    if (g_pController == nullptr)
-    {
-        return FALSE;
-    }
+    HRESULT                  hr          = S_OK;
+    BOOL                     fSuccess    = FALSE;
+    ConfigDialogController * pController = GetControllerFromDialog (hDlg);
+    HWND                     hSlider     = (HWND)lParam;
+    int                      ctrlId      = 0;
+    int                      pos         = 0;
 
-    HWND hSlider = (HWND)lParam;
-    int  ctrlId  = GetDlgCtrlID (hSlider);
-    int  pos     = (int)SendMessageW (hSlider, TBM_GETPOS, 0, 0);
+
+
+    CBRAEx (pController != nullptr, E_UNEXPECTED);
+    CBRAEx (hSlider     != nullptr, E_UNEXPECTED);
+
+    ctrlId = GetDlgCtrlID (hSlider);
+    pos    = (int)SendMessageW (hSlider, TBM_GETPOS, 0, 0);
     
     switch (ctrlId)
     {
         case IDC_DENSITY_SLIDER:
-            g_pController->UpdateDensity (pos);
+            pController->UpdateDensity (pos);
             SetDlgItemTextW (hDlg, IDC_DENSITY_LABEL, std::format (L"{}%", pos).c_str());
             break;
             
         case IDC_ANIMSPEED_SLIDER:
-            g_pController->UpdateAnimationSpeed (pos);
+            pController->UpdateAnimationSpeed (pos);
             SetDlgItemTextW (hDlg, IDC_ANIMSPEED_LABEL, std::format (L"{}%", pos).c_str());
             break;
             
         case IDC_GLOWINTENSITY_SLIDER:
-            g_pController->UpdateGlowIntensity (pos);
+            pController->UpdateGlowIntensity (pos);
             SetDlgItemTextW (hDlg, IDC_GLOWINTENSITY_LABEL, std::format (L"{}%", pos).c_str());
             break;
             
         case IDC_GLOWSIZE_SLIDER:
-            g_pController->UpdateGlowSize (pos);
+            pController->UpdateGlowSize (pos);
             SetDlgItemTextW (hDlg, IDC_GLOWSIZE_LABEL, std::format (L"{}%", pos).c_str());
             break;
     }
     
-    return TRUE;
+    fSuccess = TRUE;
+
+Error:
+    return fSuccess;
 }
 
 
@@ -160,11 +281,21 @@ static BOOL OnHScroll (HWND hDlg, LPARAM lParam)
 
 static void OnColorSchemeChange (HWND hDlg)
 {
-    int   index = (int)SendDlgItemMessageW (hDlg, IDC_COLORSCHEME_COMBO, CB_GETCURSEL, 0, 0);
-    WCHAR scheme[32];
+    HRESULT                  hr          = S_OK;
+    ConfigDialogController * pController = GetControllerFromDialog (hDlg);
+    int                      index       = 0;
+    WCHAR                    scheme[32];
+
+
+    CBRAEx (pController != nullptr, E_UNEXPECTED);
+
+    index = (int)SendDlgItemMessageW (hDlg, IDC_COLORSCHEME_COMBO, CB_GETCURSEL, 0, 0);
     
     SendDlgItemMessageW (hDlg, IDC_COLORSCHEME_COMBO, CB_GETLBTEXT, index, (LPARAM)scheme);
-    g_pController->UpdateColorScheme (scheme);
+    pController->UpdateColorScheme (scheme);
+
+Error:
+    return;
 }
 
 
@@ -179,25 +310,35 @@ static void OnColorSchemeChange (HWND hDlg)
 
 static void OnResetButton (HWND hDlg)
 {
-    g_pController->ResetToDefaults();
+    HRESULT                     hr          = S_OK;
+    ConfigDialogController    * pController = GetControllerFromDialog (hDlg);
+    const ScreenSaverSettings * pDefaults   = nullptr;
+
+
+    CBRAEx (pController != nullptr, E_UNEXPECTED);
+
+    pController->ResetToDefaults();
     
-    const ScreenSaverSettings & defaults = g_pController->GetSettings();
+    pDefaults = &pController->GetSettings();
     
-    SendDlgItemMessageW (hDlg, IDC_DENSITY_SLIDER, TBM_SETPOS, TRUE, defaults.m_densityPercent);
-    SetDlgItemTextW     (hDlg, IDC_DENSITY_LABEL, std::format (L"{}%", defaults.m_densityPercent).c_str());
+    SendDlgItemMessageW (hDlg, IDC_DENSITY_SLIDER, TBM_SETPOS, TRUE, pDefaults->m_densityPercent);
+    SetDlgItemTextW     (hDlg, IDC_DENSITY_LABEL, std::format (L"{}%", pDefaults->m_densityPercent).c_str());
     
-    SendDlgItemMessageW (hDlg, IDC_ANIMSPEED_SLIDER, TBM_SETPOS, TRUE, defaults.m_animationSpeedPercent);
-    SetDlgItemTextW     (hDlg, IDC_ANIMSPEED_LABEL, std::format (L"{}%", defaults.m_animationSpeedPercent).c_str());
+    SendDlgItemMessageW (hDlg, IDC_ANIMSPEED_SLIDER, TBM_SETPOS, TRUE, pDefaults->m_animationSpeedPercent);
+    SetDlgItemTextW     (hDlg, IDC_ANIMSPEED_LABEL, std::format (L"{}%", pDefaults->m_animationSpeedPercent).c_str());
     
-    SendDlgItemMessageW (hDlg, IDC_GLOWINTENSITY_SLIDER, TBM_SETPOS, TRUE, defaults.m_glowIntensityPercent);
-    SetDlgItemTextW     (hDlg, IDC_GLOWINTENSITY_LABEL, std::format (L"{}%", defaults.m_glowIntensityPercent).c_str());
+    SendDlgItemMessageW (hDlg, IDC_GLOWINTENSITY_SLIDER, TBM_SETPOS, TRUE, pDefaults->m_glowIntensityPercent);
+    SetDlgItemTextW     (hDlg, IDC_GLOWINTENSITY_LABEL, std::format (L"{}%", pDefaults->m_glowIntensityPercent).c_str());
     
-    SendDlgItemMessageW (hDlg, IDC_GLOWSIZE_SLIDER, TBM_SETPOS, TRUE, defaults.m_glowSizePercent);
-    SetDlgItemTextW     (hDlg, IDC_GLOWSIZE_LABEL, std::format (L"{}%", defaults.m_glowSizePercent).c_str());
+    SendDlgItemMessageW (hDlg, IDC_GLOWSIZE_SLIDER, TBM_SETPOS, TRUE, pDefaults->m_glowSizePercent);
+    SetDlgItemTextW     (hDlg, IDC_GLOWSIZE_LABEL, std::format (L"{}%", pDefaults->m_glowSizePercent).c_str());
     
-    CheckDlgButton (hDlg, IDC_STARTFULLSCREEN_CHECK, defaults.m_startFullscreen ? BST_CHECKED : BST_UNCHECKED);
-    CheckDlgButton (hDlg, IDC_SHOWDEBUG_CHECK, defaults.m_showDebugStats ? BST_CHECKED : BST_UNCHECKED);
-    CheckDlgButton (hDlg, IDC_SHOWFADETIMERS_CHECK, defaults.m_showFadeTimers ? BST_CHECKED : BST_UNCHECKED);
+    CheckDlgButton (hDlg, IDC_STARTFULLSCREEN_CHECK, pDefaults->m_startFullscreen ? BST_CHECKED : BST_UNCHECKED);
+    CheckDlgButton (hDlg, IDC_SHOWDEBUG_CHECK,       pDefaults->m_showDebugStats  ? BST_CHECKED : BST_UNCHECKED);
+    CheckDlgButton (hDlg, IDC_SHOWFADETIMERS_CHECK,  pDefaults->m_showFadeTimers  ? BST_CHECKED : BST_UNCHECKED);
+
+Error:
+    return;
 }
 
 
@@ -212,16 +353,31 @@ static void OnResetButton (HWND hDlg)
 
 static BOOL OnOK (HWND hDlg)
 {
-    HRESULT hr = g_pController->ApplyChanges();
+    HRESULT                  hr          = S_OK;
+    BOOL                     fSuccess    = FALSE;
+    ConfigDialogController * pController = GetControllerFromDialog (hDlg);
+
+
+
+    CBRAEx (pController != nullptr, E_UNEXPECTED);
+
+    hr = pController->ApplyChanges();
+    CHRL (hr, L"Failed to save settings to registry");
     
-    if (FAILED (hr))
+    // For modeless dialogs, use DestroyWindow instead of EndDialog
+    if (pController->IsLiveMode())
     {
-        MessageBoxW (hDlg, L"Failed to save settings to registry.", L"Error", MB_OK | MB_ICONERROR);
-        return TRUE;
+        DestroyWindow (hDlg);
+    }
+    else
+    {
+        EndDialog (hDlg, IDOK);
     }
     
-    EndDialog (hDlg, IDOK);
-    return TRUE;
+    fSuccess = TRUE;
+
+Error:
+    return fSuccess;
 }
 
 
@@ -236,9 +392,29 @@ static BOOL OnOK (HWND hDlg)
 
 static BOOL OnCancel (HWND hDlg)
 {
-    g_pController->CancelChanges();
-    EndDialog (hDlg, IDCANCEL);
-    return TRUE;
+    HRESULT                  hr          = S_OK;
+    BOOL                     fSuccess    = FALSE;
+    ConfigDialogController * pController = GetControllerFromDialog (hDlg);
+
+
+    CBRAEx (pController != nullptr, E_UNEXPECTED);
+
+    pController->CancelChanges();
+    
+    // For modeless dialogs, use DestroyWindow instead of EndDialog
+    if (pController->IsLiveMode())
+    {
+        DestroyWindow (hDlg);
+    }
+    else
+    {
+        EndDialog (hDlg, IDCANCEL);
+    }
+    
+    fSuccess = TRUE;
+
+Error:
+    return fSuccess;
 }
 
 
@@ -253,10 +429,12 @@ static BOOL OnCancel (HWND hDlg)
 
 static BOOL OnCommand (HWND hDlg, WPARAM wParam)
 {
-    if (g_pController == nullptr)
-    {
-        return FALSE;
-    }
+    HRESULT                  hr          = S_OK;
+    BOOL                     fSuccess    = FALSE;
+    ConfigDialogController * pController = GetControllerFromDialog (hDlg);
+
+
+    CBRAEx (pController != nullptr, E_UNEXPECTED);
 
     switch (LOWORD (wParam))
     {
@@ -268,15 +446,15 @@ static BOOL OnCommand (HWND hDlg, WPARAM wParam)
             break;
             
         case IDC_STARTFULLSCREEN_CHECK:
-            g_pController->UpdateStartFullscreen (IsDlgButtonChecked (hDlg, IDC_STARTFULLSCREEN_CHECK) == BST_CHECKED);
+            pController->UpdateStartFullscreen (IsDlgButtonChecked (hDlg, IDC_STARTFULLSCREEN_CHECK) == BST_CHECKED);
             break;
             
         case IDC_SHOWDEBUG_CHECK:
-            g_pController->UpdateShowDebugStats (IsDlgButtonChecked (hDlg, IDC_SHOWDEBUG_CHECK) == BST_CHECKED);
+            pController->UpdateShowDebugStats (IsDlgButtonChecked (hDlg, IDC_SHOWDEBUG_CHECK) == BST_CHECKED);
             break;
             
         case IDC_SHOWFADETIMERS_CHECK:
-            g_pController->UpdateShowFadeTimers (IsDlgButtonChecked (hDlg, IDC_SHOWFADETIMERS_CHECK) == BST_CHECKED);
+            pController->UpdateShowFadeTimers (IsDlgButtonChecked (hDlg, IDC_SHOWFADETIMERS_CHECK) == BST_CHECKED);
             break;
             
         case IDC_RESET_BUTTON:
@@ -284,13 +462,16 @@ static BOOL OnCommand (HWND hDlg, WPARAM wParam)
             break;
             
         case IDOK:
-            return OnOK (hDlg);
+            fSuccess = OnOK (hDlg);
+            goto Error;
             
         case IDCANCEL:
-            return OnCancel (hDlg);
+            fSuccess = OnCancel (hDlg);
+            goto Error;
     }
-    
-    return FALSE;
+
+Error:
+    return fSuccess;
 }
 
 
@@ -310,19 +491,56 @@ INT_PTR CALLBACK ConfigDialogProc (HWND   hDlg,
                                     WPARAM wParam,
                                     LPARAM lParam)
 {
+    INT_PTR result = FALSE;
+
+
+
     switch (message)
     {
         case WM_INITDIALOG:
-            return OnInitDialog (hDlg);
+            result = OnInitDialog (hDlg, lParam);
+            goto Error;
         
         case WM_HSCROLL:
-            return OnHScroll (hDlg, lParam);
+            result = OnHScroll (hDlg, lParam);
+            goto Error;
         
         case WM_COMMAND:
-            return OnCommand (hDlg, wParam);
+            result = OnCommand (hDlg, wParam);
+            goto Error;
+        
+        case WM_DESTROY:
+        {
+            DialogContext * pContext = GetDialogContext (hDlg);
+            ConfigDialogController * pController = pContext ? pContext->m_controller.get() : nullptr;
+
+            if (pController && pController->IsLiveMode())
+            {
+                if (Application * pApp = GetApplicationFromDialog (hDlg))
+                {
+                    pApp->SetConfigDialog (nullptr);
+                }
+
+                PostQuitMessage (0);
+            }
+
+            if (pContext)
+            {
+                SetWindowLongPtr (hDlg, DWLP_USER, 0);
+                
+                if (pContext->m_ownsContextMemory)
+                {
+                    delete pContext;
+                }
+            }
+
+            result = TRUE;
+            goto Error;
+        }
     }
-    
-    return FALSE;
+
+Error:
+    return result;
 }
 
 
@@ -340,19 +558,27 @@ INT_PTR CALLBACK ConfigDialogProc (HWND   hDlg,
 
 static int ShowConfigDialog (HINSTANCE hInstance, const ScreenSaverModeContext & context)
 {
-    HRESULT                hr           = S_OK;
-    ConfigDialogController controller;
-    int                    result       = 0;
-    HWND                   parentHwnd   = context.m_previewParentHwnd;
+    HRESULT         hr         = S_OK;
+    DialogContext   dlgContext;
+    HWND            parentHwnd = context.m_previewParentHwnd;
+    INT_PTR         result     = -1;
     
 
 
-    hr = controller.Initialize();
+    dlgContext.m_controller = std::make_unique<ConfigDialogController>();
+    hr = dlgContext.m_controller->Initialize();
     CHRA (hr);
 
-    g_pController = &controller;
-    result        = (int)DialogBoxW (hInstance, MAKEINTRESOURCEW (IDD_MATRIXRAIN_SAVER_CONFIG), parentHwnd, ConfigDialogProc);
-    g_pController = nullptr;
+    result = DialogBoxParamW (hInstance,
+                               MAKEINTRESOURCEW (IDD_MATRIXRAIN_SAVER_CONFIG),
+                               parentHwnd,
+                               ConfigDialogProc,
+                               reinterpret_cast<LPARAM> (&dlgContext));
+
+    if (result == -1)
+    {
+        hr = HRESULT_FROM_WIN32 (GetLastError());
+    }
 
 Error:
     if (FAILED (hr))
@@ -361,7 +587,68 @@ Error:
         return -1;
     }
 
-    return result;
+    return static_cast<int> (result);
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  CreateConfigDialog (live overlay)
+//
+//  Create modeless configuration dialog over running application.
+//  Live overlay mode: /c without HWND - dialog shown atop animation
+//  Returns dialog HWND or nullptr on failure.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+static HRESULT CreateConfigDialog (HINSTANCE          hInstance,
+                                    HWND               parentHwnd,
+                                    Application      * pApplication,
+                                    ApplicationState * pAppState,
+                                    HWND             * phDlg)
+{
+    HRESULT hr      = S_OK;
+    HWND    hDlg    = nullptr;
+    auto    context = std::make_unique<DialogContext>();
+
+
+
+    context->m_controller = std::make_unique<ConfigDialogController>();
+    hr = context->m_controller->Initialize();
+    CHRA (hr);
+
+    hr = context->m_controller->InitializeLiveMode (pAppState);
+    CHRA (hr);
+
+    context->m_pApp              = pApplication;
+    context->m_ownsContextMemory = true;
+
+    hDlg = CreateDialogParamW (hInstance,
+                               MAKEINTRESOURCEW (IDD_MATRIXRAIN_SAVER_CONFIG),
+                               parentHwnd,
+                               ConfigDialogProc,
+                               reinterpret_cast<LPARAM> (context.get()));
+    
+    CWRA (hDlg);
+
+    context.release();
+
+    // Show the modeless dialog
+    ShowWindow (hDlg, SW_SHOW);
+
+Error:
+    if (FAILED (hr))
+    {
+        MessageBoxW (nullptr, L"Failed to create live overlay configuration dialog.", L"Error", MB_OK | MB_ICONERROR);
+        hDlg = nullptr;
+    }
+
+    *phDlg = hDlg;
+
+    return hr;
 }
 
 
@@ -392,25 +679,27 @@ int APIENTRY wWinMain(_In_     HINSTANCE hInstance,
     // Handle configuration mode with HWND (modal Control Panel dialog)
     if (context.m_mode == ScreenSaverMode::SettingsDialog && context.m_previewParentHwnd != nullptr)
     {
-        return ShowConfigDialog (hInstance, context);
+        retval = ShowConfigDialog (hInstance, context);
+        goto Error;
     }
 
     // For live overlay mode (/c without HWND) or normal operation, initialize the application
     hr = app.Initialize (hInstance, nCmdShow, &context);
     CHR (hr);
     
-    // If this was a live overlay config request, show the dialog now over our window
+    // If this was a live overlay config request, create modeless dialog
     if (context.m_mode == ScreenSaverMode::SettingsDialog)
     {
-        // TODO: Get app window HWND and ApplicationState pointer from app
-        // TODO: Pass them to ShowConfigDialog for live overlay mode
-        // For now, show error
-        MessageBoxW (nullptr,
-                     L"Live overlay configuration mode not yet fully implemented.\n\n"
-                     L"Use Control Panel → Screen Saver Settings instead.",
-                     L"MatrixRain Configuration",
-                     MB_OK | MB_ICONINFORMATION);
-        return 0;
+        HWND hConfigDialog = nullptr;
+
+        hr = CreateConfigDialog (hInstance,
+                                app.GetMainWindowHwnd(),
+                                &app,
+                                app.GetApplicationState(),
+                                &hConfigDialog);
+        CHRA (hr);
+        
+        app.SetConfigDialog (hConfigDialog);
     }
     
     retval = app.Run();

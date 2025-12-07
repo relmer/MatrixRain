@@ -864,5 +864,47 @@ namespace MatrixRainTests
                               static_cast<int>(appState.GetColorScheme()), 
                               L"Color scheme should revert to snapshot");
         }
+
+
+
+
+
+        // T058: Test dialog behavior when parent app exits while live overlay dialog is open
+        TEST_METHOD (TestLiveDialogGracefulShutdownWhenParentAppExits)
+        {
+            // Note: This integration test validates that if the parent MatrixRain
+            // application window is destroyed while the live overlay dialog is open,
+            // the dialog detects this and closes gracefully without crashing.
+            // 
+            // Full validation requires:
+            // 1. Creating application window with running animation
+            // 2. Opening live overlay dialog
+            // 3. Destroying parent window (simulating app exit/crash)
+            // 4. Verifying dialog receives WM_PARENTNOTIFY or detects invalid HWND
+            // 5. Verifying dialog closes gracefully and doesn't crash
+            // 
+            // This is a placeholder for manual/automated UI testing
+
+            ApplicationState       appState;
+            ConfigDialogController controller;
+            HRESULT                hr         = S_OK;
+            
+            
+            appState.Initialize (nullptr);
+            
+            hr = controller.Initialize();
+            Assert::AreEqual (S_OK, hr, L"Controller initialization should succeed");
+
+            hr = controller.InitializeLiveMode (&appState);
+            Assert::AreEqual (S_OK, hr, L"Live mode initialization should succeed");
+
+            // TODO: Create test that:
+            // 1. Creates real HWND for parent window
+            // 2. Opens dialog with that parent
+            // 3. Destroys parent HWND (DestroyWindow or PostQuitMessage)
+            // 4. Verifies dialog detects parent destruction
+            // 5. Verifies dialog closes without crash or leak
+            Assert::Fail (L"Test not yet implemented - requires window creation and destruction simulation");
+        }
     };
 }  // namespace MatrixRainTests

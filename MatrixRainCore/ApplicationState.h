@@ -5,6 +5,8 @@
 
 
 
+
+
 struct ScreenSaverModeContext;
 
 
@@ -56,6 +58,12 @@ public:
     /// </summary>
     /// <param name="densityPercent">New density percentage (0-100)</param>
     void OnDensityChanged (int densityPercent);
+    
+    /// <summary>
+    /// Register a callback to be notified when density changes.
+    /// </summary>
+    /// <param name="callback">Function to call with new density percentage</param>
+    void RegisterDensityChangeCallback (std::function<void(int)> callback);
 
     /// <summary>
     /// Update animation speed setting.
@@ -96,8 +104,8 @@ public:
     bool                      GetShowStatistics()      const { return m_showStatistics;      }
     const ScreenSaverSettings GetSettings()            const { return m_settings;            }
 
-    void SetDisplayMode    (DisplayMode mode)   { m_displayMode = mode;                 }
-    void SetColorScheme    (ColorScheme scheme) { m_colorScheme = scheme;               }
+    void SetDisplayMode       (DisplayMode mode)   { m_displayMode = mode;                 }
+    void SetColorScheme       (ColorScheme scheme) { m_colorScheme = scheme;               }
     void ToggleStatistics();
     
     /// <summary>
@@ -107,12 +115,13 @@ public:
     HRESULT SaveSettings();
 
 private:
-    DisplayMode         m_displayMode        = DisplayMode::Fullscreen; // Current display mode
-    ColorScheme         m_colorScheme        = ColorScheme::Green;      // Current color scheme
-    bool                m_showDebugFadeTimes = false;                   // Show debug fade time overlay
-    bool                m_showStatistics     = false;                   // Show FPS and density statistics
-    float               m_elapsedTime        = 0.0f;                    // Elapsed time for color cycling animation
-    ScreenSaverSettings m_settings;                                     // User-configurable settings
+    DisplayMode                  m_displayMode           = DisplayMode::Fullscreen; // Current display mode
+    ColorScheme                  m_colorScheme           = ColorScheme::Green;      // Current color scheme
+    bool                         m_showDebugFadeTimes    = false;                   // Show debug fade time overlay
+    bool                         m_showStatistics        = false;                   // Show FPS and density statistics
+    float                        m_elapsedTime           = 0.0f;                    // Elapsed time for color cycling animation
+    ScreenSaverSettings          m_settings;                                        // User-configurable settings
+    std::function<void(int)>     m_densityChangeCallback = nullptr;                // Callback for density changes
 };
 
 

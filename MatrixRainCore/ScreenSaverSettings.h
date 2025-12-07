@@ -10,7 +10,7 @@ struct ScreenSaverSettings
 {
     static constexpr int MIN_DENSITY_PERCENT         = 0;
     static constexpr int MAX_DENSITY_PERCENT         = 100;
-    static constexpr int DEFAULT_DENSITY_PERCENT     = 100;
+    static constexpr int DEFAULT_DENSITY_PERCENT     = 80;
     
     static constexpr int MIN_ANIMATION_SPEED_PERCENT = 1;
     static constexpr int MAX_ANIMATION_SPEED_PERCENT = 100;

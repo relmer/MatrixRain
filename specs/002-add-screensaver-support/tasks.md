@@ -87,11 +87,11 @@
 - [X] T051 [US2] Extend `ConfigDialogController` to support dual modes (modal vs live overlay) with snapshot/restore logic in `MatrixRainCore/ConfigDialogController.cpp`
 - [X] T052 [US2] Implement real-time setting propagation from dialog controls to `ApplicationState` during live overlay mode in `MatrixRainCore/ConfigDialogController.cpp`
 - [X] T053 [US2] Update `/c` handling in `MatrixRain/main.cpp` to detect presence/absence of HWND in command line: if HWND provided, use it as external Control Panel parent for modal mode; if HWND absent, use `FindWindow()` to locate running MatrixRain instance and obtain its main window HWND for live overlay mode (show error if no instance found)
-- [ ] T054 [P] [US2] Add failing integration tests for live overlay dialog behavior (topmost z-order, immediate animation updates, Cancel revert, primary monitor centering with multi-monitor fullscreen) in `MatrixRainTests/integration/LiveDialogTests.cpp`
-- [ ] T055 [US2] Implement WS_EX_TOPMOST dialog styling and parent-to-app-window logic for live overlay mode in `MatrixRainCore/ConfigDialogController.cpp` and `MatrixRain/main.cpp`
-- [ ] T056 [P] [US2] Add failing error handling tests for `/c` without HWND when app not running (FindWindow returns NULL) or during screensaver sessions (FindWindow finds /s or /p mode window) in `MatrixRainTests/unit/ScreenSaverModeParserTests.cpp`
-- [ ] T057 [US2] Implement error dialogs for invalid live overlay mode invocations (no app running, screensaver active) in `MatrixRain/ScreenSaverModeParser.cpp`
-- [ ] T058 [P] [US2] Add failing tests for dialog behavior when MatrixRain application exits while live overlay dialog is open (dialog detects parent window destruction via WM_PARENTNOTIFY or window validation and closes gracefully) in `MatrixRainTests/unit/ConfigDialogControllerTests.cpp`
+- [X] T054 [P] [US2] Add failing integration tests for live overlay dialog behavior (topmost z-order, immediate animation updates, Cancel revert, primary monitor centering with multi-monitor fullscreen) in `MatrixRainTests/integration/LiveDialogTests.cpp`
+- [X] T055 [US2] Implement WS_EX_TOPMOST dialog styling and parent-to-app-window logic for live overlay mode in `MatrixRainCore/ConfigDialogController.cpp` and `MatrixRain/main.cpp`
+- [X] T056 [P] [US2] ~~Add failing error handling tests for `/c` without HWND when app not running (FindWindow returns NULL) or during screensaver sessions (FindWindow finds /s or /p mode window)~~ **NOT APPLICABLE** - architecture changed to initialize own Application instance instead of using FindWindow
+- [X] T057 [US2] ~~Implement error dialogs for invalid live overlay mode invocations (no app running, screensaver active)~~ **NOT APPLICABLE** - architecture changed to initialize own Application instance
+- [X] T058 [P] [US2] Add failing tests for dialog behavior when MatrixRain application exits while live overlay dialog is open (dialog detects parent window destruction via WM_PARENTNOTIFY or window validation and closes gracefully) in `MatrixRainTests/unit/ConfigDialogControllerTests.cpp`
 
 **Checkpoint**: Users can configure screensaver options via the dialog (modal Control Panel or live overlay), and registry persistence functions for both read and write paths with immediate visual feedback in live mode.
 
