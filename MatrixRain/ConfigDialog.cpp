@@ -36,7 +36,7 @@ static ConfigDialogController * GetControllerFromDialog (HWND hDlg)
     ConfigDialogController * pController = nullptr;
     DialogContext          * pContext    = GetDialogContext (hDlg);
 
-    
+
 
     if (pContext)
     {
@@ -309,6 +309,104 @@ Error:
 
 ////////////////////////////////////////////////////////////////////////////////
 //
+//  OnStartFullscreenCheck
+//
+////////////////////////////////////////////////////////////////////////////////
+
+static void OnStartFullscreenCheck (HWND hDlg)
+{
+    HRESULT                  hr          = S_OK;
+    ConfigDialogController * pController = GetControllerFromDialog (hDlg);
+    bool                     checked     = IsDlgButtonChecked (hDlg, IDC_STARTFULLSCREEN_CHECK) == BST_CHECKED;
+
+
+
+    CBRAEx (pController != nullptr, E_UNEXPECTED);
+
+    pController->UpdateStartFullscreen (checked);
+    
+    // If live overlay mode, immediately apply fullscreen/windowed state
+    if (Application * pApp = GetApplicationFromDialog (hDlg))
+    {
+        DisplayMode newMode = checked ? DisplayMode::Fullscreen : DisplayMode::Windowed;
+        pApp->GetApplicationState()->SetDisplayMode (newMode);
+        pApp->ApplyDisplayModeChange();
+    }
+
+Error:
+    return;
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  OnShowDebugCheck
+//
+////////////////////////////////////////////////////////////////////////////////
+
+static void OnShowDebugCheck (HWND hDlg)
+{
+    HRESULT                  hr          = S_OK;
+    ConfigDialogController * pController = GetControllerFromDialog (hDlg);
+    bool                     checked     = IsDlgButtonChecked (hDlg, IDC_SHOWDEBUG_CHECK) == BST_CHECKED;
+
+
+
+    CBRAEx (pController != nullptr, E_UNEXPECTED);
+
+    pController->UpdateShowDebugStats (checked);
+    
+    // If live overlay mode, immediately apply debug stats display
+    if (Application * pApp = GetApplicationFromDialog (hDlg))
+    {
+        pApp->GetApplicationState()->SetShowStatistics (checked);
+    }
+
+Error:
+    return;
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  OnShowFadeTimersCheck
+//
+////////////////////////////////////////////////////////////////////////////////
+
+static void OnShowFadeTimersCheck (HWND hDlg)
+{
+    HRESULT                  hr          = S_OK;
+    ConfigDialogController * pController = GetControllerFromDialog (hDlg);
+    bool                     checked     = IsDlgButtonChecked (hDlg, IDC_SHOWFADETIMERS_CHECK) == BST_CHECKED;
+
+
+
+    CBRAEx (pController != nullptr, E_UNEXPECTED);
+
+    pController->UpdateShowFadeTimers (checked);
+    
+    // If live overlay mode, immediately apply fade timers display
+    if (Application * pApp = GetApplicationFromDialog (hDlg))
+    {
+        pApp->GetApplicationState()->SetShowDebugFadeTimes (checked);
+    }
+
+Error:
+    return;
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
 //  OnResetButton
 //
 ////////////////////////////////////////////////////////////////////////////////
@@ -465,15 +563,15 @@ static BOOL OnCommand (HWND hDlg, WPARAM wParam)
             break;
             
         case IDC_STARTFULLSCREEN_CHECK:
-            pController->UpdateStartFullscreen (IsDlgButtonChecked (hDlg, IDC_STARTFULLSCREEN_CHECK) == BST_CHECKED);
+            OnStartFullscreenCheck (hDlg);
             break;
             
         case IDC_SHOWDEBUG_CHECK:
-            pController->UpdateShowDebugStats (IsDlgButtonChecked (hDlg, IDC_SHOWDEBUG_CHECK) == BST_CHECKED);
+            OnShowDebugCheck (hDlg);
             break;
             
         case IDC_SHOWFADETIMERS_CHECK:
-            pController->UpdateShowFadeTimers (IsDlgButtonChecked (hDlg, IDC_SHOWFADETIMERS_CHECK) == BST_CHECKED);
+            OnShowFadeTimersCheck (hDlg);
             break;
             
         case IDC_RESET_BUTTON:

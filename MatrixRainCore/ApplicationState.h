@@ -110,14 +110,11 @@ public:
     bool                      GetShowStatistics()      const { return m_showStatistics;      }
     const ScreenSaverSettings GetSettings()            const { return m_settings;            }
 
-    void SetDisplayMode       (DisplayMode mode)   { m_displayMode = mode;                 }
-    void SetColorScheme       (ColorScheme scheme) { m_colorScheme = scheme;               }
+    void SetDisplayMode        (DisplayMode mode)   { m_displayMode = mode;                 }
+    void SetColorScheme        (ColorScheme scheme) { m_colorScheme = scheme;               }
+    void SetShowStatistics     (bool show);
+    void SetShowDebugFadeTimes (bool show);
     void ToggleStatistics();
-    
-    /// <summary>
-    /// Save current settings to registry.
-    /// </summary>
-    /// <returns>S_OK on success, error HRESULT otherwise</returns>
     HRESULT SaveSettings();
 
 private:

@@ -33,6 +33,9 @@ public:
     HWND               GetMainWindowHwnd()   const                { return m_hwnd;                   }
     ApplicationState * GetApplicationState() const                { return m_appState.get();         }
     void               SetConfigDialog       (HWND hConfigDialog) { m_hConfigDialog = hConfigDialog; }
+    
+    // Apply display mode change and resize window
+    void               ApplyDisplayModeChange()                   { ResizeWindowForCurrentMode();    }
 
     // Window dimensions
     static constexpr UINT            DEFAULT_WIDTH  = 1280;

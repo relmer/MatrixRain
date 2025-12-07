@@ -1010,8 +1010,8 @@ HRESULT RenderSystem::ApplyBloom()
 
 
 
-    // Safety check - if bloom resources failed to create, skip
-    CBREx (m_sceneTexture && m_bloomTexture && m_bloomExtractPS && m_compositePS, E_UNEXPECTED);
+    // Safety check - if render target or bloom resources are being recreated during resize, skip
+    CBREx (m_renderTargetView && m_sceneTexture && m_bloomTexture && m_bloomExtractPS && m_compositePS, E_UNEXPECTED);
     
     // Scene texture already has the rendered characters - no need to copy from backbuffer
     
@@ -1068,6 +1068,11 @@ Error:
 
 void RenderSystem::ClearRenderTarget()
 {
+    if (!m_renderTargetView)
+    {
+        return;  // Skip if render target is being recreated during resize
+    }
+    
     // Clear to black
     float clearColor[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
     m_context->ClearRenderTargetView (m_renderTargetView.Get(), clearColor);
@@ -1214,7 +1219,7 @@ Error:
 
 void RenderSystem::Render (const AnimationSystem & animationSystem, const Viewport & viewport, ColorScheme colorScheme, float fps, int rainPercentage, int streakCount, int activeHeadCount, bool showDebugFadeTimes, float elapsedTime)
 {
-    if (!m_device || !m_context)
+    if (!m_device || !m_context || !m_renderTargetView)
     {
         return;
     }
@@ -1223,9 +1228,9 @@ void RenderSystem::Render (const AnimationSystem & animationSystem, const Viewpo
     ClearRenderTarget();
 
     // Update constant buffer with projection matrix
-    const Matrix4x4 & projection = viewport.GetProjectionMatrix();
-    D3D11_MAPPED_SUBRESOURCE mappedResource;
-    HRESULT hr = m_context->Map (m_constantBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
+    const Matrix4x4          & projection = viewport.GetProjectionMatrix();
+    D3D11_MAPPED_SUBRESOURCE   mappedResource;
+    HRESULT                    hr = m_context->Map (m_constantBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
     if (SUCCEEDED (hr))
     {
         ConstantBufferData* cbData = reinterpret_cast<ConstantBufferData*> (mappedResource.pData);

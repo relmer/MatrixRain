@@ -234,6 +234,31 @@ void ApplicationState::Update (float deltaTime)
 
 
 
+void ApplicationState::SetShowStatistics (bool show)
+{
+    m_showStatistics = show;
+    
+    // Update settings and save
+    m_settings.m_showDebugStats = show;
+    SaveSettings();
+}
+
+
+
+
+
+void ApplicationState::SetShowDebugFadeTimes (bool show)
+{
+    m_showDebugFadeTimes = show;
+    
+    // Update settings and save
+    m_settings.m_showFadeTimers = show;
+    SaveSettings();
+}
+
+
+
+
 
 void ApplicationState::ToggleStatistics()
 {
