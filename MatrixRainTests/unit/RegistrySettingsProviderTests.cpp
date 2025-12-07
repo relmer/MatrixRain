@@ -1,7 +1,7 @@
 #include "pch.h"
 
-#include "../../MatrixRainCore/RegistrySettingsProvider.h"
-#include "../../MatrixRainCore/ScreenSaverSettings.h"
+#include "..\..\MatrixRainCore\RegistrySettingsProvider.h"
+#include "..\..\MatrixRainCore\ScreenSaverSettings.h"
 
 
 

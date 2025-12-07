@@ -1,6 +1,6 @@
 #include "pch.h"
 
-#include "../../MatrixRainCore/CharacterStreak.h"
+#include "..\..\MatrixRainCore\CharacterStreak.h"
 
 
 

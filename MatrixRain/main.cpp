@@ -1,11 +1,9 @@
 #include "pch.h"
 
-#include "../MatrixRainCore/Application.h"
-#include "../MatrixRainCore/ConfigDialogController.h"
-#include "../MatrixRainCore/ScreenSaverModeParser.h"
+#include "..\MatrixRainCore\Application.h"
+#include "..\MatrixRainCore\ConfigDialogController.h"
+#include "..\MatrixRainCore\ScreenSaverModeParser.h"
 #include "resource.h"
-
-#include <CommCtrl.h>
 
 
 

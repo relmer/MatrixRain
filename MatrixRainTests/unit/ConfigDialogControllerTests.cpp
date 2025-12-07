@@ -1,9 +1,9 @@
 #include "pch.h"
 
-#include "../../MatrixRainCore/ApplicationState.h"
-#include "../../MatrixRainCore/ColorScheme.h"
-#include "../../MatrixRainCore/ConfigDialogController.h"
-#include "../../MatrixRainCore/RegistrySettingsProvider.h"
+#include "..\..\MatrixRainCore\ApplicationState.h"
+#include "..\..\MatrixRainCore\ColorScheme.h"
+#include "..\..\MatrixRainCore\ConfigDialogController.h"
+#include "..\..\MatrixRainCore\RegistrySettingsProvider.h"
 
 
 

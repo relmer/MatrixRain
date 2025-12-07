@@ -1,11 +1,11 @@
 #include "pch.h"
 
-#include "../../MatrixRainCore/Application.h"
-#include "../../MatrixRainCore/ApplicationState.h"
-#include "../../MatrixRainCore/InputSystem.h"
-#include "../../MatrixRainCore/DensityController.h"
-#include "../../MatrixRainCore/Viewport.h"
-#include "../../MatrixRainCore/Math.h"
+#include "..\..\MatrixRainCore\Application.h"
+#include "..\..\MatrixRainCore\ApplicationState.h"
+#include "..\..\MatrixRainCore\InputSystem.h"
+#include "..\..\MatrixRainCore\DensityController.h"
+#include "..\..\MatrixRainCore\Viewport.h"
+#include "..\..\MatrixRainCore\Math.h"
 
 
 

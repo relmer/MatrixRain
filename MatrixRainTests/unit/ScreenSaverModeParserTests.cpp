@@ -1,8 +1,8 @@
 #include "pch.h"
 
-#include "../../MatrixRainCore/ScreenSaverMode.h"
-#include "../../MatrixRainCore/ScreenSaverModeContext.h"
-#include "../../MatrixRainCore/ScreenSaverModeParser.h"
+#include "..\..\MatrixRainCore\ScreenSaverMode.h"
+#include "..\..\MatrixRainCore\ScreenSaverModeContext.h"
+#include "..\..\MatrixRainCore\ScreenSaverModeParser.h"
 
 
 

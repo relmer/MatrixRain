@@ -1,9 +1,9 @@
 #include "pch.h"
 
-#include "../../MatrixRainCore/ApplicationState.h"
-#include "../../MatrixRainCore/CharacterStreak.h"
-#include "../../MatrixRainCore/CharacterInstance.h"
-#include "../../MatrixRainCore/Math.h"
+#include "..\..\MatrixRainCore\ApplicationState.h"
+#include "..\..\MatrixRainCore\CharacterStreak.h"
+#include "..\..\MatrixRainCore\CharacterInstance.h"
+#include "..\..\MatrixRainCore\Math.h"
 
 
 

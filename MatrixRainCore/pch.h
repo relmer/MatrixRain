@@ -28,8 +28,9 @@
 #define NOMINMAX
 #include <Windows.h>
 
+#include <CommCtrl.h>
 #include <ShellScalingApi.h>
-#include <strsafe.h>
+#include <StrSafe.h>
 
 
 

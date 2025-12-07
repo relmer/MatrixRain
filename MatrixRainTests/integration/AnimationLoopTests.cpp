@@ -1,9 +1,9 @@
 #include "pch.h"
 
-#include "../../MatrixRainCore/AnimationSystem.h"
-#include "../../MatrixRainCore/Viewport.h"
-#include "../../MatrixRainCore/CharacterSet.h"
-#include "../../MatrixRainCore/DensityController.h"
+#include "..\..\MatrixRainCore\AnimationSystem.h"
+#include "..\..\MatrixRainCore\Viewport.h"
+#include "..\..\MatrixRainCore\CharacterSet.h"
+#include "..\..\MatrixRainCore\DensityController.h"
 
 
 
