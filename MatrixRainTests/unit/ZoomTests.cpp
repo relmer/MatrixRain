@@ -1,4 +1,4 @@
-#include "pch.h"
+#include "Pch_MatrixRainTests.h"
 
 #include "..\..\MatrixRainCore\AnimationSystem.h"
 #include "..\..\MatrixRainCore\DensityController.h"
