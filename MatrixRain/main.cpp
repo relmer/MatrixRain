@@ -334,21 +334,24 @@ INT_PTR CALLBACK ConfigDialogProc (HWND   hDlg,
 //  ShowConfigDialog
 //
 //  Display configuration dialog for screensaver settings.
+//  Modal mode (Control Panel): HWND provided via /c:<HWND>
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-static int ShowConfigDialog (HINSTANCE hInstance)
+static int ShowConfigDialog (HINSTANCE hInstance, const ScreenSaverModeContext & context)
 {
-    HRESULT                hr = S_OK;
+    HRESULT                hr           = S_OK;
     ConfigDialogController controller;
-    int                    result = 0;
+    int                    result       = 0;
+    HWND                   parentHwnd   = context.m_previewParentHwnd;
+    
 
 
     hr = controller.Initialize();
     CHRA (hr);
 
     g_pController = &controller;
-    result        = (int)DialogBoxW (hInstance, MAKEINTRESOURCEW (IDD_MATRIXRAIN_SAVER_CONFIG), nullptr, ConfigDialogProc);
+    result        = (int)DialogBoxW (hInstance, MAKEINTRESOURCEW (IDD_MATRIXRAIN_SAVER_CONFIG), parentHwnd, ConfigDialogProc);
     g_pController = nullptr;
 
 Error:
@@ -386,14 +389,29 @@ int APIENTRY wWinMain(_In_     HINSTANCE hInstance,
     hr = ParseCommandLine (lpCmdLine, context);
     CHR (hr);
 
-    // Handle configuration mode
-    if (context.m_mode == ScreenSaverMode::SettingsDialog)
+    // Handle configuration mode with HWND (modal Control Panel dialog)
+    if (context.m_mode == ScreenSaverMode::SettingsDialog && context.m_previewParentHwnd != nullptr)
     {
-        return ShowConfigDialog (hInstance);
+        return ShowConfigDialog (hInstance, context);
     }
 
+    // For live overlay mode (/c without HWND) or normal operation, initialize the application
     hr = app.Initialize (hInstance, nCmdShow, &context);
     CHR (hr);
+    
+    // If this was a live overlay config request, show the dialog now over our window
+    if (context.m_mode == ScreenSaverMode::SettingsDialog)
+    {
+        // TODO: Get app window HWND and ApplicationState pointer from app
+        // TODO: Pass them to ShowConfigDialog for live overlay mode
+        // For now, show error
+        MessageBoxW (nullptr,
+                     L"Live overlay configuration mode not yet fully implemented.\n\n"
+                     L"Use Control Panel → Screen Saver Settings instead.",
+                     L"MatrixRain Configuration",
+                     MB_OK | MB_ICONINFORMATION);
+        return 0;
+    }
     
     retval = app.Run();
 
