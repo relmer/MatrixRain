@@ -124,6 +124,74 @@ void ApplicationState::OnDensityChanged (int densityPercent)
 
 
 
+void ApplicationState::SetAnimationSpeed (int speedPercent)
+{
+    m_settings.m_animationSpeedPercent = speedPercent;
+}
+
+
+
+
+
+void ApplicationState::SetGlowIntensity (int intensityPercent)
+{
+    m_settings.m_glowIntensityPercent = intensityPercent;
+}
+
+
+
+
+
+void ApplicationState::SetGlowSize (int sizePercent)
+{
+    m_settings.m_glowSizePercent = sizePercent;
+}
+
+
+
+
+
+void ApplicationState::ApplySettings (const ScreenSaverSettings & settings)
+{
+    m_settings = settings;
+    
+    // Update runtime state to match settings
+    m_displayMode        = m_settings.m_startFullscreen ? DisplayMode::Fullscreen : DisplayMode::Windowed;
+    m_showDebugFadeTimes = m_settings.m_showFadeTimers;
+    m_showStatistics     = m_settings.m_showDebugStats;
+    
+    // Map color scheme key to enum
+    if (m_settings.m_colorSchemeKey == L"green")
+    {
+        m_colorScheme = ColorScheme::Green;
+    }
+    else if (m_settings.m_colorSchemeKey == L"blue")
+    {
+        m_colorScheme = ColorScheme::Blue;
+    }
+    else if (m_settings.m_colorSchemeKey == L"red")
+    {
+        m_colorScheme = ColorScheme::Red;
+    }
+    else if (m_settings.m_colorSchemeKey == L"amber")
+    {
+        m_colorScheme = ColorScheme::Amber;
+    }
+    else if (m_settings.m_colorSchemeKey == L"cycle")
+    {
+        m_colorScheme = ColorScheme::ColorCycle;
+    }
+    else
+    {
+        // Default to green if unknown
+        m_colorScheme = ColorScheme::Green;
+    }
+}
+
+
+
+
+
 
 void ApplicationState::Update (float deltaTime)
 {

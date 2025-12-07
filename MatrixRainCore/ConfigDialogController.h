@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ColorScheme.h"
 #include "ConfigDialogSnapshot.h"
 #include "ScreenSaverSettings.h"
 
@@ -128,7 +129,9 @@ private:
     ScreenSaverSettings  m_settings;                    // Current settings (may include pending changes)
     ScreenSaverSettings  m_originalSettings;            // Original settings loaded from registry
     ConfigDialogSnapshot m_snapshot;                    // Snapshot for live mode Cancel rollback
-    bool                 m_isValidColorScheme (const std::wstring & key) const;
+    
+    bool        m_isValidColorScheme        (const std::wstring & key) const;
+    ColorScheme m_mapColorSchemeKeyToEnum   (const std::wstring & key) const;
 };
 
 

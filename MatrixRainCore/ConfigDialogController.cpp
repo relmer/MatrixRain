@@ -1,5 +1,6 @@
 #include "pch.h"
 
+#include "ApplicationState.h"
 #include "ConfigDialogController.h"
 #include "RegistrySettingsProvider.h"
 
@@ -38,6 +39,12 @@ HRESULT ConfigDialogController::Initialize()
 void ConfigDialogController::UpdateDensity (int densityPercent)
 {
     m_settings.m_densityPercent = ScreenSaverSettings::ClampDensityPercent (densityPercent);
+    
+    // Propagate to ApplicationState in live mode
+    if (m_snapshot.isLiveMode && m_snapshot.applicationStateRef)
+    {
+        m_snapshot.applicationStateRef->OnDensityChanged (m_settings.m_densityPercent);
+    }
 }
 
 
@@ -53,6 +60,12 @@ void ConfigDialogController::UpdateColorScheme (const std::wstring & colorScheme
         std::wstring normalizedKey = colorSchemeKey;
         std::transform (normalizedKey.begin(), normalizedKey.end(), normalizedKey.begin(), ::towlower);
         m_settings.m_colorSchemeKey = normalizedKey;
+        
+        // Propagate to ApplicationState in live mode
+        if (m_snapshot.isLiveMode && m_snapshot.applicationStateRef)
+        {
+            m_snapshot.applicationStateRef->SetColorScheme (m_mapColorSchemeKeyToEnum (normalizedKey));
+        }
     }
 }
 
@@ -65,6 +78,12 @@ void ConfigDialogController::UpdateAnimationSpeed (int animationSpeedPercent)
     m_settings.m_animationSpeedPercent = ScreenSaverSettings::ClampPercent (animationSpeedPercent, 
                                                                              ScreenSaverSettings::MIN_ANIMATION_SPEED_PERCENT, 
                                                                              ScreenSaverSettings::MAX_ANIMATION_SPEED_PERCENT);
+    
+    // Propagate to ApplicationState in live mode
+    if (m_snapshot.isLiveMode && m_snapshot.applicationStateRef)
+    {
+        m_snapshot.applicationStateRef->SetAnimationSpeed (m_settings.m_animationSpeedPercent);
+    }
 }
 
 
@@ -76,6 +95,12 @@ void ConfigDialogController::UpdateGlowIntensity (int glowIntensityPercent)
     m_settings.m_glowIntensityPercent = ScreenSaverSettings::ClampPercent (glowIntensityPercent, 
                                                                             ScreenSaverSettings::MIN_GLOW_INTENSITY_PERCENT, 
                                                                             ScreenSaverSettings::MAX_GLOW_INTENSITY_PERCENT);
+    
+    // Propagate to ApplicationState in live mode
+    if (m_snapshot.isLiveMode && m_snapshot.applicationStateRef)
+    {
+        m_snapshot.applicationStateRef->SetGlowIntensity (m_settings.m_glowIntensityPercent);
+    }
 }
 
 
@@ -85,8 +110,14 @@ void ConfigDialogController::UpdateGlowIntensity (int glowIntensityPercent)
 void ConfigDialogController::UpdateGlowSize (int glowSizePercent)
 {
     m_settings.m_glowSizePercent = ScreenSaverSettings::ClampPercent (glowSizePercent, 
-                                                                       ScreenSaverSettings::MIN_GLOW_SIZE_PERCENT, 
-                                                                       ScreenSaverSettings::MAX_GLOW_SIZE_PERCENT);
+                                                                      ScreenSaverSettings::MIN_GLOW_SIZE_PERCENT, 
+                                                                      ScreenSaverSettings::MAX_GLOW_SIZE_PERCENT);
+    
+    // Propagate to ApplicationState in live mode
+    if (m_snapshot.isLiveMode && m_snapshot.applicationStateRef)
+    {
+        m_snapshot.applicationStateRef->SetGlowSize (m_settings.m_glowSizePercent);
+    }
 }
 
 
@@ -172,6 +203,38 @@ bool ConfigDialogController::m_isValidColorScheme (const std::wstring & key) con
            lowerKey == L"red"    ||
            lowerKey == L"amber"  ||
            lowerKey == L"cycle";
+}
+
+
+
+
+
+ColorScheme ConfigDialogController::m_mapColorSchemeKeyToEnum (const std::wstring & key) const
+{
+    if (key == L"green")
+    {
+        return ColorScheme::Green;
+    }
+    else if (key == L"blue")
+    {
+        return ColorScheme::Blue;
+    }
+    else if (key == L"red")
+    {
+        return ColorScheme::Red;
+    }
+    else if (key == L"amber")
+    {
+    return ColorScheme::Amber;
+    }
+    else if (key == L"cycle")
+    {
+        return ColorScheme::ColorCycle;
+    }
+    else
+    {
+        return ColorScheme::Green;  // Default
+    }
 }
 
 
@@ -269,8 +332,11 @@ HRESULT ConfigDialogController::CancelLiveMode()
     // Revert current settings to snapshot (undoing live preview changes)
     m_settings = m_snapshot.snapshotSettings;
     
-    // TODO T052: Propagate snapshot settings back to ApplicationState
-    // to visually revert animation to pre-dialog state
+    // Propagate snapshot settings back to ApplicationState to visually revert animation
+    if (m_snapshot.applicationStateRef)
+    {
+        m_snapshot.applicationStateRef->ApplySettings (m_snapshot.snapshotSettings);
+    }
     
     // Clear live mode state
     m_snapshot.isLiveMode          = false;

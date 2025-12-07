@@ -58,6 +58,30 @@ public:
     void OnDensityChanged (int densityPercent);
 
     /// <summary>
+    /// Update animation speed setting.
+    /// </summary>
+    /// <param name="speedPercent">Animation speed percentage (1-100)</param>
+    void SetAnimationSpeed (int speedPercent);
+
+    /// <summary>
+    /// Update glow intensity setting.
+    /// </summary>
+    /// <param name="intensityPercent">Glow intensity percentage (0-200)</param>
+    void SetGlowIntensity (int intensityPercent);
+
+    /// <summary>
+    /// Update glow size setting.
+    /// </summary>
+    /// <param name="sizePercent">Glow size percentage (50-200)</param>
+    void SetGlowSize (int sizePercent);
+
+    /// <summary>
+    /// Apply full settings to application state (for live dialog revert).
+    /// </summary>
+    /// <param name="settings">Settings to apply</param>
+    void ApplySettings (const ScreenSaverSettings & settings);
+
+    /// <summary>
     /// Update application state with elapsed time.
     /// Used for color cycling animation.
     /// </summary>

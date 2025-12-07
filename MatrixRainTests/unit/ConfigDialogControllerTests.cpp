@@ -1,5 +1,7 @@
 #include "pch.h"
 
+#include "../../MatrixRainCore/ApplicationState.h"
+#include "../../MatrixRainCore/ColorScheme.h"
 #include "../../MatrixRainCore/ConfigDialogController.h"
 #include "../../MatrixRainCore/RegistrySettingsProvider.h"
 
@@ -467,7 +469,10 @@ namespace MatrixRainTests
         TEST_METHOD (TestConfigDialogControllerCreatesSnapshotInLiveMode)
         {
             // Arrange: Set up initial settings in registry
-            ScreenSaverSettings initialSettings
+            HRESULT                hr              = S_OK;
+            ConfigDialogController controller;
+            ApplicationState       appState;
+            ScreenSaverSettings    initialSettings
             {
                 .m_densityPercent        = 70,
                 .m_colorSchemeKey        = L"blue",
@@ -476,18 +481,23 @@ namespace MatrixRainTests
                 .m_glowSizePercent       = 140
             };
             
-            HRESULT hr = RegistrySettingsProvider::Save (initialSettings);
+
+
+            hr = RegistrySettingsProvider::Save (initialSettings);
             Assert::AreEqual (S_OK, hr);
 
-            ConfigDialogController controller;
             hr = controller.Initialize();
             Assert::AreEqual (S_OK, hr);
 
-            // Act: Initialize live overlay mode (requires ApplicationState* - passing nullptr for now, will fail until T051)
-            hr = controller.InitializeLiveMode (nullptr);
+            appState.Initialize (nullptr);
 
-            // Assert: Should fail with E_POINTER until T051 implementation
-            Assert::AreEqual (E_POINTER, hr, L"Should fail with null ApplicationState until T051 implements live mode");
+            // Act: Initialize live overlay mode with valid ApplicationState
+            hr = controller.InitializeLiveMode (&appState);
+            Assert::AreEqual (S_OK, hr);
+
+            // Assert: Should be in live mode and have captured snapshot
+            Assert::IsTrue (controller.IsLiveMode(), L"Controller should be in live mode");
+            Assert::AreEqual (70, controller.GetSettings().m_densityPercent, L"Snapshot should preserve initial density");
         }
 
 
@@ -500,17 +510,23 @@ namespace MatrixRainTests
             // Arrange
             HRESULT                hr         = S_OK;
             ConfigDialogController controller;
+            ApplicationState       appState;
 
 
 
             hr = controller.Initialize();
             Assert::AreEqual (S_OK, hr);
 
-            // Act: Try to initialize live mode with null ApplicationState
-            hr = controller.InitializeLiveMode (nullptr);
+            appState.Initialize (nullptr);
 
-            // Assert: Should fail until T051 implementation
-            Assert::AreEqual (E_POINTER, hr, L"InitializeLiveMode should reject null ApplicationState");
+            hr = controller.InitializeLiveMode (&appState);
+            Assert::AreEqual (S_OK, hr);
+
+            // Act: Update density - should immediately propagate to ApplicationState
+            controller.UpdateDensity (85);
+
+            // Assert: ApplicationState should reflect the change
+            Assert::AreEqual (85, appState.GetSettings().m_densityPercent, L"Density changes should propagate immediately");
         }
 
 
@@ -523,17 +539,30 @@ namespace MatrixRainTests
             // Arrange
             HRESULT                 hr         = S_OK;
             ConfigDialogController  controller;
+            ApplicationState        appState;
 
 
 
             hr = controller.Initialize();
             Assert::AreEqual (S_OK, hr);
 
-            // Act: Try to cancel before initializing live mode
-            hr = controller.CancelLiveMode();
+            appState.Initialize (nullptr);
 
-            // Assert: Should fail gracefully (not in live mode)
-            Assert::AreNotEqual (S_OK, hr, L"CancelLiveMode should fail when not in live mode");
+            hr = controller.InitializeLiveMode (&appState);
+            Assert::AreEqual (S_OK, hr);
+
+            int initialDensity = appState.GetSettings().m_densityPercent;
+
+            // Act: Make a change then cancel
+            controller.UpdateDensity (90);
+            Assert::AreEqual (90, appState.GetSettings().m_densityPercent, L"Density should update immediately");
+
+            hr = controller.CancelLiveMode();
+            Assert::AreEqual (S_OK, hr);
+
+            // Assert: ApplicationState should be reverted to snapshot
+            Assert::AreEqual (initialDensity, appState.GetSettings().m_densityPercent, L"Cancel should revert to initial density");
+            Assert::IsFalse (controller.IsLiveMode(), L"Should exit live mode after cancel");
         }
 
 
@@ -544,25 +573,39 @@ namespace MatrixRainTests
         TEST_METHOD (TestLiveModeOkPersistsChanges)
         {
             // Arrange: Set up initial settings
-            HRESULT   hr = S_OK; 
             ScreenSaverSettings initialSettings
             {
                 .m_densityPercent = 50
             };
             
-            
+            HRESULT                 hr = S_OK;
+            ConfigDialogController  controller;
+            ApplicationState        appState;
+
+
             hr = RegistrySettingsProvider::Save (initialSettings);
             Assert::AreEqual (S_OK, hr);
 
-            ConfigDialogController controller;
             hr = controller.Initialize();
             Assert::AreEqual (S_OK, hr);
 
-            // Act: Try to apply live mode without initialization
-            hr = controller.ApplyLiveMode();
+            appState.Initialize (nullptr);
 
-            // Assert: Should fail (not in live mode)
-            Assert::AreNotEqual (S_OK, hr, L"ApplyLiveMode should fail when not in live mode");
+            hr = controller.InitializeLiveMode (&appState);
+            Assert::AreEqual (S_OK, hr);
+
+            // Act: Make a change and apply
+            controller.UpdateDensity (75);
+            hr = controller.ApplyLiveMode();
+            Assert::AreEqual (S_OK, hr);
+
+            // Assert: Should persist to registry and exit live mode
+            Assert::IsFalse (controller.IsLiveMode(), L"Should exit live mode after apply");
+
+            ScreenSaverSettings savedSettings;
+            hr = RegistrySettingsProvider::Load (savedSettings);
+            Assert::AreEqual (S_OK, hr);
+            Assert::AreEqual (75, savedSettings.m_densityPercent, L"Changes should be saved to registry");
         }
 
 
@@ -619,6 +662,207 @@ namespace MatrixRainTests
             Assert::AreEqual (S_OK, hr, L"ApplyChanges should work in modal mode");
 
             // Future: When in live mode, ApplyChanges should fail or be redirected
+        }
+
+
+
+
+
+        // T052.1: Test live mode propagates density changes to ApplicationState
+        TEST_METHOD (TestLiveModePropagatesDensityChanges)
+        {
+            // Arrange: Set up initial settings and ApplicationState
+            ScreenSaverSettings initialSettings
+            {
+                .m_densityPercent = 50
+            };
+            
+            HRESULT                hr = S_OK;
+            ConfigDialogController controller;
+            ApplicationState       appState;
+
+
+            hr = RegistrySettingsProvider::Save (initialSettings);
+            Assert::AreEqual (S_OK, hr);
+
+            hr = controller.Initialize();
+            Assert::AreEqual (S_OK, hr);
+
+            appState.Initialize (nullptr);
+
+            hr = controller.InitializeLiveMode (&appState);
+            Assert::AreEqual (S_OK, hr);
+
+            // Act: Update density in dialog
+            controller.UpdateDensity (75);
+
+            // Assert: Verify ApplicationState was updated
+            Assert::AreEqual (75, appState.GetSettings().m_densityPercent, L"Density should propagate to ApplicationState");
+        }
+
+
+
+
+
+        // T052.2: Test live mode propagates color scheme changes to ApplicationState
+        TEST_METHOD (TestLiveModePropagatesColorSchemeChanges)
+        {
+            // Arrange
+            ConfigDialogController controller;
+            HRESULT                hr       = S_OK;
+            ApplicationState       appState;
+
+
+
+            hr = controller.Initialize();
+            Assert::AreEqual (S_OK, hr);
+
+            appState.Initialize (nullptr);
+
+            hr = controller.InitializeLiveMode (&appState);
+            Assert::AreEqual (S_OK, hr);
+
+            // Act: Update color scheme
+            controller.UpdateColorScheme (L"blue");
+
+            // Assert: Verify ApplicationState color scheme changed
+            Assert::AreEqual (static_cast<int>(ColorScheme::Blue), 
+                              static_cast<int>(appState.GetColorScheme()), 
+                              L"Color scheme should propagate to ApplicationState");
+        }
+
+
+
+
+
+        // T052.3: Test live mode propagates animation speed changes to ApplicationState
+        TEST_METHOD (TestLiveModePropagatesAnimationSpeedChanges)
+        {
+            // Arrange
+            ConfigDialogController controller;
+            HRESULT                hr       = S_OK;
+            ApplicationState       appState;
+
+
+
+            hr = controller.Initialize();
+            Assert::AreEqual (S_OK, hr);
+
+            appState.Initialize (nullptr);
+
+            hr = controller.InitializeLiveMode (&appState);
+            Assert::AreEqual (S_OK, hr);
+
+            // Act: Update animation speed
+            controller.UpdateAnimationSpeed (60);
+
+            // Assert: Verify ApplicationState was updated
+            Assert::AreEqual (60, appState.GetSettings().m_animationSpeedPercent, L"Animation speed should propagate to ApplicationState");
+        }
+
+
+
+
+
+        // T052.4: Test live mode propagates glow intensity changes to ApplicationState
+        TEST_METHOD (TestLiveModePropagatesGlowIntensityChanges)
+        {
+            // Arrange
+            ConfigDialogController controller;
+            HRESULT                hr       = S_OK;
+            ApplicationState       appState;
+
+
+
+            hr = controller.Initialize();
+            Assert::AreEqual (S_OK, hr);
+
+            appState.Initialize (nullptr);
+
+            hr = controller.InitializeLiveMode (&appState);
+            Assert::AreEqual (S_OK, hr);
+
+            // Act: Update glow intensity
+            controller.UpdateGlowIntensity (150);
+
+            // Assert: Verify ApplicationState was updated
+            Assert::AreEqual (150, appState.GetSettings().m_glowIntensityPercent, L"Glow intensity should propagate to ApplicationState");
+        }
+
+
+
+
+
+        // T052.5: Test live mode propagates glow size changes to ApplicationState
+        TEST_METHOD (TestLiveModePropagatesGlowSizeChanges)
+        {
+            // Arrange
+            ConfigDialogController controller;
+            HRESULT                hr       = S_OK;
+            ApplicationState       appState;
+
+
+
+            hr = controller.Initialize();
+            Assert::AreEqual (S_OK, hr);
+
+            appState.Initialize (nullptr);
+
+            hr = controller.InitializeLiveMode (&appState);
+            Assert::AreEqual (S_OK, hr);
+
+            // Act: Update glow size
+            controller.UpdateGlowSize (175);
+
+            // Assert: Verify ApplicationState was updated
+            Assert::AreEqual (175, appState.GetSettings().m_glowSizePercent, L"Glow size should propagate to ApplicationState");
+        }
+
+
+
+
+
+        // T052.6: Test CancelLiveMode reverts ApplicationState to snapshot
+        TEST_METHOD (TestCancelLiveModeRevertsApplicationState)
+        {
+            // Arrange: Set up initial settings
+            ScreenSaverSettings initialSettings
+            {
+                .m_densityPercent        = 50,
+                .m_colorSchemeKey        = L"green",
+                .m_animationSpeedPercent = 70
+            };
+            
+            HRESULT                hr = S_OK;
+            ConfigDialogController controller;
+            ApplicationState       appState;
+
+
+            hr = RegistrySettingsProvider::Save (initialSettings);
+            Assert::AreEqual (S_OK, hr);
+
+            hr = controller.Initialize();
+            Assert::AreEqual (S_OK, hr);
+
+            appState.Initialize (nullptr);
+
+            hr = controller.InitializeLiveMode (&appState);
+            Assert::AreEqual (S_OK, hr);
+
+            // Act: Make changes then cancel
+            controller.UpdateDensity (80);
+            controller.UpdateColorScheme (L"blue");
+            controller.UpdateAnimationSpeed (90);
+
+            hr = controller.CancelLiveMode();
+            Assert::AreEqual (S_OK, hr);
+
+            // Assert: Verify ApplicationState reverted to snapshot
+            Assert::AreEqual (50, appState.GetSettings().m_densityPercent,        L"Density should revert to snapshot");
+            Assert::AreEqual (70, appState.GetSettings().m_animationSpeedPercent, L"Animation speed should revert to snapshot");
+            Assert::AreEqual (static_cast<int>(ColorScheme::Green), 
+                              static_cast<int>(appState.GetColorScheme()), 
+                              L"Color scheme should revert to snapshot");
         }
     };
 }  // namespace MatrixRainTests
