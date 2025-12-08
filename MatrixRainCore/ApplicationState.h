@@ -72,6 +72,18 @@ public:
     void RegisterAnimationSpeedCallback (std::function<void(int)> callback);
 
     /// <summary>
+    /// Register a callback to be notified when glow intensity changes.
+    /// </summary>
+    /// <param name="callback">Function to call with new glow intensity percentage</param>
+    void RegisterGlowIntensityCallback (std::function<void(int)> callback);
+
+    /// <summary>
+    /// Register a callback to be notified when glow size changes.
+    /// </summary>
+    /// <param name="callback">Function to call with new glow size percentage</param>
+    void RegisterGlowSizeCallback (std::function<void(int)> callback);
+
+    /// <summary>
     /// Update animation speed setting.
     /// </summary>
     /// <param name="speedPercent">Animation speed percentage (1-100)</param>
@@ -126,6 +138,8 @@ private:
     ScreenSaverSettings          m_settings;                                        // User-configurable settings
     std::function<void(int)>     m_densityChangeCallback        = nullptr;           // Callback for density changes
     std::function<void(int)>     m_animationSpeedChangeCallback = nullptr;           // Callback for animation speed changes
+    std::function<void(int)>     m_glowIntensityChangeCallback  = nullptr;           // Callback for glow intensity changes
+    std::function<void(int)>     m_glowSizeChangeCallback       = nullptr;           // Callback for glow size changes
 };
 
 

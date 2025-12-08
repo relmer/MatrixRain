@@ -88,12 +88,16 @@ void Application::InitializeApplicationState (const ScreenSaverModeContext * pSc
     m_appState->Initialize (m_pScreenSaverContext);
     
     // Register for settings change notifications
-    m_appState->RegisterDensityChangeCallback  ([this](int densityPercent) { m_densityController->SetPercentage   (densityPercent); });
-    m_appState->RegisterAnimationSpeedCallback ([this](int speedPercent)   { m_animationSystem->SetAnimationSpeed (speedPercent);   });
+    m_appState->RegisterDensityChangeCallback    ([this](int densityPercent)   { m_densityController->SetPercentage   (densityPercent);   });
+    m_appState->RegisterAnimationSpeedCallback   ([this](int speedPercent)     { m_animationSystem->SetAnimationSpeed (speedPercent);     });
+    m_appState->RegisterGlowIntensityCallback    ([this](int intensityPercent) { m_renderSystem->SetGlowIntensity     (intensityPercent); });
+    m_appState->RegisterGlowSizeCallback         ([this](int sizePercent)      { m_renderSystem->SetGlowSize          (sizePercent);      });
     
     // Apply settings to controller
     m_densityController->SetPercentage   (m_appState->GetSettings().m_densityPercent);
     m_animationSystem->SetAnimationSpeed (m_appState->GetSettings().m_animationSpeedPercent);
+    m_renderSystem->SetGlowIntensity     (m_appState->GetSettings().m_glowIntensityPercent);
+    m_renderSystem->SetGlowSize          (m_appState->GetSettings().m_glowSizePercent);
     
     // Now initialize input system with both dependencies
     m_inputSystem->Initialize (*m_densityController, *m_appState);

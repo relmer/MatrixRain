@@ -93,6 +93,18 @@ public:
     /// </summary>
     void Shutdown();
 
+    /// <summary>
+    /// Set glow intensity multiplier from percentage (0-200).
+    /// </summary>
+    /// <param name="intensityPercent">Glow intensity percentage (100 = default)</param>
+    void SetGlowIntensity (int intensityPercent);
+
+    /// <summary>
+    /// Set glow blur size from percentage (50-200).
+    /// </summary>
+    /// <param name="sizePercent">Glow size percentage (100 = default)</param>
+    void SetGlowSize (int sizePercent);
+
     // Accessors
     ID3D11Device        * GetDevice()  const { return m_device.Get();  }
     ID3D11DeviceContext * GetContext() const { return m_context.Get(); }
@@ -149,6 +161,7 @@ private:
     HRESULT CreateDummyVertexBuffer();
     HRESULT CreateInstanceBuffer();
     HRESULT CreateConstantBuffer();
+    HRESULT CreateBloomConstantBuffer();
     HRESULT CreateBlendState();
     HRESULT CreateSamplerState();
     HRESULT CreateDirect2DResources();
@@ -224,6 +237,7 @@ private:
     ComPtr<ID3D11Buffer> m_dummyVertexBuffer;
     ComPtr<ID3D11Buffer> m_instanceBuffer;
     ComPtr<ID3D11Buffer> m_constantBuffer;
+    ComPtr<ID3D11Buffer> m_bloomConstantBuffer;
     UINT                 m_instanceBufferCapacity { INITIAL_INSTANCE_CAPACITY};
 
     // Render states
@@ -236,6 +250,10 @@ private:
     // Render target dimensions
     UINT m_renderWidth  { 0 };
     UINT m_renderHeight { 0 };
+
+    // Glow effect parameters
+    float m_glowIntensity { 2.5f };  // Bloom intensity multiplier (100% = 2.5)
+    float m_glowSize      { 1.0f };  // Blur radius multiplier (100% = 1.0)
 
     // Per-frame working data (reused to avoid allocations)
     std::vector<CharacterInstanceData>   m_instanceData;

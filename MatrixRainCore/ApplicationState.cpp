@@ -165,9 +165,35 @@ void ApplicationState::SetAnimationSpeed (int speedPercent)
 
 
 
+void ApplicationState::RegisterGlowIntensityCallback (std::function<void(int)> callback)
+{
+    m_glowIntensityChangeCallback = callback;
+}
+
+
+
+
+
+void ApplicationState::RegisterGlowSizeCallback (std::function<void(int)> callback)
+{
+    m_glowSizeChangeCallback = callback;
+}
+
+
+
+
+
 void ApplicationState::SetGlowIntensity (int intensityPercent)
 {
     m_settings.m_glowIntensityPercent = intensityPercent;
+    
+    // Notify registered listener (e.g., RenderSystem)
+    if (m_glowIntensityChangeCallback)
+    {
+        m_glowIntensityChangeCallback (intensityPercent);
+    }
+    
+    SaveSettings();
 }
 
 
@@ -177,6 +203,14 @@ void ApplicationState::SetGlowIntensity (int intensityPercent)
 void ApplicationState::SetGlowSize (int sizePercent)
 {
     m_settings.m_glowSizePercent = sizePercent;
+    
+    // Notify registered listener (e.g., RenderSystem)
+    if (m_glowSizeChangeCallback)
+    {
+        m_glowSizeChangeCallback (sizePercent);
+    }
+    
+    SaveSettings();
 }
 
 

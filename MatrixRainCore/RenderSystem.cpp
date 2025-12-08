@@ -51,6 +51,9 @@ HRESULT RenderSystem::Initialize (HWND hwnd, UINT width, UINT height)
     hr = CreateConstantBuffer();
     CHR (hr);
 
+    hr = CreateBloomConstantBuffer();
+    CHR (hr);
+
     hr = CreateBlendState();
     CHR (hr);
 
@@ -473,6 +476,29 @@ Error:
 
 
 
+HRESULT RenderSystem::CreateBloomConstantBuffer()
+{
+    HRESULT           hr         = S_OK;
+    D3D11_BUFFER_DESC bufferDesc = {};
+
+
+    
+    bufferDesc.ByteWidth      = 16;  // sizeof(float) * 4 for alignment
+    bufferDesc.Usage          = D3D11_USAGE_DYNAMIC;
+    bufferDesc.BindFlags      = D3D11_BIND_CONSTANT_BUFFER;
+    bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+
+    hr = m_device->CreateBuffer (&bufferDesc, nullptr, &m_bloomConstantBuffer);
+    CHRA (hr);
+
+Error:
+    return hr;
+}
+
+
+
+
+
 HRESULT RenderSystem::CreateBlendState()
 {
     HRESULT          hr        = S_OK;
@@ -720,6 +746,12 @@ static const char * s_kszBloomExtractShaderSource = R"(
     )";
 
 static const char * s_kszBloomCompositeShaderSource = R"(
+        cbuffer BloomConstants : register(b0)
+        {
+            float bloomIntensity;
+            float3 padding;
+        };
+
         Texture2D sceneTexture : register(t0);
         Texture2D bloomTexture : register(t1);
         SamplerState samplerState : register(s0);
@@ -735,8 +767,8 @@ static const char * s_kszBloomCompositeShaderSource = R"(
             float4 scene = sceneTexture.Sample(samplerState, input.uv);
             float4 bloom = bloomTexture.Sample(samplerState, input.uv);
             
-            // Additive blend with increased bloom intensity for stronger glow
-            return scene + bloom * 2.5;
+            // Additive blend with dynamic bloom intensity
+            return scene + bloom * bloomIntensity;
         }
     )";
 
@@ -1007,6 +1039,7 @@ HRESULT RenderSystem::ApplyBloom()
 {
     HRESULT                    hr      = S_OK;
     ID3D11ShaderResourceView * srvs[2];
+    ID3D11Buffer             * nullCB  = nullptr;
 
 
 
@@ -1039,15 +1072,34 @@ HRESULT RenderSystem::ApplyBloom()
     // Restore full viewport
     SetViewport (m_renderWidth, m_renderHeight);
     
+    // Update bloom constant buffer with current intensity
+    D3D11_MAPPED_SUBRESOURCE mappedBloomCB;
+    hr = m_context->Map (m_bloomConstantBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedBloomCB);
+    if (SUCCEEDED (hr))
+    {
+        float* bloomData = static_cast<float*> (mappedBloomCB.pData);
+        bloomData[0] = m_glowIntensity;  // Bloom intensity
+        bloomData[1] = 0.0f;             // Padding
+        bloomData[2] = 0.0f;             // Padding
+        bloomData[3] = 0.0f;             // Padding
+        m_context->Unmap (m_bloomConstantBuffer.Get(), 0);
+    }
+    
     // Composite back to backbuffer
     m_context->OMSetRenderTargets (1, m_renderTargetView.GetAddressOf(), nullptr);
     
     // Disable blending for composite (we want to replace, not blend)
     m_context->OMSetBlendState (nullptr, nullptr, 0xffffffff);
     
+    // Bind bloom constant buffer to pixel shader
+    m_context->PSSetConstantBuffers (0, 1, m_bloomConstantBuffer.GetAddressOf());
+    
     srvs[0] = m_sceneSRV.Get();
     srvs[1] = m_bloomSRV.Get();
     RenderFullscreenPass (m_renderTargetView.Get(), m_compositePS.Get(), srvs, 2);
+    
+    // Unbind constant buffer from pixel shader
+    m_context->PSSetConstantBuffers (0, 1, &nullCB);
     
     // Restore render state
     SetRenderPipelineState (m_inputLayout.Get(),
@@ -1726,6 +1778,28 @@ HRESULT RenderSystem::RecreateDirect2DBitmap()
 
 Error:
     return hr;
+}
+
+
+
+
+
+void RenderSystem::SetGlowIntensity (int intensityPercent)
+{
+    // Convert percentage (0-200) to multiplier (0.0-5.0)
+    // Default is 100% = 2.5 multiplier
+    m_glowIntensity = (intensityPercent / 100.0f) * 2.5f;
+}
+
+
+
+
+
+void RenderSystem::SetGlowSize (int sizePercent)
+{
+    // Convert percentage (50-200) to multiplier (0.5-2.0)
+    // Default is 100% = 1.0 multiplier
+    m_glowSize = sizePercent / 100.0f;
 }
 
 
