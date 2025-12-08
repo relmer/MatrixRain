@@ -192,6 +192,52 @@ namespace MatrixRainTests
                     L"Character Y position should be recalculated from scaled head position");
             }
         }
+
+
+
+
+
+        TEST_METHOD (Viewport_PreviewScaling_AdjustsCharacterSpacing)
+        {
+            // Given: Preview-sized viewport (height well below 1080)
+            Viewport viewport;
+            viewport.Resize (800.0f, 480.0f);
+
+            DensityController densityController (viewport, 32.0f);
+            densityController.SetPercentage (0);
+
+            AnimationSystem animationSystem;
+            animationSystem.Initialize (viewport, densityController);
+
+            animationSystem.ClearAllStreaks ();
+            animationSystem.SpawnStreakInView ();
+
+            // Grow at least two characters on the streak
+            for (int i = 0; i < 200; ++i)
+            {
+                animationSystem.Update (0.05f);
+
+                const auto & activeStreaks = animationSystem.GetStreaks ();
+                if (!activeStreaks.empty () && activeStreaks.front ().GetCharacters ().size () >= 3)
+                {
+                    break;
+                }
+            }
+
+            const auto & streaks = animationSystem.GetStreaks ();
+            Assert::IsFalse (streaks.empty (), L"Expected at least one active streak");
+
+            const auto & characters = streaks.front ().GetCharacters ();
+            Assert::IsTrue (characters.size () >= 3, L"Need at least three characters to measure steady-state spacing");
+
+            float headY = characters.back ().positionOffset.y;
+            float prevY = characters[characters.size () - 2].positionOffset.y;
+            float actualSpacing = headY - prevY;
+
+            // Height 480 → scale clamped to 0.5, so spacing should be 16px
+            Assert::AreEqual (16.0f, actualSpacing, 0.5f,
+                L"Character spacing should shrink with viewport height (clamped at 0.5x)");
+        }
     };
 }  // namespace MatrixRainTests
 

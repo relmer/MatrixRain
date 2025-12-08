@@ -142,11 +142,13 @@ public:
     struct ConstantBufferData
     {
         float projection[16];   // 4x4 projection matrix (column-major)
-        float padding[48];      // Padding to 256 bytes for optimal GPU alignment
+        float characterScale;   // Global character scale (1.0 = normal, <1.0 for preview)
+        float padding[47];      // Padding to 256 bytes for optimal GPU alignment
 
         ConstantBufferData() :
-            projection { 1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1 },
-            padding    {}
+            projection     { 1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1 },
+            characterScale ( 1.0f ),
+            padding        {}
         {
         }
     };

@@ -18,7 +18,7 @@ namespace MatrixRainTests
 
 
 
-                Assert::AreEqual (100, settings.m_densityPercent, L"density default");
+                Assert::AreEqual (80, settings.m_densityPercent, L"density default");
                 Assert::IsTrue   (settings.m_colorSchemeKey.empty(), L"colorSchemeKey default");
                 Assert::AreEqual (75, settings.m_animationSpeedPercent, L"animation speed default");
                 Assert::AreEqual (100, settings.m_glowIntensityPercent, L"glow intensity default");

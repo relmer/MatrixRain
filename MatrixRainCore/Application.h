@@ -76,7 +76,7 @@ private:
 
     // Internal methods
     void    InitializeApplicationState    (const ScreenSaverModeContext * pScreenSaverContext);
-    void    InitializeApplicationWindow();
+    HRESULT InitializeApplicationWindow();
     HRESULT CreateApplicationWindow       (POINT & position, SIZE & size);
     void    Update                        (float deltaTime);
     void    Render();

@@ -153,8 +153,11 @@ void AnimationSystem::SpawnStreak()
     Vector3 position (x, y, z);
 
     CharacterStreak streak;
-    streak.Spawn (position);
-    streak.SetSpeedMultiplier (m_animationSpeedPercent);
+    
+    streak.Spawn               (position);
+    streak.SetSpeedMultiplier  (m_animationSpeedPercent);
+
+    streak.SetCharacterSpacing (CalculateCharacterSpacing());
     m_streaks.push_back (std::move (streak));
 }
 
@@ -184,8 +187,11 @@ void AnimationSystem::SpawnStreakInView()
     Vector3 position (x, y, z);
 
     CharacterStreak streak;
-    streak.Spawn (position);
-    streak.SetSpeedMultiplier (m_animationSpeedPercent);
+
+    streak.Spawn               (position);
+    streak.SetSpeedMultiplier  (m_animationSpeedPercent);
+    streak.SetCharacterSpacing (CalculateCharacterSpacing());
+    
     m_streaks.push_back (std::move (streak));
 }
 
@@ -313,10 +319,12 @@ void AnimationSystem::RescaleStreaksForViewport (float oldWidth, float oldHeight
 
     float scaleX = newWidth / oldWidth;
     float scaleY = newHeight / oldHeight;
+    float characterSpacing = CalculateCharacterSpacing();
 
     for (CharacterStreak & streak : m_streaks)
     {
-        streak.RescalePositions (scaleX, scaleY);
+        streak.RescalePositions    (scaleX, scaleY);
+        streak.SetCharacterSpacing (characterSpacing);
     }
 }
 
@@ -344,6 +352,43 @@ void AnimationSystem::SetAnimationSpeed (int speedPercent)
     {
         streak.SetSpeedMultiplier (speedPercent);
     }
+}
+
+
+
+
+
+float AnimationSystem::CalculateCharacterSpacing() const
+{
+    constexpr float BASE_SPACING     = 32.0f;
+    constexpr float REFERENCE_HEIGHT = 1080.0f;
+    constexpr float MIN_SCALE        = 0.5f;
+
+    float viewportHeight = 0.0f;
+
+
+
+    if (!m_viewport)
+    {
+        return BASE_SPACING;
+    }
+
+    viewportHeight = static_cast<float> (m_viewport->GetHeight ());
+    if (viewportHeight < REFERENCE_HEIGHT)
+    {
+        float scale = viewportHeight / REFERENCE_HEIGHT;
+
+
+
+        if (scale < MIN_SCALE)
+        {
+            scale = MIN_SCALE;
+        }
+
+        return BASE_SPACING * scale;
+    }
+
+    return BASE_SPACING;
 }
 
 

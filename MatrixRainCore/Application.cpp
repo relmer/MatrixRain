@@ -57,7 +57,9 @@ HRESULT Application::Initialize (HINSTANCE hInstance, int nCmdShow, const Screen
 
 
     InitializeApplicationState (pScreenSaverContext);
-    InitializeApplicationWindow();
+    
+    hr = InitializeApplicationWindow();
+    CHR (hr);
     
 
     fInitialized = charSet.Initialize();
@@ -122,15 +124,32 @@ void Application::InitializeApplicationState (const ScreenSaverModeContext * pSc
 
 
 
-void Application::InitializeApplicationWindow()
+HRESULT Application::InitializeApplicationWindow()
 {
     HRESULT hr       = S_OK;
-    POINT   position = { 0 };
-    SIZE    size     = { 0 };
+    POINT   position = {};
+    SIZE    size     = {};
 
 
 
-    GetWindowSizeForCurrentMode (position, size);
+    // For preview mode, get dimensions from parent window
+    if (m_pScreenSaverContext && 
+        m_pScreenSaverContext->m_mode == ScreenSaverMode::ScreenSaverPreview &&
+        m_pScreenSaverContext->m_previewParentHwnd != nullptr)
+    {
+        RECT rcParent { 0 };
+        
+        GetClientRect (m_pScreenSaverContext->m_previewParentHwnd, &rcParent);
+     
+        position.x = 0;
+        position.y = 0;
+        size.cx    = rcParent.right  - rcParent.left;
+        size.cy    = rcParent.bottom - rcParent.top;
+    }
+    else
+    {
+        GetWindowSizeForCurrentMode (position, size);
+    }
 
     hr = CreateApplicationWindow (position, size);
     CHR (hr);
@@ -141,7 +160,7 @@ void Application::InitializeApplicationWindow()
 
 
 Error:
-    return;
+    return hr;
 }
 
 
@@ -150,16 +169,16 @@ Error:
 
 HRESULT Application::CreateApplicationWindow (POINT & position, SIZE & size)
 {
-    HRESULT      hr        = S_OK;
-    WNDCLASSEXW  wcex      = {};
-    DWORD        error     = 0;
-    ATOM         classAtom = 0;
-    BOOL         fSuccess  = FALSE;
-    
-    
-    
+    HRESULT      hr         = S_OK;
+    WNDCLASSEXW  wcex       = { };
+    DWORD        error      = 0;
+    ATOM         classAtom  = 0;
+    BOOL         fSuccess   = FALSE;
+    DWORD        dwStyle    = WS_POPUP | WS_VISIBLE;
+    HWND         hwndParent = nullptr;
+
     // Verify HINSTANCE
-    CBRLA (m_hInstance != nullptr, L"Invalid HINSTANCE - application instance handle is null.");
+    CBRA (m_hInstance != nullptr);
 
     // Register window class
     wcex.cbSize         = sizeof (WNDCLASSEX);
@@ -184,16 +203,22 @@ HRESULT Application::CreateApplicationWindow (POINT & position, SIZE & size)
         // Class already registered - continue
     }
 
-    // Create window (fullscreen borderless)
+    // For preview mode, create as child window; otherwise create fullscreen borderless
+    if ((m_pScreenSaverContext && m_pScreenSaverContext->m_mode == ScreenSaverMode::ScreenSaverPreview))
+    {
+        dwStyle    = WS_CHILD | WS_VISIBLE;
+        hwndParent = m_pScreenSaverContext->m_previewParentHwnd;
+    }
+    
     m_hwnd = CreateWindowExW (0,
                               L"MatrixRainWindowClass",
                               WINDOW_TITLE,
-                              WS_POPUP | WS_VISIBLE,  // Borderless window, visible
+                              dwStyle,
                               position.x, 
                               position.y,
                               size.cx,
                               size.cy,
-                              nullptr,
+                              hwndParent,
                               nullptr,
                               m_hInstance,
                               this);  // Pass 'this' pointer for retrieval in WindowProc

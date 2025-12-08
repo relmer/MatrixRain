@@ -200,6 +200,8 @@ static const char* s_kszVertexShaderSource = R"(
         cbuffer Constants : register(b0)
         {
             float4x4 projection;
+            float characterScale;  // Global scale for preview mode
+            float3 padding;
         };
 
         struct VSInput
@@ -238,8 +240,8 @@ static const char* s_kszVertexShaderSource = R"(
             // Get quad vertex position
             float2 quadPos = quadVertices[vertexID % 6];
             
-            // Character size in world space (scaled up for visibility)
-            float2 charSize = float2(32.0, 48.0) * input.scale;
+            // Character size in world space (scaled for viewport and per-character)
+            float2 charSize = float2(32.0, 48.0) * input.scale * characterScale;
             float2 worldPos = input.position.xy + quadPos * charSize;
             
             // Apply projection
@@ -1289,6 +1291,26 @@ void RenderSystem::Render (const AnimationSystem & animationSystem, const Viewpo
         
         // Copy projection matrix (4x4 = 16 floats = 64 bytes)
         memcpy (cbData->projection, projection.m, sizeof (projection.m));
+
+        // Calculate character scale based on viewport height
+        // Scale down proportionally for preview mode to fit the entire effect
+        // Minimum scale ensures characters remain visible (12px tall minimum)
+        float viewportHeight = static_cast<float> (viewport.GetHeight());
+        
+        if (viewportHeight < 1080.0f)
+        {
+            // Scale linearly based on viewport height (Full HD = 1.0 reference)
+            cbData->characterScale = viewportHeight / 1080.0f;
+            
+            // Clamp to minimum 0.5 (24px tall from 48px base)
+            if (cbData->characterScale < 0.5f)
+                cbData->characterScale = 0.5f;
+        }
+        else
+        {
+            // Full HD and above: use normal character size
+            cbData->characterScale = 1.0f;
+        }
 
         m_context->Unmap (m_constantBuffer.Get(), 0);
     }

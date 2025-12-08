@@ -99,6 +99,8 @@ public:
     void SetZoomVelocity (float velocity) { m_zoomVelocity = velocity; }
 
 private:
+    float CalculateCharacterSpacing() const;
+
     std::vector<CharacterStreak>   m_streaks;                            // All active character streaks
     const Viewport               * m_viewport              = nullptr;      // Reference to viewport for bounds
     DensityController            * m_densityController     = nullptr;      // Reference to density controller (optional)

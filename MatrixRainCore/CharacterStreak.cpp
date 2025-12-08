@@ -240,6 +240,24 @@ void CharacterStreak::RescalePositions (float scaleX, float scaleY)
 
 
 
+void CharacterStreak::SetCharacterSpacing (float spacing)
+{
+    m_characterSpacing = spacing;
+
+    // Characters are stored back-to-front (tail at [0], head at [size-1])
+    for (size_t i = 0; i < m_characters.size(); i++)
+    {
+        CharacterInstance & character        = m_characters[i];
+        size_t              distanceFromHead = m_characters.size() - 1 - i;
+
+        character.positionOffset.y = m_position.y - (distanceFromHead * m_characterSpacing);
+    }
+}
+
+
+
+
+
 void CharacterStreak::SetSpeedMultiplier (int speedPercent)
 {
     // Speed multiplier: 100 = normal, 50 = half speed, 200 = double speed

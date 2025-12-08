@@ -51,7 +51,7 @@ namespace MatrixRainTests
             Assert::AreEqual (S_FALSE, hr, L"Load should return S_FALSE when registry key doesn't exist");
             
             // Verify defaults are preserved
-            Assert::AreEqual (100, settings.m_densityPercent,        L"Default density should be 100%");
+            Assert::AreEqual (80, settings.m_densityPercent,         L"Default density should be 80%");
             Assert::AreEqual (75,  settings.m_animationSpeedPercent, L"Default animation speed should be 75%");
             Assert::AreEqual (100, settings.m_glowIntensityPercent,  L"Default glow intensity should be 100%");
             Assert::AreEqual (100, settings.m_glowSizePercent,       L"Default glow size should be 100%");

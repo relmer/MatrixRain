@@ -53,7 +53,8 @@ public:
     /// </summary>
     /// <param name="scaleX">X scale ratio (newWidth / oldWidth)</param>
     /// <param name="scaleY">Y scale ratio (newHeight / oldHeight)</param>
-    void RescalePositions (float scaleX, float scaleY);
+    void RescalePositions    (float scaleX, float scaleY);
+    void SetCharacterSpacing (float spacing);
 
     // Accessors
     const Vector3                        & GetPosition()       const { return m_position;          }
