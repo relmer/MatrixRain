@@ -143,36 +143,48 @@ static BOOL OnInitDialog (HWND hDlg, LPARAM initParam)
 
     SetWindowLongPtr (hDlg, DWLP_USER, reinterpret_cast<LONG_PTR> (pContext));
 
-    // Center dialog on parent window or primary monitor
-    GetWindowRect (hDlg, &dialogRect);
-    dialogWidth  = dialogRect.right  - dialogRect.left;
-    dialogHeight = dialogRect.bottom - dialogRect.top;
+    // Center dialog for /c (no HWND) or live overlay modes
+    // Skip centering for /c:<HWND> (Control Panel with parent)
+    if (!parentHwnd || pContext->m_controller->IsLiveMode())
+    {
+        HWND appHwnd = nullptr;
+        
+        
+        
+        // Get window to center on (application window or primary monitor)
+        GetWindowRect (hDlg, &dialogRect);
+        dialogWidth  = dialogRect.right  - dialogRect.left;
+        dialogHeight = dialogRect.bottom - dialogRect.top;
 
-    if (parentHwnd)
-    {
-        GetWindowRect (parentHwnd, &centerRect);       
+        if (pContext->m_pApp != nullptr)
+        {
+            // Live overlay mode - center on application window
+            appHwnd = pContext->m_pApp->GetMainWindowHwnd();
+        }
+        
+        if (appHwnd)
+        {
+            GetWindowRect (appHwnd, &centerRect);       
+        }
+        else
+        {
+            // No app window - center on primary monitor
+            centerRect.left   = 0;
+            centerRect.top    = 0;
+            centerRect.right  = GetSystemMetrics (SM_CXSCREEN);
+            centerRect.bottom = GetSystemMetrics (SM_CYSCREEN);
+        }
+        
+        // Calculate centered position
+        centerX = (centerRect.left + centerRect.right  - dialogWidth)  / 2;
+        centerY = (centerRect.top  + centerRect.bottom - dialogHeight) / 2;
+        
+        dialogPos.x = centerX;
+        dialogPos.y = centerY;
+        
+        SetWindowPos (hDlg, nullptr, dialogPos.x, dialogPos.y, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
     }
-    else
-    {
-        // No parent - center on primary monitor
-        centerRect.left   = 0;
-        centerRect.top    = 0;
-        centerRect.right  = GetSystemMetrics (SM_CXSCREEN);
-        centerRect.bottom = GetSystemMetrics (SM_CYSCREEN);
-    }
-    
-    GetWindowRect (hDlg, &dialogRect);
-    dialogWidth  = dialogRect.right  - dialogRect.left;
-    dialogHeight = dialogRect.bottom - dialogRect.top;
-    
-    // Calculate centered position
-    centerX = (centerRect.left + centerRect.right  - dialogWidth)  / 2;
-    centerY = (centerRect.top  + centerRect.bottom - dialogHeight) / 2;
-    
-    dialogPos.x = centerX;
-    dialogPos.y = centerY;
-    
-    SetWindowPos (hDlg, nullptr, dialogPos.x, dialogPos.y, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
+    // else: Control Panel mode with parent HWND - let Windows handle positioning
 
 #ifndef _DEBUG
     if (pContext->m_controller->IsLiveMode())
@@ -417,6 +429,7 @@ static void OnResetButton (HWND hDlg)
     ConfigDialogController    * pController = GetControllerFromDialog (hDlg);
     Application               * pApp        = GetApplicationFromDialog (hDlg);
     const ScreenSaverSettings * pDefaults   = nullptr;
+    int                         schemeIndex = 0;
 
 
 
@@ -438,6 +451,14 @@ static void OnResetButton (HWND hDlg)
     
     SendDlgItemMessageW (hDlg, IDC_GLOWSIZE_SLIDER, TBM_SETPOS, TRUE, pDefaults->m_glowSizePercent);
     SetDlgItemTextW     (hDlg, IDC_GLOWSIZE_LABEL, std::format (L"{}%", pDefaults->m_glowSizePercent).c_str());
+    
+    // Update color scheme combo box
+    if      (pDefaults->m_colorSchemeKey == L"green") schemeIndex = 0;
+    else if (pDefaults->m_colorSchemeKey == L"blue")  schemeIndex = 1;
+    else if (pDefaults->m_colorSchemeKey == L"red")   schemeIndex = 2;
+    else if (pDefaults->m_colorSchemeKey == L"amber") schemeIndex = 3;
+    else if (pDefaults->m_colorSchemeKey == L"cycle") schemeIndex = 4;
+    SendDlgItemMessageW (hDlg, IDC_COLORSCHEME_COMBO, CB_SETCURSEL, schemeIndex, 0);
     
     CheckDlgButton (hDlg, IDC_STARTFULLSCREEN_CHECK, pDefaults->m_startFullscreen ? BST_CHECKED : BST_UNCHECKED);
     CheckDlgButton (hDlg, IDC_SHOWDEBUG_CHECK,       pDefaults->m_showDebugStats  ? BST_CHECKED : BST_UNCHECKED);

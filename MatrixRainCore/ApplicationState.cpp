@@ -10,7 +10,7 @@
 
 void ApplicationState::Initialize (const ScreenSaverModeContext * pScreenSaverContext)
 {
-    UNREFERENCED_PARAMETER (pScreenSaverContext);  // Reserved for future use (e.g., suppress statistics in /s mode)
+    m_pScreenSaverContext = pScreenSaverContext;
     
     // Load settings from registry (falls back to defaults if key doesn't exist)
     HRESULT hr = RegistrySettingsProvider::Load (m_settings);
@@ -21,9 +21,15 @@ void ApplicationState::Initialize (const ScreenSaverModeContext * pScreenSaverCo
     UNREFERENCED_PARAMETER (hr);
     
     // Apply settings to runtime state
-    m_displayMode        = m_settings.m_startFullscreen ? DisplayMode::Fullscreen : DisplayMode::Windowed;
-    m_showDebugFadeTimes = m_settings.m_showFadeTimers;
-    m_showStatistics     = m_settings.m_showDebugStats;
+    m_displayMode = m_settings.m_startFullscreen ? DisplayMode::Fullscreen : DisplayMode::Windowed;
+    
+    // Suppress debug overlays in preview and screensaver modes
+    bool isPreviewOrScreenSaver = pScreenSaverContext &&
+                                  (pScreenSaverContext->m_mode == ScreenSaverMode::ScreenSaverPreview ||
+                                   pScreenSaverContext->m_mode == ScreenSaverMode::ScreenSaverFull);
+    
+    m_showDebugFadeTimes = isPreviewOrScreenSaver ? false : m_settings.m_showFadeTimers;
+    m_showStatistics     = isPreviewOrScreenSaver ? false : m_settings.m_showDebugStats;
     
     // Map color scheme key to enum
     if (m_settings.m_colorSchemeKey == L"green")
@@ -270,6 +276,16 @@ void ApplicationState::Update (float deltaTime)
 
 void ApplicationState::SetShowStatistics (bool show)
 {
+    // Prevent enabling debug statistics in preview or screensaver modes
+    bool isPreviewOrScreenSaver = m_pScreenSaverContext &&
+                                  (m_pScreenSaverContext->m_mode == ScreenSaverMode::ScreenSaverPreview ||
+                                   m_pScreenSaverContext->m_mode == ScreenSaverMode::ScreenSaverFull);
+    
+    if (isPreviewOrScreenSaver && show)
+    {
+        return;  // Ignore request to enable in preview/screensaver modes
+    }
+    
     m_showStatistics = show;
     
     // Update settings and save
@@ -283,6 +299,16 @@ void ApplicationState::SetShowStatistics (bool show)
 
 void ApplicationState::SetShowDebugFadeTimes (bool show)
 {
+    // Prevent enabling fade timers in preview or screensaver modes
+    bool isPreviewOrScreenSaver = m_pScreenSaverContext &&
+                                  (m_pScreenSaverContext->m_mode == ScreenSaverMode::ScreenSaverPreview ||
+                                   m_pScreenSaverContext->m_mode == ScreenSaverMode::ScreenSaverFull);
+    
+    if (isPreviewOrScreenSaver && show)
+    {
+        return;  // Ignore request to enable in preview/screensaver modes
+    }
+    
     m_showDebugFadeTimes = show;
     
     // Update settings and save
