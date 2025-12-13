@@ -427,7 +427,6 @@ static void OnResetButton (HWND hDlg)
 {
     HRESULT                     hr          = S_OK;
     ConfigDialogController    * pController = GetControllerFromDialog (hDlg);
-    Application               * pApp        = GetApplicationFromDialog (hDlg);
     const ScreenSaverSettings * pDefaults   = nullptr;
     int                         schemeIndex = 0;
 
@@ -464,13 +463,16 @@ static void OnResetButton (HWND hDlg)
     CheckDlgButton (hDlg, IDC_SHOWDEBUG_CHECK,       pDefaults->m_showDebugStats  ? BST_CHECKED : BST_UNCHECKED);
     CheckDlgButton (hDlg, IDC_SHOWFADETIMERS_CHECK,  pDefaults->m_showFadeTimers  ? BST_CHECKED : BST_UNCHECKED);
     
-    // If live overlay mode, immediately apply changes to running application
-    if (pApp)
+    // If live overlay mode, propagate changes to running application
+    // (ResetToDefaults already updated controller settings, now trigger live propagation)
+    CBRAEx (pController != nullptr, E_UNEXPECTED);
+    if (pController->IsLiveMode())
     {
-        pApp->GetApplicationState()->OnDensityChanged       (pDefaults->m_densityPercent);
-        pApp->GetApplicationState()->SetAnimationSpeed      (pDefaults->m_animationSpeedPercent);
-        pApp->GetApplicationState()->SetGlowIntensity       (pDefaults->m_glowIntensityPercent);
-        pApp->GetApplicationState()->SetGlowSize            (pDefaults->m_glowSizePercent);
+        pController->UpdateDensity          (pDefaults->m_densityPercent);
+        pController->UpdateAnimationSpeed   (pDefaults->m_animationSpeedPercent);
+        pController->UpdateGlowIntensity    (pDefaults->m_glowIntensityPercent);
+        pController->UpdateGlowSize         (pDefaults->m_glowSizePercent);
+        pController->UpdateColorScheme      (pDefaults->m_colorSchemeKey.c_str());
     }
 
 Error:
