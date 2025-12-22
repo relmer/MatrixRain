@@ -731,18 +731,22 @@ static const char * s_kszBloomExtractShaderSource = R"(
         {
             float4 color = inputTexture.Sample(samplerState, input.uv);
             
-            // Extract only bright pixels (luminance threshold)
-            // Calculate luminance
+            // Extract only bright pixels (consider luminance and max channel)
             float luminance = dot(color.rgb, float3(0.2126, 0.7152, 0.0722));
-            
-            // Higher threshold to only extract very bright pixels
-            float threshold = 0.6;
-            
+
+            // Also consider the max color channel so saturated blues/reds can trigger bloom
+            float maxComp = max(max(color.r, color.g), color.b);
+
+            // Use the higher of luminance or max component as brightness metric
+            float brightness = max(luminance, maxComp);
+
+            // Lower threshold to include deep blues/reds while keeping green/amber strong
+            float threshold = 0.45;
+
             // Smooth falloff near threshold for gradual bloom
-            float bloomAmount = smoothstep(threshold, threshold + 0.2, luminance);
-            
+            float bloomAmount = smoothstep(threshold, threshold + 0.25, brightness);
+
             // Return the bright color multiplied by bloom amount
-            // This extracts only bright areas and blacks out dim areas
             return float4(color.rgb * bloomAmount, 1.0);
         }
     )";
