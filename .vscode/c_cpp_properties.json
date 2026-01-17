@@ -1,0 +1,41 @@
+{
+    "configurations": [
+        {
+            "name": "x64",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "${env:ProgramFiles}/Microsoft Visual Studio/**/VC/Auxiliary/VS/UnitTest/include"
+            ],
+            "defines": [
+                "_DEBUG",
+                "UNICODE",
+                "_UNICODE",
+                "_WINDOWS"
+            ],
+            "windowsSdkVersion": "10.0.26100.0",
+            "compilerPath": "${env:ProgramFiles}/Microsoft Visual Studio/**/VC/Tools/MSVC/*/bin/Hostx64/x64/cl.exe",
+            "cStandard": "c17",
+            "cppStandard": "c++26",
+            "intelliSenseMode": "windows-msvc-x64"
+        },
+        {
+            "name": "ARM64",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "${env:ProgramFiles}/Microsoft Visual Studio/**/VC/Auxiliary/VS/UnitTest/include"
+            ],
+            "defines": [
+                "_DEBUG",
+                "UNICODE",
+                "_UNICODE",
+                "_WINDOWS"
+            ],
+            "windowsSdkVersion": "10.0.26100.0",
+            "compilerPath": "${env:ProgramFiles}/Microsoft Visual Studio/**/VC/Tools/MSVC/*/bin/Hostx64/arm64/cl.exe",
+            "cStandard": "c17",
+            "cppStandard": "c++26",
+            "intelliSenseMode": "windows-msvc-arm64"
+        }
+    ],
+    "version": 4
+}
