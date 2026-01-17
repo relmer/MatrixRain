@@ -2,7 +2,7 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "Build MatrixRain Debug",
+            "label": "Build Debug (current arch)",
             "type": "process",
             "command": "pwsh",
             "args": [
@@ -11,25 +11,27 @@
                 "Bypass",
                 "-File",
                 "${workspaceFolder}\\scripts\\Invoke-MatrixRainBuild.ps1",
-                "-Target",
-                "Build",
                 "-Configuration",
                 "Debug",
                 "-Platform",
-                "x64"
+                "Auto",
+                "-Target",
+                "Build"
             ],
-            "options": {
-                "cwd": "${workspaceFolder}"
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
             },
             "problemMatcher": "$msCompile",
             "group": {
                 "kind": "build",
                 "isDefault": true
-            },
-            "detail": "Invoke MatrixRain build script (Debug, x64)."
+            }
         },
         {
-            "label": "Build MatrixRain Release",
+            "label": "Build Release (current arch)",
             "type": "process",
             "command": "pwsh",
             "args": [
@@ -38,25 +40,24 @@
                 "Bypass",
                 "-File",
                 "${workspaceFolder}\\scripts\\Invoke-MatrixRainBuild.ps1",
-                "-Target",
-                "Build",
                 "-Configuration",
                 "Release",
                 "-Platform",
-                "x64"
+                "Auto",
+                "-Target",
+                "Build"
             ],
-            "options": {
-                "cwd": "${workspaceFolder}"
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
             },
             "problemMatcher": "$msCompile",
-            "group": {
-                "kind": "build",
-                "isDefault": false
-            },
-            "detail": "Invoke MatrixRain build script (Release, x64)."
+            "group": "build"
         },
         {
-            "label": "Clean MatrixRain Debug",
+            "label": "Clean Debug (current arch)",
             "type": "process",
             "command": "pwsh",
             "args": [
@@ -65,22 +66,226 @@
                 "Bypass",
                 "-File",
                 "${workspaceFolder}\\scripts\\Invoke-MatrixRainBuild.ps1",
-                "-Target",
-                "Clean",
                 "-Configuration",
                 "Debug",
                 "-Platform",
-                "x64"
+                "Auto",
+                "-Target",
+                "Clean"
             ],
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "problemMatcher": "$msCompile",
-            "group": "none",
-            "detail": "Invoke MatrixRain build script for Clean (Debug, x64)."
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            }
         },
         {
-            "label": "Clean MatrixRain Release",
+            "label": "Clean Release (current arch)",
+            "type": "process",
+            "command": "pwsh",
+            "args": [
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                "${workspaceFolder}\\scripts\\Invoke-MatrixRainBuild.ps1",
+                "-Configuration",
+                "Release",
+                "-Platform",
+                "Auto",
+                "-Target",
+                "Clean"
+            ],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            }
+        },
+        {
+            "label": "Rebuild Debug (current arch)",
+            "type": "process",
+            "command": "pwsh",
+            "args": [
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                "${workspaceFolder}\\scripts\\Invoke-MatrixRainBuild.ps1",
+                "-Configuration",
+                "Debug",
+                "-Platform",
+                "Auto",
+                "-Target",
+                "Rebuild"
+            ],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "Rebuild Release (current arch)",
+            "type": "process",
+            "command": "pwsh",
+            "args": [
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                "${workspaceFolder}\\scripts\\Invoke-MatrixRainBuild.ps1",
+                "-Configuration",
+                "Release",
+                "-Platform",
+                "Auto",
+                "-Target",
+                "Rebuild"
+            ],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "Build + Test Debug (current arch)",
+            "dependsOn": [
+                "Build Debug (current arch)",
+                "Run Tests (no build)"
+            ],
+            "dependsOrder": "sequence",
+            "group": "build"
+        },
+        {
+            "label": "Build + Test Release (current arch)",
+            "dependsOn": [
+                "Build Release (current arch)",
+                "Run Tests (no build)"
+            ],
+            "dependsOrder": "sequence",
+            "group": "build"
+        },
+        {
+            "label": "Run Tests (current arch)",
+            "dependsOn": [
+                "Build Debug (current arch)",
+                "Run Tests (no build)"
+            ],
+            "dependsOrder": "sequence",
+            "group": {
+                "kind": "test",
+                "isDefault": true
+            }
+        },
+        {
+            "label": "Build Debug x64 (no test)",
+            "type": "process",
+            "command": "pwsh",
+            "args": [
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                "${workspaceFolder}\\scripts\\Invoke-MatrixRainBuild.ps1",
+                "-Configuration",
+                "Debug",
+                "-Platform",
+                "x64",
+                "-Target",
+                "Build"
+            ],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "Build Release x64 (no test)",
+            "type": "process",
+            "command": "pwsh",
+            "args": [
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                "${workspaceFolder}\\scripts\\Invoke-MatrixRainBuild.ps1",
+                "-Configuration",
+                "Release",
+                "-Platform",
+                "x64",
+                "-Target",
+                "Build"
+            ],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "Build Debug ARM64 (no test)",
+            "type": "process",
+            "command": "pwsh",
+            "args": [
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                "${workspaceFolder}\\scripts\\Invoke-MatrixRainBuild.ps1",
+                "-Configuration",
+                "Debug",
+                "-Platform",
+                "ARM64",
+                "-Target",
+                "Build"
+            ],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "Build Release ARM64 (no test)",
+            "type": "process",
+            "command": "pwsh",
+            "args": [
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                "${workspaceFolder}\\scripts\\Invoke-MatrixRainBuild.ps1",
+                "-Configuration",
+                "Release",
+                "-Platform",
+                "ARM64",
+                "-Target",
+                "Build"
+            ],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "Build All Release (x64 + ARM64)",
             "type": "process",
             "command": "pwsh",
             "args": [
@@ -90,21 +295,377 @@
                 "-File",
                 "${workspaceFolder}\\scripts\\Invoke-MatrixRainBuild.ps1",
                 "-Target",
-                "Clean",
+                "BuildAllRelease"
+            ],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "Rebuild All Release (x64 + ARM64)",
+            "type": "process",
+            "command": "pwsh",
+            "args": [
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                "${workspaceFolder}\\scripts\\Invoke-MatrixRainBuild.ps1",
+                "-Target",
+                "RebuildAllRelease"
+            ],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "Clean All (x64 + ARM64)",
+            "type": "process",
+            "command": "pwsh",
+            "args": [
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                "${workspaceFolder}\\scripts\\Invoke-MatrixRainBuild.ps1",
+                "-Target",
+                "CleanAll"
+            ],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            }
+        },
+        {
+            "label": "Build Debug x64",
+            "dependsOn": [
+                "Build Debug x64 (no test)",
+                "Run Tests x64 (no build)"
+            ],
+            "dependsOrder": "sequence",
+            "group": "build"
+        },
+        {
+            "label": "Build Debug ARM64",
+            "dependsOn": [
+                "Build Debug ARM64 (no test)",
+                "Run Tests ARM64 (no build)"
+            ],
+            "dependsOrder": "sequence",
+            "group": "build"
+        },
+        {
+            "label": "Build Release x64",
+            "dependsOn": [
+                "Build Release x64 (no test)",
+                "Run Tests x64 (no build)"
+            ],
+            "dependsOrder": "sequence",
+            "group": "build"
+        },
+        {
+            "label": "Build Release ARM64",
+            "dependsOn": [
+                "Build Release ARM64 (no test)",
+                "Run Tests ARM64 (no build)"
+            ],
+            "dependsOrder": "sequence",
+            "group": "build"
+        },
+        {
+            "label": "Clean Debug x64",
+            "type": "process",
+            "command": "pwsh",
+            "args": [
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                "${workspaceFolder}\\scripts\\Invoke-MatrixRainBuild.ps1",
+                "-Configuration",
+                "Debug",
+                "-Platform",
+                "x64",
+                "-Target",
+                "Clean"
+            ],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            }
+        },
+        {
+            "label": "Clean Debug ARM64",
+            "type": "process",
+            "command": "pwsh",
+            "args": [
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                "${workspaceFolder}\\scripts\\Invoke-MatrixRainBuild.ps1",
+                "-Configuration",
+                "Debug",
+                "-Platform",
+                "ARM64",
+                "-Target",
+                "Clean"
+            ],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            }
+        },
+        {
+            "label": "Clean Release x64",
+            "type": "process",
+            "command": "pwsh",
+            "args": [
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                "${workspaceFolder}\\scripts\\Invoke-MatrixRainBuild.ps1",
                 "-Configuration",
                 "Release",
                 "-Platform",
-                "x64"
+                "x64",
+                "-Target",
+                "Clean"
             ],
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "problemMatcher": "$msCompile",
-            "group": "none",
-            "detail": "Invoke MatrixRain build script for Clean (Release, x64)."
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            }
         },
         {
-            "label": "Run MatrixRain Tests",
+            "label": "Clean Release ARM64",
+            "type": "process",
+            "command": "pwsh",
+            "args": [
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                "${workspaceFolder}\\scripts\\Invoke-MatrixRainBuild.ps1",
+                "-Configuration",
+                "Release",
+                "-Platform",
+                "ARM64",
+                "-Target",
+                "Clean"
+            ],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            }
+        },
+        {
+            "label": "Rebuild Debug x64 (no test)",
+            "type": "process",
+            "command": "pwsh",
+            "args": [
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                "${workspaceFolder}\\scripts\\Invoke-MatrixRainBuild.ps1",
+                "-Configuration",
+                "Debug",
+                "-Platform",
+                "x64",
+                "-Target",
+                "Rebuild"
+            ],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "Rebuild Debug ARM64 (no test)",
+            "type": "process",
+            "command": "pwsh",
+            "args": [
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                "${workspaceFolder}\\scripts\\Invoke-MatrixRainBuild.ps1",
+                "-Configuration",
+                "Debug",
+                "-Platform",
+                "ARM64",
+                "-Target",
+                "Rebuild"
+            ],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "Rebuild Release x64 (no test)",
+            "type": "process",
+            "command": "pwsh",
+            "args": [
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                "${workspaceFolder}\\scripts\\Invoke-MatrixRainBuild.ps1",
+                "-Configuration",
+                "Release",
+                "-Platform",
+                "x64",
+                "-Target",
+                "Rebuild"
+            ],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "Rebuild Release ARM64 (no test)",
+            "type": "process",
+            "command": "pwsh",
+            "args": [
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                "${workspaceFolder}\\scripts\\Invoke-MatrixRainBuild.ps1",
+                "-Configuration",
+                "Release",
+                "-Platform",
+                "ARM64",
+                "-Target",
+                "Rebuild"
+            ],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "Rebuild Debug x64",
+            "dependsOn": [
+                "Rebuild Debug x64 (no test)",
+                "Run Tests x64 (no build)"
+            ],
+            "dependsOrder": "sequence",
+            "group": "build"
+        },
+        {
+            "label": "Rebuild Debug ARM64",
+            "dependsOn": [
+                "Rebuild Debug ARM64 (no test)",
+                "Run Tests ARM64 (no build)"
+            ],
+            "dependsOrder": "sequence",
+            "group": "build"
+        },
+        {
+            "label": "Rebuild Release x64",
+            "dependsOn": [
+                "Rebuild Release x64 (no test)",
+                "Run Tests x64 (no build)"
+            ],
+            "dependsOrder": "sequence",
+            "group": "build"
+        },
+        {
+            "label": "Rebuild Release ARM64",
+            "dependsOn": [
+                "Rebuild Release ARM64 (no test)",
+                "Run Tests ARM64 (no build)"
+            ],
+            "dependsOrder": "sequence",
+            "group": "build"
+        },
+        {
+            "label": "Run Tests x64",
+            "dependsOn": [
+                "Build Debug x64 (no test)",
+                "Run Tests x64 (no build)"
+            ],
+            "dependsOrder": "sequence",
+            "group": "test"
+        },
+        {
+            "label": "Run Tests ARM64",
+            "dependsOn": [
+                "Build Debug ARM64 (no test)",
+                "Run Tests ARM64 (no build)"
+            ],
+            "dependsOrder": "sequence",
+            "group": "test"
+        },
+        {
+            "label": "Run Tests (no build)",
+            "type": "process",
+            "command": "pwsh",
+            "args": [
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                "${workspaceFolder}\\scripts\\Invoke-MatrixRainTests.ps1",
+                "-Configuration",
+                "Debug",
+                "-Platform",
+                "Auto",
+                "-RunSettings",
+                "MatrixRainTests.runsettings",
+                "-Parallel"
+            ],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            }
+        },
+        {
+            "label": "Run Tests x64 (no build)",
             "type": "process",
             "command": "pwsh",
             "args": [
@@ -121,16 +682,37 @@
                 "MatrixRainTests.runsettings",
                 "-Parallel"
             ],
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "dependsOn": "Build MatrixRain Debug",
-            "problemMatcher": [],
-            "group": {
-                "kind": "test",
-                "isDefault": true
-            },
-            "detail": "Invoke MatrixRain test script (Debug, x64)."
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            }
+        },
+        {
+            "label": "Run Tests ARM64 (no build)",
+            "type": "process",
+            "command": "pwsh",
+            "args": [
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                "${workspaceFolder}\\scripts\\Invoke-MatrixRainTests.ps1",
+                "-Configuration",
+                "Debug",
+                "-Platform",
+                "ARM64",
+                "-RunSettings",
+                "MatrixRainTests.runsettings",
+                "-Parallel"
+            ],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            }
         }
     ]
 }

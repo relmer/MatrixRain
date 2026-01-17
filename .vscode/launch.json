@@ -8,7 +8,7 @@
             "program": "${workspaceFolder}\\x64\\Debug\\MatrixRain.exe",
             "args": ["/c"],
             "cwd": "${workspaceFolder}\\MatrixRain",
-            "preLaunchTask": "Build MatrixRain Debug",
+            "preLaunchTask": "Build Debug x64 (no test)",
             "stopAtEntry": false,
             "console": "integratedTerminal"
         },
@@ -19,7 +19,7 @@
             "program": "${workspaceFolder}\\x64\\Debug\\MatrixRain.exe",
             "args": [],
             "cwd": "${workspaceFolder}\\MatrixRain",
-            "preLaunchTask": "Build MatrixRain Debug",
+            "preLaunchTask": "Build Debug x64 (no test)",
             "stopAtEntry": false,
             "console": "integratedTerminal"
         },
@@ -30,7 +30,40 @@
             "program": "${workspaceFolder}\\x64\\Release\\MatrixRain.exe",
             "args": [],
             "cwd": "${workspaceFolder}\\MatrixRain",
-            "preLaunchTask": "Build MatrixRain Release",
+            "preLaunchTask": "Build Release x64 (no test)",
+            "stopAtEntry": false,
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Launch MatrixRain with config dialog (Debug ARM64)",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}\\ARM64\\Debug\\MatrixRain.exe",
+            "args": ["/c"],
+            "cwd": "${workspaceFolder}\\MatrixRain",
+            "preLaunchTask": "Build Debug ARM64 (no test)",
+            "stopAtEntry": false,
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Launch MatrixRain (Debug ARM64)",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}\\ARM64\\Debug\\MatrixRain.exe",
+            "args": [],
+            "cwd": "${workspaceFolder}\\MatrixRain",
+            "preLaunchTask": "Build Debug ARM64 (no test)",
+            "stopAtEntry": false,
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Launch MatrixRain (Release ARM64)",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}\\ARM64\\Release\\MatrixRain.exe",
+            "args": [],
+            "cwd": "${workspaceFolder}\\MatrixRain",
+            "preLaunchTask": "Build Release ARM64 (no test)",
             "stopAtEntry": false,
             "console": "integratedTerminal"
         }

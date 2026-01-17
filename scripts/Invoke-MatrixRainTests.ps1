@@ -3,108 +3,63 @@ param(
     [ValidateSet('Debug', 'Release')]
     [string]$Configuration = 'Debug',
 
-    [ValidateSet('x64', 'Win32')]
-    [string]$Platform = 'x64',
+    [ValidateSet('x64', 'ARM64', 'Auto')]
+    [string]$Platform = 'Auto',
 
     [string]$RunSettings = 'MatrixRainTests.runsettings',
 
     [switch]$Parallel
 )
 
+# Resolve 'Auto' platform to actual architecture
+if ($Platform -eq 'Auto') {
+    if ([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture -eq [System.Runtime.InteropServices.Architecture]::Arm64) {
+        $Platform = 'ARM64'
+    } else {
+        $Platform = 'x64'
+    }
+}
+
 $ErrorActionPreference = 'Stop'
 
-function Get-VisualStudioInstallationPath
-{
-    $programFilesX86 = [Environment]::GetEnvironmentVariable('ProgramFiles(x86)')
-    if ([string]::IsNullOrWhiteSpace($programFilesX86))
-    {
-        throw 'ProgramFiles(x86) environment variable not found.'
-    }
+$repoRoot = $PSScriptRoot | Split-Path -Parent
 
-    $vswherePath = Join-Path -Path $programFilesX86 -ChildPath 'Microsoft Visual Studio\Installer\vswhere.exe'
-    if (-not (Test-Path -Path $vswherePath))
-    {
-        throw "vswhere.exe not found at the expected location: $vswherePath"
-    }
-
-    $installationPath = & $vswherePath -latest -requires Microsoft.Component.MSBuild -property installationPath
-    if ([string]::IsNullOrWhiteSpace($installationPath))
-    {
-        # Fall back to any installed product in case the MSBuild workload name shifts.
-        $installationPath = & $vswherePath -latest -products * -property installationPath
-    }
-
-    if ([string]::IsNullOrWhiteSpace($installationPath))
-    {
-        throw 'No Visual Studio installation detected.'
-    }
-
-    return $installationPath
+$toolsScript = Join-Path $PSScriptRoot 'VSTools.ps1'
+if (-not (Test-Path $toolsScript)) {
+    throw "Tool helper script not found: $toolsScript"
 }
 
-function Get-VsTestConsolePath
-{
-    param([string]$InstallationPath)
+. $toolsScript
 
-    $candidatePaths = @(
-        Join-Path -Path $InstallationPath -ChildPath 'Common7\IDE\CommonExtensions\Microsoft\TestWindow\vstest.console.exe'
-        Join-Path -Path $InstallationPath -ChildPath 'Common7\IDE\Extensions\TestPlatform\vstest.console.exe'
-    )
-
-    foreach ($candidate in $candidatePaths)
-    {
-        if (Test-Path -Path $candidate)
-        {
-            return $candidate
-        }
-    }
-
-    $searchRoot = Join-Path -Path $InstallationPath -ChildPath 'Common7\IDE'
-    $found = Get-ChildItem -Path $searchRoot -Filter 'vstest.console.exe' -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
-    if ($null -ne $found)
-    {
-        return $found.FullName
-    }
-
-    throw 'vstest.console.exe not found in the detected Visual Studio installation.'
+# Always use native test runner for current OS architecture (not test platform)
+$vstestPath = Get-VS2026VSTestPath
+if (-not $vstestPath) {
+    $vstestPath = Get-VS2026VSTestPath -IncludePrerelease
 }
 
-$repositoryRoot = Resolve-Path -Path (Join-Path -Path $PSScriptRoot -ChildPath '..')
-Push-Location -Path $repositoryRoot
-
-try
-{
-    $vsInstallPath = Get-VisualStudioInstallationPath
-    $vstestPath    = Get-VsTestConsolePath -InstallationPath $vsInstallPath
-
-    $testAssembly = Join-Path -Path $repositoryRoot -ChildPath "x64\\$Configuration\\MatrixRainTests.dll"
-    if (-not (Test-Path -Path $testAssembly))
-    {
-        throw "Test assembly not found at $testAssembly. Build the tests before running them."
-    }
-
-    $runSettingsPath = Join-Path -Path $repositoryRoot -ChildPath $RunSettings
-    if (-not (Test-Path -Path $runSettingsPath))
-    {
-        throw "Runsettings file not found at $runSettingsPath."
-    }
-
-    $vstestArguments = @($testAssembly, "/Settings:$runSettingsPath")
-    if ($Parallel.IsPresent)
-    {
-        $vstestArguments += '/Parallel'
-    }
-
-    Write-Host "Running tests from $testAssembly" -ForegroundColor Cyan
-    Write-Host "vstest.console path: $vstestPath" -ForegroundColor DarkGray
-
-    & $vstestPath @vstestArguments
-    if ($LASTEXITCODE -ne 0)
-    {
-        exit $LASTEXITCODE
-    }
+if (-not $vstestPath) {
+    throw 'vstest.console.exe not found in VS 2026 (v18.x). Install VS 2026 with Test workload.'
 }
-finally
-{
-    Pop-Location
+
+$testAssembly = Join-Path -Path $repoRoot -ChildPath "$Platform\$Configuration\MatrixRainTests.dll"
+if (-not (Test-Path -Path $testAssembly)) {
+    throw "Test assembly not found at $testAssembly. Build the tests before running them."
+}
+
+$runSettingsPath = Join-Path -Path $repoRoot -ChildPath $RunSettings
+if (-not (Test-Path -Path $runSettingsPath)) {
+    throw "Runsettings file not found at $runSettingsPath."
+}
+
+$vstestArguments = @($testAssembly, "/Settings:$runSettingsPath")
+if ($Parallel.IsPresent) {
+    $vstestArguments += '/Parallel'
+}
+
+Write-Host "Running tests from $testAssembly" -ForegroundColor Cyan
+Write-Host "vstest.console path: $vstestPath" -ForegroundColor DarkGray
+
+& $vstestPath @vstestArguments
+if ($LASTEXITCODE -ne 0) {
+    exit $LASTEXITCODE
 }
