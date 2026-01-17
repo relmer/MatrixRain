@@ -167,7 +167,7 @@
             "label": "Build + Test Release (current arch)",
             "dependsOn": [
                 "Build Release (current arch)",
-                "Run Tests (no build)"
+                "Run Tests Release (no build)"
             ],
             "dependsOrder": "sequence",
             "group": "build"
@@ -371,7 +371,7 @@
             "label": "Build Release x64",
             "dependsOn": [
                 "Build Release x64 (no test)",
-                "Run Tests x64 (no build)"
+                "Run Tests x64 Release (no build)"
             ],
             "dependsOrder": "sequence",
             "group": "build"
@@ -380,7 +380,7 @@
             "label": "Build Release ARM64",
             "dependsOn": [
                 "Build Release ARM64 (no test)",
-                "Run Tests ARM64 (no build)"
+                "Run Tests ARM64 Release (no build)"
             ],
             "dependsOrder": "sequence",
             "group": "build"
@@ -607,7 +607,7 @@
             "label": "Rebuild Release x64",
             "dependsOn": [
                 "Rebuild Release x64 (no test)",
-                "Run Tests x64 (no build)"
+                "Run Tests x64 Release (no build)"
             ],
             "dependsOrder": "sequence",
             "group": "build"
@@ -616,7 +616,7 @@
             "label": "Rebuild Release ARM64",
             "dependsOn": [
                 "Rebuild Release ARM64 (no test)",
-                "Run Tests ARM64 (no build)"
+                "Run Tests ARM64 Release (no build)"
             ],
             "dependsOrder": "sequence",
             "group": "build"
@@ -651,6 +651,31 @@
                 "${workspaceFolder}\\scripts\\Invoke-MatrixRainTests.ps1",
                 "-Configuration",
                 "Debug",
+                "-Platform",
+                "Auto",
+                "-RunSettings",
+                "MatrixRainTests.runsettings",
+                "-Parallel"
+            ],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            }
+        },
+        {
+            "label": "Run Tests Release (no build)",
+            "type": "process",
+            "command": "pwsh",
+            "args": [
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                "${workspaceFolder}\\scripts\\Invoke-MatrixRainTests.ps1",
+                "-Configuration",
+                "Release",
                 "-Platform",
                 "Auto",
                 "-RunSettings",
@@ -701,6 +726,56 @@
                 "${workspaceFolder}\\scripts\\Invoke-MatrixRainTests.ps1",
                 "-Configuration",
                 "Debug",
+                "-Platform",
+                "ARM64",
+                "-RunSettings",
+                "MatrixRainTests.runsettings",
+                "-Parallel"
+            ],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            }
+        },
+        {
+            "label": "Run Tests x64 Release (no build)",
+            "type": "process",
+            "command": "pwsh",
+            "args": [
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                "${workspaceFolder}\\scripts\\Invoke-MatrixRainTests.ps1",
+                "-Configuration",
+                "Release",
+                "-Platform",
+                "x64",
+                "-RunSettings",
+                "MatrixRainTests.runsettings",
+                "-Parallel"
+            ],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            }
+        },
+        {
+            "label": "Run Tests ARM64 Release (no build)",
+            "type": "process",
+            "command": "pwsh",
+            "args": [
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                "${workspaceFolder}\\scripts\\Invoke-MatrixRainTests.ps1",
+                "-Configuration",
+                "Release",
                 "-Platform",
                 "ARM64",
                 "-RunSettings",
