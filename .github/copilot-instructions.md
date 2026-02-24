@@ -954,6 +954,50 @@ namespace fs = std::filesystem;  // OK for heavy filesystem usage in this file
 
 ---
 
+## Git Commit Messages
+
+### Conventional Commits
+- **ALWAYS** use [Conventional Commits](https://www.conventionalcommits.org/) format
+- Format: `type(scope): description`
+- Type must be lowercase
+- Description must be lowercase, imperative mood, no period at end
+
+### Allowed Types
+- `feat` - new feature
+- `fix` - bug fix
+- `refactor` - code change that neither fixes a bug nor adds a feature
+- `perf` - performance improvement
+- `test` - adding or correcting tests
+- `docs` - documentation only
+- `style` - formatting, missing semicolons, etc. (no code change)
+- `build` - build system or external dependency changes
+- `ci` - CI configuration changes
+- `chore` - other changes that don't modify src or test files
+
+### Scopes
+- Use a parenthesized scope to indicate the area of the codebase affected
+- Common scopes: `core`, `rendering`, `animation`, `registry`, `tests`, `ui`
+- Scope is optional but preferred
+
+### Body
+- Use the body to explain **what** and **why**, not how
+- Wrap at 72 characters
+- Use bullet points (`-`) for multiple changes
+
+### Examples
+```
+fix(core): improve thread safety and correctness
+
+- Extend mutex scope to cover Render() call in game loop
+- Use thread_local RNG to eliminate shared mutable state
+
+refactor(core): extract shared color scheme parsing
+
+perf(animation): reuse temp vectors in RemoveExcessStreaks
+```
+
+---
+
 ## Git Commands - Automation Rules
 
 ### **ALWAYS** Use Non-Interactive Git Commands
@@ -998,5 +1042,5 @@ git diff       # Bad - will paginate
 
 ---
 
-*Last Updated: 2025-01-XX*
+*Last Updated: 2026-02-23*
 *These rules apply globally to all projects and conversations*
