@@ -1,0 +1,271 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (e.g., v1.0.1000)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  id-token: write
+
+env:
+  MSBUILD_FLAGS: -p:PlatformToolset=v143
+
+jobs:
+  wait-for-ci:
+    runs-on: windows-latest
+    if: github.event_name == 'push'
+    steps:
+      - name: Wait for CI workflow to succeed
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $sha = "${{ github.sha }}"
+          $maxAttempts = 30
+          $delaySeconds = 30
+
+          Write-Host "Waiting for CI workflow to pass on commit $sha ..."
+
+          for ($i = 1; $i -le $maxAttempts; $i++) {
+            $runs = gh api "repos/${{ github.repository }}/actions/workflows/ci.yml/runs?head_sha=$sha&per_page=5" | ConvertFrom-Json
+
+            $ciRun = $runs.workflow_runs | Where-Object { $_.head_sha -eq $sha } | Select-Object -First 1
+
+            if ($ciRun) {
+              Write-Host "Attempt $i/$maxAttempts — CI run #$($ciRun.run_number): status=$($ciRun.status) conclusion=$($ciRun.conclusion)"
+
+              if ($ciRun.status -eq "completed") {
+                if ($ciRun.conclusion -eq "success") {
+                  Write-Host "CI passed."
+                  exit 0
+                } else {
+                  Write-Error "CI failed with conclusion: $($ciRun.conclusion). Aborting release."
+                  exit 1
+                }
+              }
+            } else {
+              Write-Host "Attempt $i/$maxAttempts — CI run not found yet for $sha"
+            }
+
+            Start-Sleep -Seconds $delaySeconds
+          }
+
+          Write-Error "Timed out waiting for CI after $($maxAttempts * $delaySeconds) seconds."
+          exit 1
+
+  build-and-release:
+    needs: [wait-for-ci]
+    if: always() && (needs.wait-for-ci.result == 'success' || needs.wait-for-ci.result == 'skipped')
+    runs-on: windows-latest
+    environment: release
+
+    steps:
+      - name: Determine tag
+        id: tag
+        shell: pwsh
+        run: |
+          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+            $tag = "${{ inputs.tag }}"
+          } else {
+            $tag = "${{ github.ref_name }}"
+          }
+
+          if ($tag -notmatch '^v\d+\.\d+\.\d+$') {
+            Write-Error "Invalid tag format: $tag (expected v#.#.#)"
+            exit 1
+          }
+
+          $version = $tag.TrimStart('v')
+          Write-Output "tag=$tag" >> $env:GITHUB_OUTPUT
+          Write-Output "version=$version" >> $env:GITHUB_OUTPUT
+          Write-Host "Release tag: $tag  Version: $version"
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate tag matches Version.h
+        shell: pwsh
+        run: |
+          $content = Get-Content "MatrixRainCore/Version.h" -Raw
+          $major = [regex]::Match($content, '#define VERSION_MAJOR\s+(\d+)').Groups[1].Value
+          $minor = [regex]::Match($content, '#define VERSION_MINOR\s+(\d+)').Groups[1].Value
+          $build = [regex]::Match($content, '#define VERSION_BUILD\s+(\d+)').Groups[1].Value
+          $headerVersion = "$major.$minor.$build"
+          $tagVersion = "${{ steps.tag.outputs.version }}"
+
+          if ($headerVersion -ne $tagVersion) {
+            Write-Error "Version mismatch: Version.h has $headerVersion but tag is v$tagVersion"
+            exit 1
+          }
+
+          Write-Host "Version validated: $headerVersion"
+
+      - name: Add MSBuild to PATH
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Setup VSTest
+        uses: darenm/Setup-VSTest@v1.3
+
+      # --- Build ---
+
+      - name: Build Release x64
+        run: msbuild MatrixRain.sln -p:Configuration=Release -p:Platform=x64 ${{ env.MSBUILD_FLAGS }}
+
+      - name: Build Release ARM64
+        run: msbuild MatrixRain.sln -p:Configuration=Release -p:Platform=ARM64 ${{ env.MSBUILD_FLAGS }}
+
+      # --- Test ---
+
+      - name: Run Tests (x64)
+        run: vstest.console.exe x64/Release/MatrixRainTests.dll
+
+      # --- Prepare release assets ---
+
+      - name: Stage release assets
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path release -Force | Out-Null
+          Copy-Item "x64/Release/MatrixRain.exe"    "release/MatrixRain.exe"
+          Copy-Item "ARM64/Release/MatrixRain.exe"   "release/MatrixRain-ARM64.exe"
+
+      # --- Sign release binaries ---
+
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Sign binaries
+        uses: azure/trusted-signing-action@v0.5.0
+        with:
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          endpoint: https://wcus.codesigning.azure.net/
+          trusted-signing-account-name: relmer-signing
+          certificate-profile-name: relmer-public
+          files-folder: ${{ github.workspace }}/release
+          files-folder-filter: exe
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+
+      # --- Create .scr copies from signed .exe ---
+
+      - name: Create screensaver copies
+        shell: pwsh
+        run: |
+          Copy-Item "release/MatrixRain.exe"       "release/MatrixRain.scr"
+          Copy-Item "release/MatrixRain-ARM64.exe"  "release/MatrixRain-ARM64.scr"
+
+      - name: Generate SHA256 checksums
+        shell: pwsh
+        run: |
+          Push-Location release
+          $files = @(
+            "MatrixRain.exe",
+            "MatrixRain-ARM64.exe",
+            "MatrixRain.scr",
+            "MatrixRain-ARM64.scr"
+          )
+          $lines = foreach ($f in $files) {
+            $hash = (Get-FileHash $f -Algorithm SHA256).Hash.ToLower()
+            "$hash  $f"
+          }
+          $lines | Set-Content "SHA256SUMS.txt" -Encoding UTF8
+          Write-Host (Get-Content "SHA256SUMS.txt" -Raw)
+          Pop-Location
+
+      # --- Extract changelog ---
+
+      - name: Extract changelog since previous release
+        id: changelog
+        shell: pwsh
+        run: |
+          $currentVersion = "${{ steps.tag.outputs.version }}"
+
+          # Find previous release tag
+          $prevTag = $null
+          try {
+            $tags = git tag --list 'v*' --sort=-version:refname
+            foreach ($t in $tags) {
+              $v = $t.TrimStart('v')
+              if ($v -ne $currentVersion -and $v -match '^\d+\.\d+\.\d+$') {
+                $prevTag = $t
+                break
+              }
+            }
+          } catch {
+            Write-Host "Could not enumerate tags: $_"
+          }
+
+          $collecting = $false
+          $lines = @()
+
+          foreach ($line in (Get-Content "CHANGELOG.md")) {
+            if ($line -match '^## \[(.+?)\]') {
+              $sectionVersion = $Matches[1]
+
+              if ($collecting) {
+                if ($prevTag -and $sectionVersion -eq $prevTag.TrimStart('v')) {
+                  break
+                }
+                if ($sectionVersion -notmatch '^\d+\.\d+') {
+                  break
+                }
+              }
+
+              if (-not $collecting) {
+                $collecting = $true
+              }
+
+              $lines += ""
+              $lines += $line
+            }
+            elseif ($collecting) {
+              $lines += $line
+            }
+          }
+
+          $body = ($lines -join "`n").Trim()
+
+          if (-not $body) {
+            $body = "Release $currentVersion"
+          }
+
+          $body | Set-Content "release/RELEASE_NOTES.md" -Encoding UTF8
+          Write-Host "--- Release notes ---"
+          Write-Host $body
+          Write-Host "--- End ---"
+
+      # --- Create GitHub Release ---
+
+      - name: Create tag (workflow_dispatch only)
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          git tag ${{ steps.tag.outputs.tag }}
+          git push origin ${{ steps.tag.outputs.tag }}
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: MatrixRain ${{ steps.tag.outputs.version }}
+          body_path: release/RELEASE_NOTES.md
+          files: |
+            release/MatrixRain.exe
+            release/MatrixRain-ARM64.exe
+            release/MatrixRain.scr
+            release/MatrixRain-ARM64.scr
+            release/SHA256SUMS.txt
+          draft: false
+          prerelease: false

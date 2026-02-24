@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  build-and-test:
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        configuration: [Debug, Release]
+        platform: [x64]
+      fail-fast: false
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Add MSBuild to PATH
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Setup VSTest
+        uses: darenm/Setup-VSTest@v1.3
+
+      - name: Build
+        run: msbuild MatrixRain.sln -p:Configuration=${{ matrix.configuration }} -p:Platform=${{ matrix.platform }} -p:PlatformToolset=v143
+
+      - name: Run Tests
+        run: vstest.console.exe ${{ matrix.platform }}/${{ matrix.configuration }}/MatrixRainTests.dll
+
+      - name: Upload x64 Release Binary
+        uses: actions/upload-artifact@v4
+        if: matrix.configuration == 'Release'
+        with:
+          name: matrixrain-x64-Release
+          path: |
+            x64/Release/MatrixRain.exe
+            x64/Release/MatrixRain.scr
+          retention-days: 30
+
+  build-arm64:
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        configuration: [Debug, Release]
+      fail-fast: false
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Add MSBuild to PATH
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Build ARM64
+        run: msbuild MatrixRain.sln -p:Configuration=${{ matrix.configuration }} -p:Platform=ARM64 -p:PlatformToolset=v143
+
+      - name: Upload ARM64 Release Binaries
+        uses: actions/upload-artifact@v4
+        if: matrix.configuration == 'Release'
+        with:
+          name: matrixrain-arm64-Release
+          path: |
+            ARM64/Release/MatrixRain.exe
+            ARM64/Release/MatrixRain.scr
+          retention-days: 30
