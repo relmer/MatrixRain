@@ -35,9 +35,14 @@ void CharacterInstance::Update (float deltaTime)
         // Still in bright phase
         brightness = 1.0f;
     }
-    else
+    else if (fadeTime > 0.0f)
     {
         // In fade phase: brightness fades from 1.0 to 0.0 as lifetime goes from fadeTime to 0
         brightness = lifetime / fadeTime;
+    }
+    else
+    {
+        // Guard against division by zero if fadeTime is ever 0
+        brightness = 0.0f;
     }
 }

@@ -54,7 +54,6 @@ void CharacterStreak::Spawn (const Vector3 & position)
     
     // Spawn the first character immediately at the head position
     CharacterSet & charSet = CharacterSet::GetInstance();
-    charSet.Initialize();
     
     CharacterInstance character;
     
@@ -102,7 +101,6 @@ void CharacterStreak::Update (float deltaTime, float viewportHeight)
             }
             
             CharacterSet & charSet = CharacterSet::GetInstance();
-            charSet.Initialize();
             
             CharacterInstance character;
             
@@ -154,17 +152,15 @@ void CharacterStreak::Update (float deltaTime, float viewportHeight)
         character.Update (deltaTime);
     }
 
-    // Remove characters that have fully faded (only from the tail/front of vector)
-    while (!m_characters.empty() && m_characters.front ().brightness <= 0.0f)
-    {
-        m_characters.erase (m_characters.begin());
-    }
-    
+    // Remove characters that have fully faded from the front (tail end of streak)
+    auto firstAlive = std::find_if (m_characters.begin(), m_characters.end(),
+        [](const CharacterInstance & c) { return c.brightness > 0.0f; });
+    m_characters.erase (m_characters.begin(), firstAlive);
+
     // Also remove any faded characters from the back (e.g., when head goes offscreen and fades)
-    while (!m_characters.empty() && m_characters.back ().brightness <= 0.0f)
-    {
-        m_characters.pop_back();
-    }
+    auto lastAlive = std::find_if (m_characters.rbegin(), m_characters.rend(),
+        [](const CharacterInstance & c) { return c.brightness > 0.0f; });
+    m_characters.erase (lastAlive.base(), m_characters.end());
 
     // Handle character mutation (5% probability per character per second)
     std::uniform_real_distribution<float> mutationDist (0.0f, 1.0f);

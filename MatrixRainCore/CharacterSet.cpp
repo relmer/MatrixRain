@@ -88,8 +88,8 @@ bool CharacterSet::Initialize()
 
 size_t CharacterSet::GetRandomGlyphIndex() const
 {
-    static std::random_device rd;
-    static std::mt19937       gen (rd());
+    static thread_local std::random_device rd;
+    static thread_local std::mt19937       gen (rd());
 
 
 
@@ -132,7 +132,7 @@ size_t CharacterSet::GetGlyphCount() const
 
 
 
-void * CharacterSet::GetTextureResource() const
+ID3D11Texture2D * CharacterSet::GetTextureResource() const
 {
     return m_textureResource.Get();
 }
@@ -141,7 +141,7 @@ void * CharacterSet::GetTextureResource() const
 
 
 
-void * CharacterSet::GetTextureResourceView() const
+ID3D11ShaderResourceView * CharacterSet::GetTextureResourceView() const
 {
     return m_textureResourceView.Get();
 }
@@ -162,10 +162,10 @@ void CharacterSet::Shutdown()
 
 
 
-HRESULT CharacterSet::CreateTextureAtlas (void * d3dDevice)
+HRESULT CharacterSet::CreateTextureAtlas (ID3D11Device * d3dDevice)
 {
     HRESULT                            hr          = S_OK;
-    ID3D11Device                     * device      = static_cast<ID3D11Device *> (d3dDevice);
+    ID3D11Device                     * device      = d3dDevice;
     D3D11_TEXTURE2D_DESC               textureDesc = {};
     D3D11_SHADER_RESOURCE_VIEW_DESC    srvDesc     = {};
     
@@ -201,7 +201,7 @@ HRESULT CharacterSet::CreateTextureAtlas (void * d3dDevice)
     CHRA (hr);
 
     // Render glyphs to the atlas
-    hr = RenderGlyphsToAtlas (d3dDevice);
+    hr = RenderGlyphsToAtlas (device);
     CHRA (hr);
 
     
@@ -219,10 +219,10 @@ Error:
 
 
 
-HRESULT CharacterSet::RenderGlyphsToAtlas (void * d3dDevice)
+HRESULT CharacterSet::RenderGlyphsToAtlas (ID3D11Device * d3dDevice)
 {
     HRESULT                              hr              = S_OK;
-    ID3D11Device                       * device          = static_cast<ID3D11Device *> (d3dDevice);
+    ID3D11Device                       * device          = d3dDevice;
     ID3D11Texture2D                    * texture         = m_textureResource.Get();
     ComPtr<IDXGIDevice>                  dxgiDevice;
     ComPtr<ID2D1Factory1>                d2dFactory;

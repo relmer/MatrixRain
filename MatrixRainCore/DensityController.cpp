@@ -64,7 +64,7 @@ int DensityController::GetTargetStreakCount() const
 
     // Apply percentage: targetStreaks = maxPossible * (percentage / 100)
     // But always show at least MIN_STREAKS even at 0%
-    int target = static_cast<int> ((maxPossible * m_percentage) / 100.0f);
+    int target = static_cast<int> (static_cast<float> (maxPossible) * m_percentage / 100.0f);
     return std::max (target, MIN_STREAKS);
 }
 

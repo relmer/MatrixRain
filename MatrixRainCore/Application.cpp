@@ -225,8 +225,10 @@ HRESULT Application::CreateApplicationWindow (POINT & position, SIZE & size)
     
     CWRA (m_hwnd != nullptr);
 
-    fSuccess = ShowWindow (m_hwnd, SW_SHOW);
-    CWRA (fSuccess);
+    // ShowWindow returns the previous visibility state (not success/failure).
+    // A return of FALSE simply means the window was previously hidden, which is
+    // expected for a newly created window.  Do not check with CWRA.
+    ShowWindow (m_hwnd, SW_SHOW);
     
     fSuccess = UpdateWindow (m_hwnd);
     CWRA (fSuccess);
@@ -711,12 +713,13 @@ void Application::RenderThreadProc()
             }
             
             // Update and render (with mutex protection for config changes)
+            // Mutex must cover both Update and Render to prevent the UI thread from
+            // modifying shared state (e.g., streak vectors) while Render reads them.
             {
                 std::lock_guard<std::mutex> lock (m_renderMutex);
                 Update (deltaTime);
+                Render();
             }
-            
-            Render();
         }
         
         // Sleep to maintain target framerate
