@@ -227,23 +227,23 @@ int AnimationSystem::RemoveExcessStreaks (int targetCount)
     // Count active heads (streaks with heads still on screen)
     float viewportHeight = m_viewport ? m_viewport->GetHeight () : 1080.0f;
     
-    // Build list of indices of active streaks
-    std::vector<size_t> activeIndices;
-    std::vector<size_t> inactiveIndices;
+    // Build list of indices of active streaks (reuse member vectors to avoid allocations)
+    m_activeIndices.clear();
+    m_inactiveIndices.clear();
     
     for (size_t i = 0; i < m_streaks.size (); i++)
     {
         if (!m_streaks[i].IsHeadOffscreen (viewportHeight))
         {
-            activeIndices.push_back (i);
+            m_activeIndices.push_back (i);
         }
         else
         {
-            inactiveIndices.push_back (i);
+            m_inactiveIndices.push_back (i);
         }
     }
         
-    int activeCount = static_cast<int> (activeIndices.size ());
+    int activeCount = static_cast<int> (m_activeIndices.size ());
     if (activeCount <= targetCount)
     {
         return 0; // No excess active heads to remove
@@ -253,23 +253,23 @@ int AnimationSystem::RemoveExcessStreaks (int targetCount)
     int removeCount = activeCount - targetCount;
 
     // Sort active indices by Z depth (furthest first) - these are oldest/least visible
-    std::sort (activeIndices.begin (), activeIndices.end (),
+    std::sort (m_activeIndices.begin (), m_activeIndices.end (),
         [this](size_t a, size_t b) {
             return m_streaks[a].GetPosition ().z > m_streaks[b].GetPosition ().z;
         });
 
     // Mark the furthest active streaks for removal (first removeCount indices)
-    std::vector<bool> shouldRemove (m_streaks.size (), false);
+    m_shouldRemove.assign (m_streaks.size (), false);
     for (int i = 0; i < removeCount; i++)
     {
-        shouldRemove[activeIndices[i]] = true;
+        m_shouldRemove[m_activeIndices[i]] = true;
     }
     
     // Remove marked streaks in reverse order to maintain indices
     int actuallyRemoved = 0;
     for (int i = static_cast<int> (m_streaks.size ()) - 1; i >= 0; i--)
     {
-        if (shouldRemove[i])
+        if (m_shouldRemove[i])
         {
             m_streaks.erase (m_streaks.begin () + i);
             actuallyRemoved++;

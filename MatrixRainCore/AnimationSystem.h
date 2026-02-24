@@ -114,6 +114,11 @@ private:
     std::random_device             m_randomDevice;
     std::mt19937                   m_generator            { m_randomDevice() }; // Seeded from random_device
 
+    // Reusable temporary vectors for RemoveExcessStreaks (avoid per-frame heap allocations)
+    std::vector<size_t>            m_activeIndices;
+    std::vector<size_t>            m_inactiveIndices;
+    std::vector<bool>              m_shouldRemove;
+
 #ifdef _DEBUG
     std::vector<CharacterStreak>   m_previousFrameStreaks;               // Previous frame snapshot for diff detection
     int                            m_intentionalRemovalCount = 0;        // Number of streaks intentionally removed this frame
