@@ -266,6 +266,7 @@ HRESULT RegistrySettingsProvider::ReadString (HKEY hKey, LPCWSTR valueName, std:
     CBRA (lstat == ERROR_SUCCESS);
     CBRA (dwType == REG_SZ);
     CBRA (cbValue > 0);
+    CBRA (cbValue <= 512);  // Reject unreasonably large strings (max 256 wide chars)
     
     // Allocate buffer and read string
     {
