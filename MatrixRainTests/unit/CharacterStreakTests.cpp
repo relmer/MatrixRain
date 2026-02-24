@@ -1,6 +1,7 @@
 #include "Pch_MatrixRainTests.h"
 
 #include "..\..\MatrixRainCore\CharacterStreak.h"
+#include "..\..\MatrixRainCore\CharacterSet.h"
 
 
 
@@ -11,6 +12,11 @@ namespace MatrixRainTests
     TEST_CLASS (CharacterStreakTests)
     {
     public:
+        TEST_CLASS_INITIALIZE (ClassSetup)
+        {
+            CharacterSet::GetInstance().Initialize();
+        }
+
         TEST_METHOD (CharacterStreak_Spawn_InitializesWithRandomLength)
         {
             // Spawn multiple streaks and verify they start with 1 character

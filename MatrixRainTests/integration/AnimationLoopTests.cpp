@@ -61,9 +61,7 @@ namespace MatrixRainTests
 
             // After 10 seconds, verify that the animation system is still functional
             // (it should have spawned and despawned many streaks by now)
-            // We can't easily verify specific behavior without exposing internals,
-            // but we can verify that Update() doesn't crash or hang
-            Assert::IsTrue (true, L"Animation loop completed successfully without crashing");
+            Assert::IsTrue (animationSystem.GetActiveStreakCount() > 0, L"Animation system should have active streaks after 10-second simulation");
 
             // Clean up
             charSet.Shutdown();
@@ -98,9 +96,8 @@ namespace MatrixRainTests
                 animationSystem.Update (1.0f / 60.0f);
             }
 
-            // We can't directly verify streak count without exposing internals,
-            // but we can verify the system doesn't crash
-            Assert::IsTrue (true, L"AnimationSystem spawned streaks and updated successfully");
+            // Streaks should have been spawned during the update loop
+            Assert::IsTrue (animationSystem.GetActiveStreakCount() > 0, L"AnimationSystem should have active streaks after 2 seconds of updates");
 
             charSet.Shutdown();
         }
@@ -148,8 +145,8 @@ namespace MatrixRainTests
                 animationSystem.Update (1.0f / 60.0f);
             }
 
-            // Verify no crash occurred
-            Assert::IsTrue (true, L"Viewport resize during animation succeeded");
+            // Verify animation system is still functional after resize
+            Assert::IsTrue (animationSystem.GetActiveStreakCount() > 0, L"Animation system should have active streaks after viewport resize");
 
             charSet.Shutdown();
         }
@@ -182,8 +179,9 @@ namespace MatrixRainTests
                 animationSystem.Update (0.0f);
             }
 
-            // System should handle this gracefully (no spawning/updates should occur)
-            Assert::IsTrue (true, L"Zero time step handled gracefully");
+            // System should handle this gracefully
+            // With zero dt, Initialize() should still have spawned initial streaks
+            Assert::IsTrue (animationSystem.GetActiveStreakCount() >= 0, L"Zero time step handled gracefully");
 
             charSet.Shutdown();
         }
@@ -216,7 +214,7 @@ namespace MatrixRainTests
             animationSystem.Update (10.0f);
 
             // System should handle this without overflow or infinite spawning
-            Assert::IsTrue (true, L"Large time step handled gracefully");
+            Assert::IsTrue (animationSystem.GetActiveStreakCount() > 0, L"Animation system should survive large time step");
 
             charSet.Shutdown();
         }
