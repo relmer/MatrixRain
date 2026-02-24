@@ -11,6 +11,7 @@ using Microsoft::WRL::ComPtr;
 
 
 
+struct ID3D11Device;
 struct ID3D11Texture2D;
 struct ID3D11ShaderResourceView;
 
@@ -56,7 +57,7 @@ public:
     // Create the texture atlas using the provided D3D11 device
     // Must be called after Initialize() and after D3D11 device is created
     // Returns HRESULT indicating success or failure
-    HRESULT CreateTextureAtlas (void * d3dDevice);
+    HRESULT CreateTextureAtlas (ID3D11Device * d3dDevice);
 
     // Get a random glyph from the set (uniform distribution)
     // Returns the index into the glyphs array
@@ -70,11 +71,11 @@ public:
 
     // Get the texture atlas (for binding to GPU)
     // Returns nullptr if not initialized
-    void * GetTextureResource() const;
+    ID3D11Texture2D          * GetTextureResource() const;
 
     // Get the shader resource view for the texture atlas
     // Returns nullptr if texture not created
-    void * GetTextureResourceView() const;
+    ID3D11ShaderResourceView * GetTextureResourceView() const;
 
     // Cleanup resources
     void Shutdown();
@@ -89,7 +90,7 @@ private:
     CharacterSet & operator= (const CharacterSet &) = delete;
 
     // Internal initialization helpers
-    HRESULT RenderGlyphsToAtlas    (void * d3dDevice);
+    HRESULT RenderGlyphsToAtlas    (ID3D11Device * d3dDevice);
     void    CalculateUVCoordinates ();
 
     // Member data

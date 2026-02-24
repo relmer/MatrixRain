@@ -931,9 +931,12 @@ HRESULT RenderSystem::CreateBloomResources (UINT width, UINT height)
     hr = m_device->CreateShaderResourceView (m_blurTempTexture.Get(), nullptr, &m_blurTempSRV);
     CHRA (hr);
 
-    // Compile bloom shaders and create fullscreen quad resources
-    hr = CompileBloomShaders();
-    CHR (hr);
+    // Compile bloom shaders and create fullscreen quad resources (only on first call)
+    if (!m_bloomExtractPS)
+    {
+        hr = CompileBloomShaders();
+        CHR (hr);
+    }
 
 Error:
     return hr;
@@ -1364,7 +1367,7 @@ void RenderSystem::Render (const AnimationSystem & animationSystem, const Viewpo
     
     // Bind texture atlas from CharacterSet
     CharacterSet& charSet = CharacterSet::GetInstance();
-    ID3D11ShaderResourceView* srv = static_cast<ID3D11ShaderResourceView*> (charSet.GetTextureResourceView());
+    ID3D11ShaderResourceView * srv = charSet.GetTextureResourceView();
     if (srv)
     {
         m_context->PSSetShaderResources (0, 1, &srv);
@@ -1691,11 +1694,6 @@ void RenderSystem::ReleaseBloomResources()
     m_blurTempSRV.Reset();
     m_blurTempRTV.Reset();
     m_blurTempTexture.Reset();
-    m_fullscreenQuadVS.Reset();
-    m_fullscreenQuadVB.Reset();
-    m_compositePS.Reset();
-    m_blurVerticalPS.Reset();
-    m_blurHorizontalPS.Reset();
 }
 
 
@@ -1748,6 +1746,13 @@ void RenderSystem::ReleaseRenderTargetResources()
 
 void RenderSystem::ReleaseDirectXResources()
 {
+    m_fullscreenQuadVS.Reset();
+    m_fullscreenQuadVB.Reset();
+    m_bloomExtractPS.Reset();
+    m_blurHorizontalPS.Reset();
+    m_blurVerticalPS.Reset();
+    m_compositePS.Reset();
+    m_bloomConstantBuffer.Reset();
     m_atlasTextureSRV.Reset();
     m_samplerState.Reset();
     m_blendState.Reset();

@@ -41,6 +41,28 @@ ColorScheme GetNextColorScheme (ColorScheme current);
 /// <returns>Color4 with RGB values (0-1 range)</returns>
 Color4 GetColorRGB (ColorScheme scheme, float elapsedTime = 0.0f);
 
+/// <summary>
+/// Parse a color scheme key string to its enum value.
+/// Returns ColorScheme::Green for unrecognized keys.
+/// </summary>
+/// <param name="key">Color scheme key (green, blue, red, amber, cycle)</param>
+/// <returns>Corresponding ColorScheme enum value</returns>
+ColorScheme ParseColorSchemeKey (const std::wstring & key);
+
+/// <summary>
+/// Convert a ColorScheme enum value to its string key.
+/// </summary>
+/// <param name="scheme">Color scheme enum value</param>
+/// <returns>String key (e.g., L"green", L"blue")</returns>
+std::wstring ColorSchemeToKey (ColorScheme scheme);
+
+/// <summary>
+/// Check if a color scheme key string is valid.
+/// </summary>
+/// <param name="key">Color scheme key to validate (case-insensitive)</param>
+/// <returns>True if the key maps to a known color scheme</returns>
+bool IsValidColorSchemeKey (const std::wstring & key);
+
 
 
 

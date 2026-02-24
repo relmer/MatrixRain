@@ -107,3 +107,51 @@ Color4 GetColorRGB (ColorScheme scheme, float elapsedTime)
     // Fallback to green
     return s_colorTable[0];
 }
+
+
+
+
+
+ColorScheme ParseColorSchemeKey (const std::wstring & key)
+{
+    if (key == L"green")      return ColorScheme::Green;
+    if (key == L"blue")       return ColorScheme::Blue;
+    if (key == L"red")        return ColorScheme::Red;
+    if (key == L"amber")      return ColorScheme::Amber;
+    if (key == L"cycle")      return ColorScheme::ColorCycle;
+
+    return ColorScheme::Green;  // Default for unrecognized keys
+}
+
+
+
+
+
+std::wstring ColorSchemeToKey (ColorScheme scheme)
+{
+    switch (scheme)
+    {
+        case ColorScheme::Green:      return L"green";
+        case ColorScheme::Blue:       return L"blue";
+        case ColorScheme::Red:        return L"red";
+        case ColorScheme::Amber:      return L"amber";
+        case ColorScheme::ColorCycle: return L"cycle";
+        default:                      return L"green";
+    }
+}
+
+
+
+
+
+bool IsValidColorSchemeKey (const std::wstring & key)
+{
+    std::wstring lowerKey = key;
+    std::transform (lowerKey.begin(), lowerKey.end(), lowerKey.begin(), ::towlower);
+
+    return lowerKey == L"green"  ||
+           lowerKey == L"blue"   ||
+           lowerKey == L"red"    ||
+           lowerKey == L"amber"  ||
+           lowerKey == L"cycle";
+}

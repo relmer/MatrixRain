@@ -32,31 +32,7 @@ void ApplicationState::Initialize (const ScreenSaverModeContext * pScreenSaverCo
     m_showStatistics     = isPreviewOrScreenSaver ? false : m_settings.m_showDebugStats;
     
     // Map color scheme key to enum
-    if (m_settings.m_colorSchemeKey == L"green")
-    {
-        m_colorScheme = ColorScheme::Green;
-    }
-    else if (m_settings.m_colorSchemeKey == L"blue")
-    {
-        m_colorScheme = ColorScheme::Blue;
-    }
-    else if (m_settings.m_colorSchemeKey == L"red")
-    {
-        m_colorScheme = ColorScheme::Red;
-    }
-    else if (m_settings.m_colorSchemeKey == L"amber")
-    {
-        m_colorScheme = ColorScheme::Amber;
-    }
-    else if (m_settings.m_colorSchemeKey == L"cycle")
-    {
-    m_colorScheme = ColorScheme::ColorCycle;
-    }
-    else
-    {
-        // Default to green if unknown
-        m_colorScheme = ColorScheme::Green;
-    }
+    m_colorScheme = ParseColorSchemeKey (m_settings.m_colorSchemeKey);
 }
 
 
@@ -90,14 +66,7 @@ void ApplicationState::CycleColorScheme()
     m_colorScheme = GetNextColorScheme (m_colorScheme);
     
     // Update settings and save
-    switch (m_colorScheme)
-    {
-        case ColorScheme::Green:      m_settings.m_colorSchemeKey = L"green";  break;
-        case ColorScheme::Blue:       m_settings.m_colorSchemeKey = L"blue";   break;
-        case ColorScheme::Red:        m_settings.m_colorSchemeKey = L"red";    break;
-        case ColorScheme::Amber:      m_settings.m_colorSchemeKey = L"amber";  break;
-        case ColorScheme::ColorCycle: m_settings.m_colorSchemeKey = L"cycle";  break;
-    }
+    m_settings.m_colorSchemeKey = ColorSchemeToKey (m_colorScheme);
     
     SaveSettings();
 }
@@ -233,31 +202,7 @@ void ApplicationState::ApplySettings (const ScreenSaverSettings & settings)
     m_showStatistics     = m_settings.m_showDebugStats;
     
     // Map color scheme key to enum
-    if (m_settings.m_colorSchemeKey == L"green")
-    {
-        m_colorScheme = ColorScheme::Green;
-    }
-    else if (m_settings.m_colorSchemeKey == L"blue")
-    {
-        m_colorScheme = ColorScheme::Blue;
-    }
-    else if (m_settings.m_colorSchemeKey == L"red")
-    {
-        m_colorScheme = ColorScheme::Red;
-    }
-    else if (m_settings.m_colorSchemeKey == L"amber")
-    {
-        m_colorScheme = ColorScheme::Amber;
-    }
-    else if (m_settings.m_colorSchemeKey == L"cycle")
-    {
-        m_colorScheme = ColorScheme::ColorCycle;
-    }
-    else
-    {
-        // Default to green if unknown
-        m_colorScheme = ColorScheme::Green;
-    }
+    m_colorScheme = ParseColorSchemeKey (m_settings.m_colorSchemeKey);
 }
 
 

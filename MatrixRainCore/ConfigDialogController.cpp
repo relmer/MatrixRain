@@ -54,7 +54,7 @@ void ConfigDialogController::UpdateDensity (int densityPercent)
 void ConfigDialogController::UpdateColorScheme (const std::wstring & colorSchemeKey)
 {
     // Only update if valid color scheme
-    if (m_isValidColorScheme (colorSchemeKey))
+    if (IsValidColorSchemeKey (colorSchemeKey))
     {
         // Normalize to lowercase for storage
         std::wstring normalizedKey = colorSchemeKey;
@@ -64,7 +64,7 @@ void ConfigDialogController::UpdateColorScheme (const std::wstring & colorScheme
         // Propagate to ApplicationState in live mode
         if (m_snapshot.isLiveMode && m_snapshot.applicationStateRef)
         {
-            m_snapshot.applicationStateRef->SetColorScheme (m_mapColorSchemeKeyToEnum (normalizedKey));
+            m_snapshot.applicationStateRef->SetColorScheme (ParseColorSchemeKey (normalizedKey));
         }
     }
 }
@@ -187,54 +187,6 @@ void ConfigDialogController::ResetToDefaults()
 {
     // Reset to factory defaults
     m_settings = ScreenSaverSettings();
-}
-
-
-
-
-
-bool ConfigDialogController::m_isValidColorScheme (const std::wstring & key) const
-{
-    std::wstring lowerKey = key;
-    std::transform (lowerKey.begin(), lowerKey.end(), lowerKey.begin(), ::towlower);
-    
-    return lowerKey == L"green"  ||
-           lowerKey == L"blue"   ||
-           lowerKey == L"red"    ||
-           lowerKey == L"amber"  ||
-           lowerKey == L"cycle";
-}
-
-
-
-
-
-ColorScheme ConfigDialogController::m_mapColorSchemeKeyToEnum (const std::wstring & key) const
-{
-    if (key == L"green")
-    {
-        return ColorScheme::Green;
-    }
-    else if (key == L"blue")
-    {
-        return ColorScheme::Blue;
-    }
-    else if (key == L"red")
-    {
-        return ColorScheme::Red;
-    }
-    else if (key == L"amber")
-    {
-    return ColorScheme::Amber;
-    }
-    else if (key == L"cycle")
-    {
-        return ColorScheme::ColorCycle;
-    }
-    else
-    {
-        return ColorScheme::Green;  // Default
-    }
 }
 
 
