@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.10.0.schema.json
 
 PackageIdentifier: relmer.MatrixRain
-PackageVersion: 1.0.1000
+PackageVersion: 1.0.1001
 PackageLocale: en-US
 Publisher: relmer
 PublisherUrl: https://github.com/relmer

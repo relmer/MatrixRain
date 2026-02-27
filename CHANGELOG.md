@@ -4,15 +4,25 @@ All notable changes to MatrixRain are documented in this file.
 
 ## [Unreleased]
 
+## [1.0.1001] - 2026-02-23
+
+### Added
+- MIT LICENSE file
+- WinGet package manifest (`relmer.MatrixRain`) and automated publish step
+- VERSIONINFO resource block for Windows file properties
+
 ### Changed
 - Conventional commits convention adopted
 - Improved thread safety: extended mutex scope in game loop, thread-local RNG
 - Extracted shared color scheme parsing; removed `void*` casts
 - Reuse temp vectors in `RemoveExcessStreaks` for reduced allocations
 - Validate string length on registry reads
+- Statically link the C runtime (eliminates vcruntime140.dll dependency)
+- Explicit diagnostic when D3D debug layer is unavailable (Graphics Tools)
 
 ### Fixed
 - Strengthened unit test assertions and fixed CharacterSet initialization
+- WinGet workflow: use `env` context for PAT secret in step conditions
 
 ## [1.0.1000] - 2026-01-17
 
