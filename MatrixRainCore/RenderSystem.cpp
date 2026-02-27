@@ -86,15 +86,13 @@ Error:
 
 HRESULT RenderSystem::CreateDevice()
 {
-    HRESULT           hr               = S_OK;
+    HRESULT           hr                = S_OK;
     UINT              createDeviceFlags = D3D11_CREATE_DEVICE_BGRA_SUPPORT; // Required for Direct2D interop
-    D3D_FEATURE_LEVEL featureLevels[]  = {
-        D3D_FEATURE_LEVEL_11_1,
-        D3D_FEATURE_LEVEL_11_0,
-    };
+    D3D_FEATURE_LEVEL featureLevels[]   = { D3D_FEATURE_LEVEL_11_1, D3D_FEATURE_LEVEL_11_0 };
     D3D_FEATURE_LEVEL featureLevel;
 
 
+    
 #ifdef _DEBUG
     createDeviceFlags |= D3D11_CREATE_DEVICE_DEBUG;
 #endif
@@ -109,7 +107,15 @@ HRESULT RenderSystem::CreateDevice()
                             &m_device,
                             &featureLevel,
                             &m_context);
+
+#ifdef _DEBUG
+    // D3D11_CREATE_DEVICE_DEBUG requires the Graphics Tools optional feature.
+    // Install via: Settings > System > Optional Features > Graphics Tools
+    CBRLA (hr != DXGI_ERROR_SDK_COMPONENT_MISSING, L"D3D debug layer unavailable — install Graphics Tools optional feature");
+#endif
+
     CHRA (hr);
+
 
 Error:
     return hr;
