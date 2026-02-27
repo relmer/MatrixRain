@@ -273,6 +273,15 @@ jobs:
 
       # --- Publish to WinGet ---
 
+      - name: Install wingetcreate
+        if: env.WINGET_PAT != ''
+        shell: pwsh
+        run: |
+          $url = "https://aka.ms/wingetcreate/latest"
+          $dest = "$env:RUNNER_TEMP\wingetcreate.exe"
+          Invoke-WebRequest -Uri $url -OutFile $dest -UseBasicParsing
+          Copy-Item $dest "$env:LOCALAPPDATA\Microsoft\WindowsApps\wingetcreate.exe" -Force
+
       - name: Publish to WinGet
         if: env.WINGET_PAT != ''
         shell: pwsh
