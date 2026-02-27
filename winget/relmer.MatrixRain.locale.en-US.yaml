@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.9.0.schema.json
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.10.0.schema.json
 
 PackageIdentifier: relmer.MatrixRain
 PackageVersion: 1.0.1000
@@ -26,4 +26,4 @@ Tags:
   - windows
 ReleaseNotesUrl: https://github.com/relmer/MatrixRain/releases/tag/v1.0.1000
 ManifestType: defaultLocale
-ManifestVersion: 1.9.0
+ManifestVersion: 1.10.0
