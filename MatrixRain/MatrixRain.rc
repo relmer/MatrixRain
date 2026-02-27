@@ -9,6 +9,16 @@
 //
 #include "winres.h"
 
+#include "..\\MatrixRainCore\\Version.h"
+
+
+
+#define VER_FILEVERSION     VERSION_MAJOR,VERSION_MINOR,VERSION_BUILD,0
+#define VER_PRODUCTVERSION  VERSION_MAJOR,VERSION_MINOR,VERSION_BUILD,0
+
+#define VER_FILEVERSION_STR    STRINGIFY(VERSION_MAJOR) "." STRINGIFY(VERSION_MINOR) "." STRINGIFY(VERSION_BUILD) ".0"
+#define VER_PRODUCTVERSION_STR STRINGIFY(VERSION_MAJOR) "." STRINGIFY(VERSION_MINOR) "." STRINGIFY(VERSION_BUILD) ".0"
+
 /////////////////////////////////////////////////////////////////////////////
 #undef APSTUDIO_READONLY_SYMBOLS
 
@@ -26,6 +36,41 @@ LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
 // Icon with lowest ID value placed first to ensure application icon
 // remains consistent on all systems.
 IDI_MATRIXRAIN          ICON                    "MatrixRain.ico"
+
+
+
+VS_VERSION_INFO VERSIONINFO
+ FILEVERSION VER_FILEVERSION
+ PRODUCTVERSION VER_PRODUCTVERSION
+ FILEFLAGSMASK VS_FFI_FILEFLAGSMASK
+#ifdef _DEBUG
+ FILEFLAGS VS_FF_DEBUG
+#else
+ FILEFLAGS 0x0L
+#endif
+ FILEOS VOS__WINDOWS32
+ FILETYPE VFT_APP
+ FILESUBTYPE 0x0L
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904B0"
+        BEGIN
+            VALUE "CompanyName",      "relmer"
+            VALUE "FileDescription",  "Matrix Rain"
+            VALUE "FileVersion",      VER_FILEVERSION_STR
+            VALUE "InternalName",     "MatrixRain"
+            VALUE "LegalCopyright",   "Copyright (C) " STRINGIFY(VERSION_YEAR) " relmer"
+            VALUE "OriginalFilename", "MatrixRain.exe"
+            VALUE "ProductName",      "MatrixRain"
+            VALUE "ProductVersion",   VER_PRODUCTVERSION_STR
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x0409, 1200
+    END
+END
 
 /////////////////////////////////////////////////////////////////////////////
 //
