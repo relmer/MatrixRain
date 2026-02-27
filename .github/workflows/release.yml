@@ -16,6 +16,7 @@ permissions:
 
 env:
   MSBUILD_FLAGS: -p:PlatformToolset=v143
+  WINGET_PAT: ${{ secrets.WINGET_PAT }}
 
 jobs:
   wait-for-ci:
@@ -273,7 +274,7 @@ jobs:
       # --- Publish to WinGet ---
 
       - name: Publish to WinGet
-        if: secrets.WINGET_PAT != ''
+        if: env.WINGET_PAT != ''
         shell: pwsh
         run: |
           $tag = "${{ steps.tag.outputs.tag }}"
