@@ -76,27 +76,27 @@ The following tasks were completed under the original console-based approach but
 
 > **Write tests FIRST, verify they FAIL, then implement**
 
-- [ ] T067 [P] [US3] Test HelpRainDialog window sizing — ComputeWindowSize() returns 2x text bounding box dimensions (from IDWriteTextLayout metrics), capped at 80% of primary monitor work area per dimension — in MatrixRainTests/unit/HelpRainDialogTests.cpp
-- [ ] T068 [P] [US3] Test HelpRainDialog Phase 1 (reveal) animation state — pre-compute CharPosition for every non-space character, shuffle into revealQueue, spawn RevealStreak at each character's (x, y), character locks in when streak head reaches targetPixelY — in MatrixRainTests/unit/HelpRainDialogTests.cpp
-- [ ] T069 [P] [US3] Test HelpRainDialog::IsRevealComplete() returns true when all revealedFlags are true — in MatrixRainTests/unit/HelpRainDialogTests.cpp
-- [ ] T083 [P] [US3] Test HelpRainDialog Phase 2 (background) — after reveal completes, decorative streaks density and speed reduce via tunable multipliers (kPhase2DensityMultiplier, kPhase2SpeedMultiplier), decorative streaks never lock in characters — in MatrixRainTests/unit/HelpRainDialogTests.cpp
-- [ ] T085 [P] [US3] Test HelpRainDialog reveal queue drain rate — verify queue drains completely within kRevealDurationSeconds (3.0f), fixed rate = N characters / duration — in MatrixRainTests/unit/HelpRainDialogTests.cpp
-- [ ] T086 [P] [US3] Test UsageText section grouping — GetFormattedText() produces "Options:" section with /c and /?, "Screensaver Options:" section with /s, /p, /a — no hotkeys — in MatrixRainTests/unit/UsageTextTests.cpp
+- [X] T067 [P] [US3] Test HelpRainDialog window sizing — ComputeWindowSize() returns 2x text bounding box dimensions (from IDWriteTextLayout metrics), capped at 80% of primary monitor work area per dimension — in MatrixRainTests/unit/HelpRainDialogTests.cpp
+- [X] T068 [P] [US3] Test HelpRainDialog Phase 1 (reveal) animation state — pre-compute CharPosition for every non-space character, shuffle into revealQueue, spawn RevealStreak at each character's (x, y), character locks in when streak head reaches targetPixelY — in MatrixRainTests/unit/HelpRainDialogTests.cpp
+- [X] T069 [P] [US3] Test HelpRainDialog::IsRevealComplete() returns true when all revealedFlags are true — in MatrixRainTests/unit/HelpRainDialogTests.cpp
+- [X] T083 [P] [US3] Test HelpRainDialog Phase 2 (background) — after reveal completes, decorative streaks density and speed reduce via tunable multipliers (kPhase2DensityMultiplier, kPhase2SpeedMultiplier), decorative streaks never lock in characters — in MatrixRainTests/unit/HelpRainDialogTests.cpp
+- [X] T085 [P] [US3] Test HelpRainDialog reveal queue drain rate — verify queue drains completely within kRevealDurationSeconds (3.0f), fixed rate = N characters / duration — in MatrixRainTests/unit/HelpRainDialogTests.cpp
+- [X] T086 [P] [US3] Test UsageText section grouping — GetFormattedText() produces "Options:" section with /c and /?, "Screensaver Options:" section with /s, /p, /a — no hotkeys — in MatrixRainTests/unit/UsageTextTests.cpp
 
 ### New Implementation for HelpRainDialog
 
-- [ ] T087 [US3] Create UnicodeSymbols.h in MatrixRain/ — namespace UnicodeSymbols with static constexpr WCHAR constants for em dash (\u2014) and other Unicode symbols, following TCDir's pattern
-- [ ] T088 [US3] Update UsageText to produce section-grouped content — "Options:" section (/c, /?), "Screensaver Options:" section (/s, /p, /a), no hotkeys, em dash from UnicodeSymbols.h, remove BuildTextGrid()/BuildColumnActivityMap() — in MatrixRainCore/UsageText.h/.cpp
-- [ ] T070 [US3] Implement HelpRainDialog class declaration in MatrixRainCore/HelpRainDialog.h — window handle, D3D11 device/swap chain, D2D render target, revealQueue, characterPositions (vector<CharPosition>), revealedFlags, activeRevealStreaks, decorativeStreaks, D2D brushes (text/glow/head/trail), textLayout (IDWriteTextLayout), animation phase enum (Revealing/Background), tunable constants
-- [ ] T071 [US3] Implement HelpRainDialog window creation in MatrixRainCore/HelpRainDialog.cpp — register WNDCLASS, create popup window with WS_OVERLAPPED|WS_CAPTION|WS_SYSMENU (close button, non-resizable), size to 2x text bounding box capped at 80% work area, center on primary monitor
-- [ ] T072 [US3] Implement HelpRainDialog D3D11 and D2D initialization in MatrixRainCore/HelpRainDialog.cpp — create device, swap chain, DXGI surface, D2D render target, DirectWrite Segoe UI proportional text format (14-16pt DPI-scaled), IDWriteTextLayout for formatted text, create brushes: white text brush, black glow brush (variable opacity), bright green head brush, dim green trail brush
-- [ ] T089 [US3] Implement HelpRainDialog character position computation in MatrixRainCore/HelpRainDialog.cpp — iterate every non-space character in formatted text, call IDWriteTextLayout::HitTestTextPosition to get (x, y), build characterPositions vector, shuffle indices into revealQueue, compute drain rate = N / kRevealDurationSeconds
-- [ ] T073 [US3] Implement HelpRainDialog Phase 1 render logic in MatrixRainCore/HelpRainDialog.cpp — drain revealQueue at fixed rate, spawn RevealStreak at each dequeued character's (x, y) with kStreakLeadCells above and kStreakTrailCells below, lock in character when head reaches targetPixelY (set revealedFlags), render streak heads (bright green/white random glyph) and trails (dimming green), render resolved characters with feathered dark glow (DrawFeatheredGlow technique), render decorative streaks at random pixel x across full window at same density/speed, transition to Phase 2 when all revealedFlags true
-- [ ] T084 [US3] Implement HelpRainDialog Phase 2 render logic in MatrixRainCore/HelpRainDialog.cpp — reduce decorative streak density via kPhase2DensityMultiplier (0.15f) and increase speed via kPhase2SpeedMultiplier (1.5f), continue rendering resolved text with feathered glow, rain fills entire window — streaks pass through text area
-- [ ] T074 [US3] Implement HelpRainDialog input handling in MatrixRainCore/HelpRainDialog.cpp — WndProc handles WM_KEYDOWN (VK_RETURN, VK_ESCAPE to dismiss), WM_CLOSE, WM_DESTROY, close button (X)
-- [ ] T075 [US3] Implement HelpRainDialog::Show() in MatrixRainCore/HelpRainDialog.cpp — show window, run PeekMessage-based message pump with render-on-idle pattern, block until dismissed
-- [ ] T076 [US3] Update CommandLineHelp::DisplayCommandLineHelp() in MatrixRainCore/CommandLineHelp.cpp — create UsageText, create HelpRainDialog with const UsageText&, call Show(), no console attachment or detection
-- [ ] T077 [US3] Remove dead console code — delete ConsoleRainEffect.h/.cpp, remove AttachParentConsole/ConsoleCtrlHandler from CommandLineHelp, remove BuildTextGrid/BuildColumnActivityMap from UsageText if still present, remove AnsiCodes.h if unused elsewhere
+- [X] T087 [US3] Create UnicodeSymbols.h in MatrixRain/ — namespace UnicodeSymbols with static constexpr WCHAR constants for em dash (\u2014) and other Unicode symbols, following TCDir's pattern
+- [X] T088 [US3] Update UsageText to produce section-grouped content — "Options:" section (/c, /?), "Screensaver Options:" section (/s, /p, /a), no hotkeys, em dash from UnicodeSymbols.h, remove BuildTextGrid()/BuildColumnActivityMap() — in MatrixRainCore/UsageText.h/.cpp
+- [X] T070 [US3] Implement HelpRainDialog class declaration in MatrixRainCore/HelpRainDialog.h — window handle, D3D11 device/swap chain, D2D render target, revealQueue, characterPositions (vector<CharPosition>), revealedFlags, activeRevealStreaks, decorativeStreaks, D2D brushes (text/glow/head/trail), textLayout (IDWriteTextLayout), animation phase enum (Revealing/Background), tunable constants
+- [X] T071 [US3] Implement HelpRainDialog window creation in MatrixRainCore/HelpRainDialog.cpp — register WNDCLASS, create popup window with WS_OVERLAPPED|WS_CAPTION|WS_SYSMENU (close button, non-resizable), size to 2x text bounding box capped at 80% work area, center on primary monitor
+- [X] T072 [US3] Implement HelpRainDialog D3D11 and D2D initialization in MatrixRainCore/HelpRainDialog.cpp — create device, swap chain, DXGI surface, D2D render target, DirectWrite Segoe UI proportional text format (14-16pt DPI-scaled), IDWriteTextLayout for formatted text, create brushes: white text brush, black glow brush (variable opacity), bright green head brush, dim green trail brush
+- [X] T089 [US3] Implement HelpRainDialog character position computation in MatrixRainCore/HelpRainDialog.cpp — iterate every non-space character in formatted text, call IDWriteTextLayout::HitTestTextPosition to get (x, y), build characterPositions vector, shuffle indices into revealQueue, compute drain rate = N / kRevealDurationSeconds
+- [X] T073 [US3] Implement HelpRainDialog Phase 1 render logic in MatrixRainCore/HelpRainDialog.cpp — drain revealQueue at fixed rate, spawn RevealStreak at each dequeued character's (x, y) with kStreakLeadCells above and kStreakTrailCells below, lock in character when head reaches targetPixelY (set revealedFlags), render streak heads (bright green/white random glyph) and trails (dimming green), render resolved characters with feathered dark glow (DrawFeatheredGlow technique), render decorative streaks at random pixel x across full window at same density/speed, transition to Phase 2 when all revealedFlags true
+- [X] T084 [US3] Implement HelpRainDialog Phase 2 render logic in MatrixRainCore/HelpRainDialog.cpp — reduce decorative streak density via kPhase2DensityMultiplier (0.15f) and increase speed via kPhase2SpeedMultiplier (1.5f), continue rendering resolved text with feathered glow, rain fills entire window — streaks pass through text area
+- [X] T074 [US3] Implement HelpRainDialog input handling in MatrixRainCore/HelpRainDialog.cpp — WndProc handles WM_KEYDOWN (VK_RETURN, VK_ESCAPE to dismiss), WM_CLOSE, WM_DESTROY, close button (X)
+- [X] T075 [US3] Implement HelpRainDialog::Show() in MatrixRainCore/HelpRainDialog.cpp — show window, run PeekMessage-based message pump with render-on-idle pattern, block until dismissed
+- [X] T076 [US3] Update CommandLineHelp::DisplayCommandLineHelp() in MatrixRainCore/CommandLineHelp.cpp — create UsageText, create HelpRainDialog with const UsageText&, call Show(), no console attachment or detection
+- [X] T077 [US3] Remove dead console code — delete ConsoleRainEffect.h/.cpp, remove AttachParentConsole/ConsoleCtrlHandler from CommandLineHelp, remove BuildTextGrid/BuildColumnActivityMap from UsageText if still present, remove AnsiCodes.h if unused elsewhere
 
 **Checkpoint**: `/?` and `-?` launch a custom graphical window with proportional font, per-character queued reveal (~3s), two independent streak pools (reveal + decorative), feathered dark glow, switches only (Options + Screensaver Options, no hotkeys). Enter/Esc dismisses. No console output. MVP complete.
 
@@ -214,17 +214,17 @@ The following tasks were completed under the original console-based approach but
 
 > **Write tests FIRST, verify they FAIL, then implement**
 
-- [ ] T090 [P] [US5] Test HotkeyOverlay initial state: phase is Hidden, IsActive() returns false — in MatrixRainTests/unit/HotkeyOverlayTests.cpp
-- [ ] T091 [P] [US5] Test HotkeyOverlay::Show() transitions phase to Visible, builds hotkey list with all runtime hotkeys and descriptions — in MatrixRainTests/unit/HotkeyOverlayTests.cpp
-- [ ] T092 [P] [US5] Test HotkeyOverlay::Dismiss() transitions phase to Dissolving, no-op if already Hidden — in MatrixRainTests/unit/HotkeyOverlayTests.cpp
-- [ ] T093 [P] [US5] Test HotkeyOverlay::Update() during Dissolving: opacity decreases, transitions to Hidden when fully faded — in MatrixRainTests/unit/HotkeyOverlayTests.cpp
+- [X] T090 [P] [US5] Test HotkeyOverlay initial state: phase is Hidden, IsActive() returns false — in MatrixRainTests/unit/HotkeyOverlayTests.cpp
+- [X] T091 [P] [US5] Test HotkeyOverlay::Show() transitions phase to Visible, builds hotkey list with all runtime hotkeys and descriptions — in MatrixRainTests/unit/HotkeyOverlayTests.cpp
+- [X] T092 [P] [US5] Test HotkeyOverlay::Dismiss() transitions phase to Dissolving, no-op if already Hidden — in MatrixRainTests/unit/HotkeyOverlayTests.cpp
+- [X] T093 [P] [US5] Test HotkeyOverlay::Update() during Dissolving: opacity decreases, transitions to Hidden when fully faded — in MatrixRainTests/unit/HotkeyOverlayTests.cpp
 
 ### New Implementation for User Story 5 (In-App Overlay)
 
-- [ ] T094 [US5] Implement HotkeyOverlay class declaration in MatrixRainCore/HotkeyOverlay.h — phase enum (Hidden/Visible/Dissolving), hotkey list, opacity, bounding rect, positioning
-- [ ] T095 [US5] Implement HotkeyOverlay state machine and Update() in MatrixRainCore/HotkeyOverlay.cpp — Show()/Dismiss()/Update() with dissolve animation
-- [ ] T096 [US5] Render HotkeyOverlay in RenderSystem — draw hotkey list with D2D/DirectWrite, feathered dark glow for readability, centered on screen — in MatrixRainCore/RenderSystem.cpp
-- [ ] T097 [US5] Wire ? key to HotkeyOverlay in Application::OnKeyDown — show overlay when pressed, guard against duplicate, call HelpHintOverlay::Dismiss() — in MatrixRainCore/Application.cpp
+- [X] T094 [US5] Implement HotkeyOverlay class declaration in MatrixRainCore/HotkeyOverlay.h — phase enum (Hidden/Visible/Dissolving), hotkey list, opacity, bounding rect, positioning
+- [X] T095 [US5] Implement HotkeyOverlay state machine and Update() in MatrixRainCore/HotkeyOverlay.cpp — Show()/Dismiss()/Update() with dissolve animation
+- [X] T096 [US5] Render HotkeyOverlay in RenderSystem — draw hotkey list with D2D/DirectWrite, feathered dark glow for readability, centered on screen — in MatrixRainCore/RenderSystem.cpp
+- [X] T097 [US5] Wire ? key to HotkeyOverlay in Application::OnKeyDown — show overlay when pressed, guard against duplicate, call HelpHintOverlay::Dismiss() — in MatrixRainCore/Application.cpp
 
 ### Retained Implementation
 
@@ -246,9 +246,9 @@ The following tasks were completed under the original console-based approach but
 
 ### Active Tasks
 
-- [ ] T080 Add HelpRainDialog.h/.cpp, HotkeyOverlay.h/.cpp, UnicodeSymbols.h to MatrixRainCore.vcxproj and HelpRainDialogTests.cpp, HotkeyOverlayTests.cpp to MatrixRainTests.vcxproj — verify build with `MSBuild MatrixRain.sln /p:Configuration=Debug /p:Platform=x64`
-- [ ] T081 Run full test suite and fix any failures — `vstest.console.exe x64\Debug\MatrixRainTests.dll`
-- [ ] T082 Run manual validation scenarios — overlay startup, `/?` graphical dialog (switches only, proportional font, per-character reveal, two pools), `-?` graphical dialog, screensaver mode suppression, Enter key config dialog, `?` key hotkey overlay (in-app, not dialog)
+- [X] T080 Add HelpRainDialog.h/.cpp, HotkeyOverlay.h/.cpp, UnicodeSymbols.h to MatrixRainCore.vcxproj and HelpRainDialogTests.cpp, HotkeyOverlayTests.cpp to MatrixRainTests.vcxproj — verify build with `MSBuild MatrixRain.sln /p:Configuration=Debug /p:Platform=x64`
+- [X] T081 Run full test suite and fix any failures — `vstest.console.exe x64\Debug\MatrixRainTests.dll`
+- [X] T082 Run manual validation scenarios — overlay startup, `/?` graphical dialog (switches only, proportional font, per-character reveal, two pools), `-?` graphical dialog, screensaver mode suppression, Enter key config dialog, `?` key hotkey overlay (in-app, not dialog)
 
 ---
 

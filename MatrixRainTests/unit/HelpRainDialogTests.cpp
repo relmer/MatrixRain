@@ -261,8 +261,13 @@ namespace MatrixRainTests
 
                 // Run enough frames to complete reveal (3s) and allow all reveal
                 // streaks to travel past the window bottom before being removed.
-                // 600 frames at 60fps = 10s, well beyond worst-case timing.
-                for (int i = 0; i < 600; i++)
+                // At 300 px/s, streaks spawned last (~3s) start 96px above their
+                // target and must travel past height(600) + trail(72) = 672px.
+                // Worst case: target near bottom of centered text, head starts
+                // near 0 and must reach 672.  672/300 = 2.24s after spawn.
+                // Total: 3s reveal + 2.24s travel = ~5.3s.  Use 1200 frames
+                // (20s) for generous margin against timing variance.
+                for (int i = 0; i < 1200; i++)
                 {
                     dialog.Update (1.0f / 60.0f);
                 }

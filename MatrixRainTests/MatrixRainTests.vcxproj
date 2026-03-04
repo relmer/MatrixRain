@@ -311,6 +311,8 @@
     <ClCompile Include="unit\FPSCounterTests.cpp" />
     <ClCompile Include="unit\UsageTextTests.cpp" />
     <ClCompile Include="unit\HelpHintOverlayTests.cpp" />
+    <ClCompile Include="unit\HelpRainDialogTests.cpp" />
+    <ClCompile Include="unit\HotkeyOverlayTests.cpp" />
     <ClCompile Include="integration\AnimationLoopTests.cpp" />
     <ClCompile Include="integration\DensityControlTests.cpp" />
     <ClCompile Include="integration\DisplayModeTests.cpp" />

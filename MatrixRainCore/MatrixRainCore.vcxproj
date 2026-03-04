@@ -267,6 +267,8 @@
     <ClInclude Include="DensityController.h" />
     <ClInclude Include="FPSCounter.h" />
     <ClInclude Include="HelpHintOverlay.h" />
+    <ClInclude Include="HelpRainDialog.h" />
+    <ClInclude Include="HotkeyOverlay.h" />
     <ClInclude Include="InputSystem.h" />
     <ClInclude Include="Math.h" />
     <ClInclude Include="RegistrySettingsProvider.h" />
@@ -274,6 +276,7 @@
     <ClInclude Include="ScreenSaverModeParser.h" />
     <ClInclude Include="Timer.h" />
     <ClInclude Include="UsageText.h" />
+    <ClInclude Include="UnicodeSymbols.h" />
     <ClInclude Include="Viewport.h" />
     <ClInclude Include="pch.h" />
   </ItemGroup>
@@ -308,6 +311,8 @@
     <ClCompile Include="UsageText.cpp" />
     <ClCompile Include="CommandLineHelp.cpp" />
     <ClCompile Include="HelpHintOverlay.cpp" />
+    <ClCompile Include="HelpRainDialog.cpp" />
+    <ClCompile Include="HotkeyOverlay.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
