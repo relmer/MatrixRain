@@ -6,6 +6,7 @@
 #include "CharacterSet.h"
 #include "ColorScheme.h"
 #include "HelpHintOverlay.h"
+#include "HotkeyOverlay.h"
 
 using Microsoft::WRL::ComPtr;
 
@@ -1299,7 +1300,7 @@ Error:
 
 
 
-void RenderSystem::Render (const AnimationSystem & animationSystem, const Viewport & viewport, ColorScheme colorScheme, float fps, int rainPercentage, int streakCount, int activeHeadCount, bool showDebugFadeTimes, float elapsedTime, const HelpHintOverlay * pOverlay)
+void RenderSystem::Render (const AnimationSystem & animationSystem, const Viewport & viewport, ColorScheme colorScheme, float fps, int rainPercentage, int streakCount, int activeHeadCount, bool showDebugFadeTimes, float elapsedTime, const HelpHintOverlay * pOverlay, const HotkeyOverlay * pHotkeyOverlay)
 {
     if (!m_device || !m_context || !m_renderTargetView)
     {
@@ -1438,6 +1439,12 @@ void RenderSystem::Render (const AnimationSystem & animationSystem, const Viewpo
     if (pOverlay && pOverlay->IsActive())
     {
         RenderHelpHintOverlay (*pOverlay);
+    }
+
+    // Render hotkey overlay if active (after help hint, before FPS counter)
+    if (pHotkeyOverlay && pHotkeyOverlay->IsActive())
+    {
+        RenderHotkeyOverlay (*pHotkeyOverlay);
     }
 
     // Render FPS counter overlay if fps > 0
@@ -1691,6 +1698,133 @@ Error:
 
 
 ////////////////////////////////////////////////////////////////////////////////
+//
+//  RenderSystem::RenderHotkeyOverlay
+//
+//  Renders the hotkey reference overlay using D2D/DirectWrite.
+//  Draws a feathered dark background, then each hotkey row with
+//  key name (bright green) and description (white).
+//
+////////////////////////////////////////////////////////////////////////////////
+
+void RenderSystem::RenderHotkeyOverlay (const HotkeyOverlay & overlay)
+{
+    HRESULT     hr      = S_OK;
+    bool        drawing = false;
+    D2D1_RECT_F boundingRect = {};
+    float       opacity = 0.0f;
+
+
+
+    CBRAEx (m_d2dContext && m_fpsBrush && m_fpsTextFormat && m_fpsGlowBrush, E_UNEXPECTED);
+
+    opacity = overlay.GetOpacity();
+
+    BAIL_OUT_IF (opacity <= 0.01f, S_OK);
+
+    boundingRect = overlay.GetBoundingRect();
+
+    m_d2dContext->BeginDraw();
+    drawing = true;
+
+    //
+    // Feathered dark background
+    //
+
+    {
+        const int   featherLayers = 12;
+        const float maxExpand     = 20.0f;
+
+        for (int i = featherLayers; i > 0; --i)
+        {
+            float expand    = maxExpand * (static_cast<float>(i) / static_cast<float>(featherLayers));
+            float layerAlpha = 0.7f * opacity * (1.0f - (static_cast<float>(i) / static_cast<float>(featherLayers)));
+
+            D2D1_RECT_F expandedRect = D2D1::RectF (boundingRect.left   - expand,
+                                                      boundingRect.top    - expand,
+                                                      boundingRect.right  + expand,
+                                                      boundingRect.bottom + expand);
+
+            m_fpsGlowBrush->SetColor (D2D1::ColorF (D2D1::ColorF::Black, layerAlpha));
+            m_d2dContext->FillRectangle (expandedRect, m_fpsGlowBrush.Get());
+        }
+
+        // Solid dark center
+        m_fpsGlowBrush->SetColor (D2D1::ColorF (D2D1::ColorF::Black, 0.7f * opacity));
+        m_d2dContext->FillRectangle (boundingRect, m_fpsGlowBrush.Get());
+    }
+
+    //
+    // Render hotkey rows
+    //
+
+    {
+        static constexpr float ROW_HEIGHT     = 28.0f;
+        static constexpr float PADDING        = 30.0f;
+        static constexpr float KEY_COL_WIDTH  = 120.0f;
+        static constexpr float GAP            = 16.0f;
+
+        const auto & hotkeys = overlay.GetHotkeys();
+
+        float baseX = boundingRect.left + PADDING;
+        float baseY = boundingRect.top  + PADDING;
+
+        // Save current text alignment and set to left/top for hotkey rendering
+        DWRITE_TEXT_ALIGNMENT      savedTextAlign = m_fpsTextFormat->GetTextAlignment();
+        DWRITE_PARAGRAPH_ALIGNMENT savedParaAlign = m_fpsTextFormat->GetParagraphAlignment();
+
+        m_fpsTextFormat->SetTextAlignment (DWRITE_TEXT_ALIGNMENT_LEADING);
+        m_fpsTextFormat->SetParagraphAlignment (DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
+
+        for (size_t i = 0; i < hotkeys.size(); ++i)
+        {
+            float rowY = baseY + static_cast<float>(i) * ROW_HEIGHT;
+
+            // Key name — bright green
+            D2D1_RECT_F keyRect = D2D1::RectF (baseX, rowY, baseX + KEY_COL_WIDTH, rowY + ROW_HEIGHT);
+
+            m_fpsBrush->SetColor (D2D1::ColorF (0.0f, 0.9f, 0.0f, opacity));
+
+            m_d2dContext->DrawText (hotkeys[i].keyName.c_str(),
+                                    static_cast<UINT32>(hotkeys[i].keyName.size()),
+                                    m_fpsTextFormat.Get(),
+                                    keyRect,
+                                    m_fpsBrush.Get());
+
+            // Description — white
+            D2D1_RECT_F descRect = D2D1::RectF (baseX + KEY_COL_WIDTH + GAP, rowY,
+                                                  boundingRect.right - PADDING, rowY + ROW_HEIGHT);
+
+            m_fpsBrush->SetColor (D2D1::ColorF (D2D1::ColorF::White, opacity));
+
+            m_d2dContext->DrawText (hotkeys[i].description.c_str(),
+                                    static_cast<UINT32>(hotkeys[i].description.size()),
+                                    m_fpsTextFormat.Get(),
+                                    descRect,
+                                    m_fpsBrush.Get());
+        }
+
+        // Restore text alignment
+        m_fpsTextFormat->SetTextAlignment (savedTextAlign);
+        m_fpsTextFormat->SetParagraphAlignment (savedParaAlign);
+
+        // Reset brush color back to white
+        m_fpsBrush->SetColor (D2D1::ColorF (D2D1::ColorF::White, 1.0f));
+    }
+
+Error:
+    if (drawing)
+    {
+        m_d2dContext->EndDraw();
+    }
+
+    return;
+}
+
+
+
+
+
 //
 //  RenderSystem::DrawFeatheredGlow
 //

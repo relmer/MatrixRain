@@ -13,6 +13,7 @@ class InputSystem;
 class ApplicationState;
 class FPSCounter;
 class HelpHintOverlay;
+class HotkeyOverlay;
 struct ScreenSaverModeContext;
 
 
@@ -61,6 +62,7 @@ private:
     std::unique_ptr<ApplicationState>  m_appState;
     std::unique_ptr<FPSCounter>        m_fpsCounter;
     std::unique_ptr<HelpHintOverlay>   m_helpHintOverlay;
+    std::unique_ptr<HotkeyOverlay>     m_hotkeyOverlay;
 
     // Win32 window
     HWND      m_hwnd                    { nullptr };

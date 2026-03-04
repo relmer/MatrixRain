@@ -4,6 +4,7 @@
 #include "AnimationSystem.h"
 #include "ApplicationState.h"
 #include "HelpHintOverlay.h"
+#include "HotkeyOverlay.h"
 #include "RenderSystem.h"
 #include "Viewport.h"
 #include "Timer.h"
@@ -55,6 +56,7 @@ HRESULT Application::Initialize (HINSTANCE hInstance, int nCmdShow, const Screen
     m_inputSystem       = std::make_unique<InputSystem>();
     m_fpsCounter        = std::make_unique<FPSCounter>();
     m_helpHintOverlay   = std::make_unique<HelpHintOverlay>();
+    m_hotkeyOverlay     = std::make_unique<HotkeyOverlay>();
     m_timer             = std::make_unique<Timer>();
 
 
@@ -309,6 +311,11 @@ void Application::Update (float deltaTime)
     {
         m_helpHintOverlay->Update (deltaTime);
     }
+
+    if (m_hotkeyOverlay && m_hotkeyOverlay->IsActive())
+    {
+        m_hotkeyOverlay->Update (deltaTime);
+    }
 }
 
 
@@ -423,10 +430,11 @@ void Application::Render()
         bool        showDebugFadeTimes = m_appState->GetShowDebugFadeTimes();
         float       elapsedTime        = m_appState->GetElapsedTime();
         
-        // Pass overlay pointer to render system for rendering + occlusion
-        const HelpHintOverlay * pOverlay = (m_helpHintOverlay && m_helpHintOverlay->IsActive()) ? m_helpHintOverlay.get() : nullptr;
+        // Pass overlay pointers to render system for rendering + occlusion
+        const HelpHintOverlay * pOverlay       = (m_helpHintOverlay && m_helpHintOverlay->IsActive()) ? m_helpHintOverlay.get() : nullptr;
+        const HotkeyOverlay   * pHotkeyOverlay = (m_hotkeyOverlay && m_hotkeyOverlay->IsActive())     ? m_hotkeyOverlay.get()  : nullptr;
         
-        m_renderSystem->Render (*m_animationSystem, *m_viewport, scheme, fps, rainPercentage, streakCount, activeHeadCount, showDebugFadeTimes, elapsedTime, pOverlay);
+        m_renderSystem->Render (*m_animationSystem, *m_viewport, scheme, fps, rainPercentage, streakCount, activeHeadCount, showDebugFadeTimes, elapsedTime, pOverlay, pHotkeyOverlay);
         m_renderSystem->Present();
     }
 }
@@ -625,10 +633,18 @@ void Application::OnKeyDown (WPARAM wParam)
     }
     else if (wParam == VK_OEM_2 && (GetAsyncKeyState (VK_SHIFT) & 0x8000))
     {
-        // ? key (Shift + /) — show usage dialog
-        if (m_showUsageDialogCallback)
+        // ? key (Shift + /) — toggle hotkey overlay
+        if (m_hotkeyOverlay)
         {
-            m_showUsageDialogCallback();
+            if (m_hotkeyOverlay->GetPhase() == HotkeyOverlayPhase::Visible)
+            {
+                m_hotkeyOverlay->Dismiss();
+            }
+            else
+            {
+                m_hotkeyOverlay->UpdateLayout (static_cast<float>(m_viewport->GetWidth()), static_cast<float>(m_viewport->GetHeight()));
+                m_hotkeyOverlay->Show();
+            }
         }
         isRecognized = true;
     }
@@ -647,6 +663,13 @@ void Application::OnKeyDown (WPARAM wParam)
         {
             m_helpHintOverlay->Show();
         }
+    }
+
+    // Dismiss hotkey overlay on any recognized key other than ? toggle
+    if (m_hotkeyOverlay && m_hotkeyOverlay->IsActive() && isRecognized &&
+        !(wParam == VK_OEM_2 && (GetAsyncKeyState (VK_SHIFT) & 0x8000)))
+    {
+        m_hotkeyOverlay->Dismiss();
     }
 }
 
@@ -679,6 +702,12 @@ void Application::OnSysKeyDown (WPARAM wParam)
         if (m_helpHintOverlay && m_appState && m_appState->GetHelpHintEnabled())
         {
             m_helpHintOverlay->Dismiss();
+        }
+
+        // Dismiss hotkey overlay on Alt+Enter
+        if (m_hotkeyOverlay && m_hotkeyOverlay->IsActive())
+        {
+            m_hotkeyOverlay->Dismiss();
         }
     }
 }
@@ -737,6 +766,11 @@ void Application::OnSize (LPARAM lParam)
         if (m_helpHintOverlay)
         {
             m_helpHintOverlay->UpdateLayout (static_cast<float>(width), static_cast<float>(height));
+        }
+
+        if (m_hotkeyOverlay && m_hotkeyOverlay->IsActive())
+        {
+            m_hotkeyOverlay->UpdateLayout (static_cast<float>(width), static_cast<float>(height));
         }
     }
 }
