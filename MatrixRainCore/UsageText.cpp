@@ -2,6 +2,7 @@
 
 #include "UsageText.h"
 
+#include "UnicodeSymbols.h"
 #include "Version.h"
 
 
@@ -20,33 +21,16 @@ UsageText::UsageText (wchar_t switchPrefix) :
     m_switchPrefix (switchPrefix)
 {
     //
-    // Populate switch table
+    // Populate switch table — general options first, then screensaver options
     //
 
     m_switches =
     {
-        { L's', L"",       L"Run as full-screen screensaver"                },
-        { L'p', L"<HWND>", L"Preview in the specified window"              },
-        { L'c', L"",       L"Show settings dialog"                         },
-        { L'a', L"",       L"Password change (unsupported, exits quietly)" },
-        { L'?', L"",       L"Display this help message"                    },
-    };
-
-    //
-    // Populate hotkey table
-    //
-
-    m_hotkeys =
-    {
-        { L"Space",     L"Pause / resume animation"       },
-        { L"Enter",     L"Open settings dialog"           },
-        { L"?",         L"Show this help information"      },
-        { L"C",         L"Cycle color scheme"              },
-        { L"S",         L"Toggle screensaver mode"         },
-        { L"+/-",       L"Adjust rain density"             },
-        { L"`",         L"Toggle FPS counter"              },
-        { L"Alt+Enter", L"Toggle fullscreen"               },
-        { L"Esc",       L"Exit"                            },
+        { L'c', L"",       L"Show settings dialog",                         false },
+        { L'?', L"",       L"Display this help message",                    false },
+        { L's', L"",       L"Run as full-screen screensaver",               true  },
+        { L'p', L"<HWND>", L"Preview in the specified window",              true  },
+        { L'a', L"",       L"Password change (unsupported, exits quietly)", true  },
     };
 
     BuildFormattedLines();
@@ -60,7 +44,8 @@ UsageText::UsageText (wchar_t switchPrefix) :
 //
 //  UsageText::BuildFormattedLines
 //
-//  Formats the usage text into display-ready lines.
+//  Formats the usage text into section-grouped display-ready lines.
+//  Splits switches into "Options:" and "Screensaver Options:" sections.
 //
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -83,13 +68,18 @@ void UsageText::BuildFormattedLines ()
     m_formattedLines.push_back (L"");
 
     //
-    // Switches
+    // Options section (non-screensaver switches)
     //
 
     m_formattedLines.push_back (L"Options:");
 
     for (const auto & sw : m_switches)
     {
+        if (sw.isScreensaverOption)
+        {
+            continue;
+        }
+
         std::wstring switchStr = std::format (L"  {}{}", m_switchPrefix, sw.switchChar);
 
         if (!sw.argument.empty())
@@ -97,34 +87,63 @@ void UsageText::BuildFormattedLines ()
             switchStr += L" " + sw.argument;
         }
 
-        // Pad to column width for description alignment
         while (switchStr.size() < 18)
         {
             switchStr += L' ';
         }
 
+        switchStr += UnicodeSymbols::EmDash;
+        switchStr += L" ";
         switchStr += sw.description;
         m_formattedLines.push_back (switchStr);
     }
 
     //
-    // Hotkeys
+    // Screensaver Options section
     //
 
     m_formattedLines.push_back (L"");
-    m_formattedLines.push_back (L"Hotkeys:");
+    m_formattedLines.push_back (L"Screensaver Options:");
 
-    for (const auto & hk : m_hotkeys)
+    for (const auto & sw : m_switches)
     {
-        std::wstring keyStr = std::format (L"  {}", hk.keyName);
-
-        while (keyStr.size() < 18)
+        if (!sw.isScreensaverOption)
         {
-            keyStr += L' ';
+            continue;
         }
 
-        keyStr += hk.description;
-        m_formattedLines.push_back (keyStr);
+        std::wstring switchStr = std::format (L"  {}{}", m_switchPrefix, sw.switchChar);
+
+        if (!sw.argument.empty())
+        {
+            switchStr += L" " + sw.argument;
+        }
+
+        while (switchStr.size() < 18)
+        {
+            switchStr += L' ';
+        }
+
+        switchStr += UnicodeSymbols::EmDash;
+        switchStr += L" ";
+        switchStr += sw.description;
+        m_formattedLines.push_back (switchStr);
+    }
+
+    //
+    // Build the single formatted text string
+    //
+
+    m_formattedText.clear();
+
+    for (size_t i = 0; i < m_formattedLines.size(); i++)
+    {
+        m_formattedText += m_formattedLines[i];
+
+        if (i + 1 < m_formattedLines.size())
+        {
+            m_formattedText += L"\n";
+        }
     }
 }
 
@@ -136,7 +155,7 @@ void UsageText::BuildFormattedLines ()
 //
 //  UsageText::GetPlainText
 //
-//  Returns all formatted lines joined with CRLF.
+//  Returns formatted text with CRLF line endings for MessageBox display.
 //
 ////////////////////////////////////////////////////////////////////////////////
 

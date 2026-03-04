@@ -181,6 +181,174 @@ namespace MatrixRainTests
 
                 Assert::AreEqual (L'/', prefix, L"Should default to / when no match");
             }
+
+
+
+
+            ////////////////////////////////////////////////////////////
+            //  T086: Section grouping — GetFormattedText
+            ////////////////////////////////////////////////////////////
+
+            TEST_METHOD (GetFormattedText_ContainsOptionsSectionHeader)
+            {
+                UsageText usage (L'/');
+
+
+                const std::wstring & text = usage.GetFormattedText();
+
+
+
+                Assert::IsTrue (text.find (L"Options:") != std::wstring::npos,
+                                L"Should contain 'Options:' section header");
+            }
+
+
+
+
+            TEST_METHOD (GetFormattedText_ContainsScreensaverOptionsSectionHeader)
+            {
+                UsageText usage (L'/');
+
+
+                const std::wstring & text = usage.GetFormattedText();
+
+
+
+                Assert::IsTrue (text.find (L"Screensaver Options:") != std::wstring::npos,
+                                L"Should contain 'Screensaver Options:' section header");
+            }
+
+
+
+
+            TEST_METHOD (GetFormattedText_OptionsSectionBeforeScreensaverSection)
+            {
+                UsageText usage (L'/');
+
+
+                const std::wstring & text = usage.GetFormattedText();
+
+                auto optionsPos    = text.find (L"Options:");
+                auto screensaverPos = text.find (L"Screensaver Options:");
+
+
+
+                Assert::IsTrue (optionsPos != std::wstring::npos, L"Should contain Options:");
+                Assert::IsTrue (screensaverPos != std::wstring::npos, L"Should contain Screensaver Options:");
+                Assert::IsTrue (optionsPos < screensaverPos, L"Options: should appear before Screensaver Options:");
+            }
+
+
+
+
+            TEST_METHOD (GetFormattedText_GeneralSwitchesInOptionsSection)
+            {
+                UsageText usage (L'/');
+
+
+                const std::wstring & text = usage.GetFormattedText();
+
+                auto optionsPos     = text.find (L"Options:");
+                auto screensaverPos = text.find (L"Screensaver Options:");
+
+                // /c and /? should appear between Options: and Screensaver Options:
+                auto slashC = text.find (L"/c");
+                auto slashQ = text.find (L"/?");
+
+
+
+                Assert::IsTrue (slashC > optionsPos && slashC < screensaverPos,
+                                L"/c should be in the Options section");
+                Assert::IsTrue (slashQ > optionsPos && slashQ < screensaverPos,
+                                L"/? should be in the Options section");
+            }
+
+
+
+
+            TEST_METHOD (GetFormattedText_ScreensaverSwitchesInScreensaverSection)
+            {
+                UsageText usage (L'/');
+
+
+                const std::wstring & text = usage.GetFormattedText();
+
+                auto screensaverPos = text.find (L"Screensaver Options:");
+
+                // /s, /p, /a should appear after Screensaver Options:
+                auto slashS = text.find (L"/s");
+                auto slashP = text.find (L"/p");
+                auto slashA = text.find (L"/a");
+
+
+
+                Assert::IsTrue (slashS > screensaverPos, L"/s should be in the Screensaver Options section");
+                Assert::IsTrue (slashP > screensaverPos, L"/p should be in the Screensaver Options section");
+                Assert::IsTrue (slashA > screensaverPos, L"/a should be in the Screensaver Options section");
+            }
+
+
+
+
+            TEST_METHOD (GetFormattedText_UsesEmDashSeparator)
+            {
+                UsageText usage (L'/');
+
+
+                const std::wstring & text = usage.GetFormattedText();
+
+
+
+                Assert::IsTrue (text.find (L'\u2014') != std::wstring::npos,
+                                L"Should use em dash separator between switch name and description");
+            }
+
+
+
+
+            TEST_METHOD (GetFormattedText_DoesNotContainHotkeys)
+            {
+                UsageText usage (L'/');
+
+
+                const std::wstring & text = usage.GetFormattedText();
+
+
+
+                // Hotkeys like "Space", "Enter", "Esc" as standalone key names should not appear
+                // (they may appear in descriptions, so check for typical hotkey-only patterns)
+                Assert::IsTrue (text.find (L"Hotkeys:") == std::wstring::npos,
+                                L"Should not contain 'Hotkeys:' section");
+                Assert::IsTrue (text.find (L"Runtime Hotkeys:") == std::wstring::npos,
+                                L"Should not contain 'Runtime Hotkeys:' section");
+            }
+
+
+
+
+            TEST_METHOD (GetFormattedText_MatchesFormattedLinesContent)
+            {
+                UsageText usage (L'/');
+
+
+                const std::wstring &              text  = usage.GetFormattedText();
+                const std::vector<std::wstring> & lines = usage.GetFormattedLines();
+
+                // Rebuild from lines using LF joins to compare
+                std::wstring rebuilt;
+                for (size_t i = 0; i < lines.size(); i++)
+                {
+                    rebuilt += lines[i];
+                    if (i + 1 < lines.size())
+                    {
+                        rebuilt += L"\n";
+                    }
+                }
+
+
+
+                Assert::AreEqual (rebuilt, text, L"GetFormattedText() should match LF-joined GetFormattedLines()");
+            }
     };
 
 

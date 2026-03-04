@@ -9,6 +9,7 @@ struct SwitchEntry
     wchar_t      switchChar;
     std::wstring argument;
     std::wstring description;
+    bool         isScreensaverOption = false;
 };
 
 
@@ -31,9 +32,10 @@ public:
 
 
     // Queries
-    const std::vector<std::wstring> & GetFormattedLines () const { return m_formattedLines; }
-    wchar_t                           GetSwitchPrefix ()   const { return m_switchPrefix;   }
-    std::wstring                      GetPlainText ()      const;
+    const std::wstring                & GetFormattedText ()   const { return m_formattedText;   }
+    const std::vector<std::wstring>   & GetFormattedLines ()  const { return m_formattedLines;  }
+    wchar_t                             GetSwitchPrefix ()    const { return m_switchPrefix;    }
+    std::wstring                        GetPlainText ()       const;
 
 
     // Static helpers
@@ -46,7 +48,7 @@ private:
 
     wchar_t                    m_switchPrefix = L'/';
     std::vector<SwitchEntry>   m_switches;
-    std::vector<HotkeyEntry>   m_hotkeys;
     std::vector<std::wstring>  m_formattedLines;
+    std::wstring               m_formattedText;
 };
 

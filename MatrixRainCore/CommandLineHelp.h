@@ -1,5 +1,6 @@
 #pragma once
 
+#include "HelpRainDialog.h"
 #include "UsageText.h"
 
 

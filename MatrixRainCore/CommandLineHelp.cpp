@@ -11,17 +11,24 @@
 //  CommandLineHelp::DisplayCommandLineHelp
 //
 //  Top-level orchestration for /? and -? help display.
-//  Shows a MessageBox with the formatted usage text.
+//  Creates a HelpRainDialog with matrix rain reveal animation.
 //
 ////////////////////////////////////////////////////////////////////////////////
 
 HRESULT CommandLineHelp::DisplayCommandLineHelp (wchar_t switchPrefix)
 {
+    HRESULT   hr = S_OK;
     UsageText usage (switchPrefix);
 
 
 
-    MessageBoxW (nullptr, usage.GetPlainText().c_str(), L"MatrixRain \u2014 Help", MB_OK | MB_ICONINFORMATION);
+    {
+        HelpRainDialog dialog (usage);
 
-    return S_OK;
+        hr = dialog.Show();
+        CHR (hr);
+    }
+
+Error:
+    return hr;
 }
