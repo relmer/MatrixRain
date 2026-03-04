@@ -10,5 +10,6 @@ enum class ScreenSaverMode
     ScreenSaverFull,
     ScreenSaverPreview,
     SettingsDialog,
-    PasswordChangeUnsupported
+    PasswordChangeUnsupported,
+    HelpRequested
 };

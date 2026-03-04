@@ -309,6 +309,8 @@
     <ClCompile Include="unit\ViewportTests.cpp" />
     <ClCompile Include="unit\TimerTests.cpp" />
     <ClCompile Include="unit\FPSCounterTests.cpp" />
+    <ClCompile Include="unit\UsageTextTests.cpp" />
+    <ClCompile Include="unit\HelpHintOverlayTests.cpp" />
     <ClCompile Include="integration\AnimationLoopTests.cpp" />
     <ClCompile Include="integration\DensityControlTests.cpp" />
     <ClCompile Include="integration\DisplayModeTests.cpp" />

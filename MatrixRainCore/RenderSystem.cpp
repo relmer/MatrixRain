@@ -2,8 +2,10 @@
 
 #include "RenderSystem.h"
 
+#include "CharacterConstants.h"
 #include "CharacterSet.h"
 #include "ColorScheme.h"
+#include "HelpHintOverlay.h"
 
 using Microsoft::WRL::ComPtr;
 
@@ -1217,7 +1219,7 @@ void RenderSystem::BuildCharacterInstanceData (const CharacterInstance & charact
 
 
 
-HRESULT RenderSystem::UpdateInstanceBuffer (const AnimationSystem& animationSystem, ColorScheme colorScheme, float elapsedTime)
+HRESULT RenderSystem::UpdateInstanceBuffer (const AnimationSystem& animationSystem, ColorScheme colorScheme, float elapsedTime, const D2D1_RECT_F * pOcclusionRect)
 {
     HRESULT                  hr             = S_OK;
     Color4                   schemeColor    = GetColorRGB (colorScheme, elapsedTime);
@@ -1247,6 +1249,19 @@ HRESULT RenderSystem::UpdateInstanceBuffer (const AnimationSystem& animationSyst
         // Render all characters (they manage their own fading/removal)
         for (const auto& character : characters)
         {
+            // Skip characters occluded by the help hint overlay
+            if (pOcclusionRect)
+            {
+                float charX = streakPos.x + character.positionOffset.x;
+                float charY = character.positionOffset.y;
+
+                if (charX >= pOcclusionRect->left && charX <= pOcclusionRect->right &&
+                    charY >= pOcclusionRect->top  && charY <= pOcclusionRect->bottom)
+                {
+                    continue;
+                }
+            }
+
             CharacterInstanceData data;
             BuildCharacterInstanceData (character, streakPos, schemeColor, data);
             m_instanceData.push_back (data);
@@ -1284,7 +1299,7 @@ Error:
 
 
 
-void RenderSystem::Render (const AnimationSystem & animationSystem, const Viewport & viewport, ColorScheme colorScheme, float fps, int rainPercentage, int streakCount, int activeHeadCount, bool showDebugFadeTimes, float elapsedTime)
+void RenderSystem::Render (const AnimationSystem & animationSystem, const Viewport & viewport, ColorScheme colorScheme, float fps, int rainPercentage, int streakCount, int activeHeadCount, bool showDebugFadeTimes, float elapsedTime, const HelpHintOverlay * pOverlay)
 {
     if (!m_device || !m_context || !m_renderTargetView)
     {
@@ -1328,8 +1343,17 @@ void RenderSystem::Render (const AnimationSystem & animationSystem, const Viewpo
         m_context->Unmap (m_constantBuffer.Get(), 0);
     }
 
-    // Update instance buffer with character data
-    (void) UpdateInstanceBuffer (animationSystem, colorScheme, elapsedTime);  // Ignore return - errors already handled within
+    // Update instance buffer with character data (pass occlusion rect if overlay active)
+    const D2D1_RECT_F * pOcclusionRect = nullptr;
+    D2D1_RECT_F         occlusionRect  = {};
+
+    if (pOverlay && pOverlay->IsActive())
+    {
+        occlusionRect  = pOverlay->GetBoundingRect();
+        pOcclusionRect = &occlusionRect;
+    }
+
+    (void) UpdateInstanceBuffer (animationSystem, colorScheme, elapsedTime, pOcclusionRect);  // Ignore return - errors already handled within
 
     // Count total characters to render
     size_t totalCharacters = 0;
@@ -1408,6 +1432,12 @@ void RenderSystem::Render (const AnimationSystem & animationSystem, const Viewpo
         // Fallback: render directly to backbuffer if bloom not available
         m_context->OMSetRenderTargets (1, m_renderTargetView.GetAddressOf(), nullptr);
         m_context->DrawInstanced (6, static_cast<UINT> (totalCharacters), 0, 0);
+    }
+
+    // Render help hint overlay if active (after bloom, before FPS counter)
+    if (pOverlay && pOverlay->IsActive())
+    {
+        RenderHelpHintOverlay (*pOverlay);
     }
 
     // Render FPS counter overlay if fps > 0
@@ -1503,6 +1533,153 @@ Error:
     if (drawing)
     {
         // End D2D rendering
+        m_d2dContext->EndDraw();
+    }
+
+    return;
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  RenderSystem::RenderHelpHintOverlay
+//
+//  Renders the help hint overlay using D2D/DirectWrite.
+//  Draws a feathered dark background, then each non-hidden character
+//  using the current glyph and opacity from the overlay state machine.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+void RenderSystem::RenderHelpHintOverlay (const HelpHintOverlay & overlay)
+{
+    HRESULT                   hr      = S_OK;
+    bool                      drawing = false;
+    std::span<const HintCharacter> chars;
+    int                       rows    = 0;
+    int                       cols    = 0;
+    D2D1_RECT_F               boundingRect = {};
+    std::vector<uint32_t>     allGlyphs;
+
+
+
+    CBRAEx (m_d2dContext && m_fpsBrush && m_fpsTextFormat && m_fpsGlowBrush && m_dwriteFactory, E_UNEXPECTED);
+
+    chars = overlay.GetCharacters();
+    rows  = overlay.GetRows();
+    cols  = overlay.GetCols();
+
+    BAIL_OUT_IF (chars.empty(), S_OK);
+
+    m_d2dContext->BeginDraw();
+    drawing = true;
+
+    //
+    // Get the bounding rect and draw a feathered dark background
+    //
+
+    boundingRect = overlay.GetBoundingRect();
+
+    {
+        const int   featherLayers = 12;
+        const float maxExpand     = 20.0f;
+
+        for (int i = featherLayers; i > 0; --i)
+        {
+            float expand  = maxExpand * (static_cast<float>(i) / static_cast<float>(featherLayers));
+            float opacity = 0.7f * (1.0f - (static_cast<float>(i) / static_cast<float>(featherLayers)));
+
+            D2D1_RECT_F expandedRect = D2D1::RectF (boundingRect.left   - expand,
+                                                      boundingRect.top    - expand,
+                                                      boundingRect.right  + expand,
+                                                      boundingRect.bottom + expand);
+
+            m_fpsGlowBrush->SetColor (D2D1::ColorF (D2D1::ColorF::Black, opacity));
+            m_d2dContext->FillRectangle (expandedRect, m_fpsGlowBrush.Get());
+        }
+
+        // Solid dark center
+        m_fpsGlowBrush->SetColor (D2D1::ColorF (D2D1::ColorF::Black, 0.7f));
+        m_d2dContext->FillRectangle (boundingRect, m_fpsGlowBrush.Get());
+    }
+
+    //
+    // Render each non-hidden character
+    //
+
+    {
+        static constexpr float CHAR_WIDTH  = 16.0f;
+        static constexpr float CHAR_HEIGHT = 28.0f;
+        static constexpr float PADDING     = 20.0f;
+
+        // Get the all-glyphs list for codepoint lookup
+        allGlyphs = CharacterConstants::GetAllCodepoints();
+
+        float baseX = boundingRect.left + PADDING;
+        float baseY = boundingRect.top  + PADDING;
+
+        for (const auto & ch : chars)
+        {
+            if (ch.isSpace || ch.phase == CharPhase::Hidden)
+            {
+                continue;
+            }
+
+            if (ch.opacity <= 0.01f)
+            {
+                continue;
+            }
+
+            // Get the codepoint for the current glyph
+            uint32_t codepoint = 0;
+
+            if (ch.currentGlyphIndex < allGlyphs.size())
+            {
+                codepoint = allGlyphs[ch.currentGlyphIndex];
+            }
+
+            // Convert codepoint to wchar_t string
+            wchar_t glyphStr[3] = {};
+            int     glyphLen    = 0;
+
+            if (codepoint <= 0xFFFF)
+            {
+                glyphStr[0] = static_cast<wchar_t>(codepoint);
+                glyphLen    = 1;
+            }
+            else
+            {
+                // UTF-16 surrogate pair
+                glyphStr[0] = static_cast<wchar_t>(0xD800 + ((codepoint - 0x10000) >> 10));
+                glyphStr[1] = static_cast<wchar_t>(0xDC00 + ((codepoint - 0x10000) & 0x3FF));
+                glyphLen    = 2;
+            }
+
+            // Calculate character position
+            float charX = baseX + ch.col * CHAR_WIDTH;
+            float charY = baseY + ch.row * CHAR_HEIGHT;
+
+            D2D1_RECT_F charRect = D2D1::RectF (charX, charY, charX + CHAR_WIDTH, charY + CHAR_HEIGHT);
+
+            // Draw with green color and the character's opacity
+            m_fpsBrush->SetColor (D2D1::ColorF (0.0f, 0.8f, 0.0f, ch.opacity));
+
+            m_d2dContext->DrawText (glyphStr,
+                                    static_cast<UINT32>(glyphLen),
+                                    m_fpsTextFormat.Get(),
+                                    charRect,
+                                    m_fpsBrush.Get());
+        }
+
+        // Reset brush color back to white for FPS counter
+        m_fpsBrush->SetColor (D2D1::ColorF (D2D1::ColorF::White, 1.0f));
+    }
+
+Error:
+    if (drawing)
+    {
         m_d2dContext->EndDraw();
     }
 

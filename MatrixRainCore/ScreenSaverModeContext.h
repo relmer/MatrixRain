@@ -15,5 +15,6 @@ struct ScreenSaverModeContext
     bool             m_exitOnInput       { false                   };
     bool             m_suppressDebug     { false                   };
     bool             m_spanAllDisplays   { false                   };
+    wchar_t          m_switchPrefix      { L'/'                    };
     std::wstring     m_errorMessage;
 };

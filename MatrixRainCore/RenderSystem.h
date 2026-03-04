@@ -21,6 +21,7 @@ using Microsoft::WRL::ComPtr;
 
 // Forward declarations
 class CharacterStreak;
+class HelpHintOverlay;
 
 /// <summary>
 /// Manages DirectX 11 rendering pipeline for Matrix Rain effect.
@@ -52,7 +53,7 @@ public:
     /// <param name="activeHeadCount">Current number of active streak heads on screen</param>
     /// <param name="showDebugFadeTimes">True to show debug fade time overlay</param>
     /// <param name="elapsedTime">Elapsed time in seconds for color cycling</param>
-    void Render (const AnimationSystem & animationSystem, const Viewport & viewport, ColorScheme colorScheme = ColorScheme::Green, float fps = 0.0f, int rainPercentage = 0, int streakCount = 0, int activeHeadCount = 0, bool showDebugFadeTimes = false, float elapsedTime = 0.0f);
+    void Render (const AnimationSystem & animationSystem, const Viewport & viewport, ColorScheme colorScheme = ColorScheme::Green, float fps = 0.0f, int rainPercentage = 0, int streakCount = 0, int activeHeadCount = 0, bool showDebugFadeTimes = false, float elapsedTime = 0.0f, const HelpHintOverlay * pOverlay = nullptr);
 
     /// <summary>
     /// Present the rendered frame to the screen.
@@ -171,9 +172,10 @@ private:
 
     // Rendering helpers
     void    SortStreaksByDepth       (std::vector<const CharacterStreak *> & streaks);
-    HRESULT UpdateInstanceBuffer     (const AnimationSystem & animationSystem, ColorScheme colorScheme, float elapsedTime);
+    HRESULT UpdateInstanceBuffer     (const AnimationSystem & animationSystem, ColorScheme colorScheme, float elapsedTime, const D2D1_RECT_F * pOcclusionRect = nullptr);
     void    ClearRenderTarget();
     void    RenderFPSCounter         (float fps, int rainPercentage, int streakCount, int activeHeadCount);
+    void    RenderHelpHintOverlay    (const HelpHintOverlay & overlay);
     void    DrawFeatheredGlow        (const wchar_t * fpsText, UINT32 textLength, const D2D1_RECT_F & textRect);
     void    RenderDebugFadeTimes     (const AnimationSystem & animationSystem);
     HRESULT ApplyBloom();

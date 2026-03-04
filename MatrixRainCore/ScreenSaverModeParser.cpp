@@ -70,6 +70,12 @@ static void SetContextFlagsFromMode (ScreenSaverModeContext & context, HWND hwnd
             context.m_exitOnInput   = false;
             break;
 
+        case ScreenSaverMode::HelpRequested:
+            context.m_enableHotkeys = false;
+            context.m_hideCursor    = false;
+            context.m_exitOnInput   = false;
+            break;
+
         case ScreenSaverMode::Normal:
         default:
             // Fallback to Normal mode on unexpected value
@@ -114,6 +120,9 @@ HRESULT ParseCommandLine (LPCWSTR pszCommandLine, ScreenSaverModeContext & conte
     hasSwitch = (*pszCommandLine == L'/' || *pszCommandLine == L'-');
     BAIL_OUT_IF (!hasSwitch, S_OK);
 
+    // Remember which prefix the user used
+    context.m_switchPrefix = *pszCommandLine;
+
     // Skip the / or - prefix
     pszCommandLine++;
 
@@ -153,6 +162,10 @@ HRESULT ParseCommandLine (LPCWSTR pszCommandLine, ScreenSaverModeContext & conte
 
         case L'a':  // /a - Password change (unsupported)
             context.m_mode = ScreenSaverMode::PasswordChangeUnsupported;
+            break;
+
+        case L'?':  // /? or -? - Display help
+            context.m_mode = ScreenSaverMode::HelpRequested;
             break;
 
         default:  // Unknown argument - return error

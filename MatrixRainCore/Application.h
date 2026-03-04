@@ -12,6 +12,7 @@ class DensityController;
 class InputSystem;
 class ApplicationState;
 class FPSCounter;
+class HelpHintOverlay;
 struct ScreenSaverModeContext;
 
 
@@ -31,8 +32,15 @@ public:
 
     // Accessors for live overlay configuration dialog
     HWND               GetMainWindowHwnd()   const                { return m_hwnd;                   }
+    HINSTANCE          GetInstance()          const                { return m_hInstance;              }
     ApplicationState * GetApplicationState() const                { return m_appState.get();         }
     void               SetConfigDialog       (HWND hConfigDialog) { m_hConfigDialog = hConfigDialog; }
+    
+    // Callback for opening config dialog from Enter key (set by main.cpp)
+    void               SetOpenConfigDialogCallback (std::function<void()> callback) { m_openConfigDialogCallback = callback; }
+    
+    // Callback for showing usage dialog from ? key (set by main.cpp)
+    void               SetShowUsageDialogCallback (std::function<void()> callback)  { m_showUsageDialogCallback = callback; }
     
     // Apply display mode change and resize window
     void               ApplyDisplayModeChange()                   { ResizeWindowForCurrentMode();    }
@@ -52,6 +60,7 @@ private:
     std::unique_ptr<InputSystem>       m_inputSystem;
     std::unique_ptr<ApplicationState>  m_appState;
     std::unique_ptr<FPSCounter>        m_fpsCounter;
+    std::unique_ptr<HelpHintOverlay>   m_helpHintOverlay;
 
     // Win32 window
     HWND      m_hwnd                    { nullptr };
@@ -62,6 +71,12 @@ private:
     
     // Live overlay configuration dialog (modeless)
     HWND      m_hConfigDialog           { nullptr };
+    
+    // Callback for opening config dialog from Enter key
+    std::function<void()> m_openConfigDialogCallback;
+    
+    // Callback for showing usage dialog from ? key
+    std::function<void()> m_showUsageDialogCallback;
     
     // Screensaver mode
     const ScreenSaverModeContext * m_pScreenSaverContext { nullptr };

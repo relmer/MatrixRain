@@ -3,6 +3,7 @@
 #include "Application.h"
 #include "AnimationSystem.h"
 #include "ApplicationState.h"
+#include "HelpHintOverlay.h"
 #include "RenderSystem.h"
 #include "Viewport.h"
 #include "Timer.h"
@@ -53,6 +54,7 @@ HRESULT Application::Initialize (HINSTANCE hInstance, int nCmdShow, const Screen
     m_renderSystem      = std::make_unique<RenderSystem>();
     m_inputSystem       = std::make_unique<InputSystem>();
     m_fpsCounter        = std::make_unique<FPSCounter>();
+    m_helpHintOverlay   = std::make_unique<HelpHintOverlay>();
     m_timer             = std::make_unique<Timer>();
 
 
@@ -72,6 +74,13 @@ HRESULT Application::Initialize (HINSTANCE hInstance, int nCmdShow, const Screen
 
 
     m_isRunning = true;
+
+    // Show help hint overlay in Normal mode only
+    if (m_appState->GetHelpHintEnabled() && m_helpHintOverlay)
+    {
+        m_helpHintOverlay->UpdateLayout (static_cast<float>(m_viewport->GetWidth()), static_cast<float>(m_viewport->GetHeight()));
+        m_helpHintOverlay->Show();
+    }
 
 
     
@@ -295,6 +304,11 @@ void Application::Update (float deltaTime)
     {
         m_animationSystem->Update (deltaTime);
     }
+
+    if (m_helpHintOverlay && m_helpHintOverlay->IsActive())
+    {
+        m_helpHintOverlay->Update (deltaTime);
+    }
 }
 
 
@@ -409,7 +423,10 @@ void Application::Render()
         bool        showDebugFadeTimes = m_appState->GetShowDebugFadeTimes();
         float       elapsedTime        = m_appState->GetElapsedTime();
         
-        m_renderSystem->Render (*m_animationSystem, *m_viewport, scheme, fps, rainPercentage, streakCount, activeHeadCount, showDebugFadeTimes, elapsedTime);
+        // Pass overlay pointer to render system for rendering + occlusion
+        const HelpHintOverlay * pOverlay = (m_helpHintOverlay && m_helpHintOverlay->IsActive()) ? m_helpHintOverlay.get() : nullptr;
+        
+        m_renderSystem->Render (*m_animationSystem, *m_viewport, scheme, fps, rainPercentage, streakCount, activeHeadCount, showDebugFadeTimes, elapsedTime, pOverlay);
         m_renderSystem->Present();
     }
 }
@@ -556,30 +573,80 @@ void Application::OnKeyDown (WPARAM wParam)
         return;
     }
 
+    //
+    // Determine if this key is a recognized hotkey
+    //
+
+    bool isRecognized = false;
+
     if (wParam == VK_ESCAPE || ShouldExitScreenSaverOnKey (wParam))
     {
         // ESC key pressed - exit application
         PostQuitMessage (0);
+        isRecognized = true;
     }
     else if (wParam == VK_SPACE)
     {
         // Spacebar pressed - toggle pause
         m_isPaused = !m_isPaused;
+        isRecognized = true;
     }
     else if (wParam == 'C' && m_appState)
     {
         // C key pressed - cycle color scheme
         m_appState->CycleColorScheme();
+        isRecognized = true;
     }
     else if (wParam == 'S' && m_appState)
     {
         // S key pressed - toggle statistics display
         m_appState->ToggleStatistics();
+        isRecognized = true;
     }
-    else if (m_inputSystem)
+    else if (wParam == VK_ADD || wParam == VK_OEM_PLUS ||
+             wParam == VK_SUBTRACT || wParam == VK_OEM_MINUS ||
+             wParam == VK_OEM_3)
     {
-        // Process density control keys (+/- on both numpad and main keyboard)
-        m_inputSystem->ProcessKeyDown (static_cast<int> (wParam));
+        // Density +/- or backtick — process via InputSystem
+        if (m_inputSystem)
+        {
+            m_inputSystem->ProcessKeyDown (static_cast<int> (wParam));
+        }
+        isRecognized = true;
+    }
+    else if (wParam == VK_RETURN)
+    {
+        // Enter key — open config dialog as live overlay (guard against opening twice)
+        if (!m_hConfigDialog && m_openConfigDialogCallback)
+        {
+            m_openConfigDialogCallback();
+        }
+        isRecognized = true;
+    }
+    else if (wParam == VK_OEM_2 && (GetAsyncKeyState (VK_SHIFT) & 0x8000))
+    {
+        // ? key (Shift + /) — show usage dialog
+        if (m_showUsageDialogCallback)
+        {
+            m_showUsageDialogCallback();
+        }
+        isRecognized = true;
+    }
+
+    //
+    // Help hint overlay: dismiss on recognized key, show on unrecognized
+    //
+
+    if (m_helpHintOverlay && m_appState && m_appState->GetHelpHintEnabled())
+    {
+        if (isRecognized)
+        {
+            m_helpHintOverlay->Dismiss();
+        }
+        else
+        {
+            m_helpHintOverlay->Show();
+        }
     }
 }
 
@@ -606,6 +673,12 @@ void Application::OnSysKeyDown (WPARAM wParam)
             m_appState->ToggleDisplayMode();
             ResizeWindowForCurrentMode();
             m_inDisplayModeTransition = false;
+        }
+
+        // Dismiss help hint on Alt+Enter (recognized hotkey)
+        if (m_helpHintOverlay && m_appState && m_appState->GetHelpHintEnabled())
+        {
+            m_helpHintOverlay->Dismiss();
         }
     }
 }
@@ -660,6 +733,11 @@ void Application::OnSize (LPARAM lParam)
     {
         m_renderSystem->Resize (width, height);
         m_viewport->Resize (static_cast<float> (width), static_cast<float> (height));
+
+        if (m_helpHintOverlay)
+        {
+            m_helpHintOverlay->UpdateLayout (static_cast<float>(width), static_cast<float>(height));
+        }
     }
 }
 

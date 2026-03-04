@@ -31,6 +31,9 @@ void ApplicationState::Initialize (const ScreenSaverModeContext * pScreenSaverCo
     m_showDebugFadeTimes = isPreviewOrScreenSaver ? false : m_settings.m_showFadeTimers;
     m_showStatistics     = isPreviewOrScreenSaver ? false : m_settings.m_showDebugStats;
     
+    // Help hint enabled only in Normal mode (no screensaver arguments)
+    m_helpHintEnabled = (!pScreenSaverContext || pScreenSaverContext->m_mode == ScreenSaverMode::Normal);
+    
     // Map color scheme key to enum
     m_colorScheme = ParseColorSchemeKey (m_settings.m_colorSchemeKey);
 }
