@@ -22,8 +22,15 @@ namespace CharacterConstants
     // Numerals (0-9): 10 characters
     extern const uint32_t NUMERAL_CODEPOINTS[];
 
+    // Half-width Katakana (U+FF65-U+FF9F): single-column-width characters
+    extern const uint32_t HALFWIDTH_KATAKANA_CODEPOINTS[];
+    extern const size_t   HALFWIDTH_KATAKANA_COUNT;
+
     // Get all codepoints in a single vector (132 total)
     std::vector<uint32_t> GetAllCodepoints();
+
+    // Get codepoints suitable for console rendering (single-width only)
+    std::vector<uint32_t> GetConsoleCodepoints();
 }
 
 

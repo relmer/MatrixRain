@@ -162,6 +162,74 @@ namespace CharacterConstants
     };
     constexpr size_t NUMERAL_COUNT = sizeof(NUMERAL_CODEPOINTS) / sizeof(NUMERAL_CODEPOINTS[0]);
 
+    // Half-width Katakana (U+FF65-U+FF9F): single-column-width in terminals
+    // These are the characters actually used in the Matrix films
+    const uint32_t HALFWIDTH_KATAKANA_CODEPOINTS[] = {
+        0xFF66, // ヲ Wo
+        0xFF67, // ァ Small A
+        0xFF68, // ィ Small I
+        0xFF69, // ゥ Small U
+        0xFF6A, // ェ Small E
+        0xFF6B, // ォ Small O
+        0xFF6C, // ャ Small Ya
+        0xFF6D, // ュ Small Yu
+        0xFF6E, // ョ Small Yo
+        0xFF6F, // ッ Small Tsu
+        0xFF70, // ー Prolonged Sound Mark
+        0xFF71, // ア A
+        0xFF72, // イ I
+        0xFF73, // ウ U
+        0xFF74, // エ E
+        0xFF75, // オ O
+        0xFF76, // カ Ka
+        0xFF77, // キ Ki
+        0xFF78, // ク Ku
+        0xFF79, // ケ Ke
+        0xFF7A, // コ Ko
+        0xFF7B, // サ Sa
+        0xFF7C, // シ Shi
+        0xFF7D, // ス Su
+        0xFF7E, // セ Se
+        0xFF7F, // ソ So
+        0xFF80, // タ Ta
+        0xFF81, // チ Chi
+        0xFF82, // ツ Tsu
+        0xFF83, // テ Te
+        0xFF84, // ト To
+        0xFF85, // ナ Na
+        0xFF86, // ニ Ni
+        0xFF87, // ヌ Nu
+        0xFF88, // ネ Ne
+        0xFF89, // ノ No
+        0xFF8A, // ハ Ha
+        0xFF8B, // ヒ Hi
+        0xFF8C, // フ Fu
+        0xFF8D, // ヘ He
+        0xFF8E, // ホ Ho
+        0xFF8F, // マ Ma
+        0xFF90, // ミ Mi
+        0xFF91, // ム Mu
+        0xFF92, // メ Me
+        0xFF93, // モ Mo
+        0xFF94, // ヤ Ya
+        0xFF95, // ユ Yu
+        0xFF96, // ヨ Yo
+        0xFF97, // ラ Ra
+        0xFF98, // リ Ri
+        0xFF99, // ル Ru
+        0xFF9A, // レ Re
+        0xFF9B, // ロ Ro
+        0xFF9C, // ワ Wa
+        0xFF9D, // ン N
+        0xFF9E, // ゙ Voiced Sound Mark
+        0xFF9F  // ゚ Semi-Voiced Sound Mark
+    };
+    const size_t HALFWIDTH_KATAKANA_COUNT = sizeof(HALFWIDTH_KATAKANA_CODEPOINTS) / sizeof(HALFWIDTH_KATAKANA_CODEPOINTS[0]);
+
+
+
+
+
     // Total: 72 + 26 + 26 + 10 = 134 unique characters
     // With mirroring, the texture atlas will contain 134 * 2 = 268 glyphs
 
@@ -196,5 +264,48 @@ namespace CharacterConstants
         }
 
         return allCodepoints;
+    }
+
+
+
+
+
+    ////////////////////////////////////////////////////////////////////////////////
+    //
+    //  GetConsoleCodepoints
+    //
+    //  Returns codepoints suitable for console/terminal rendering.
+    //  Uses half-width Katakana (U+FF66-U+FF9F) instead of full-width,
+    //  because full-width Katakana occupy 2 columns in terminals and
+    //  corrupt the character grid.
+    //
+    ////////////////////////////////////////////////////////////////////////////////
+
+    std::vector<uint32_t> GetConsoleCodepoints()
+    {
+        std::vector<uint32_t> codepoints;
+        codepoints.reserve(HALFWIDTH_KATAKANA_COUNT + LATIN_UPPERCASE_COUNT + LATIN_LOWERCASE_COUNT + NUMERAL_COUNT);
+
+        for (uint32_t cp : HALFWIDTH_KATAKANA_CODEPOINTS)
+        {
+            codepoints.push_back(cp);
+        }
+
+        for (uint32_t cp : LATIN_UPPERCASE_CODEPOINTS)
+        {
+            codepoints.push_back(cp);
+        }
+
+        for (uint32_t cp : LATIN_LOWERCASE_CODEPOINTS)
+        {
+            codepoints.push_back(cp);
+        }
+
+        for (uint32_t cp : NUMERAL_CODEPOINTS)
+        {
+            codepoints.push_back(cp);
+        }
+
+        return codepoints;
     }
 }
