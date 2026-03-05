@@ -7,7 +7,9 @@ param(
     [string]$Configuration = 'Debug',
 
     [ValidateSet('x64', 'ARM64', 'Auto')]
-    [string]$Platform = 'Auto'
+    [string]$Platform = 'Auto',
+
+    [switch]$SkipVersionIncrement
 )
 
 # Resolve 'Auto' platform to actual architecture
@@ -196,6 +198,10 @@ try {
                     $msbuildArgs += "-p:PreferredToolArchitecture=arm64"
                 }
 
+                if ($SkipVersionIncrement) {
+                    $msbuildArgs += '-p:PreBuildEventUseInBuild=false'
+                }
+
                 Write-Host "Using MSBuild: $msbuildPath"
                 Write-Host "Building: $solutionPath ($configToBuild|$platformToBuild) Target=$msbuildTarget"
 
@@ -258,6 +264,10 @@ try {
 
         if ($Target -ne 'Build') {
             $msbuildArgs += "-t:$Target"
+        }
+
+        if ($SkipVersionIncrement) {
+            $msbuildArgs += '-p:PreBuildEventUseInBuild=false'
         }
 
         Write-Host "Using MSBuild: $msbuildPath"

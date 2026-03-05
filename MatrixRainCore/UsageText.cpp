@@ -21,16 +21,14 @@ UsageText::UsageText (wchar_t switchPrefix) :
     m_switchPrefix (switchPrefix)
 {
     //
-    // Populate switch table — general options first, then screensaver options
+    // Populate switch table — general options only (screensaver options not
+    // shown; they're internal Windows screensaver protocol, not for users)
     //
 
     m_switches =
     {
-        { L'c', L"",       L"Show settings dialog",                         false },
-        { L'?', L"",       L"Display this help message",                    false },
-        { L's', L"",       L"Run as full-screen screensaver",               true  },
-        { L'p', L"<HWND>", L"Preview in the specified window",              true  },
-        { L'a', L"",       L"Password change (unsupported, exits quietly)", true  },
+        { L'c', L"", L"Show settings dialog"      },
+        { L'?', L"", L"Display this help message"  },
     };
 
     BuildFormattedLines();
@@ -44,8 +42,8 @@ UsageText::UsageText (wchar_t switchPrefix) :
 //
 //  UsageText::BuildFormattedLines
 //
-//  Formats the usage text into section-grouped display-ready lines.
-//  Splits switches into "Options:" and "Screensaver Options:" sections.
+//  Formats the usage text into display-ready lines with version, copyright,
+//  and command-line switch descriptions.
 //
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -54,10 +52,18 @@ void UsageText::BuildFormattedLines ()
     m_formattedLines.clear();
 
     //
-    // Header
+    // Header — version, architecture, build timestamp, copyright
     //
 
-    m_formattedLines.push_back (std::format (L"MatrixRain v{}.{}.{}", VERSION_MAJOR, VERSION_MINOR, VERSION_BUILD));
+    std::wstring buildTimestamp = VERSION_BUILD_TIMESTAMP;
+
+    m_formattedLines.push_back (std::format (L"MatrixRain v{} {} ({})",
+                                             VERSION_WSTRING,
+                                             VERSION_ARCH_WSTRING,
+                                             buildTimestamp));
+    m_formattedLines.push_back (std::format (L"Copyright {} 2024-{} by Robert Elmer",
+                                             UnicodeSymbols::Copyright,
+                                             VERSION_YEAR_WSTRING));
     m_formattedLines.push_back (L"");
 
     //
@@ -68,50 +74,13 @@ void UsageText::BuildFormattedLines ()
     m_formattedLines.push_back (L"");
 
     //
-    // Options section (non-screensaver switches)
+    // Options section
     //
 
     m_formattedLines.push_back (L"Options:");
 
     for (const auto & sw : m_switches)
     {
-        if (sw.isScreensaverOption)
-        {
-            continue;
-        }
-
-        std::wstring switchStr = std::format (L"  {}{}", m_switchPrefix, sw.switchChar);
-
-        if (!sw.argument.empty())
-        {
-            switchStr += L" " + sw.argument;
-        }
-
-        while (switchStr.size() < 18)
-        {
-            switchStr += L' ';
-        }
-
-        switchStr += UnicodeSymbols::EmDash;
-        switchStr += L" ";
-        switchStr += sw.description;
-        m_formattedLines.push_back (switchStr);
-    }
-
-    //
-    // Screensaver Options section
-    //
-
-    m_formattedLines.push_back (L"");
-    m_formattedLines.push_back (L"Screensaver Options:");
-
-    for (const auto & sw : m_switches)
-    {
-        if (!sw.isScreensaverOption)
-        {
-            continue;
-        }
-
         std::wstring switchStr = std::format (L"  {}{}", m_switchPrefix, sw.switchChar);
 
         if (!sw.argument.empty())

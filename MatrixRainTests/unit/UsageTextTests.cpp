@@ -35,25 +35,16 @@ namespace MatrixRainTests
                 Assert::IsFalse (lines.empty(), L"Should have formatted lines");
 
                 // Verify switches use / prefix
-                bool foundSlashS = false;
-                bool foundSlashP = false;
                 bool foundSlashC = false;
-                bool foundSlashA = false;
                 bool foundSlashQ = false;
 
                 for (const auto & line : lines)
                 {
-                    if (line.find (L"/s") != std::wstring::npos) foundSlashS = true;
-                    if (line.find (L"/p") != std::wstring::npos) foundSlashP = true;
                     if (line.find (L"/c") != std::wstring::npos) foundSlashC = true;
-                    if (line.find (L"/a") != std::wstring::npos) foundSlashA = true;
                     if (line.find (L"/?") != std::wstring::npos) foundSlashQ = true;
                 }
 
-                Assert::IsTrue (foundSlashS, L"Should contain /s switch");
-                Assert::IsTrue (foundSlashP, L"Should contain /p switch");
                 Assert::IsTrue (foundSlashC, L"Should contain /c switch");
-                Assert::IsTrue (foundSlashA, L"Should contain /a switch");
                 Assert::IsTrue (foundSlashQ, L"Should contain /? switch");
             }
 
@@ -87,20 +78,17 @@ namespace MatrixRainTests
 
                 Assert::IsFalse (lines.empty(), L"Should have formatted lines");
 
-                bool foundDashS = false;
-                bool foundDashP = false;
                 bool foundDashC = false;
+                bool foundDashQ = false;
 
                 for (const auto & line : lines)
                 {
-                    if (line.find (L"-s") != std::wstring::npos) foundDashS = true;
-                    if (line.find (L"-p") != std::wstring::npos) foundDashP = true;
                     if (line.find (L"-c") != std::wstring::npos) foundDashC = true;
+                    if (line.find (L"-?") != std::wstring::npos) foundDashQ = true;
                 }
 
-                Assert::IsTrue (foundDashS, L"Should contain -s switch");
-                Assert::IsTrue (foundDashP, L"Should contain -p switch");
                 Assert::IsTrue (foundDashC, L"Should contain -c switch");
+                Assert::IsTrue (foundDashQ, L"Should contain -? switch");
             }
 
 
@@ -205,7 +193,7 @@ namespace MatrixRainTests
 
 
 
-            TEST_METHOD (GetFormattedText_ContainsScreensaverOptionsSectionHeader)
+            TEST_METHOD (GetFormattedText_DoesNotContainScreensaverOptions)
             {
                 UsageText usage (L'/');
 
@@ -214,77 +202,67 @@ namespace MatrixRainTests
 
 
 
-                Assert::IsTrue (text.find (L"Screensaver Options:") != std::wstring::npos,
-                                L"Should contain 'Screensaver Options:' section header");
+                Assert::IsTrue (text.find (L"Screensaver Options:") == std::wstring::npos,
+                                L"Should not contain 'Screensaver Options:' header");
+                Assert::IsTrue (text.find (L"/s") == std::wstring::npos,
+                                L"Should not contain /s switch");
+                Assert::IsTrue (text.find (L"/p") == std::wstring::npos,
+                                L"Should not contain /p switch");
+                Assert::IsTrue (text.find (L"/a") == std::wstring::npos,
+                                L"Should not contain /a switch");
             }
 
 
 
 
-            TEST_METHOD (GetFormattedText_OptionsSectionBeforeScreensaverSection)
+            TEST_METHOD (GetFormattedText_ContainsVersionString)
             {
                 UsageText usage (L'/');
 
 
                 const std::wstring & text = usage.GetFormattedText();
 
-                auto optionsPos    = text.find (L"Options:");
-                auto screensaverPos = text.find (L"Screensaver Options:");
 
 
-
-                Assert::IsTrue (optionsPos != std::wstring::npos, L"Should contain Options:");
-                Assert::IsTrue (screensaverPos != std::wstring::npos, L"Should contain Screensaver Options:");
-                Assert::IsTrue (optionsPos < screensaverPos, L"Options: should appear before Screensaver Options:");
+                Assert::IsTrue (text.find (L"MatrixRain v") != std::wstring::npos,
+                                L"Should contain version header");
             }
 
 
 
 
-            TEST_METHOD (GetFormattedText_GeneralSwitchesInOptionsSection)
+            TEST_METHOD (GetFormattedText_ContainsCopyrightLine)
             {
                 UsageText usage (L'/');
 
 
                 const std::wstring & text = usage.GetFormattedText();
 
-                auto optionsPos     = text.find (L"Options:");
-                auto screensaverPos = text.find (L"Screensaver Options:");
-
-                // /c and /? should appear between Options: and Screensaver Options:
-                auto slashC = text.find (L"/c");
-                auto slashQ = text.find (L"/?");
 
 
-
-                Assert::IsTrue (slashC > optionsPos && slashC < screensaverPos,
-                                L"/c should be in the Options section");
-                Assert::IsTrue (slashQ > optionsPos && slashQ < screensaverPos,
-                                L"/? should be in the Options section");
+                Assert::IsTrue (text.find (L"Copyright") != std::wstring::npos,
+                                L"Should contain copyright text");
+                Assert::IsTrue (text.find (L"Robert Elmer") != std::wstring::npos,
+                                L"Should contain author name");
             }
 
 
 
 
-            TEST_METHOD (GetFormattedText_ScreensaverSwitchesInScreensaverSection)
+            TEST_METHOD (GetFormattedText_ContainsArchitecture)
             {
                 UsageText usage (L'/');
 
 
                 const std::wstring & text = usage.GetFormattedText();
 
-                auto screensaverPos = text.find (L"Screensaver Options:");
-
-                // /s, /p, /a should appear after Screensaver Options:
-                auto slashS = text.find (L"/s");
-                auto slashP = text.find (L"/p");
-                auto slashA = text.find (L"/a");
+                // Should contain either x64 or ARM64
+                bool hasArch = (text.find (L"x64") != std::wstring::npos) ||
+                               (text.find (L"ARM64") != std::wstring::npos);
 
 
 
-                Assert::IsTrue (slashS > screensaverPos, L"/s should be in the Screensaver Options section");
-                Assert::IsTrue (slashP > screensaverPos, L"/p should be in the Screensaver Options section");
-                Assert::IsTrue (slashA > screensaverPos, L"/a should be in the Screensaver Options section");
+                Assert::IsTrue (hasArch, L"Should contain architecture string (x64 or ARM64)");
             }
 
 

@@ -9,7 +9,6 @@ struct SwitchEntry
     wchar_t      switchChar;
     std::wstring argument;
     std::wstring description;
-    bool         isScreensaverOption = false;
 };
 
 
