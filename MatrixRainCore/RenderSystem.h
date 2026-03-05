@@ -107,9 +107,19 @@ public:
     /// <param name="sizePercent">Glow size percentage (100 = default)</param>
     void SetGlowSize (int sizePercent);
 
+    /// <summary>
+    /// Override character scale to prevent viewport-based scaling.
+    /// When set, the constant buffer characterScale uses this value
+    /// instead of computing from viewport height.
+    /// </summary>
+    /// <param name="scale">Fixed character scale (1.0 = full size)</param>
+    void SetCharacterScaleOverride (float scale);
+
     // Accessors
-    ID3D11Device        * GetDevice()  const { return m_device.Get();  }
-    ID3D11DeviceContext * GetContext() const { return m_context.Get(); }
+    ID3D11Device        * GetDevice()       const { return m_device.Get();       }
+    ID3D11DeviceContext * GetContext()      const { return m_context.Get();      }
+    ID2D1DeviceContext  * GetD2DContext()   const { return m_d2dContext.Get();   }
+    IDWriteFactory      * GetDWriteFactory() const { return m_dwriteFactory.Get(); }
 
     // Internal data structures (public for static helper function access)
     /// <summary>
@@ -260,6 +270,9 @@ private:
     // Glow effect parameters
     float m_glowIntensity { 2.5f };  // Bloom intensity multiplier (100% = 2.5)
     float m_glowSize      { 1.0f };  // Blur radius multiplier (100% = 1.0)
+
+    // Character scale override (bypasses viewport-based scaling when set)
+    std::optional<float> m_characterScaleOverride;
 
     // Per-frame working data (reused to avoid allocations)
     std::vector<CharacterInstanceData>   m_instanceData;

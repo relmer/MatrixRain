@@ -358,6 +358,25 @@ void AnimationSystem::SetAnimationSpeed (int speedPercent)
 
 
 
+////////////////////////////////////////////////////////////////////////////////
+//
+//  AnimationSystem::SetCharacterSpacingOverride
+//
+//  Overrides the viewport-based character spacing calculation.
+//  Used by HelpRainDialog to force full-size rain characters in its
+//  smaller window.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+void AnimationSystem::SetCharacterSpacingOverride (float spacing)
+{
+    m_characterSpacingOverride = spacing;
+}
+
+
+
+
+
 float AnimationSystem::CalculateCharacterSpacing() const
 {
     constexpr float BASE_SPACING     = 32.0f;
@@ -367,6 +386,12 @@ float AnimationSystem::CalculateCharacterSpacing() const
     float viewportHeight = 0.0f;
 
 
+
+    // Use override if set (bypasses viewport-based scaling)
+    if (m_characterSpacingOverride.has_value())
+    {
+        return m_characterSpacingOverride.value();
+    }
 
     if (!m_viewport)
     {

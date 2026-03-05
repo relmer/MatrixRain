@@ -90,6 +90,14 @@ public:
     /// <param name="speedPercent">Animation speed percentage (1-100)</param>
     void SetAnimationSpeed (int speedPercent);
 
+    /// <summary>
+    /// Override character spacing to prevent viewport-based scaling.
+    /// When set, CalculateCharacterSpacing() returns this value instead
+    /// of computing from viewport height.
+    /// </summary>
+    /// <param name="spacing">Fixed character spacing in pixels</param>
+    void SetCharacterSpacingOverride (float spacing);
+
     // Accessors
     const std::vector<CharacterStreak> & GetStreaks()            const { return m_streaks;        }
     size_t                               GetActiveStreakCount()  const { return m_streaks.size(); }
@@ -109,6 +117,7 @@ private:
     float                          m_spawnInterval         = SPAWN_INTERVAL; // Time between automatic spawns
     int                            m_previousTargetCount   = 0;            // Previous frame's target count (to detect density changes)
     int                            m_animationSpeedPercent = 100;        // Current animation speed percentage (1-100)
+    std::optional<float>           m_characterSpacingOverride;            // Override for character spacing (bypasses viewport scaling)
     
     // Random number generation
     std::random_device             m_randomDevice;

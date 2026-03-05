@@ -1,7 +1,13 @@
 #pragma once
 
+#include "AnimationSystem.h"
 #include "CharacterConstants.h"
+#include "ColorScheme.h"
+#include "DensityController.h"
+#include "RenderSystem.h"
+#include "ScreenSaverSettings.h"
 #include "UsageText.h"
+#include "Viewport.h"
 
 using Microsoft::WRL::ComPtr;
 
@@ -40,49 +46,15 @@ struct CharPosition
 
 
 ////////////////////////////////////////////////////////////////////////////////
-//  RevealStreak — A short streak spawned to reveal a specific character
-////////////////////////////////////////////////////////////////////////////////
-
-struct RevealStreak
-{
-    size_t               targetCharIndex = 0;
-    float                pixelX          = 0.0f;
-    float                headPixelY      = 0.0f;
-    float                targetPixelY    = 0.0f;
-    float                speed           = 0.0f;
-    int                  leadCells       = 4;
-    int                  trailCells      = 3;
-    std::vector<size_t>  glyphIndices;
-    bool                 revealed        = false;
-};
-
-
-
-
-
-////////////////////////////////////////////////////////////////////////////////
-//  DecorativeStreak — An ambient rain streak for visual atmosphere
-////////////////////////////////////////////////////////////////////////////////
-
-struct DecorativeStreak
-{
-    float                pixelX      = 0.0f;
-    float                headPixelY  = 0.0f;
-    int                  trailLength = 7;
-    float                speed       = 0.0f;
-    std::vector<size_t>  glyphIndices;
-};
-
-
-
-
-
-////////////////////////////////////////////////////////////////////////////////
 //  HelpRainDialog — Custom graphical window with matrix rain reveal animation
 //
-//  Displays command-line switches (Options + Screensaver Options) via a
-//  two-phase GPU-rendered matrix rain animation. Phase 1 reveals text through
-//  per-character rain streaks. Phase 2 continues ambient decorative rain.
+//  Displays command-line switches via a two-phase GPU-rendered matrix rain
+//  animation.  Phase 1 reveals text through dense rain that sweeps downward,
+//  revealing characters as the front passes.  Phase 2 continues ambient rain
+//  at the user's configured density/speed.
+//
+//  Owns a full RenderSystem + AnimationSystem for GPU-rendered rain with bloom.
+//  D2D text overlay renders the revealed usage text on top of the rain.
 //
 //  Used by /? and -? invocation only — the ? key uses an in-app overlay.
 ////////////////////////////////////////////////////////////////////////////////
@@ -99,15 +71,12 @@ public:
 
 
     // Queries
-    bool                                       IsRevealComplete ()       const;
-    AnimationPhase                             GetAnimationPhase ()      const { return m_animationPhase;      }
-    const std::vector<CharPosition>          & GetCharacterPositions ()  const { return m_characterPositions;  }
-    const std::vector<bool>                  & GetRevealedFlags ()       const { return m_revealedFlags;       }
-    const std::vector<size_t>                & GetRevealQueue ()         const { return m_revealQueue;         }
-    size_t                                     GetRevealQueueIndex ()    const { return m_revealQueueIndex;    }
-    const std::vector<RevealStreak>          & GetActiveRevealStreaks () const { return m_activeRevealStreaks;  }
-    const std::vector<DecorativeStreak>      & GetDecorativeStreaks ()   const { return m_decorativeStreaks;    }
-    float                                      GetRevealSpawnRate ()     const { return m_revealSpawnRate;     }
+    bool                                  IsRevealComplete ()       const;
+    AnimationPhase                        GetAnimationPhase ()      const { return m_animationPhase;      }
+    const std::vector<CharPosition>     & GetCharacterPositions ()  const { return m_characterPositions;  }
+    const std::vector<float>            & GetRevealedFlags ()       const { return m_revealedFlags;       }
+    float                                 GetRevealFrontY ()        const { return m_revealFrontY;        }
+    const AnimationSystem               * GetAnimationSystem ()     const { return m_animationSystem.get(); }
 
 
     // Internal sizing helper (public for testability)
@@ -118,37 +87,34 @@ public:
     void Update (float deltaTime);
 
 
-    // Tunable constants
-    static constexpr float kRevealDurationSeconds   = 3.0f;
-    static constexpr int   kStreakLeadCells          = 4;
-    static constexpr int   kStreakTrailCells         = 3;
+    // Tunable constants — reveal phase
+    static constexpr float kRevealSpeed              = 150.0f;
+    static constexpr float kRevealFadeInSpeed        = 2.5f;
+    static constexpr float kRevealProximityThresholdX = 16.0f;
+    static constexpr int   kRevealDensityPercent     = 35;
+    static constexpr int   kRevealSpeedPercent       = 100;
+
+    // Tunable constants — background phase
     static constexpr float kPhase2DensityMultiplier  = 0.15f;
     static constexpr float kPhase2SpeedMultiplier    = 1.5f;
-    static constexpr float kCellHeight               = 24.0f;
-    static constexpr float kDefaultStreakSpeed        = 300.0f;
 
 
 private:
     // Initialization
     HRESULT CreateDialogWindow();
-    HRESULT CreateDeviceResources();
+    HRESULT CreateRenderPipeline();
     HRESULT InitializeTextLayout();
     void    ComputeCharacterPositions();
-    void    BuildRevealQueue();
+    HRESULT LoadUserSettings();
 
     // Render loop
     void    RenderFrame();
-    void    RenderDecorativeStreaks();
-    void    RenderRevealStreaks();
-    void    RenderResolvedText();
-    void    DrawCharacterGlow (wchar_t ch, float x, float y);
-    void    DrawRainGlyph (size_t glyphIndex, float x, float y, float opacity, ID2D1SolidColorBrush * pBrush);
+    void    RenderTextOverlay();
+    void    DrawCharacterGlow (ID2D1DeviceContext * pContext, wchar_t ch, float x, float y, float opacity);
 
     // Animation update helpers
     void    UpdateRevealPhase (float deltaTime);
     void    UpdateBackgroundPhase (float deltaTime);
-    void    SpawnDecorativeStreak();
-    void    AdvanceStreaks (float deltaTime);
 
     // Window procedure
     static LRESULT CALLBACK WndProc (HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
@@ -158,21 +124,36 @@ private:
     const UsageText              & m_usageText;
 
 
+    // GPU render pipeline (rain + bloom)
+    std::unique_ptr<RenderSystem>      m_renderSystem;
+    std::unique_ptr<AnimationSystem>   m_animationSystem;
+    std::unique_ptr<Viewport>          m_viewport;
+    std::unique_ptr<DensityController> m_densityController;
+
+
+    // User settings
+    ScreenSaverSettings            m_settings;
+    ColorScheme                    m_colorScheme     = ColorScheme::Green;
+
+
     // Animation state
-    AnimationPhase                 m_animationPhase    = AnimationPhase::Revealing;
-    float                          m_phaseTimer        = 0.0f;
-    float                          m_revealSpawnRate   = 0.0f;
-    float                          m_spawnAccumulator  = 0.0f;
+    AnimationPhase                 m_animationPhase  = AnimationPhase::Revealing;
+    float                          m_phaseTimer      = 0.0f;
+    float                          m_revealFrontY    = -50.0f;
+    float                          m_elapsedTime     = 0.0f;
 
     std::vector<CharPosition>      m_characterPositions;
-    std::vector<size_t>            m_revealQueue;
-    size_t                         m_revealQueueIndex  = 0;
-    std::vector<bool>              m_revealedFlags;
-    std::vector<RevealStreak>      m_activeRevealStreaks;
-    std::vector<DecorativeStreak>  m_decorativeStreaks;
+    std::vector<float>             m_revealedFlags;
 
-    float                          m_decorativeSpawnAccumulator = 0.0f;
-    float                          m_decorativeSpawnRate        = 0.0f;
+
+    // Text layout (DWrite — independent of RenderSystem D2D)
+    ComPtr<IDWriteFactory>         m_dwriteFactory;
+    ComPtr<IDWriteTextFormat>      m_textFormat;
+    ComPtr<IDWriteTextLayout>      m_textLayout;
+
+    // D2D text overlay brushes (created on RenderSystem's D2D context)
+    ComPtr<ID2D1SolidColorBrush>   m_textBrush;
+    ComPtr<ID2D1SolidColorBrush>   m_glowBrush;
 
 
     // Text layout metrics
@@ -188,29 +169,4 @@ private:
     bool                           m_dismissed        = false;
 
     static constexpr LPCWSTR       kWindowClassName   = L"MatrixRainHelpDialog";
-
-
-    // D3D11 / D2D resources
-    ComPtr<ID3D11Device>           m_device;
-    ComPtr<ID3D11DeviceContext>    m_deviceContext;
-    ComPtr<IDXGISwapChain>         m_swapChain;
-    ComPtr<ID2D1Factory1>          m_d2dFactory;
-    ComPtr<ID2D1RenderTarget>      m_d2dRenderTarget;
-    ComPtr<IDWriteFactory>         m_dwriteFactory;
-    ComPtr<IDWriteTextFormat>      m_textFormat;
-    ComPtr<IDWriteTextLayout>      m_textLayout;
-
-    // Brushes
-    ComPtr<ID2D1SolidColorBrush>   m_textBrush;
-    ComPtr<ID2D1SolidColorBrush>   m_glowBrush;
-    ComPtr<ID2D1SolidColorBrush>   m_headBrush;
-    ComPtr<ID2D1SolidColorBrush>   m_trailBrush;
-
-
-    // Character set for random glyphs
-    std::vector<uint32_t>          m_allGlyphs;
-
-
-    // RNG
-    std::mt19937                   m_rng { std::random_device{}() };
 };

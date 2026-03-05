@@ -1324,21 +1324,29 @@ void RenderSystem::Render (const AnimationSystem & animationSystem, const Viewpo
         // Calculate character scale based on viewport height
         // Scale down proportionally for preview mode to fit the entire effect
         // Minimum scale ensures characters remain visible (12px tall minimum)
-        float viewportHeight = static_cast<float> (viewport.GetHeight());
-        
-        if (viewportHeight < 1080.0f)
+        if (m_characterScaleOverride.has_value())
         {
-            // Scale linearly based on viewport height (Full HD = 1.0 reference)
-            cbData->characterScale = viewportHeight / 1080.0f;
-            
-            // Clamp to minimum 0.5 (24px tall from 48px base)
-            if (cbData->characterScale < 0.5f)
-                cbData->characterScale = 0.5f;
+            // Use explicit override (e.g., HelpRainDialog forcing full-size characters)
+            cbData->characterScale = m_characterScaleOverride.value();
         }
         else
         {
-            // Full HD and above: use normal character size
-            cbData->characterScale = 1.0f;
+            float viewportHeight = static_cast<float> (viewport.GetHeight());
+
+            if (viewportHeight < 1080.0f)
+            {
+                // Scale linearly based on viewport height (Full HD = 1.0 reference)
+                cbData->characterScale = viewportHeight / 1080.0f;
+
+                // Clamp to minimum 0.5 (24px tall from 48px base)
+                if (cbData->characterScale < 0.5f)
+                    cbData->characterScale = 0.5f;
+            }
+            else
+            {
+                // Full HD and above: use normal character size
+                cbData->characterScale = 1.0f;
+            }
         }
 
         m_context->Unmap (m_constantBuffer.Get(), 0);
@@ -2148,6 +2156,25 @@ void RenderSystem::SetGlowSize (int sizePercent)
     // Convert percentage (50-200) to multiplier (0.5-2.0)
     // Default is 100% = 1.0 multiplier
     m_glowSize = sizePercent / 100.0f;
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  RenderSystem::SetCharacterScaleOverride
+//
+//  Overrides the viewport-based character scale calculation.
+//  Used by HelpRainDialog to force full-size rain characters in its
+//  smaller window.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+void RenderSystem::SetCharacterScaleOverride (float scale)
+{
+    m_characterScaleOverride = scale;
 }
 
 

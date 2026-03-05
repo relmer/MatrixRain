@@ -2,6 +2,8 @@
 
 #include "HelpRainDialog.h"
 
+#include "CharacterSet.h"
+#include "RegistrySettingsProvider.h"
 #include "UnicodeSymbols.h"
 #include "Version.h"
 
@@ -13,7 +15,7 @@
 //
 //  HelpRainDialog::HelpRainDialog
 //
-//  Pre-computes character positions and builds the randomized reveal queue.
+//  Pre-computes character positions for the reveal mechanism.
 //  Does NOT create the window or start animation — call Show() to begin.
 //
 ////////////////////////////////////////////////////////////////////////////////
@@ -21,22 +23,9 @@
 HelpRainDialog::HelpRainDialog (const UsageText & usageText) :
     m_usageText (usageText)
 {
-    // Cache the glyph set for random rain characters
-    m_allGlyphs = CharacterConstants::GetAllCodepoints();
-
     // Pre-compute character positions using a temporary text layout
     InitializeTextLayout();
     ComputeCharacterPositions();
-    BuildRevealQueue();
-
-    // Compute reveal spawn rate: N characters over kRevealDurationSeconds
-    if (!m_characterPositions.empty())
-    {
-        m_revealSpawnRate = static_cast<float> (m_characterPositions.size()) / kRevealDurationSeconds;
-    }
-
-    // Set decorative spawn rate to match reveal rate initially
-    m_decorativeSpawnRate = m_revealSpawnRate;
 }
 
 
@@ -51,6 +40,18 @@ HelpRainDialog::HelpRainDialog (const UsageText & usageText) :
 
 HelpRainDialog::~HelpRainDialog()
 {
+    // Release D2D brushes before RenderSystem shutdown
+    m_textBrush.Reset();
+    m_glowBrush.Reset();
+
+    // Shutdown render pipeline
+    if (m_renderSystem)
+    {
+        m_renderSystem->Shutdown();
+    }
+
+    CharacterSet::GetInstance().Shutdown();
+
     if (m_hWnd)
     {
         DestroyWindow (m_hWnd);
@@ -72,9 +73,9 @@ HelpRainDialog::~HelpRainDialog()
 
 bool HelpRainDialog::IsRevealComplete () const
 {
-    for (bool flag : m_revealedFlags)
+    for (float opacity : m_revealedFlags)
     {
-        if (!flag)
+        if (opacity <= 0.0f)
         {
             return false;
         }
@@ -186,8 +187,8 @@ Error:
 //
 //  HelpRainDialog::Show
 //
-//  Creates the dialog window, initializes D3D/D2D, and runs the message loop.
-//  Blocking call — returns when dismissed.
+//  Creates the dialog window, initializes the GPU render pipeline, and runs
+//  the message loop.  Blocking call — returns when dismissed.
 //
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -202,20 +203,14 @@ HRESULT HelpRainDialog::Show ()
     hr = CreateDialogWindow();
     CHR (hr);
 
-    hr = CreateDeviceResources();
+    hr = CreateRenderPipeline();
     CHR (hr);
 
-    // Re-initialize text layout with the actual D2D resources
+    // Re-initialize text layout with actual window DPI
+    m_textFormat.Reset();
+    m_textLayout.Reset();
     InitializeTextLayout();
     ComputeCharacterPositions();
-    BuildRevealQueue();
-
-    // Recalculate spawn rate with final character count
-    if (!m_characterPositions.empty())
-    {
-        m_revealSpawnRate   = static_cast<float> (m_characterPositions.size()) / kRevealDurationSeconds;
-        m_decorativeSpawnRate = m_revealSpawnRate;
-    }
 
     ShowWindow (m_hWnd, SW_SHOW);
     UpdateWindow (m_hWnd);
@@ -271,12 +266,14 @@ Error:
 //  HelpRainDialog::Update
 //
 //  Advances the animation state by deltaTime seconds.
+//  Delegates rain spawning/updating to AnimationSystem.
 //
 ////////////////////////////////////////////////////////////////////////////////
 
 void HelpRainDialog::Update (float deltaTime)
 {
-    m_phaseTimer += deltaTime;
+    m_phaseTimer   += deltaTime;
+    m_elapsedTime  += deltaTime;
 
     if (m_animationPhase == AnimationPhase::Revealing)
     {
@@ -287,7 +284,20 @@ void HelpRainDialog::Update (float deltaTime)
         UpdateBackgroundPhase (deltaTime);
     }
 
-    AdvanceStreaks (deltaTime);
+    // Ramp up opacity on all revealed characters
+    for (float & opacity : m_revealedFlags)
+    {
+        if (opacity > 0.0f && opacity < 1.0f)
+        {
+            opacity = std::min (1.0f, opacity + kRevealFadeInSpeed * deltaTime);
+        }
+    }
+
+    // Let AnimationSystem handle streak spawning, updating, and despawning
+    if (m_animationSystem)
+    {
+        m_animationSystem->Update (deltaTime);
+    }
 }
 
 
@@ -298,62 +308,88 @@ void HelpRainDialog::Update (float deltaTime)
 //
 //  HelpRainDialog::UpdateRevealPhase
 //
-//  Drains the reveal queue at the calibrated spawn rate, spawning reveal
-//  streaks at each dequeued character's position.
+//  Reveals text characters when rain streaks cross their positions.
+//  Each streak's head Y is compared against unrevealed characters:
+//  if a streak's column is close enough in X and its head has passed
+//  the character's Y, the character begins fading in.
+//
+//  When no AnimationSystem is available (unit-test path), falls back to
+//  a simple time-based sweep front at kRevealSpeed.
 //
 ////////////////////////////////////////////////////////////////////////////////
 
 void HelpRainDialog::UpdateRevealPhase (float deltaTime)
 {
-    // Drain reveal queue at the calibrated rate
-    m_spawnAccumulator += deltaTime * m_revealSpawnRate;
+    // Always advance the reveal front (used by sweep-front fallback
+    // and exposed via GetRevealFrontY for test observability).
+    m_revealFrontY += kRevealSpeed * deltaTime;
 
-    while (m_spawnAccumulator >= 1.0f && m_revealQueueIndex < m_revealQueue.size())
+    if (m_animationSystem)
     {
-        size_t charIdx = m_revealQueue[m_revealQueueIndex];
-        m_revealQueueIndex++;
-        m_spawnAccumulator -= 1.0f;
-
-        const CharPosition & pos = m_characterPositions[charIdx];
-
-        RevealStreak streak;
-        streak.targetCharIndex = charIdx;
-        streak.pixelX          = pos.x + m_textOffsetX;
-        streak.targetPixelY    = pos.y + m_textOffsetY;
-        streak.headPixelY      = streak.targetPixelY - (kStreakLeadCells * kCellHeight);
-        streak.speed           = kDefaultStreakSpeed;
-        streak.leadCells       = kStreakLeadCells;
-        streak.trailCells      = kStreakTrailCells;
-        streak.revealed        = false;
-
-        // Random glyphs for head and trail
-        std::uniform_int_distribution<size_t> glyphDist (0, m_allGlyphs.size() - 1);
-
-        for (int i = 0; i < streak.leadCells + streak.trailCells + 1; i++)
+        // Production path: reveal characters when rain streaks cross them
+        for (const auto & streak : m_animationSystem->GetStreaks())
         {
-            streak.glyphIndices.push_back (glyphDist (m_rng));
+            float streakX    = streak.GetPosition().x;
+            float streakHeadY = streak.GetPosition().y;
+
+            for (size_t i = 0; i < m_characterPositions.size(); i++)
+            {
+                if (m_revealedFlags[i] > 0.0f)
+                {
+                    continue;
+                }
+
+                float charWorldX = m_characterPositions[i].x + m_textOffsetX;
+                float charWorldY = m_characterPositions[i].y + m_textOffsetY;
+
+                float dx = std::abs (streakX - charWorldX);
+
+                // Streak column must be close in X and head must have
+                // reached or passed the character's Y position.
+                if (dx <= kRevealProximityThresholdX && streakHeadY >= charWorldY)
+                {
+                    m_revealedFlags[i] = 0.01f;  // Start fade-in
+                }
+            }
         }
-
-        m_activeRevealStreaks.push_back (std::move (streak));
     }
-
-    // Spawn decorative streaks
-    m_decorativeSpawnAccumulator += deltaTime * m_decorativeSpawnRate;
-
-    while (m_decorativeSpawnAccumulator >= 1.0f)
+    else
     {
-        SpawnDecorativeStreak();
-        m_decorativeSpawnAccumulator -= 1.0f;
+        // Test fallback: sweep-front reveals characters by Y position
+        for (size_t i = 0; i < m_characterPositions.size(); i++)
+        {
+            if (m_revealedFlags[i] > 0.0f)
+            {
+                continue;
+            }
+
+            float charWorldY = m_characterPositions[i].y + m_textOffsetY;
+
+            if (charWorldY <= m_revealFrontY)
+            {
+                m_revealedFlags[i] = 0.01f;  // Start fade-in
+            }
+        }
     }
 
-    // Check if reveal is complete (all flags true AND all reveal streaks done)
-    if (m_revealQueueIndex >= m_revealQueue.size() && IsRevealComplete() && m_activeRevealStreaks.empty())
+    // Check if reveal is complete
+    if (IsRevealComplete())
     {
         m_animationPhase = AnimationPhase::Background;
         m_phaseTimer     = 0.0f;
 
-        // Reduce decorative density for Phase 2
-        m_decorativeSpawnRate = m_revealSpawnRate * kPhase2DensityMultiplier;
+        // Reduce density and speed for ambient background rain
+        if (m_densityController)
+        {
+            int bgDensity = static_cast<int> (m_settings.m_densityPercent * kPhase2DensityMultiplier);
+            m_densityController->SetPercentage (std::max (1, bgDensity));
+        }
+
+        if (m_animationSystem)
+        {
+            int bgSpeed = static_cast<int> (m_settings.m_animationSpeedPercent * kPhase2SpeedMultiplier);
+            m_animationSystem->SetAnimationSpeed (std::min (100, bgSpeed));
+        }
     }
 }
 
@@ -365,130 +401,14 @@ void HelpRainDialog::UpdateRevealPhase (float deltaTime)
 //
 //  HelpRainDialog::UpdateBackgroundPhase
 //
-//  Continues ambient decorative rain at reduced density/speed.
+//  Ambient rain continues at reduced density — AnimationSystem handles
+//  all streak lifecycle.  Nothing additional to do here.
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void HelpRainDialog::UpdateBackgroundPhase (float deltaTime)
+void HelpRainDialog::UpdateBackgroundPhase (float /* deltaTime */)
 {
-    // Continue spawning decorative streaks at reduced rate
-    m_decorativeSpawnAccumulator += deltaTime * m_decorativeSpawnRate;
-
-    while (m_decorativeSpawnAccumulator >= 1.0f)
-    {
-        SpawnDecorativeStreak();
-        m_decorativeSpawnAccumulator -= 1.0f;
-    }
-}
-
-
-
-
-
-////////////////////////////////////////////////////////////////////////////////
-//
-//  HelpRainDialog::SpawnDecorativeStreak
-//
-//  Creates a new decorative streak at a random pixel x-position.
-//
-////////////////////////////////////////////////////////////////////////////////
-
-void HelpRainDialog::SpawnDecorativeStreak ()
-{
-    int width = (m_windowWidth > 0) ? m_windowWidth : 800;
-
-    std::uniform_real_distribution<float> xDist (0.0f, static_cast<float> (width));
-    std::uniform_int_distribution<int>    trailDist (5, 10);
-    std::uniform_int_distribution<size_t> glyphDist (0, m_allGlyphs.empty() ? 0 : m_allGlyphs.size() - 1);
-
-    DecorativeStreak streak;
-    streak.pixelX      = xDist (m_rng);
-    streak.headPixelY  = -kCellHeight * 5.0f;
-    streak.trailLength = trailDist (m_rng);
-    streak.speed       = kDefaultStreakSpeed;
-
-    if (m_animationPhase == AnimationPhase::Background)
-    {
-        streak.speed *= kPhase2SpeedMultiplier;
-    }
-
-    for (int i = 0; i < streak.trailLength + 1; i++)
-    {
-        streak.glyphIndices.push_back (glyphDist (m_rng));
-    }
-
-    m_decorativeStreaks.push_back (std::move (streak));
-}
-
-
-
-
-
-////////////////////////////////////////////////////////////////////////////////
-//
-//  HelpRainDialog::AdvanceStreaks
-//
-//  Moves all streaks downward, locks in revealed characters, removes
-//  off-screen streaks.
-//
-////////////////////////////////////////////////////////////////////////////////
-
-void HelpRainDialog::AdvanceStreaks (float deltaTime)
-{
-    int height = (m_windowHeight > 0) ? m_windowHeight : 600;
-
-    // Advance reveal streaks
-    for (auto & streak : m_activeRevealStreaks)
-    {
-        streak.headPixelY += streak.speed * deltaTime;
-
-        // Lock in character when head reaches target
-        if (!streak.revealed && streak.headPixelY >= streak.targetPixelY)
-        {
-            streak.revealed = true;
-            m_revealedFlags[streak.targetCharIndex] = true;
-        }
-
-        // Cycle random glyphs
-        if (!m_allGlyphs.empty())
-        {
-            std::uniform_int_distribution<size_t> glyphDist (0, m_allGlyphs.size() - 1);
-
-            for (auto & idx : streak.glyphIndices)
-            {
-                idx = glyphDist (m_rng);
-            }
-        }
-    }
-
-    // Remove reveal streaks that have passed below the window
-    std::erase_if (m_activeRevealStreaks, [height] (const RevealStreak & s)
-    {
-        return s.revealed && s.headPixelY > static_cast<float> (height) + s.trailCells * 24.0f;
-    });
-
-    // Advance decorative streaks
-    for (auto & streak : m_decorativeStreaks)
-    {
-        streak.headPixelY += streak.speed * deltaTime;
-
-        // Cycle random glyphs
-        if (!m_allGlyphs.empty())
-        {
-            std::uniform_int_distribution<size_t> glyphDist (0, m_allGlyphs.size() - 1);
-
-            for (auto & idx : streak.glyphIndices)
-            {
-                idx = glyphDist (m_rng);
-            }
-        }
-    }
-
-    // Remove decorative streaks that have passed below the window
-    std::erase_if (m_decorativeStreaks, [height] (const DecorativeStreak & s)
-    {
-        return s.headPixelY > static_cast<float> (height) + s.trailLength * 24.0f;
-    });
+    // AnimationSystem handles all streak spawning/updating
 }
 
 
@@ -634,32 +554,10 @@ void HelpRainDialog::ComputeCharacterPositions ()
     }
 
     // Initialize revealed flags
-    m_revealedFlags.assign (m_characterPositions.size(), false);
-}
+    m_revealedFlags.assign (m_characterPositions.size(), 0.0f);
 
-
-
-
-
-////////////////////////////////////////////////////////////////////////////////
-//
-//  HelpRainDialog::BuildRevealQueue
-//
-//  Creates a randomized permutation of indices into characterPositions.
-//
-////////////////////////////////////////////////////////////////////////////////
-
-void HelpRainDialog::BuildRevealQueue ()
-{
-    m_revealQueue.resize (m_characterPositions.size());
-
-    for (size_t i = 0; i < m_revealQueue.size(); i++)
-    {
-        m_revealQueue[i] = i;
-    }
-
-    std::ranges::shuffle (m_revealQueue, m_rng);
-    m_revealQueueIndex = 0;
+    // Initialize the reveal front above the window
+    m_revealFrontY = -50.0f;
 }
 
 
@@ -762,165 +660,84 @@ Error:
 //
 //  HelpRainDialog::CreateDeviceResources
 //
-//  Creates D3D11 device, swap chain, and D2D render target.
-//  Minimal setup — no 3D geometry, no bloom.
+//  Creates the GPU render pipeline: RenderSystem, CharacterSet, AnimationSystem,
+//  Viewport, DensityController, and D2D text overlay brushes.
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-HRESULT HelpRainDialog::CreateDeviceResources ()
+HRESULT HelpRainDialog::CreateRenderPipeline ()
 {
-    HRESULT              hr                = S_OK;
-    UINT                 createDeviceFlags = D3D11_CREATE_DEVICE_BGRA_SUPPORT;
-    D3D_FEATURE_LEVEL    featureLevels[]   = { D3D_FEATURE_LEVEL_11_1, D3D_FEATURE_LEVEL_11_0 };
-    D3D_FEATURE_LEVEL    featureLevel;
-    ComPtr<IDXGIDevice>  dxgiDevice;
-    ComPtr<IDXGIAdapter> dxgiAdapter;
-    ComPtr<IDXGIFactory> dxgiFactory;
-    ComPtr<IDXGISurface> dxgiSurface;
+    HRESULT hr = S_OK;
 
 
 
-#ifdef _DEBUG
-    createDeviceFlags |= D3D11_CREATE_DEVICE_DEBUG;
-#endif
+    // Load user's settings from registry (color scheme, glow, etc.)
+    hr = LoadUserSettings();
+    CHR (hr);
 
-    // Create D3D11 device
-    hr = D3D11CreateDevice (nullptr,
-                            D3D_DRIVER_TYPE_HARDWARE,
-                            nullptr,
-                            createDeviceFlags,
-                            featureLevels,
-                            _countof (featureLevels),
-                            D3D11_SDK_VERSION,
-                            &m_device,
-                            &featureLevel,
-                            &m_deviceContext);
+    // Create RenderSystem — creates D3D11 device, swap chain, shaders, and bloom
+    m_renderSystem = std::make_unique<RenderSystem>();
 
-#ifdef _DEBUG
-    if (hr == DXGI_ERROR_SDK_COMPONENT_MISSING)
+    hr = m_renderSystem->Initialize (m_hWnd,
+                                     static_cast<UINT> (m_windowWidth),
+                                     static_cast<UINT> (m_windowHeight));
+    CHR (hr);
+
+    // Apply user's glow settings
+    m_renderSystem->SetGlowIntensity (m_settings.m_glowIntensityPercent);
+    m_renderSystem->SetGlowSize (m_settings.m_glowSizePercent);
+
+    // Initialize CharacterSet atlas on RenderSystem's device
     {
-        // Retry without debug layer
-        createDeviceFlags &= ~D3D11_CREATE_DEVICE_DEBUG;
+        CharacterSet & charSet = CharacterSet::GetInstance();
 
-        hr = D3D11CreateDevice (nullptr,
-                                D3D_DRIVER_TYPE_HARDWARE,
-                                nullptr,
-                                createDeviceFlags,
-                                featureLevels,
-                                _countof (featureLevels),
-                                D3D11_SDK_VERSION,
-                                &m_device,
-                                &featureLevel,
-                                &m_deviceContext);
-    }
-#endif
-
-    CHRA (hr);
-
-    // Create swap chain
-    {
-        DXGI_SWAP_CHAIN_DESC swapChainDesc                  = {};
-        swapChainDesc.BufferCount                            = 2;
-        swapChainDesc.BufferDesc.Width                       = static_cast<UINT> (m_windowWidth);
-        swapChainDesc.BufferDesc.Height                      = static_cast<UINT> (m_windowHeight);
-        swapChainDesc.BufferDesc.Format                      = DXGI_FORMAT_B8G8R8A8_UNORM;
-        swapChainDesc.BufferDesc.RefreshRate.Numerator        = 60;
-        swapChainDesc.BufferDesc.RefreshRate.Denominator      = 1;
-        swapChainDesc.BufferUsage                             = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-        swapChainDesc.OutputWindow                            = m_hWnd;
-        swapChainDesc.SampleDesc.Count                        = 1;
-        swapChainDesc.SampleDesc.Quality                      = 0;
-        swapChainDesc.Windowed                                = TRUE;
-        swapChainDesc.SwapEffect                              = DXGI_SWAP_EFFECT_DISCARD;
-
-        hr = m_device.As (&dxgiDevice);
-        CHRA (hr);
-
-        hr = dxgiDevice->GetAdapter (&dxgiAdapter);
-        CHRA (hr);
-
-        hr = dxgiAdapter->GetParent (__uuidof (IDXGIFactory), reinterpret_cast<void **> (dxgiFactory.GetAddressOf()));
-        CHRA (hr);
-
-        hr = dxgiFactory->CreateSwapChain (m_device.Get(), &swapChainDesc, &m_swapChain);
-        CHRA (hr);
-    }
-
-    // Create D2D factory
-    {
-        D2D1_FACTORY_OPTIONS d2dOptions = {};
-
-#ifdef _DEBUG
-        d2dOptions.debugLevel = D2D1_DEBUG_LEVEL_INFORMATION;
-#endif
-
-        hr = D2D1CreateFactory (D2D1_FACTORY_TYPE_SINGLE_THREADED,
-                                __uuidof (ID2D1Factory1),
-                                &d2dOptions,
-                                reinterpret_cast<void **> (m_d2dFactory.GetAddressOf()));
-        CHRA (hr);
-    }
-
-    // Create D2D render target from swap chain surface
-    {
-        hr = m_swapChain->GetBuffer (0, __uuidof (IDXGISurface), reinterpret_cast<void **> (dxgiSurface.GetAddressOf()));
-        CHRA (hr);
-
-        D2D1_RENDER_TARGET_PROPERTIES props = D2D1::RenderTargetProperties (
-            D2D1_RENDER_TARGET_TYPE_DEFAULT,
-            D2D1::PixelFormat (DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED)
-        );
-
-        hr = m_d2dFactory->CreateDxgiSurfaceRenderTarget (dxgiSurface.Get(), &props, &m_d2dRenderTarget);
-        CHRA (hr);
-    }
-
-    // Create DirectWrite factory and text format
-    {
-        m_dwriteFactory.Reset();
-        m_textFormat.Reset();
-
-        hr = DWriteCreateFactory (DWRITE_FACTORY_TYPE_SHARED,
-                                  __uuidof (IDWriteFactory),
-                                  reinterpret_cast<IUnknown **> (m_dwriteFactory.GetAddressOf()));
-        CHRA (hr);
-
-        float fontSize = 15.0f;
-
-        if (m_hWnd)
+        if (!charSet.Initialize())
         {
-            UINT dpi = GetDpiForWindow (m_hWnd);
-            fontSize = 15.0f * (static_cast<float> (dpi) / 96.0f);
+            hr = E_FAIL;
+            CHR (hr);
         }
 
-        hr = m_dwriteFactory->CreateTextFormat (L"Segoe UI",
-                                                 nullptr,
-                                                 DWRITE_FONT_WEIGHT_NORMAL,
-                                                 DWRITE_FONT_STYLE_NORMAL,
-                                                 DWRITE_FONT_STRETCH_NORMAL,
-                                                 fontSize,
-                                                 L"en-us",
-                                                 &m_textFormat);
-        CHRA (hr);
+        hr = charSet.CreateTextureAtlas (m_renderSystem->GetDevice());
+        CHR (hr);
     }
 
-    // Create brushes
+    // Create Viewport and DensityController
+    m_viewport = std::make_unique<Viewport>();
+    m_viewport->Resize (static_cast<float> (m_windowWidth),
+                        static_cast<float> (m_windowHeight));
+
+    m_densityController = std::make_unique<DensityController> (*m_viewport, 32.0f);
+    m_densityController->SetPercentage (kRevealDensityPercent);
+
+    // Create AnimationSystem — max density + max speed for reveal phase
+    m_animationSystem = std::make_unique<AnimationSystem>();
+    m_animationSystem->Initialize (*m_viewport, *m_densityController);
+    m_animationSystem->SetAnimationSpeed (kRevealSpeedPercent);
+
+    // Force full-size rain characters regardless of viewport size.
+    // Without overrides the pipeline scales characters down proportionally
+    // for viewports smaller than 1080px — fine for the settings preview
+    // but wrong for the help dialog where we want full-impact rain.
+    m_animationSystem->SetCharacterSpacingOverride (32.0f);
+    m_renderSystem->SetCharacterScaleOverride (1.0f);
+
+    // Create D2D text overlay brushes on RenderSystem's D2D context
     {
+        ID2D1DeviceContext * d2dContext = m_renderSystem->GetD2DContext();
+        CBRA (d2dContext != nullptr);
+
         // White text brush for resolved usage text
-        hr = m_d2dRenderTarget->CreateSolidColorBrush (D2D1::ColorF (D2D1::ColorF::White), &m_textBrush);
+        hr = d2dContext->CreateSolidColorBrush (D2D1::ColorF (D2D1::ColorF::White), &m_textBrush);
         CHRA (hr);
 
         // Black glow brush (variable opacity)
-        hr = m_d2dRenderTarget->CreateSolidColorBrush (D2D1::ColorF (D2D1::ColorF::Black, 0.0f), &m_glowBrush);
+        hr = d2dContext->CreateSolidColorBrush (D2D1::ColorF (D2D1::ColorF::Black, 0.0f), &m_glowBrush);
         CHRA (hr);
 
-        // Bright green head brush
-        hr = m_d2dRenderTarget->CreateSolidColorBrush (D2D1::ColorF (0.5f, 1.0f, 0.5f, 1.0f), &m_headBrush);
-        CHRA (hr);
-
-        // Dim green trail brush
-        hr = m_d2dRenderTarget->CreateSolidColorBrush (D2D1::ColorF (0.0f, 0.7f, 0.0f, 0.8f), &m_trailBrush);
-        CHRA (hr);
+        // Keep D2D context at 96 DPI — the font size and all text layout
+        // coordinates are already manually DPI-scaled to physical pixel
+        // space, so 1 D2D unit = 1 physical pixel is the correct mapping.
+        d2dContext->SetDpi (96.0f, 96.0f);
     }
 
 Error:
@@ -933,32 +750,58 @@ Error:
 
 ////////////////////////////////////////////////////////////////////////////////
 //
+//  HelpRainDialog::LoadUserSettings
+//
+//  Loads the user's screensaver settings from the registry to pick up
+//  color scheme, glow intensity, and glow size.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+HRESULT HelpRainDialog::LoadUserSettings ()
+{
+    // Load settings from registry — ignore failure (defaults are fine)
+    RegistrySettingsProvider::Load (m_settings);
+    m_settings.Clamp();
+
+    m_colorScheme = ParseColorSchemeKey (m_settings.m_colorSchemeKey);
+
+    return S_OK;
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
 //  HelpRainDialog::RenderFrame
 //
-//  Renders one frame: decorative rain → reveal streaks → resolved text.
+//  Renders one frame: GPU rain (via RenderSystem) → D2D text overlay → present.
 //
 ////////////////////////////////////////////////////////////////////////////////
 
 void HelpRainDialog::RenderFrame ()
 {
-    if (!m_d2dRenderTarget)
+    if (!m_renderSystem || !m_animationSystem || !m_viewport)
     {
         return;
     }
 
-    m_d2dRenderTarget->BeginDraw();
-    m_d2dRenderTarget->Clear (D2D1::ColorF (D2D1::ColorF::Black));
+    // Render GPU rain with bloom
+    m_renderSystem->Render (*m_animationSystem,
+                            *m_viewport,
+                            m_colorScheme,
+                            0.0f,     // fps (hidden)
+                            0,        // rainPercentage
+                            0,        // streakCount
+                            0,        // activeHeadCount
+                            false,    // showDebugFadeTimes
+                            m_elapsedTime);
 
-    RenderDecorativeStreaks();
-    RenderRevealStreaks();
-    RenderResolvedText();
+    // D2D text overlay on top of rain
+    RenderTextOverlay();
 
-    m_d2dRenderTarget->EndDraw();
-
-    if (m_swapChain)
-    {
-        m_swapChain->Present (1, 0);
-    }
+    m_renderSystem->Present();
 }
 
 
@@ -967,122 +810,39 @@ void HelpRainDialog::RenderFrame ()
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-//  HelpRainDialog::RenderDecorativeStreaks
+//  HelpRainDialog::RenderTextOverlay
 //
-//  Draws all active decorative rain streaks.
+//  Draws revealed usage text on top of the GPU-rendered rain using D2D.
+//  Two passes: dark glow halos first, then white foreground text.
+//  Uses RenderSystem's D2D context for rendering.
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void HelpRainDialog::RenderDecorativeStreaks ()
+void HelpRainDialog::RenderTextOverlay ()
 {
-    if (!m_trailBrush || !m_headBrush)
+    if (!m_renderSystem || !m_textBrush || !m_glowBrush || !m_textFormat)
     {
         return;
     }
 
-    for (const auto & streak : m_decorativeStreaks)
-    {
-        // Render trail characters
-        for (int t = 0; t < streak.trailLength; t++)
-        {
-            float trailY   = streak.headPixelY - (t + 1) * kCellHeight;
-            float opacity  = 1.0f - (static_cast<float> (t + 1) / static_cast<float> (streak.trailLength + 1));
+    ID2D1DeviceContext * d2dContext = m_renderSystem->GetD2DContext();
 
-            if (t < static_cast<int> (streak.glyphIndices.size()))
-            {
-                DrawRainGlyph (streak.glyphIndices[t], streak.pixelX, trailY, opacity * 0.6f, m_trailBrush.Get());
-            }
-        }
-
-        // Render head character (bright)
-        if (!streak.glyphIndices.empty())
-        {
-            DrawRainGlyph (streak.glyphIndices.back(), streak.pixelX, streak.headPixelY, 1.0f, m_headBrush.Get());
-        }
-    }
-}
-
-
-
-
-
-////////////////////////////////////////////////////////////////////////////////
-//
-//  HelpRainDialog::RenderRevealStreaks
-//
-//  Draws all active reveal streaks (Phase 1 only).
-//
-////////////////////////////////////////////////////////////////////////////////
-
-void HelpRainDialog::RenderRevealStreaks ()
-{
-    if (!m_trailBrush || !m_headBrush)
+    if (!d2dContext)
     {
         return;
     }
 
-    for (const auto & streak : m_activeRevealStreaks)
-    {
-        // Render lead characters above head
-        for (int l = 1; l <= streak.leadCells; l++)
-        {
-            float leadY   = streak.headPixelY - l * kCellHeight;
-            float opacity = 1.0f - (static_cast<float> (l) / static_cast<float> (streak.leadCells + 1));
+    d2dContext->BeginDraw();
 
-            if (l < static_cast<int> (streak.glyphIndices.size()))
-            {
-                DrawRainGlyph (streak.glyphIndices[l], streak.pixelX, leadY, opacity * 0.5f, m_trailBrush.Get());
-            }
-        }
-
-        // Render head (bright green/white)
-        if (!streak.glyphIndices.empty())
-        {
-            DrawRainGlyph (streak.glyphIndices[0], streak.pixelX, streak.headPixelY, 1.0f, m_headBrush.Get());
-        }
-
-        // Render trail below head
-        for (int t = 1; t <= streak.trailCells; t++)
-        {
-            float trailY  = streak.headPixelY + t * kCellHeight;
-            float opacity = 1.0f - (static_cast<float> (t) / static_cast<float> (streak.trailCells + 1));
-
-            size_t idx = static_cast<size_t> (streak.leadCells + t);
-
-            if (idx < streak.glyphIndices.size())
-            {
-                DrawRainGlyph (streak.glyphIndices[idx], streak.pixelX, trailY, opacity * 0.4f, m_trailBrush.Get());
-            }
-        }
-    }
-}
-
-
-
-
-
-////////////////////////////////////////////////////////////////////////////////
-//
-//  HelpRainDialog::RenderResolvedText
-//
-//  Draws all revealed characters with feathered dark glow for readability.
-//  Uses two passes: first all glows (dark halos), then all foreground text.
-//  This prevents one character's glow from dimming an adjacent character's
-//  already-drawn white text.
-//
-////////////////////////////////////////////////////////////////////////////////
-
-void HelpRainDialog::RenderResolvedText ()
-{
-    if (!m_textBrush || !m_glowBrush)
-    {
-        return;
-    }
+    static constexpr float kCharWidth  = 20.0f;
+    static constexpr float kCharHeight = 24.0f;
 
     // Pass 1: Draw all feathered dark glows
     for (size_t i = 0; i < m_characterPositions.size(); i++)
     {
-        if (!m_revealedFlags[i])
+        float opacity = m_revealedFlags[i];
+
+        if (opacity <= 0.0f)
         {
             continue;
         }
@@ -1091,13 +851,15 @@ void HelpRainDialog::RenderResolvedText ()
         float drawX              = pos.x + m_textOffsetX;
         float drawY              = pos.y + m_textOffsetY;
 
-        DrawCharacterGlow (pos.character, drawX, drawY);
+        DrawCharacterGlow (d2dContext, pos.character, drawX, drawY, opacity);
     }
 
     // Pass 2: Draw all foreground text on top
     for (size_t i = 0; i < m_characterPositions.size(); i++)
     {
-        if (!m_revealedFlags[i])
+        float opacity = m_revealedFlags[i];
+
+        if (opacity <= 0.0f)
         {
             continue;
         }
@@ -1107,10 +869,14 @@ void HelpRainDialog::RenderResolvedText ()
         float drawY              = pos.y + m_textOffsetY;
 
         wchar_t     str[2]   = { pos.character, L'\0' };
-        D2D1_RECT_F charRect = D2D1::RectF (drawX, drawY, drawX + 20.0f, drawY + kCellHeight);
+        D2D1_RECT_F charRect = D2D1::RectF (drawX, drawY, drawX + kCharWidth, drawY + kCharHeight);
 
-        m_d2dRenderTarget->DrawText (str, 1, m_textFormat.Get(), charRect, m_textBrush.Get());
+        m_textBrush->SetOpacity (opacity);
+        d2dContext->DrawText (str, 1, m_textFormat.Get(), charRect, m_textBrush.Get());
+        m_textBrush->SetOpacity (1.0f);
     }
+
+    d2dContext->EndDraw();
 }
 
 
@@ -1127,26 +893,29 @@ void HelpRainDialog::RenderResolvedText ()
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void HelpRainDialog::DrawCharacterGlow (wchar_t ch, float x, float y)
+void HelpRainDialog::DrawCharacterGlow (ID2D1DeviceContext * pContext, wchar_t ch, float x, float y, float opacity)
 {
-    if (!m_d2dRenderTarget || !m_textFormat || !m_glowBrush)
+    if (!pContext || !m_textFormat || !m_glowBrush)
     {
         return;
     }
 
+    static constexpr float kCharWidth  = 20.0f;
+    static constexpr float kCharHeight = 24.0f;
+
     wchar_t str[2] = { ch, L'\0' };
 
-    D2D1_RECT_F charRect = D2D1::RectF (x, y, x + 20.0f, y + kCellHeight);
+    D2D1_RECT_F charRect = D2D1::RectF (x, y, x + kCharWidth, y + kCharHeight);
 
-    // Draw feathered dark glow (same technique as DrawFeatheredGlow)
+    // Draw feathered dark glow
     const int glowLayers = 8;
 
     for (int i = glowLayers; i > 0; --i)
     {
-        float offset  = static_cast<float> (i);
-        float opacity = 0.9f - (static_cast<float> (i) / static_cast<float> (glowLayers));
+        float offset    = static_cast<float> (i);
+        float baseAlpha = 0.9f - (static_cast<float> (i) / static_cast<float> (glowLayers));
 
-        m_glowBrush->SetColor (D2D1::ColorF (D2D1::ColorF::Black, opacity));
+        m_glowBrush->SetColor (D2D1::ColorF (D2D1::ColorF::Black, baseAlpha * opacity));
 
         for (int dx = -1; dx <= 1; ++dx)
         {
@@ -1162,63 +931,10 @@ void HelpRainDialog::DrawCharacterGlow (wchar_t ch, float x, float y)
                                                      charRect.right  + offset * dx,
                                                      charRect.bottom + offset * dy);
 
-                m_d2dRenderTarget->DrawText (str, 1, m_textFormat.Get(), glowRect, m_glowBrush.Get());
+                pContext->DrawText (str, 1, m_textFormat.Get(), glowRect, m_glowBrush.Get());
             }
         }
     }
-}
-
-
-
-
-
-////////////////////////////////////////////////////////////////////////////////
-//
-//  HelpRainDialog::DrawRainGlyph
-//
-//  Renders a single rain glyph at (x, y) with specified opacity.
-//
-////////////////////////////////////////////////////////////////////////////////
-
-void HelpRainDialog::DrawRainGlyph (size_t glyphIndex, float x, float y, float opacity, ID2D1SolidColorBrush * pBrush)
-{
-    if (!m_d2dRenderTarget || !m_textFormat || !pBrush || m_allGlyphs.empty())
-    {
-        return;
-    }
-
-    if (glyphIndex >= m_allGlyphs.size())
-    {
-        return;
-    }
-
-    uint32_t codepoint = m_allGlyphs[glyphIndex];
-
-    // Convert codepoint to wchar_t string
-    wchar_t glyphStr[3] = {};
-    int     glyphLen    = 0;
-
-    if (codepoint <= 0xFFFF)
-    {
-        glyphStr[0] = static_cast<wchar_t> (codepoint);
-        glyphLen    = 1;
-    }
-    else
-    {
-        glyphStr[0] = static_cast<wchar_t> (0xD800 + ((codepoint - 0x10000) >> 10));
-        glyphStr[1] = static_cast<wchar_t> (0xDC00 + ((codepoint - 0x10000) & 0x3FF));
-        glyphLen    = 2;
-    }
-
-    D2D1_RECT_F charRect = D2D1::RectF (x, y, x + 20.0f, y + kCellHeight);
-
-    D2D1_COLOR_F origColor = pBrush->GetColor();
-    D2D1_COLOR_F newColor  = origColor;
-    newColor.a             = opacity;
-
-    pBrush->SetColor (newColor);
-    m_d2dRenderTarget->DrawText (glyphStr, static_cast<UINT32> (glyphLen), m_textFormat.Get(), charRect, pBrush);
-    pBrush->SetColor (origColor);
 }
 
 
@@ -1258,6 +974,33 @@ LRESULT CALLBACK HelpRainDialog::WndProc (HWND hwnd, UINT msg, WPARAM wParam, LP
                 if (pDialog)
                 {
                     pDialog->m_dismissed = true;
+                }
+
+                return 0;
+            }
+
+            // DEBUG: Space resets animation to initial state
+            if (wParam == VK_SPACE)
+            {
+                if (pDialog)
+                {
+                    pDialog->m_animationPhase = AnimationPhase::Revealing;
+                    pDialog->m_phaseTimer     = 0.0f;
+                    pDialog->m_revealFrontY   = -50.0f;
+                    pDialog->m_elapsedTime    = 0.0f;
+                    pDialog->m_revealedFlags.assign (pDialog->m_characterPositions.size(), 0.0f);
+
+                    // Reset AnimationSystem to reveal-phase density/speed
+                    if (pDialog->m_animationSystem)
+                    {
+                        pDialog->m_animationSystem->ClearAllStreaks();
+                        pDialog->m_animationSystem->SetAnimationSpeed (kRevealSpeedPercent);
+                    }
+
+                    if (pDialog->m_densityController)
+                    {
+                        pDialog->m_densityController->SetPercentage (kRevealDensityPercent);
+                    }
                 }
 
                 return 0;

@@ -119,30 +119,19 @@ namespace MatrixRainTests
 
 
 
-            TEST_METHOD (Constructor_BuildsShuffledRevealQueue)
+            TEST_METHOD (Constructor_AnimationSystemNullBeforeShow)
             {
                 UsageText usage (L'/');
 
 
                 HelpRainDialog dialog (usage);
 
-                const auto & queue     = dialog.GetRevealQueue();
-                const auto & positions = dialog.GetCharacterPositions();
 
 
-
-                Assert::AreEqual (positions.size(), queue.size(),
-                                  L"Reveal queue should have same count as character positions");
-
-                // Queue should contain indices [0, N) in some order
-                std::vector<size_t> sorted (queue.begin(), queue.end());
-                std::ranges::sort (sorted);
-
-                for (size_t i = 0; i < sorted.size(); i++)
-                {
-                    Assert::AreEqual (i, sorted[i],
-                                      L"Reveal queue should be a permutation of [0, N)");
-                }
+                // AnimationSystem is created in CreateRenderPipeline (called
+                // from Show), so it should be null after construction alone.
+                Assert::IsNull (dialog.GetAnimationSystem(),
+                                L"AnimationSystem should be null before Show()");
             }
 
 
@@ -165,7 +154,7 @@ namespace MatrixRainTests
 
                 for (size_t i = 0; i < flags.size(); i++)
                 {
-                    Assert::IsFalse (flags[i], L"All flags should start as false");
+                    Assert::AreEqual (0.0f, flags[i], L"All flags should start at zero opacity");
                 }
             }
 
@@ -188,7 +177,7 @@ namespace MatrixRainTests
 
 
 
-            TEST_METHOD (Constructor_RevealQueueIndexStartsAtZero)
+            TEST_METHOD (Constructor_RevealFrontStartsAboveWindow)
             {
                 UsageText usage (L'/');
 
@@ -197,8 +186,8 @@ namespace MatrixRainTests
 
 
 
-                Assert::AreEqual (static_cast<size_t> (0), dialog.GetRevealQueueIndex(),
-                                  L"Reveal queue index should start at 0");
+                Assert::IsTrue (dialog.GetRevealFrontY() < 0.0f,
+                                L"Reveal front should start above the window");
             }
 
 
@@ -231,10 +220,11 @@ namespace MatrixRainTests
 
                 HelpRainDialog dialog (usage);
 
-                // Simulate full reveal by calling Update with enough time
-                // The reveal should complete in kRevealDurationSeconds (3.0s)
-                // Run in increments to simulate the animation loop
-                for (int i = 0; i < 250; i++)
+                // With one-char-per-column-per-frame, columns may need
+                // multiple full sweeps to reveal all stacked characters.
+                // At 150px/s and 60fps, one sweep ≈ 240 frames.  Use 3600
+                // frames (~60s) for ample margin.
+                for (int i = 0; i < 3600; i++)
                 {
                     dialog.Update (1.0f / 60.0f);
                 }
@@ -242,7 +232,7 @@ namespace MatrixRainTests
 
 
                 Assert::IsTrue (dialog.IsRevealComplete(),
-                                L"Reveal should be complete after simulating 250 frames (~4.2s > 3.0s reveal duration)");
+                                L"Reveal should be complete after simulating enough frames");
             }
 
 
@@ -259,15 +249,10 @@ namespace MatrixRainTests
 
                 HelpRainDialog dialog (usage);
 
-                // Run enough frames to complete reveal (3s) and allow all reveal
-                // streaks to travel past the window bottom before being removed.
-                // At 300 px/s, streaks spawned last (~3s) start 96px above their
-                // target and must travel past height(600) + trail(72) = 672px.
-                // Worst case: target near bottom of centered text, head starts
-                // near 0 and must reach 672.  672/300 = 2.24s after spawn.
-                // Total: 3s reveal + 2.24s travel = ~5.3s.  Use 1200 frames
-                // (20s) for generous margin against timing variance.
-                for (int i = 0; i < 1200; i++)
+                // Transition to Background happens as soon as all characters
+                // are revealed (columns respawn during Revealing).  Same
+                // timing as IsRevealComplete test.  Use 3600 frames (60s).
+                for (int i = 0; i < 3600; i++)
                 {
                     dialog.Update (1.0f / 60.0f);
                 }
@@ -285,56 +270,35 @@ namespace MatrixRainTests
             //  T085: Reveal queue drain rate
             ////////////////////////////////////////////////////////////
 
-            TEST_METHOD (RevealSpawnRate_CalibratedForDuration)
+            TEST_METHOD (RevealFrontY_AdvancesWithUpdate)
             {
                 UsageText usage (L'/');
 
 
                 HelpRainDialog dialog (usage);
 
-                float  spawnRate = dialog.GetRevealSpawnRate();
-                size_t charCount = dialog.GetCharacterPositions().size();
+                float initialFront = dialog.GetRevealFrontY();
 
-                // Rate should be N / kRevealDurationSeconds
-                float expected = static_cast<float> (charCount) / HelpRainDialog::kRevealDurationSeconds;
-
-
-
-                Assert::AreEqual (expected, spawnRate, 0.01f,
-                                  L"Spawn rate should be N / kRevealDurationSeconds");
-            }
-
-
-
-
-            TEST_METHOD (RevealQueue_DrainsCompletelyWithinDuration)
-            {
-                UsageText usage (L'/');
-
-
-                HelpRainDialog dialog (usage);
-
-                size_t totalChars = dialog.GetCharacterPositions().size();
-                float  elapsed    = 0.0f;
-                float  dt         = 1.0f / 60.0f;
-
-                // Simulate until queue is fully drained
-                while (dialog.GetRevealQueueIndex() < totalChars && elapsed < 10.0f)
+                // Simulate 10 frames at 60 fps
+                for (int i = 0; i < 10; i++)
                 {
-                    dialog.Update (dt);
-                    elapsed += dt;
+                    dialog.Update (1.0f / 60.0f);
                 }
 
+                float advancedFront = dialog.GetRevealFrontY();
 
 
-                Assert::AreEqual (totalChars, dialog.GetRevealQueueIndex(),
-                                  L"Reveal queue should be fully drained");
 
-                // Should have drained within kRevealDurationSeconds + some tolerance
-                float maxAllowed = HelpRainDialog::kRevealDurationSeconds + 0.5f;
-                Assert::IsTrue (elapsed <= maxAllowed,
-                                std::format (L"Queue should drain within {:.1f}s, took {:.1f}s",
-                                             maxAllowed, elapsed).c_str());
+                // Reveal front should have moved downward (increasing Y)
+                Assert::IsTrue (advancedFront > initialFront,
+                                L"Reveal front should advance downward with each update");
+
+                // Verify approximate distance: 10 frames * (1/60)s * 150px/s ≈ 25px
+                float expectedAdvance = 10.0f * (1.0f / 60.0f) * HelpRainDialog::kRevealSpeed;
+                float actualAdvance   = advancedFront - initialFront;
+
+                Assert::IsTrue (abs (actualAdvance - expectedAdvance) < 1.0f,
+                                L"Reveal front should advance at kRevealSpeed");
             }
     };
 
