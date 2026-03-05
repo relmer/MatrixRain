@@ -138,9 +138,26 @@ void AnimationSystem::SpawnStreak()
         return; // Not initialized
     }
 
-    // Random X position across viewport width
-    std::uniform_real_distribution<float> xDist (0.0f, m_viewport->GetWidth ());
-    float x = xDist (m_generator);
+    float viewportWidth = m_viewport->GetWidth ();
+
+
+
+    // Random X position across viewport width, unless callback overrides
+    std::uniform_real_distribution<float> xDist (0.0f, viewportWidth);
+
+    float x;
+
+    if (m_spawnPositionCallback)
+    {
+        SpawnRange range { 0.0f, viewportWidth, -200.0f, 0.0f };
+        auto       result = m_spawnPositionCallback (range);
+
+        x = result.value_or (xDist (m_generator));
+    }
+    else
+    {
+        x = xDist (m_generator);
+    }
 
     // Random Y position above viewport (between -200 and 0)
     std::uniform_real_distribution<float> yDist (-200.0f, 0.0f);
@@ -172,12 +189,30 @@ void AnimationSystem::SpawnStreakInView()
         return; // Not initialized
     }
 
-    // Random X position across viewport width
-    std::uniform_real_distribution<float> xDist (0.0f, m_viewport->GetWidth ());
-    float x = xDist (m_generator);
+    float viewportWidth  = m_viewport->GetWidth ();
+    float viewportHeight = m_viewport->GetHeight ();
+
+
+
+    // Random X position across viewport width, unless callback overrides
+    std::uniform_real_distribution<float> xDist (0.0f, viewportWidth);
+
+    float x;
+
+    if (m_spawnPositionCallback)
+    {
+        SpawnRange range { 0.0f, viewportWidth, 0.0f, viewportHeight };
+        auto       result = m_spawnPositionCallback (range);
+
+        x = result.value_or (xDist (m_generator));
+    }
+    else
+    {
+        x = xDist (m_generator);
+    }
 
     // Random Y position WITHIN viewport (0 to height) for immediate visibility
-    std::uniform_real_distribution<float> yDist (0.0f, m_viewport->GetHeight ());
+    std::uniform_real_distribution<float> yDist (0.0f, viewportHeight);
     float y = yDist (m_generator);
 
     // Random Z depth (0 = near, 100 = far)
@@ -371,6 +406,25 @@ void AnimationSystem::SetAnimationSpeed (int speedPercent)
 void AnimationSystem::SetCharacterSpacingOverride (float spacing)
 {
     m_characterSpacingOverride = spacing;
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  AnimationSystem::SetSpawnPositionCallback
+//
+//  Sets or clears the callback used to override streak spawn X positions.
+//  The callback receives the valid spawn coordinate range and returns an
+//  X position override, or nullopt to use normal random placement.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+void AnimationSystem::SetSpawnPositionCallback (SpawnPositionCallback callback)
+{
+    m_spawnPositionCallback = std::move (callback);
 }
 
 

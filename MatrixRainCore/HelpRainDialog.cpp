@@ -293,6 +293,27 @@ void HelpRainDialog::Update (float deltaTime)
         }
     }
 
+    // Density tracks reveal progress: full reveal density when all hidden,
+    // drops smoothly to background density as characters are revealed.
+    if (m_densityController && !m_characterPositions.empty())
+    {
+        size_t unrevealed = 0;
+
+        for (float flag : m_revealedFlags)
+        {
+            if (flag <= 0.0f)
+            {
+                unrevealed++;
+            }
+        }
+
+        float hiddenRatio = static_cast<float> (unrevealed) / static_cast<float> (m_characterPositions.size());
+        float bgDensity   = std::max (1.0f, m_settings.m_densityPercent * kPhase2DensityMultiplier);
+        float density     = bgDensity + hiddenRatio * (static_cast<float> (kRevealDensityPercent) - bgDensity);
+
+        m_densityController->SetPercentage (std::max (1, static_cast<int> (density)));
+    }
+
     // Let AnimationSystem handle streak spawning, updating, and despawning
     if (m_animationSystem)
     {
@@ -378,17 +399,12 @@ void HelpRainDialog::UpdateRevealPhase (float deltaTime)
         m_animationPhase = AnimationPhase::Background;
         m_phaseTimer     = 0.0f;
 
-        // Reduce density and speed for ambient background rain
-        if (m_densityController)
-        {
-            int bgDensity = static_cast<int> (m_settings.m_densityPercent * kPhase2DensityMultiplier);
-            m_densityController->SetPercentage (std::max (1, bgDensity));
-        }
-
+        // Transition to background speed and clear targeted spawning
         if (m_animationSystem)
         {
             int bgSpeed = static_cast<int> (m_settings.m_animationSpeedPercent * kPhase2SpeedMultiplier);
             m_animationSystem->SetAnimationSpeed (std::min (100, bgSpeed));
+            m_animationSystem->SetSpawnPositionCallback (nullptr);
         }
     }
 }
@@ -408,7 +424,8 @@ void HelpRainDialog::UpdateRevealPhase (float deltaTime)
 
 void HelpRainDialog::UpdateBackgroundPhase (float /* deltaTime */)
 {
-    // AnimationSystem handles all streak spawning/updating
+    // Density is now continuously driven by the hidden-ratio formula
+    // in Update() — no phase-specific density logic needed here.
 }
 
 
@@ -720,6 +737,44 @@ HRESULT HelpRainDialog::CreateRenderPipeline ()
     // but wrong for the help dialog where we want full-impact rain.
     m_animationSystem->SetCharacterSpacingOverride (32.0f);
     m_renderSystem->SetCharacterScaleOverride (1.0f);
+
+    // Install targeted spawning callback — biases new streak positions
+    // toward unrevealed character columns during the reveal phase.
+    // ~70% of spawns target unrevealed characters; ~30% are fully random
+    // to maintain natural rain coverage across the entire viewport.
+    m_animationSystem->SetSpawnPositionCallback (
+        [this] (const SpawnRange & /* range */) -> std::optional<float>
+        {
+            m_spawnCallCounter++;
+
+            // 30% of spawns are random for visual variety
+            if (m_spawnCallCounter % 10 >= 7)
+            {
+                return std::nullopt;
+            }
+
+            // Find the next unrevealed character, cycling from the counter
+            // position so spawns distribute across all unrevealed columns
+            size_t count = m_characterPositions.size();
+
+            if (count == 0)
+            {
+                return std::nullopt;
+            }
+
+            for (size_t j = 0; j < count; j++)
+            {
+                size_t idx = (m_spawnCallCounter + j) % count;
+
+                if (m_revealedFlags[idx] <= 0.0f)
+                {
+                    return m_characterPositions[idx].x + m_textOffsetX;
+                }
+            }
+
+            return std::nullopt;  // All revealed
+        }
+    );
 
     // Create D2D text overlay brushes on RenderSystem's D2D context
     {

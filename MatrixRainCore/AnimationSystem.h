@@ -13,6 +13,38 @@
 
 class DensityController;
 
+
+
+
+
+/// <summary>
+/// Describes the valid coordinate ranges for streak spawning.
+/// Passed to the spawn position callback so clients can choose positions
+/// without needing internal knowledge of AnimationSystem spawn logic.
+/// </summary>
+struct SpawnRange
+{
+    float minX = 0.0f;
+    float maxX = 0.0f;
+    float minY = 0.0f;
+    float maxY = 0.0f;
+};
+
+
+
+
+
+/// <summary>
+/// Callback type for overriding streak spawn X position.
+/// Receives the valid spawn range; returns an X position to use,
+/// or nullopt to let AnimationSystem pick randomly.
+/// </summary>
+using SpawnPositionCallback = std::function<std::optional<float> (const SpawnRange &)>;
+
+
+
+
+
 /// <summary>
 /// Manages all animated character streaks and camera zoom effects.
 /// Handles spawning, updating, and despawning of streaks based on viewport bounds.
@@ -98,6 +130,15 @@ public:
     /// <param name="spacing">Fixed character spacing in pixels</param>
     void SetCharacterSpacingOverride (float spacing);
 
+    /// <summary>
+    /// Set a callback that can override the X position of newly spawned streaks.
+    /// The callback receives the valid spawn range and returns an X position,
+    /// or nullopt to use normal random placement.
+    /// Pass nullptr to clear the callback.
+    /// </summary>
+    /// <param name="callback">Spawn position callback, or nullptr to clear</param>
+    void SetSpawnPositionCallback (SpawnPositionCallback callback);
+
     // Accessors
     const std::vector<CharacterStreak> & GetStreaks()            const { return m_streaks;        }
     size_t                               GetActiveStreakCount()  const { return m_streaks.size(); }
@@ -118,6 +159,7 @@ private:
     int                            m_previousTargetCount   = 0;            // Previous frame's target count (to detect density changes)
     int                            m_animationSpeedPercent = 100;        // Current animation speed percentage (1-100)
     std::optional<float>           m_characterSpacingOverride;            // Override for character spacing (bypasses viewport scaling)
+    SpawnPositionCallback          m_spawnPositionCallback;               // Optional callback for overriding spawn X position
     
     // Random number generation
     std::random_device             m_randomDevice;

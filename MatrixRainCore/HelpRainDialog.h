@@ -141,6 +141,7 @@ private:
     float                          m_phaseTimer      = 0.0f;
     float                          m_revealFrontY    = -50.0f;
     float                          m_elapsedTime     = 0.0f;
+    size_t                         m_spawnCallCounter = 0;
 
     std::vector<CharPosition>      m_characterPositions;
     std::vector<float>             m_revealedFlags;
