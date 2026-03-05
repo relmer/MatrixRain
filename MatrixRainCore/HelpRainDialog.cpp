@@ -1062,6 +1062,9 @@ void HelpRainDialog::RenderRevealStreaks ()
 //  HelpRainDialog::RenderResolvedText
 //
 //  Draws all revealed characters with feathered dark glow for readability.
+//  Uses two passes: first all glows (dark halos), then all foreground text.
+//  This prevents one character's glow from dimming an adjacent character's
+//  already-drawn white text.
 //
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -1072,6 +1075,7 @@ void HelpRainDialog::RenderResolvedText ()
         return;
     }
 
+    // Pass 1: Draw all feathered dark glows
     for (size_t i = 0; i < m_characterPositions.size(); i++)
     {
         if (!m_revealedFlags[i])
@@ -1083,7 +1087,25 @@ void HelpRainDialog::RenderResolvedText ()
         float drawX              = pos.x + m_textOffsetX;
         float drawY              = pos.y + m_textOffsetY;
 
-        DrawCharacterWithGlow (pos.character, drawX, drawY, m_textBrush.Get());
+        DrawCharacterGlow (pos.character, drawX, drawY);
+    }
+
+    // Pass 2: Draw all foreground text on top
+    for (size_t i = 0; i < m_characterPositions.size(); i++)
+    {
+        if (!m_revealedFlags[i])
+        {
+            continue;
+        }
+
+        const CharPosition & pos = m_characterPositions[i];
+        float drawX              = pos.x + m_textOffsetX;
+        float drawY              = pos.y + m_textOffsetY;
+
+        wchar_t     str[2]   = { pos.character, L'\0' };
+        D2D1_RECT_F charRect = D2D1::RectF (drawX, drawY, drawX + 20.0f, drawY + kCellHeight);
+
+        m_d2dRenderTarget->DrawText (str, 1, m_textFormat.Get(), charRect, m_textBrush.Get());
     }
 }
 
@@ -1093,16 +1115,17 @@ void HelpRainDialog::RenderResolvedText ()
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-//  HelpRainDialog::DrawCharacterWithGlow
+//  HelpRainDialog::DrawCharacterGlow
 //
-//  Renders a single character with a feathered dark glow effect for
-//  readability against the rain background.
+//  Renders only the feathered dark glow halo for a single character.
+//  The foreground text is drawn separately in a second pass so that
+//  adjacent characters' glow layers cannot dim already-drawn text.
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void HelpRainDialog::DrawCharacterWithGlow (wchar_t ch, float x, float y, ID2D1SolidColorBrush * pBrush)
+void HelpRainDialog::DrawCharacterGlow (wchar_t ch, float x, float y)
 {
-    if (!m_d2dRenderTarget || !m_textFormat || !m_glowBrush || !pBrush)
+    if (!m_d2dRenderTarget || !m_textFormat || !m_glowBrush)
     {
         return;
     }
@@ -1139,9 +1162,6 @@ void HelpRainDialog::DrawCharacterWithGlow (wchar_t ch, float x, float y, ID2D1S
             }
         }
     }
-
-    // Draw the actual character
-    m_d2dRenderTarget->DrawText (str, 1, m_textFormat.Get(), charRect, pBrush);
 }
 
 

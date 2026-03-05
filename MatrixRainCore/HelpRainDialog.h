@@ -141,7 +141,7 @@ private:
     void    RenderDecorativeStreaks();
     void    RenderRevealStreaks();
     void    RenderResolvedText();
-    void    DrawCharacterWithGlow (wchar_t ch, float x, float y, ID2D1SolidColorBrush * pBrush);
+    void    DrawCharacterGlow (wchar_t ch, float x, float y);
     void    DrawRainGlyph (size_t glyphIndex, float x, float y, float opacity, ID2D1SolidColorBrush * pBrush);
 
     // Animation update helpers
