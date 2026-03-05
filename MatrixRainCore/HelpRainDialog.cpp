@@ -703,20 +703,24 @@ HRESULT HelpRainDialog::CreateDialogWindow ()
 
     RegisterClassW (&wc);
 
-    // Compute window size
+    // Compute window size using actual system DPI (must match rendering DPI)
     {
-        UINT dpi = 96;
+        UINT dpi = GetDpiForSystem();
 
         clientSize = ComputeWindowSize (m_usageText, static_cast<float> (dpi));
     }
 
-    // Adjust for window chrome
-    windowRect.left   = 0;
-    windowRect.top    = 0;
-    windowRect.right  = clientSize.cx;
-    windowRect.bottom = clientSize.cy;
+    // Adjust for window chrome (DPI-aware)
+    {
+        UINT dpi = GetDpiForSystem();
 
-    AdjustWindowRect (&windowRect, WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU, FALSE);
+        windowRect.left   = 0;
+        windowRect.top    = 0;
+        windowRect.right  = clientSize.cx;
+        windowRect.bottom = clientSize.cy;
+
+        AdjustWindowRectExForDpi (&windowRect, WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU, FALSE, 0, dpi);
+    }
 
     windowW = windowRect.right  - windowRect.left;
     windowH = windowRect.bottom - windowRect.top;
