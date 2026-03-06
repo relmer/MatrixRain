@@ -755,7 +755,7 @@ HRESULT HelpRainDialog::CreateDialogWindow ()
     wc.cbClsExtra    = 0;
     wc.cbWndExtra    = sizeof (LONG_PTR);
     wc.hInstance     = GetModuleHandleW (nullptr);
-    wc.hIcon         = LoadIconW (nullptr, IDI_APPLICATION);
+    wc.hIcon         = LoadIconW (GetModuleHandleW (nullptr), MAKEINTRESOURCEW (101));  // IDI_MATRIXRAIN
     wc.hCursor       = LoadCursorW (nullptr, IDC_ARROW);
     wc.hbrBackground = static_cast<HBRUSH> (GetStockObject (BLACK_BRUSH));
     wc.lpszMenuName  = nullptr;
