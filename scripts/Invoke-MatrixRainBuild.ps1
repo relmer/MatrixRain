@@ -165,6 +165,18 @@ function Test-BuildArtifacts {
 $scriptExitCode = 0
 
 try {
+    # Increment version before building (unless skipped or cleaning)
+    $isBuildTarget = $Target -in @('Build', 'Rebuild', 'BuildAllRelease', 'RebuildAllRelease')
+    if ($isBuildTarget -and -not $SkipVersionIncrement) {
+        $incrementScript = Join-Path $PSScriptRoot 'IncrementVersion.ps1'
+        if (Test-Path $incrementScript) {
+            & $incrementScript
+            if ($LASTEXITCODE -ne 0) {
+                throw "Version increment failed with exit code $LASTEXITCODE"
+            }
+        }
+    }
+
     if ($Target -eq 'BuildAllRelease' -or $Target -eq 'RebuildAllRelease' -or $Target -eq 'CleanAll') {
         $platformsToBuild = @('x64', 'ARM64')
         if (-not (Test-VSVCPlatformInstalled -MSBuildPath $msbuildPath -Platform 'ARM64')) {
@@ -196,10 +208,6 @@ try {
                 # Use native ARM64 compiler when building ARM64 on ARM64 host
                 if ($platformToBuild -eq 'ARM64' -and [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture -eq [System.Runtime.InteropServices.Architecture]::Arm64) {
                     $msbuildArgs += "-p:PreferredToolArchitecture=arm64"
-                }
-
-                if ($SkipVersionIncrement) {
-                    $msbuildArgs += '-p:PreBuildEventUseInBuild=false'
                 }
 
                 Write-Host "Using MSBuild: $msbuildPath"
@@ -264,10 +272,6 @@ try {
 
         if ($Target -ne 'Build') {
             $msbuildArgs += "-t:$Target"
-        }
-
-        if ($SkipVersionIncrement) {
-            $msbuildArgs += '-p:PreBuildEventUseInBuild=false'
         }
 
         Write-Host "Using MSBuild: $msbuildPath"
