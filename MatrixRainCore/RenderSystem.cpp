@@ -1370,17 +1370,15 @@ void RenderSystem::Render (const AnimationSystem & animationSystem, const Viewpo
         overlayOcclusionRect    = pOverlay->GetBoundingRect();
         pEffectiveOcclusionRect = &overlayOcclusionRect;
     }
+    else if (!pEffectiveOcclusionRect && pHotkeyOverlay && pHotkeyOverlay->IsActive())
+    {
+        overlayOcclusionRect    = pHotkeyOverlay->GetBoundingRect();
+        pEffectiveOcclusionRect = &overlayOcclusionRect;
+    }
 
     (void) UpdateInstanceBuffer (animationSystem, colorScheme, elapsedTime, pEffectiveOcclusionRect);  // Ignore return - errors already handled within
 
-    // Count total characters to render
-    size_t totalCharacters = 0;
-    for (const auto& streak : animationSystem.GetStreaks())
-    {
-        totalCharacters += streak.GetLength();
-    }
-
-    if (totalCharacters == 0)
+    if (m_instanceData.empty())
     {
         return;
     }
@@ -1440,7 +1438,7 @@ void RenderSystem::Render (const AnimationSystem & animationSystem, const Viewpo
         m_context->ClearRenderTargetView (m_sceneRTV.Get(), clearColor);
         
         m_context->OMSetRenderTargets (1, m_sceneRTV.GetAddressOf(), nullptr);
-        m_context->DrawInstanced (6, static_cast<UINT> (totalCharacters), 0, 0);
+        m_context->DrawInstanced (6, static_cast<UINT> (m_instanceData.size()), 0, 0);
         
         // Now apply bloom (which will composite to backbuffer)
         (void)ApplyBloom();  // Ignore return - errors already handled within
@@ -1449,7 +1447,7 @@ void RenderSystem::Render (const AnimationSystem & animationSystem, const Viewpo
     {
         // Fallback: render directly to backbuffer if bloom not available
         m_context->OMSetRenderTargets (1, m_renderTargetView.GetAddressOf(), nullptr);
-        m_context->DrawInstanced (6, static_cast<UINT> (totalCharacters), 0, 0);
+        m_context->DrawInstanced (6, static_cast<UINT> (m_instanceData.size()), 0, 0);
     }
 
     // Render help hint overlay if active (after bloom, before FPS counter)
@@ -1639,7 +1637,10 @@ void RenderSystem::RenderHelpHintOverlay (const HelpHintOverlay & overlay)
         static constexpr float PADDING     = 20.0f;
 
         // Get the all-glyphs list for codepoint lookup
-        allGlyphs = CharacterConstants::GetAllCodepoints();
+        // Use the overlay's glyph set (which includes any extra characters
+        // like '?' appended during construction) rather than the base set.
+        auto glyphSpan = overlay.GetAllGlyphs();
+        allGlyphs.assign (glyphSpan.begin(), glyphSpan.end());
 
         float baseX = boundingRect.left + PADDING;
         float baseY = boundingRect.top  + PADDING;
@@ -1716,30 +1717,126 @@ Error:
 
 ////////////////////////////////////////////////////////////////////////////////
 //
+//  RenderSystem::ComputeHotkeyOverlayLayout
+//
+//  Uses IDWriteTextLayout to measure the exact pixel width of each key name
+//  and description string, then computes a precisely-sized bounding rect
+//  centered in the viewport.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+void RenderSystem::ComputeHotkeyOverlayLayout (HotkeyOverlay & overlay, float viewportWidth, float viewportHeight)
+{
+    static constexpr float ROW_HEIGHT = 28.0f;
+    static constexpr float PADDING    = 30.0f;
+    static constexpr float GAP        = 16.0f;
+
+    const auto & hotkeys = overlay.GetHotkeys();
+
+    float maxKeyWidth  = 0.0f;
+    float maxDescWidth = 0.0f;
+
+
+
+    if (!m_dwriteFactory || !m_fpsTextFormat)
+    {
+        return;
+    }
+
+    for (const auto & entry : hotkeys)
+    {
+        // Measure key name
+        {
+            ComPtr<IDWriteTextLayout> layout;
+
+            HRESULT hr = m_dwriteFactory->CreateTextLayout (entry.keyName.c_str(),
+                                                            static_cast<UINT32> (entry.keyName.size()),
+                                                            m_fpsTextFormat.Get(),
+                                                            10000.0f,
+                                                            ROW_HEIGHT,
+                                                            &layout);
+            if (SUCCEEDED (hr))
+            {
+                DWRITE_TEXT_METRICS metrics = {};
+
+                layout->GetMetrics (&metrics);
+                maxKeyWidth = std::max (maxKeyWidth, metrics.width);
+            }
+        }
+
+        // Measure description
+        {
+            ComPtr<IDWriteTextLayout> layout;
+
+            HRESULT hr = m_dwriteFactory->CreateTextLayout (entry.description.c_str(),
+                                                            static_cast<UINT32> (entry.description.size()),
+                                                            m_fpsTextFormat.Get(),
+                                                            10000.0f,
+                                                            ROW_HEIGHT,
+                                                            &layout);
+            if (SUCCEEDED (hr))
+            {
+                DWRITE_TEXT_METRICS metrics = {};
+
+                layout->GetMetrics (&metrics);
+                maxDescWidth = std::max (maxDescWidth, metrics.width);
+            }
+        }
+    }
+
+    // Round up to avoid sub-pixel clipping
+    maxKeyWidth  = std::ceil (maxKeyWidth);
+    maxDescWidth = std::ceil (maxDescWidth);
+
+    float contentWidth  = PADDING + maxKeyWidth + GAP + maxDescWidth + PADDING;
+    float contentHeight = PADDING + static_cast<float> (hotkeys.size()) * ROW_HEIGHT + PADDING;
+
+    float left = (viewportWidth  - contentWidth)  / 2.0f;
+    float top  = (viewportHeight - contentHeight) / 2.0f;
+
+    D2D1_RECT_F rect = D2D1::RectF (left, top, left + contentWidth, top + contentHeight);
+
+    overlay.SetMeasuredLayout (rect, maxKeyWidth);
+}
+
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
 //  RenderSystem::RenderHotkeyOverlay
 //
-//  Renders the hotkey reference overlay using D2D/DirectWrite.
-//  Draws a feathered dark background, then each hotkey row with
-//  key name (bright green) and description (white).
+//  Renders the hotkey reference overlay using D2D/DirectWrite with
+//  per-character scramble/resolve animation matching HelpHintOverlay.
+//  Key names render in bright green, descriptions in white.
 //
 ////////////////////////////////////////////////////////////////////////////////
 
 void RenderSystem::RenderHotkeyOverlay (const HotkeyOverlay & overlay)
 {
-    HRESULT     hr      = S_OK;
-    bool        drawing = false;
-    D2D1_RECT_F boundingRect = {};
-    float       opacity = 0.0f;
+    HRESULT                        hr      = S_OK;
+    bool                           drawing = false;
+    std::span<const HintCharacter> chars;
+    D2D1_RECT_F                    boundingRect = {};
+    std::vector<uint32_t>          allGlyphs;
+    int                            cols         = 0;
+    int                            keyColChars  = 0;
 
 
 
-    CBRAEx (m_d2dContext && m_fpsBrush && m_fpsTextFormat && m_fpsGlowBrush, E_UNEXPECTED);
+    CBRAEx (m_d2dContext && m_fpsBrush && m_fpsTextFormat && m_fpsGlowBrush && m_dwriteFactory, E_UNEXPECTED);
 
-    opacity = overlay.GetOpacity();
+    chars = overlay.GetCharacters();
+    cols  = overlay.GetCols();
 
-    BAIL_OUT_IF (opacity <= 0.01f, S_OK);
+    BAIL_OUT_IF (chars.empty(), S_OK);
 
     boundingRect = overlay.GetBoundingRect();
+
+    // Determine key column character count from the overlay's internal layout
+    keyColChars = static_cast<int> (overlay.GetKeyColumnWidth());
 
     m_d2dContext->BeginDraw();
     drawing = true;
@@ -1754,8 +1851,8 @@ void RenderSystem::RenderHotkeyOverlay (const HotkeyOverlay & overlay)
 
         for (int i = featherLayers; i > 0; --i)
         {
-            float expand    = maxExpand * (static_cast<float>(i) / static_cast<float>(featherLayers));
-            float layerAlpha = 0.7f * opacity * (1.0f - (static_cast<float>(i) / static_cast<float>(featherLayers)));
+            float expand     = maxExpand * (static_cast<float>(i) / static_cast<float>(featherLayers));
+            float layerAlpha = 0.7f * (1.0f - (static_cast<float>(i) / static_cast<float>(featherLayers)));
 
             D2D1_RECT_F expandedRect = D2D1::RectF (boundingRect.left   - expand,
                                                       boundingRect.top    - expand,
@@ -1767,63 +1864,143 @@ void RenderSystem::RenderHotkeyOverlay (const HotkeyOverlay & overlay)
         }
 
         // Solid dark center
-        m_fpsGlowBrush->SetColor (D2D1::ColorF (D2D1::ColorF::Black, 0.7f * opacity));
+        m_fpsGlowBrush->SetColor (D2D1::ColorF (D2D1::ColorF::Black, 0.7f));
         m_d2dContext->FillRectangle (boundingRect, m_fpsGlowBrush.Get());
     }
 
     //
-    // Render hotkey rows
+    // Render each non-hidden character
     //
 
     {
-        static constexpr float ROW_HEIGHT     = 28.0f;
-        static constexpr float PADDING        = 30.0f;
-        static constexpr float KEY_COL_WIDTH  = 120.0f;
-        static constexpr float GAP            = 16.0f;
+        static constexpr float ROW_HEIGHT = 28.0f;
+        static constexpr float PADDING    = 30.0f;
+        static constexpr float GAP        = 16.0f;
 
-        const auto & hotkeys = overlay.GetHotkeys();
+        // Use the DWrite-measured key column pixel width for positioning
+        float keyColPixelWidth = overlay.GetKeyColumnWidth();
+
+        // Get the all-glyphs list for codepoint lookup
+        auto glyphSpan = overlay.GetAllGlyphs();
+        allGlyphs.assign (glyphSpan.begin(), glyphSpan.end());
 
         float baseX = boundingRect.left + PADDING;
         float baseY = boundingRect.top  + PADDING;
 
-        // Save current text alignment and set to left/top for hotkey rendering
+        // Measure the average character width for key and desc columns
+        float keyCharWidth  = 0.0f;
+        float descCharWidth = 0.0f;
+
+        // Key column: compute char width from measured pixel width / max key chars
+        const auto & hotkeys = overlay.GetHotkeys();
+
+        int maxKeyChars = 0;
+        int maxDescChars = 0;
+
+        for (const auto & entry : hotkeys)
+        {
+            maxKeyChars  = std::max (maxKeyChars,  static_cast<int> (entry.keyName.size()));
+            maxDescChars = std::max (maxDescChars, static_cast<int> (entry.description.size()));
+        }
+
+        int gapChars = cols - maxKeyChars - maxDescChars;
+
+        if (maxKeyChars > 0)
+        {
+            keyCharWidth = keyColPixelWidth / static_cast<float> (maxKeyChars);
+        }
+
+        // Measure desc column pixel width
+        float descColPixelWidth = (boundingRect.right - PADDING) - (baseX + keyColPixelWidth + GAP);
+
+        if (maxDescChars > 0)
+        {
+            descCharWidth = descColPixelWidth / static_cast<float> (maxDescChars);
+        }
+
+        // Save and set text format
         DWRITE_TEXT_ALIGNMENT      savedTextAlign = m_fpsTextFormat->GetTextAlignment();
         DWRITE_PARAGRAPH_ALIGNMENT savedParaAlign = m_fpsTextFormat->GetParagraphAlignment();
 
         m_fpsTextFormat->SetTextAlignment (DWRITE_TEXT_ALIGNMENT_LEADING);
         m_fpsTextFormat->SetParagraphAlignment (DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
+        m_fpsTextFormat->SetWordWrapping (DWRITE_WORD_WRAPPING_NO_WRAP);
 
-        for (size_t i = 0; i < hotkeys.size(); ++i)
+        for (const auto & ch : chars)
         {
-            float rowY = baseY + static_cast<float>(i) * ROW_HEIGHT;
+            if (ch.isSpace || ch.phase == CharPhase::Hidden)
+            {
+                continue;
+            }
 
-            // Key name — bright green
-            D2D1_RECT_F keyRect = D2D1::RectF (baseX, rowY, baseX + KEY_COL_WIDTH, rowY + ROW_HEIGHT);
+            if (ch.opacity <= 0.01f)
+            {
+                continue;
+            }
 
-            m_fpsBrush->SetColor (D2D1::ColorF (0.0f, 0.9f, 0.0f, opacity));
+            // Look up the codepoint
+            uint32_t codepoint = 0;
 
-            m_d2dContext->DrawText (hotkeys[i].keyName.c_str(),
-                                    static_cast<UINT32>(hotkeys[i].keyName.size()),
+            if (ch.currentGlyphIndex < allGlyphs.size())
+            {
+                codepoint = allGlyphs[ch.currentGlyphIndex];
+            }
+
+            // Convert codepoint to wchar_t string
+            wchar_t glyphStr[3] = {};
+            int     glyphLen    = 0;
+
+            if (codepoint <= 0xFFFF)
+            {
+                glyphStr[0] = static_cast<wchar_t> (codepoint);
+                glyphLen    = 1;
+            }
+            else
+            {
+                glyphStr[0] = static_cast<wchar_t> (0xD800 + ((codepoint - 0x10000) >> 10));
+                glyphStr[1] = static_cast<wchar_t> (0xDC00 + ((codepoint - 0x10000) & 0x3FF));
+                glyphLen    = 2;
+            }
+
+            // Determine column position and color
+            float charX = 0.0f;
+            bool  isKeyColumn = (ch.col < maxKeyChars);
+
+            if (isKeyColumn)
+            {
+                // Key column characters
+                charX = baseX + static_cast<float> (ch.col) * keyCharWidth;
+                m_fpsBrush->SetColor (D2D1::ColorF (0.0f, 0.9f, 0.0f, ch.opacity));
+            }
+            else if (ch.col >= maxKeyChars + gapChars)
+            {
+                // Description column characters
+                int descCol = ch.col - maxKeyChars - gapChars;
+
+                charX = baseX + keyColPixelWidth + GAP + static_cast<float> (descCol) * descCharWidth;
+                m_fpsBrush->SetColor (D2D1::ColorF (D2D1::ColorF::White, ch.opacity));
+            }
+            else
+            {
+                // Gap characters (spaces) — skip
+                continue;
+            }
+
+            float charY = baseY + static_cast<float> (ch.row) * ROW_HEIGHT;
+
+            D2D1_RECT_F charRect = D2D1::RectF (charX, charY, charX + (isKeyColumn ? keyCharWidth : descCharWidth), charY + ROW_HEIGHT);
+
+            m_d2dContext->DrawText (glyphStr,
+                                    static_cast<UINT32> (glyphLen),
                                     m_fpsTextFormat.Get(),
-                                    keyRect,
-                                    m_fpsBrush.Get());
-
-            // Description — white
-            D2D1_RECT_F descRect = D2D1::RectF (baseX + KEY_COL_WIDTH + GAP, rowY,
-                                                  boundingRect.right - PADDING, rowY + ROW_HEIGHT);
-
-            m_fpsBrush->SetColor (D2D1::ColorF (D2D1::ColorF::White, opacity));
-
-            m_d2dContext->DrawText (hotkeys[i].description.c_str(),
-                                    static_cast<UINT32>(hotkeys[i].description.size()),
-                                    m_fpsTextFormat.Get(),
-                                    descRect,
+                                    charRect,
                                     m_fpsBrush.Get());
         }
 
-        // Restore text alignment
+        // Restore text format settings
         m_fpsTextFormat->SetTextAlignment (savedTextAlign);
         m_fpsTextFormat->SetParagraphAlignment (savedParaAlign);
+        m_fpsTextFormat->SetWordWrapping (DWRITE_WORD_WRAPPING_WRAP);
 
         // Reset brush color back to white
         m_fpsBrush->SetColor (D2D1::ColorF (D2D1::ColorF::White, 1.0f));

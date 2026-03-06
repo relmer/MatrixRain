@@ -39,7 +39,7 @@ void InputSystem::ProcessKeyDown (int virtualKey)
         case VK_OEM_3:              // Backtick/tilde key (`~)
             if (m_appState)
             {
-                m_appState->ToggleDebugFadeTimes();
+                m_appState->ToggleStatistics();
             }
             break;
 

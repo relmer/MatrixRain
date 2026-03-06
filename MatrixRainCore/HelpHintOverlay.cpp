@@ -35,6 +35,27 @@ HelpHintOverlay::HelpHintOverlay()
         L"    Exit      Esc"
     };
 
+    // Ensure text characters (like '?') that aren't in the
+    // katakana/Latin/numeral glyph set get appended so they
+    // resolve to the correct codepoint during scramble→reveal.
+    for (const auto & line : m_textLines)
+    {
+        for (wchar_t wc : line)
+        {
+            if (wc == L' ')
+            {
+                continue;
+            }
+
+            uint32_t cp = static_cast<uint32_t> (wc);
+
+            if (std::find (m_allGlyphs.begin(), m_allGlyphs.end(), cp) == m_allGlyphs.end())
+            {
+                m_allGlyphs.push_back (cp);
+            }
+        }
+    }
+
     // Ensure uniform width
     size_t maxLen = 0;
     for (const auto & line : m_textLines)

@@ -636,13 +636,14 @@ void Application::OnKeyDown (WPARAM wParam)
         // ? key (Shift + /) — toggle hotkey overlay
         if (m_hotkeyOverlay)
         {
-            if (m_hotkeyOverlay->GetPhase() == HotkeyOverlayPhase::Visible)
+            if (m_hotkeyOverlay->GetPhase() == OverlayPhase::Holding ||
+                m_hotkeyOverlay->GetPhase() == OverlayPhase::Revealing)
             {
                 m_hotkeyOverlay->Dismiss();
             }
             else
             {
-                m_hotkeyOverlay->UpdateLayout (static_cast<float>(m_viewport->GetWidth()), static_cast<float>(m_viewport->GetHeight()));
+                m_renderSystem->ComputeHotkeyOverlayLayout (*m_hotkeyOverlay, static_cast<float>(m_viewport->GetWidth()), static_cast<float>(m_viewport->GetHeight()));
                 m_hotkeyOverlay->Show();
             }
         }
@@ -661,6 +662,7 @@ void Application::OnKeyDown (WPARAM wParam)
         }
         else
         {
+            m_helpHintOverlay->UpdateLayout (static_cast<float>(m_viewport->GetWidth()), static_cast<float>(m_viewport->GetHeight()));
             m_helpHintOverlay->Show();
         }
     }
@@ -698,16 +700,16 @@ void Application::OnSysKeyDown (WPARAM wParam)
             m_inDisplayModeTransition = false;
         }
 
-        // Dismiss help hint on Alt+Enter (recognized hotkey)
+        // Immediately hide help hint on Alt+Enter (no fade — viewport is changing)
         if (m_helpHintOverlay && m_appState && m_appState->GetHelpHintEnabled())
         {
-            m_helpHintOverlay->Dismiss();
+            m_helpHintOverlay->Hide();
         }
 
-        // Dismiss hotkey overlay on Alt+Enter
+        // Immediately hide hotkey overlay on Alt+Enter
         if (m_hotkeyOverlay && m_hotkeyOverlay->IsActive())
         {
-            m_hotkeyOverlay->Dismiss();
+            m_hotkeyOverlay->Hide();
         }
     }
 }
@@ -770,7 +772,7 @@ void Application::OnSize (LPARAM lParam)
 
         if (m_hotkeyOverlay && m_hotkeyOverlay->IsActive())
         {
-            m_hotkeyOverlay->UpdateLayout (static_cast<float>(width), static_cast<float>(height));
+            m_renderSystem->ComputeHotkeyOverlayLayout (*m_hotkeyOverlay, static_cast<float>(width), static_cast<float>(height));
         }
     }
 }

@@ -124,7 +124,7 @@ public:
     const ScreenSaverSettings GetSettings()            const { return m_settings;            }
 
     void    SetDisplayMode        (DisplayMode mode)   { m_displayMode = mode;                 }
-    void    SetColorScheme        (ColorScheme scheme) { m_colorScheme = scheme;               }
+    void    SetColorScheme        (ColorScheme scheme) { m_colorScheme = scheme; m_settings.m_colorSchemeKey = ColorSchemeToKey (scheme); }
     void    SetShowStatistics     (bool show);
     void    SetShowDebugFadeTimes (bool show);
     void    ToggleStatistics();

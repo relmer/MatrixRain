@@ -103,6 +103,7 @@ public:
     OverlayPhase                     GetPhase()         const { return m_phase;                                  }
     D2D1_RECT_F                      GetBoundingRect()  const { return m_boundingRect;                           }
     std::span<const HintCharacter>   GetCharacters()    const { return std::span<const HintCharacter>(m_chars);  }
+    std::span<const uint32_t>        GetAllGlyphs()     const { return std::span<const uint32_t>(m_allGlyphs);   }
     int                              GetRows()          const { return m_rows;                                   }
     int                              GetCols()          const { return m_cols;                                   }
 

@@ -58,6 +58,11 @@ public:
     void Render (const AnimationSystem & animationSystem, const Viewport & viewport, ColorScheme colorScheme = ColorScheme::Green, float fps = 0.0f, int rainPercentage = 0, int streakCount = 0, int activeHeadCount = 0, bool showDebugFadeTimes = false, float elapsedTime = 0.0f, const HelpHintOverlay * pOverlay = nullptr, const HotkeyOverlay * pHotkeyOverlay = nullptr, const D2D1_RECT_F * pOcclusionRect = nullptr);
 
     /// <summary>
+    /// Compute exact bounding rect for hotkey overlay using DWrite text metrics.
+    /// </summary>
+    void ComputeHotkeyOverlayLayout (HotkeyOverlay & overlay, float viewportWidth, float viewportHeight);
+
+    /// <summary>
     /// Present the rendered frame to the screen.
     /// </summary>
     void Present();
