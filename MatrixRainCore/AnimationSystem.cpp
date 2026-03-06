@@ -431,6 +431,25 @@ void AnimationSystem::SetSpawnPositionCallback (SpawnPositionCallback callback)
 
 
 
+////////////////////////////////////////////////////////////////////////////////
+//
+//  AnimationSystem::SetOverlayCharacters
+//
+//  Replaces the current set of overlay characters.  These are rendered
+//  alongside normal streaks by the GPU pipeline but are not subject to
+//  density control or despawning — the caller owns their lifecycle.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+void AnimationSystem::SetOverlayCharacters (std::vector<OverlayCharacter> overlays)
+{
+    m_overlayCharacters = std::move (overlays);
+}
+
+
+
+
+
 float AnimationSystem::CalculateCharacterSpacing() const
 {
     constexpr float BASE_SPACING     = 32.0f;

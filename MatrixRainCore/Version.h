@@ -5,7 +5,7 @@
 
 #define VERSION_MAJOR 1
 #define VERSION_MINOR 1
-#define VERSION_BUILD 1023
+#define VERSION_BUILD 1045
 #define VERSION_YEAR 2026
 
 // Helper macros for stringification

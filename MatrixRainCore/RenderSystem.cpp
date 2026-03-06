@@ -1269,6 +1269,15 @@ HRESULT RenderSystem::UpdateInstanceBuffer (const AnimationSystem& animationSyst
         }
     }
 
+    // Render overlay characters (standalone characters not attached to any streak,
+    // such as horizontal tracer animations in the help dialog)
+    for (const auto & overlay : animationSystem.GetOverlayCharacters())
+    {
+        CharacterInstanceData data;
+        BuildCharacterInstanceData (overlay.character, overlay.position, schemeColor, data);
+        m_instanceData.push_back (data);
+    }
+
     BAIL_OUT_IF (m_instanceData.empty(), S_OK);
 
     // Resize buffer if needed (double capacity each time to reduce allocations)
@@ -1300,7 +1309,7 @@ Error:
 
 
 
-void RenderSystem::Render (const AnimationSystem & animationSystem, const Viewport & viewport, ColorScheme colorScheme, float fps, int rainPercentage, int streakCount, int activeHeadCount, bool showDebugFadeTimes, float elapsedTime, const HelpHintOverlay * pOverlay, const HotkeyOverlay * pHotkeyOverlay)
+void RenderSystem::Render (const AnimationSystem & animationSystem, const Viewport & viewport, ColorScheme colorScheme, float fps, int rainPercentage, int streakCount, int activeHeadCount, bool showDebugFadeTimes, float elapsedTime, const HelpHintOverlay * pOverlay, const HotkeyOverlay * pHotkeyOverlay, const D2D1_RECT_F * pOcclusionRect)
 {
     if (!m_device || !m_context || !m_renderTargetView)
     {
@@ -1352,17 +1361,17 @@ void RenderSystem::Render (const AnimationSystem & animationSystem, const Viewpo
         m_context->Unmap (m_constantBuffer.Get(), 0);
     }
 
-    // Update instance buffer with character data (pass occlusion rect if overlay active)
-    const D2D1_RECT_F * pOcclusionRect = nullptr;
-    D2D1_RECT_F         occlusionRect  = {};
+    // Update instance buffer with character data (pass occlusion rect if provided or derived from overlay)
+    const D2D1_RECT_F * pEffectiveOcclusionRect = pOcclusionRect;
+    D2D1_RECT_F         overlayOcclusionRect    = {};
 
-    if (pOverlay && pOverlay->IsActive())
+    if (!pEffectiveOcclusionRect && pOverlay && pOverlay->IsActive())
     {
-        occlusionRect  = pOverlay->GetBoundingRect();
-        pOcclusionRect = &occlusionRect;
+        overlayOcclusionRect    = pOverlay->GetBoundingRect();
+        pEffectiveOcclusionRect = &overlayOcclusionRect;
     }
 
-    (void) UpdateInstanceBuffer (animationSystem, colorScheme, elapsedTime, pOcclusionRect);  // Ignore return - errors already handled within
+    (void) UpdateInstanceBuffer (animationSystem, colorScheme, elapsedTime, pEffectiveOcclusionRect);  // Ignore return - errors already handled within
 
     // Count total characters to render
     size_t totalCharacters = 0;

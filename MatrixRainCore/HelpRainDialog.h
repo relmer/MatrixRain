@@ -48,10 +48,10 @@ struct CharPosition
 ////////////////////////////////////////////////////////////////////////////////
 //  HelpRainDialog — Custom graphical window with matrix rain reveal animation
 //
-//  Displays command-line switches via a two-phase GPU-rendered matrix rain
-//  animation.  Phase 1 reveals text through dense rain that sweeps downward,
-//  revealing characters as the front passes.  Phase 2 continues ambient rain
-//  at the user's configured density/speed.
+//  Displays command-line switches via GPU-rendered matrix rain with a
+//  horizontal tracer reveal.  Short rain-like streaks sweep left to right
+//  along each text line, revealing characters in their wake.  Background
+//  rain runs at the user's configured steady-state density throughout.
 //
 //  Owns a full RenderSystem + AnimationSystem for GPU-rendered rain with bloom.
 //  D2D text overlay renders the revealed usage text on top of the rain.
@@ -90,12 +90,15 @@ public:
     // Tunable constants — reveal phase
     static constexpr float kRevealSpeed              = 150.0f;
     static constexpr float kRevealFadeInSpeed        = 2.5f;
-    static constexpr float kRevealProximityThresholdX = 16.0f;
-    static constexpr int   kRevealDensityPercent     = 35;
+    static constexpr float kTracerDurationMin        = 2.0f;
+    static constexpr float kTracerDurationMax        = 4.0f;
     static constexpr int   kRevealSpeedPercent       = 100;
+    static constexpr float kTracerTrailMin           = 250.0f;
+    static constexpr float kTracerTrailMax           = 550.0f;
+    static constexpr float kTracerStaggerRange       = 0.8f;
 
     // Tunable constants — background phase
-    static constexpr float kPhase2DensityMultiplier  = 0.15f;
+    static constexpr float kBgDensityMultiplier     = 0.15f;
     static constexpr float kPhase2SpeedMultiplier    = 1.5f;
 
 
@@ -115,6 +118,9 @@ private:
     // Animation update helpers
     void    UpdateRevealPhase (float deltaTime);
     void    UpdateBackgroundPhase (float deltaTime);
+    void    ComputeLineYPositions();
+    size_t  FindLineIndex (float charY) const;
+    float   ComputeLineTracerX (size_t lineIndex) const;
 
     // Window procedure
     static LRESULT CALLBACK WndProc (HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
@@ -141,10 +147,18 @@ private:
     float                          m_phaseTimer      = 0.0f;
     float                          m_revealFrontY    = -50.0f;
     float                          m_elapsedTime     = 0.0f;
-    size_t                         m_spawnCallCounter = 0;
+    float                          m_tracerProgress  = 0.0f;
 
     std::vector<CharPosition>      m_characterPositions;
     std::vector<float>             m_revealedFlags;
+    std::vector<float>             m_revealTimes;
+    std::vector<float>             m_lineYPositions;
+    std::vector<float>             m_lineTracerDelays;
+    std::vector<float>             m_lineTracerDurations;
+    std::vector<float>             m_lineTrailPixels;
+    std::vector<float>             m_lineFadeDurations;
+    float                          m_textMinX        = 0.0f;
+    float                          m_textMaxX        = 0.0f;
 
 
     // Text layout (DWrite — independent of RenderSystem D2D)
@@ -155,6 +169,7 @@ private:
     // D2D text overlay brushes (created on RenderSystem's D2D context)
     ComPtr<ID2D1SolidColorBrush>   m_textBrush;
     ComPtr<ID2D1SolidColorBrush>   m_glowBrush;
+    ComPtr<ID2D1SolidColorBrush>   m_tracerBrush;
 
 
     // Text layout metrics

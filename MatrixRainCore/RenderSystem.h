@@ -54,7 +54,8 @@ public:
     /// <param name="activeHeadCount">Current number of active streak heads on screen</param>
     /// <param name="showDebugFadeTimes">True to show debug fade time overlay</param>
     /// <param name="elapsedTime">Elapsed time in seconds for color cycling</param>
-    void Render (const AnimationSystem & animationSystem, const Viewport & viewport, ColorScheme colorScheme = ColorScheme::Green, float fps = 0.0f, int rainPercentage = 0, int streakCount = 0, int activeHeadCount = 0, bool showDebugFadeTimes = false, float elapsedTime = 0.0f, const HelpHintOverlay * pOverlay = nullptr, const HotkeyOverlay * pHotkeyOverlay = nullptr);
+    /// <param name="pOcclusionRect">Optional rect in pixel coordinates where rain should not render</param>
+    void Render (const AnimationSystem & animationSystem, const Viewport & viewport, ColorScheme colorScheme = ColorScheme::Green, float fps = 0.0f, int rainPercentage = 0, int streakCount = 0, int activeHeadCount = 0, bool showDebugFadeTimes = false, float elapsedTime = 0.0f, const HelpHintOverlay * pOverlay = nullptr, const HotkeyOverlay * pHotkeyOverlay = nullptr, const D2D1_RECT_F * pOcclusionRect = nullptr);
 
     /// <summary>
     /// Present the rendered frame to the screen.

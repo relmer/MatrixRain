@@ -26,6 +26,7 @@ HelpRainDialog::HelpRainDialog (const UsageText & usageText) :
     // Pre-compute character positions using a temporary text layout
     InitializeTextLayout();
     ComputeCharacterPositions();
+    ComputeLineYPositions();
 }
 
 
@@ -42,6 +43,7 @@ HelpRainDialog::~HelpRainDialog()
 {
     // Release D2D brushes before RenderSystem shutdown
     m_textBrush.Reset();
+    m_tracerBrush.Reset();
     m_glowBrush.Reset();
 
     // Shutdown render pipeline
@@ -67,7 +69,10 @@ HelpRainDialog::~HelpRainDialog()
 //
 //  HelpRainDialog::IsRevealComplete
 //
-//  Returns true when all characters in the reveal queue have been locked in.
+//  Returns true when all characters have been revealed AND all per-line
+//  tracer trails have fully swept past the text.  This prevents the
+//  trail animation from being cut short when the head passes the last
+//  character but the trail is still visible.
 //
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -81,7 +86,26 @@ bool HelpRainDialog::IsRevealComplete () const
         }
     }
 
-    return !m_revealedFlags.empty();
+    if (m_revealedFlags.empty())
+    {
+        return false;
+    }
+
+    // All characters revealed — now ensure every line's trail has
+    // finished sweeping (lineProgress == 1.0 for all lines).
+    for (size_t j = 0; j < m_lineTracerDelays.size(); j++)
+    {
+        float delay    = m_lineTracerDelays[j];
+        float duration = (j < m_lineTracerDurations.size()) ? m_lineTracerDurations[j] : kTracerDurationMax;
+        float progress = (m_phaseTimer - delay) / duration;
+
+        if (progress < 1.0f)
+        {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 
@@ -211,6 +235,7 @@ HRESULT HelpRainDialog::Show ()
     m_textLayout.Reset();
     InitializeTextLayout();
     ComputeCharacterPositions();
+    ComputeLineYPositions();
 
     ShowWindow (m_hWnd, SW_SHOW);
     UpdateWindow (m_hWnd);
@@ -293,29 +318,9 @@ void HelpRainDialog::Update (float deltaTime)
         }
     }
 
-    // Density tracks reveal progress: full reveal density when all hidden,
-    // drops smoothly to background density as characters are revealed.
-    if (m_densityController && !m_characterPositions.empty())
-    {
-        size_t unrevealed = 0;
-
-        for (float flag : m_revealedFlags)
-        {
-            if (flag <= 0.0f)
-            {
-                unrevealed++;
-            }
-        }
-
-        float hiddenRatio = static_cast<float> (unrevealed) / static_cast<float> (m_characterPositions.size());
-        float bgDensity   = std::max (1.0f, m_settings.m_densityPercent * kPhase2DensityMultiplier);
-        float density     = bgDensity + hiddenRatio * (static_cast<float> (kRevealDensityPercent) - bgDensity);
-
-        m_densityController->SetPercentage (std::max (1, static_cast<int> (density)));
-    }
-
     // Let AnimationSystem handle streak spawning, updating, and despawning
-    if (m_animationSystem)
+    // (only during background phase — no rain during reveal)
+    if (m_animationSystem && m_animationPhase == AnimationPhase::Background)
     {
         m_animationSystem->Update (deltaTime);
     }
@@ -329,11 +334,8 @@ void HelpRainDialog::Update (float deltaTime)
 //
 //  HelpRainDialog::UpdateRevealPhase
 //
-//  Reveals text characters when rain streaks cross their positions.
-//  Each streak's head Y is compared against unrevealed characters:
-//  if a streak's column is close enough in X and its head has passed
-//  the character's Y, the character begins fading in.
-//
+//  Advances horizontal tracer streaks left to right across each text line.
+//  Characters are revealed as the tracer head passes their X position.
 //  When no AnimationSystem is available (unit-test path), falls back to
 //  a simple time-based sweep front at kRevealSpeed.
 //
@@ -345,34 +347,32 @@ void HelpRainDialog::UpdateRevealPhase (float deltaTime)
     // and exposed via GetRevealFrontY for test observability).
     m_revealFrontY += kRevealSpeed * deltaTime;
 
+    // Advance tracer progress (0 = left edge, 1 = right edge)
+    m_tracerProgress = std::min (1.0f, m_phaseTimer / kTracerDurationMax);
+
     if (m_animationSystem)
     {
-        // Production path: reveal characters when rain streaks cross them
-        for (const auto & streak : m_animationSystem->GetStreaks())
+        // Production path: tracer reveals characters as it sweeps right.
+        // Each line has its own staggered tracer position.
+        for (size_t i = 0; i < m_characterPositions.size(); i++)
         {
-            float streakX    = streak.GetPosition().x;
-            float streakHeadY = streak.GetPosition().y;
-
-            for (size_t i = 0; i < m_characterPositions.size(); i++)
+            if (m_revealedFlags[i] > 0.0f)
             {
-                if (m_revealedFlags[i] > 0.0f)
-                {
-                    continue;
-                }
+                continue;
+            }
 
-                float charWorldX = m_characterPositions[i].x + m_textOffsetX;
-                float charWorldY = m_characterPositions[i].y + m_textOffsetY;
+            float  charWorldX = m_characterPositions[i].x + m_textOffsetX;
+            size_t lineIdx    = FindLineIndex (m_characterPositions[i].y);
+            float  lineTracerX = ComputeLineTracerX (lineIdx);
 
-                float dx = std::abs (streakX - charWorldX);
-
-                // Streak column must be close in X and head must have
-                // reached or passed the character's Y position.
-                if (dx <= kRevealProximityThresholdX && streakHeadY >= charWorldY)
-                {
-                    m_revealedFlags[i] = 0.01f;  // Start fade-in
-                }
+            if (charWorldX <= lineTracerX)
+            {
+                m_revealedFlags[i] = 0.01f;  // Start fade-in
+                m_revealTimes[i]   = m_elapsedTime;
             }
         }
+
+        // Tracer coloring is handled in RenderTextOverlay via D2D
     }
     else
     {
@@ -389,6 +389,7 @@ void HelpRainDialog::UpdateRevealPhase (float deltaTime)
             if (charWorldY <= m_revealFrontY)
             {
                 m_revealedFlags[i] = 0.01f;  // Start fade-in
+                m_revealTimes[i]   = m_elapsedTime;
             }
         }
     }
@@ -399,12 +400,14 @@ void HelpRainDialog::UpdateRevealPhase (float deltaTime)
         m_animationPhase = AnimationPhase::Background;
         m_phaseTimer     = 0.0f;
 
-        // Transition to background speed and clear targeted spawning
+        // Start background rain now that text is fully revealed
         if (m_animationSystem)
         {
+            int bgDensity = std::max (1, static_cast<int> (m_settings.m_densityPercent * kBgDensityMultiplier));
+            m_densityController->SetPercentage (bgDensity);
+
             int bgSpeed = static_cast<int> (m_settings.m_animationSpeedPercent * kPhase2SpeedMultiplier);
             m_animationSystem->SetAnimationSpeed (std::min (100, bgSpeed));
-            m_animationSystem->SetSpawnPositionCallback (nullptr);
         }
     }
 }
@@ -424,8 +427,149 @@ void HelpRainDialog::UpdateRevealPhase (float deltaTime)
 
 void HelpRainDialog::UpdateBackgroundPhase (float /* deltaTime */)
 {
-    // Density is now continuously driven by the hidden-ratio formula
-    // in Update() — no phase-specific density logic needed here.
+    // Background rain runs at steady-state — AnimationSystem handles
+    // all streak lifecycle.  Nothing additional to do here.
+}
+
+
+
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  HelpRainDialog::ComputeLineYPositions
+//
+//  Extracts the unique Y coordinates from character positions to know
+//  which text lines exist.  Used to spawn one tracer per line.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+void HelpRainDialog::ComputeLineYPositions()
+{
+    m_lineYPositions.clear();
+    m_textMinX =  std::numeric_limits<float>::max();
+    m_textMaxX = -std::numeric_limits<float>::max();
+
+
+
+    for (const auto & pos : m_characterPositions)
+    {
+        // Track overall X bounds
+        float worldX = pos.x + m_textOffsetX;
+
+        if (worldX < m_textMinX) m_textMinX = worldX;
+        if (worldX > m_textMaxX) m_textMaxX = worldX;
+
+        // Collect unique Y values (within 1px tolerance for float rounding)
+        bool found = false;
+
+        for (float existing : m_lineYPositions)
+        {
+            if (std::abs (existing - pos.y) < 1.0f)
+            {
+                found = true;
+                break;
+            }
+        }
+
+        if (!found)
+        {
+            m_lineYPositions.push_back (pos.y);
+        }
+    }
+
+    // Sort top to bottom for visual consistency
+    std::sort (m_lineYPositions.begin(), m_lineYPositions.end());
+
+    // Generate random per-line parameters so each streak has its own
+    // start delay, sweep speed, and trail length.
+    size_t lineCount = m_lineYPositions.size();
+
+    std::mt19937 rng (42);
+    std::uniform_real_distribution<float> delayDist    (0.0f, kTracerStaggerRange);
+    std::uniform_real_distribution<float> durationDist (kTracerDurationMin, kTracerDurationMax);
+    std::uniform_real_distribution<float> trailDist    (kTracerTrailMin, kTracerTrailMax);
+
+    m_lineTracerDelays.resize    (lineCount);
+    m_lineTracerDurations.resize (lineCount);
+    m_lineTrailPixels.resize     (lineCount);
+    m_lineFadeDurations.resize   (lineCount);
+
+    float textWidth = m_textMaxX - m_textMinX;
+
+    for (size_t j = 0; j < lineCount; j++)
+    {
+        m_lineTracerDelays[j]    = delayDist (rng);
+        m_lineTracerDurations[j] = durationDist (rng);
+        m_lineTrailPixels[j]     = trailDist (rng);
+
+        // Fade-to-white duration matches the time a character dwells in the trail
+        float sweepSpan          = textWidth + m_lineTrailPixels[j];
+        m_lineFadeDurations[j]   = (sweepSpan > 0.0f)
+                                   ? m_lineTrailPixels[j] * m_lineTracerDurations[j] / sweepSpan
+                                   : 1.0f;
+    }
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  HelpRainDialog::FindLineIndex
+//
+//  Returns the index into m_lineYPositions that matches the given
+//  character Y position (within 1px tolerance).  Returns 0 if no match.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+size_t HelpRainDialog::FindLineIndex (float charY) const
+{
+    for (size_t j = 0; j < m_lineYPositions.size(); j++)
+    {
+        if (std::abs (m_lineYPositions[j] - charY) < 1.0f)
+        {
+            return j;
+        }
+    }
+
+    return 0;
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  HelpRainDialog::ComputeLineTracerX
+//
+//  Computes the current tracer X position for a given line, accounting
+//  for that line's random stagger delay.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+float HelpRainDialog::ComputeLineTracerX (size_t lineIndex) const
+{
+    float delay    = (lineIndex < m_lineTracerDelays.size())    ? m_lineTracerDelays[lineIndex]    : 0.0f;
+    float duration = (lineIndex < m_lineTracerDurations.size()) ? m_lineTracerDurations[lineIndex] : kTracerDurationMax;
+    float trail    = (lineIndex < m_lineTrailPixels.size())     ? m_lineTrailPixels[lineIndex]     : kTracerTrailMax;
+
+    // Tracer hasn't started for this line yet — return a position
+    // far enough left that no characters will match.
+    if (m_phaseTimer < delay)
+    {
+        return m_textMinX - trail - 1.0f;
+    }
+
+    float lineProgress = std::clamp ((m_phaseTimer - delay) / duration, 0.0f, 1.0f);
+    float textWidth    = m_textMaxX - m_textMinX;
+
+    return m_textMinX + lineProgress * (textWidth + trail);
 }
 
 
@@ -570,8 +714,9 @@ void HelpRainDialog::ComputeCharacterPositions ()
         }
     }
 
-    // Initialize revealed flags
+    // Initialize revealed flags and reveal times
     m_revealedFlags.assign (m_characterPositions.size(), 0.0f);
+    m_revealTimes.assign   (m_characterPositions.size(), 0.0f);
 
     // Initialize the reveal front above the window
     m_revealFrontY = -50.0f;
@@ -724,12 +869,14 @@ HRESULT HelpRainDialog::CreateRenderPipeline ()
                         static_cast<float> (m_windowHeight));
 
     m_densityController = std::make_unique<DensityController> (*m_viewport, 32.0f);
-    m_densityController->SetPercentage (kRevealDensityPercent);
+    m_densityController->SetPercentage (0);  // No rain during reveal; starts after text is fully revealed
 
-    // Create AnimationSystem — max density + max speed for reveal phase
+    // Create AnimationSystem — steady-state density and speed from the start.
+    // The horizontal tracers handle reveal; background rain is purely ambient.
     m_animationSystem = std::make_unique<AnimationSystem>();
     m_animationSystem->Initialize (*m_viewport, *m_densityController);
-    m_animationSystem->SetAnimationSpeed (kRevealSpeedPercent);
+    m_animationSystem->ClearAllStreaks();  // Remove the MIN_STREAKS streak spawned during init
+    m_animationSystem->SetAnimationSpeed (std::min (100, static_cast<int> (m_settings.m_animationSpeedPercent)));
 
     // Force full-size rain characters regardless of viewport size.
     // Without overrides the pipeline scales characters down proportionally
@@ -737,44 +884,6 @@ HRESULT HelpRainDialog::CreateRenderPipeline ()
     // but wrong for the help dialog where we want full-impact rain.
     m_animationSystem->SetCharacterSpacingOverride (32.0f);
     m_renderSystem->SetCharacterScaleOverride (1.0f);
-
-    // Install targeted spawning callback — biases new streak positions
-    // toward unrevealed character columns during the reveal phase.
-    // ~70% of spawns target unrevealed characters; ~30% are fully random
-    // to maintain natural rain coverage across the entire viewport.
-    m_animationSystem->SetSpawnPositionCallback (
-        [this] (const SpawnRange & /* range */) -> std::optional<float>
-        {
-            m_spawnCallCounter++;
-
-            // 30% of spawns are random for visual variety
-            if (m_spawnCallCounter % 10 >= 7)
-            {
-                return std::nullopt;
-            }
-
-            // Find the next unrevealed character, cycling from the counter
-            // position so spawns distribute across all unrevealed columns
-            size_t count = m_characterPositions.size();
-
-            if (count == 0)
-            {
-                return std::nullopt;
-            }
-
-            for (size_t j = 0; j < count; j++)
-            {
-                size_t idx = (m_spawnCallCounter + j) % count;
-
-                if (m_revealedFlags[idx] <= 0.0f)
-                {
-                    return m_characterPositions[idx].x + m_textOffsetX;
-                }
-            }
-
-            return std::nullopt;  // All revealed
-        }
-    );
 
     // Create D2D text overlay brushes on RenderSystem's D2D context
     {
@@ -787,6 +896,10 @@ HRESULT HelpRainDialog::CreateRenderPipeline ()
 
         // Black glow brush (variable opacity)
         hr = d2dContext->CreateSolidColorBrush (D2D1::ColorF (D2D1::ColorF::Black, 0.0f), &m_glowBrush);
+        CHRA (hr);
+
+        // Green brush for tracer trail (variable color/opacity)
+        hr = d2dContext->CreateSolidColorBrush (D2D1::ColorF (0.0f, 1.0f, 0.0f, 1.0f), &m_tracerBrush);
         CHRA (hr);
 
         // Keep D2D context at 96 DPI — the font size and all text layout
@@ -842,7 +955,7 @@ void HelpRainDialog::RenderFrame ()
         return;
     }
 
-    // Render GPU rain with bloom
+    // Render GPU rain with bloom (no occlusion — D2D glow halos keep text readable)
     m_renderSystem->Render (*m_animationSystem,
                             *m_viewport,
                             m_colorScheme,
@@ -875,7 +988,7 @@ void HelpRainDialog::RenderFrame ()
 
 void HelpRainDialog::RenderTextOverlay ()
 {
-    if (!m_renderSystem || !m_textBrush || !m_glowBrush || !m_textFormat)
+    if (!m_renderSystem || !m_textBrush || !m_glowBrush || !m_tracerBrush || !m_textFormat)
     {
         return;
     }
@@ -891,6 +1004,8 @@ void HelpRainDialog::RenderTextOverlay ()
 
     static constexpr float kCharWidth  = 20.0f;
     static constexpr float kCharHeight = 24.0f;
+
+    bool  isTracing = (m_animationPhase == AnimationPhase::Revealing && m_animationSystem != nullptr);
 
     // Pass 1: Draw all feathered dark glows
     for (size_t i = 0; i < m_characterPositions.size(); i++)
@@ -910,6 +1025,14 @@ void HelpRainDialog::RenderTextOverlay ()
     }
 
     // Pass 2: Draw all foreground text on top
+    // Characters in the tracer zone show random matrix rain characters (katakana)
+    // that transition to the actual text character halfway through the trail.
+    // This creates the iconic "decoding" effect:
+    //   Head        — bright white random char
+    //   Early trail — green random chars, brightness fading
+    //   Mid trail   — crossfade from random to actual char
+    //   Late trail  — actual text char in green, settling to white
+    //   Behind      — normal white text (fully revealed)
     for (size_t i = 0; i < m_characterPositions.size(); i++)
     {
         float opacity = m_revealedFlags[i];
@@ -923,12 +1046,95 @@ void HelpRainDialog::RenderTextOverlay ()
         float drawX              = pos.x + m_textOffsetX;
         float drawY              = pos.y + m_textOffsetY;
 
-        wchar_t     str[2]   = { pos.character, L'\0' };
         D2D1_RECT_F charRect = D2D1::RectF (drawX, drawY, drawX + kCharWidth, drawY + kCharHeight);
 
-        m_textBrush->SetOpacity (opacity);
-        d2dContext->DrawText (str, 1, m_textFormat.Get(), charRect, m_textBrush.Get());
-        m_textBrush->SetOpacity (1.0f);
+        // Compute per-line tracer X to support staggered line reveals
+        size_t lineIdx       = FindLineIndex (pos.y);
+        float  lineTracerX   = ComputeLineTracerX (lineIdx);
+        float  lineDelay     = (lineIdx < m_lineTracerDelays.size())    ? m_lineTracerDelays[lineIdx]    : 0.0f;
+        float  lineDuration  = (lineIdx < m_lineTracerDurations.size()) ? m_lineTracerDurations[lineIdx] : kTracerDurationMax;
+        float  lineTrail     = (lineIdx < m_lineTrailPixels.size())     ? m_lineTrailPixels[lineIdx]     : kTracerTrailMax;
+        float  lineProgress  = std::clamp ((m_phaseTimer - lineDelay) / lineDuration, 0.0f, 1.0f);
+
+        // Determine character color based on distance from tracer head
+        float distFromTracer = lineTracerX - drawX;
+
+        if (isTracing && distFromTracer >= 0.0f && distFromTracer < lineTrail)
+        {
+            // Character is in the tracer trail zone
+            float t = distFromTracer / lineTrail;  // 0 = head, 1 = tail end
+
+            // Pick a random katakana character that changes each frame.
+            // Use a hash of index + scaled progress to create frame-to-frame variation.
+            size_t  charSeed    = i * 7 + static_cast<size_t> (lineProgress * 1000.0f);
+            size_t  katIndex    = charSeed % CharacterConstants::HALFWIDTH_KATAKANA_COUNT;
+            wchar_t randomChar  = static_cast<wchar_t> (CharacterConstants::HALFWIDTH_KATAKANA_CODEPOINTS[katIndex]);
+            wchar_t randomStr[2] = { randomChar, L'\0' };
+            wchar_t actualStr[2] = { pos.character, L'\0' };
+
+            if (t < 0.5f)
+            {
+                // First half: random matrix character (white head → fading green trail)
+                if (t < 0.10f)
+                {
+                    // Head: bright white random char
+                    m_textBrush->SetOpacity (1.0f);
+                    d2dContext->DrawText (randomStr, 1, m_textFormat.Get(), charRect, m_textBrush.Get());
+                }
+                else
+                {
+                    // Early trail: green random char, brightness proportional to position
+                    float greenBrightness = 1.0f - (t - 0.10f) / 0.40f;  // 1.0 → 0.0 over 10%–50%
+
+                    m_tracerBrush->SetColor (D2D1::ColorF (0.0f, 0.3f + 0.7f * greenBrightness, 0.0f, 1.0f));
+                    m_tracerBrush->SetOpacity (1.0f);
+                    d2dContext->DrawText (randomStr, 1, m_textFormat.Get(), charRect, m_tracerBrush.Get());
+                }
+            }
+            else
+            {
+                // Second half: actual text character stays green
+                // (matching the dim green at the end of the first half)
+                // and brightens slightly toward the tail.
+                float settleT = (t - 0.5f) / 0.5f;  // 0 → 1 over the second half
+                float g       = 0.3f + 0.2f * settleT;   // 0.3 → 0.5
+
+                m_tracerBrush->SetColor (D2D1::ColorF (0.0f, g, 0.0f, 1.0f));
+                m_tracerBrush->SetOpacity (1.0f);
+                d2dContext->DrawText (actualStr, 1, m_textFormat.Get(), charRect, m_tracerBrush.Get());
+            }
+        }
+        else
+        {
+            // Revealed text behind the trail — fade from green to white
+            // using time since reveal, so the fade continues even after
+            // the tracer phase ends.
+            wchar_t str[2] = { pos.character, L'\0' };
+
+            float timeSinceReveal = m_elapsedTime - m_revealTimes[i];
+            float lineFade        = (lineIdx < m_lineFadeDurations.size()) ? m_lineFadeDurations[lineIdx] : 1.0f;
+            float timeSinceExit   = timeSinceReveal - lineFade;  // Offset by trail dwell time
+            float fadeT           = std::clamp (timeSinceExit / 0.3f, 0.0f, 1.0f);
+
+            if (fadeT < 1.0f)
+            {
+                // Lerp from dim green (matching trail tail) to white
+                float r = fadeT;
+                float g = 0.5f + 0.5f * fadeT;
+                float b = fadeT;
+
+                m_tracerBrush->SetColor (D2D1::ColorF (r, g, b, 1.0f));
+                m_tracerBrush->SetOpacity (opacity);
+                d2dContext->DrawText (str, 1, m_textFormat.Get(), charRect, m_tracerBrush.Get());
+            }
+            else
+            {
+                // Fully settled: white
+                m_textBrush->SetOpacity (opacity);
+                d2dContext->DrawText (str, 1, m_textFormat.Get(), charRect, m_textBrush.Get());
+                m_textBrush->SetOpacity (1.0f);
+            }
+        }
     }
 
     d2dContext->EndDraw();
@@ -1043,18 +1249,35 @@ LRESULT CALLBACK HelpRainDialog::WndProc (HWND hwnd, UINT msg, WPARAM wParam, LP
                     pDialog->m_phaseTimer     = 0.0f;
                     pDialog->m_revealFrontY   = -50.0f;
                     pDialog->m_elapsedTime    = 0.0f;
+                    pDialog->m_tracerProgress = 0.0f;
                     pDialog->m_revealedFlags.assign (pDialog->m_characterPositions.size(), 0.0f);
+                    pDialog->m_revealTimes.assign   (pDialog->m_characterPositions.size(), 0.0f);
 
-                    // Reset AnimationSystem to reveal-phase density/speed
+                    // Regenerate per-line stagger delays for variety on each replay
+                    std::mt19937 rng (static_cast<unsigned> (std::chrono::steady_clock::now().time_since_epoch().count()));
+                    std::uniform_real_distribution<float> delayDist    (0.0f, kTracerStaggerRange);
+                    std::uniform_real_distribution<float> durationDist (kTracerDurationMin, kTracerDurationMax);
+                    std::uniform_real_distribution<float> trailDist    (kTracerTrailMin, kTracerTrailMax);
+
+                    for (size_t j = 0; j < pDialog->m_lineTracerDelays.size(); j++)
+                    {
+                        pDialog->m_lineTracerDelays[j]    = delayDist (rng);
+                        pDialog->m_lineTracerDurations[j] = durationDist (rng);
+                        pDialog->m_lineTrailPixels[j]     = trailDist (rng);
+
+                        float sweepSpan                   = (pDialog->m_textMaxX - pDialog->m_textMinX) + pDialog->m_lineTrailPixels[j];
+                        pDialog->m_lineFadeDurations[j]   = (sweepSpan > 0.0f)
+                                                            ? pDialog->m_lineTrailPixels[j] * pDialog->m_lineTracerDurations[j] / sweepSpan
+                                                            : 1.0f;
+                    }
+
+                    // Reset AnimationSystem — no rain during reveal
                     if (pDialog->m_animationSystem)
                     {
                         pDialog->m_animationSystem->ClearAllStreaks();
-                        pDialog->m_animationSystem->SetAnimationSpeed (kRevealSpeedPercent);
-                    }
-
-                    if (pDialog->m_densityController)
-                    {
-                        pDialog->m_densityController->SetPercentage (kRevealDensityPercent);
+                        pDialog->m_densityController->SetPercentage (0);
+                        pDialog->m_animationSystem->SetAnimationSpeed (
+                            std::min (100, static_cast<int> (pDialog->m_settings.m_animationSpeedPercent)));
                     }
                 }
 

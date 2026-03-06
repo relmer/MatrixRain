@@ -46,6 +46,21 @@ using SpawnPositionCallback = std::function<std::optional<float> (const SpawnRan
 
 
 /// <summary>
+/// A standalone character rendered through the GPU pipeline but not
+/// attached to any CharacterStreak.  Used for effects like horizontal
+/// tracer streaks in the help dialog.
+/// </summary>
+struct OverlayCharacter
+{
+    CharacterInstance character;       // Glyph, color, brightness, scale
+    Vector3           position;        // World position (x, y, z)
+};
+
+
+
+
+
+/// <summary>
 /// Manages all animated character streaks and camera zoom effects.
 /// Handles spawning, updating, and despawning of streaks based on viewport bounds.
 /// </summary>
@@ -139,10 +154,19 @@ public:
     /// <param name="callback">Spawn position callback, or nullptr to clear</param>
     void SetSpawnPositionCallback (SpawnPositionCallback callback);
 
+    /// <summary>
+    /// Set overlay characters to be rendered alongside normal streaks.
+    /// These are standalone characters not attached to any streak,
+    /// useful for effects like horizontal tracer animations.
+    /// </summary>
+    /// <param name="overlays">Vector of overlay characters to render</param>
+    void SetOverlayCharacters (std::vector<OverlayCharacter> overlays);
+
     // Accessors
-    const std::vector<CharacterStreak> & GetStreaks()            const { return m_streaks;        }
-    size_t                               GetActiveStreakCount()  const { return m_streaks.size(); }
-    size_t                               GetActiveHeadCount()    const;
+    const std::vector<CharacterStreak>  & GetStreaks()            const { return m_streaks;            }
+    const std::vector<OverlayCharacter> & GetOverlayCharacters()  const { return m_overlayCharacters;  }
+    size_t                                GetActiveStreakCount()  const { return m_streaks.size();      }
+    size_t                                GetActiveHeadCount()    const;
     float                                GetZoomVelocity()       const { return m_zoomVelocity;   }
 
     void SetZoomVelocity (float velocity) { m_zoomVelocity = velocity; }
@@ -160,6 +184,7 @@ private:
     int                            m_animationSpeedPercent = 100;        // Current animation speed percentage (1-100)
     std::optional<float>           m_characterSpacingOverride;            // Override for character spacing (bypasses viewport scaling)
     SpawnPositionCallback          m_spawnPositionCallback;               // Optional callback for overriding spawn X position
+    std::vector<OverlayCharacter>  m_overlayCharacters;                   // Extra characters rendered alongside streaks
     
     // Random number generation
     std::random_device             m_randomDevice;
