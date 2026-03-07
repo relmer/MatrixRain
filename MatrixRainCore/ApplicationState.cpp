@@ -1,8 +1,16 @@
 #include "pch.h"
 
 #include "ApplicationState.h"
-#include "RegistrySettingsProvider.h"
 #include "ScreenSaverModeContext.h"
+
+
+
+
+
+ApplicationState::ApplicationState (ISettingsProvider & settingsProvider) :
+    m_settingsProvider (settingsProvider)
+{
+}
 
 
 
@@ -12,8 +20,8 @@ void ApplicationState::Initialize (const ScreenSaverModeContext * pScreenSaverCo
 {
     m_pScreenSaverContext = pScreenSaverContext;
     
-    // Load settings from registry (falls back to defaults if key doesn't exist)
-    HRESULT hr = RegistrySettingsProvider::Load (m_settings);
+    // Load settings from provider (falls back to defaults if no data exists)
+    HRESULT hr = m_settingsProvider.Load (m_settings);
     
     // hr == S_FALSE means key didn't exist, used defaults (not an error)
     // hr == S_OK means loaded from registry successfully
@@ -28,7 +36,7 @@ void ApplicationState::Initialize (const ScreenSaverModeContext * pScreenSaverCo
                                   (pScreenSaverContext->m_mode == ScreenSaverMode::ScreenSaverPreview ||
                                    pScreenSaverContext->m_mode == ScreenSaverMode::ScreenSaverFull);
     
-    m_showDebugFadeTimes = isPreviewOrScreenSaver ? false : m_settings.m_showFadeTimers;
+    m_showDebugFadeTimes = false;
     m_showStatistics     = isPreviewOrScreenSaver ? false : m_settings.m_showDebugStats;
     
     // Help hint enabled only in Normal mode (no screensaver arguments)
@@ -81,10 +89,6 @@ void ApplicationState::CycleColorScheme()
 void ApplicationState::ToggleDebugFadeTimes()
 {
     m_showDebugFadeTimes = !m_showDebugFadeTimes;
-    
-    // Update settings and save
-    m_settings.m_showFadeTimers = m_showDebugFadeTimes;
-    SaveSettings();
 }
 
 
@@ -258,10 +262,6 @@ void ApplicationState::SetShowDebugFadeTimes (bool show)
     }
     
     m_showDebugFadeTimes = show;
-    
-    // Update settings and save
-    m_settings.m_showFadeTimers = show;
-    SaveSettings();
 }
 
 
@@ -293,6 +293,6 @@ void ApplicationState::ToggleStatistics()
 HRESULT
 ApplicationState::SaveSettings()
 {
-    return RegistrySettingsProvider::Save (m_settings);
+    return m_settingsProvider.Save (m_settings);
 }
 

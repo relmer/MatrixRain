@@ -1,5 +1,7 @@
 #pragma once
 
+#include "RegistrySettingsProvider.h"
+
 
 
 
@@ -32,19 +34,20 @@ public:
     void    Shutdown();
 
     // Accessors for live overlay configuration dialog
-    HWND               GetMainWindowHwnd()   const                { return m_hwnd;                   }
-    HINSTANCE          GetInstance()          const                { return m_hInstance;              }
-    ApplicationState * GetApplicationState() const                { return m_appState.get();         }
-    void               SetConfigDialog       (HWND hConfigDialog) { m_hConfigDialog = hConfigDialog; }
+    HWND                GetMainWindowHwnd()   const                { return m_hwnd;                   }
+    HINSTANCE           GetInstance()         const                { return m_hInstance;              }
+    ApplicationState  * GetApplicationState() const                { return m_appState.get();         }
+    ISettingsProvider & GetSettingsProvider()                      { return m_settingsProvider;       }
+    void                SetConfigDialog       (HWND hConfigDialog) { m_hConfigDialog = hConfigDialog; }
     
     // Callback for opening config dialog from Enter key (set by main.cpp)
-    void               SetOpenConfigDialogCallback (std::function<void()> callback) { m_openConfigDialogCallback = callback; }
+    void                SetOpenConfigDialogCallback (std::function<void()> callback) { m_openConfigDialogCallback = callback; }
     
     // Callback for showing usage dialog from ? key (set by main.cpp)
-    void               SetShowUsageDialogCallback (std::function<void()> callback)  { m_showUsageDialogCallback = callback; }
+    void                SetShowUsageDialogCallback (std::function<void()> callback)  { m_showUsageDialogCallback = callback; }
     
     // Apply display mode change and resize window
-    void               ApplyDisplayModeChange()                   { ResizeWindowForCurrentMode();    }
+    void                ApplyDisplayModeChange()                   { ResizeWindowForCurrentMode();    }
 
     // Window dimensions
     static constexpr UINT            DEFAULT_WIDTH  = 1280;
@@ -53,6 +56,7 @@ public:
 
 private:
     // Core systems
+    RegistrySettingsProvider           m_settingsProvider;
     std::unique_ptr<Viewport>          m_viewport;
     std::unique_ptr<AnimationSystem>   m_animationSystem;
     std::unique_ptr<RenderSystem>      m_renderSystem;

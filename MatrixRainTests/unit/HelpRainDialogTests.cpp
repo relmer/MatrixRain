@@ -1,6 +1,7 @@
 #include "Pch_MatrixRainTests.h"
 
 #include "..\..\MatrixRainCore\HelpRainDialog.h"
+#include "..\..\MatrixRainCore\InMemorySettingsProvider.h"
 
 
 
@@ -14,6 +15,9 @@ namespace MatrixRainTests
 
     TEST_CLASS (HelpRainDialogTests)
     {
+        private:
+            InMemorySettingsProvider m_settingsProvider;
+
         public:
 
 
@@ -91,7 +95,7 @@ namespace MatrixRainTests
                 UsageText usage (L'/');
 
 
-                HelpRainDialog dialog (usage);
+                HelpRainDialog dialog (usage, m_settingsProvider);
 
                 const auto & positions = dialog.GetCharacterPositions();
 
@@ -124,7 +128,7 @@ namespace MatrixRainTests
                 UsageText usage (L'/');
 
 
-                HelpRainDialog dialog (usage);
+                HelpRainDialog dialog (usage, m_settingsProvider);
 
 
 
@@ -142,7 +146,7 @@ namespace MatrixRainTests
                 UsageText usage (L'/');
 
 
-                HelpRainDialog dialog (usage);
+                HelpRainDialog dialog (usage, m_settingsProvider);
 
                 const auto & flags     = dialog.GetRevealedFlags();
                 const auto & positions = dialog.GetCharacterPositions();
@@ -166,7 +170,7 @@ namespace MatrixRainTests
                 UsageText usage (L'/');
 
 
-                HelpRainDialog dialog (usage);
+                HelpRainDialog dialog (usage, m_settingsProvider);
 
 
 
@@ -182,7 +186,7 @@ namespace MatrixRainTests
                 UsageText usage (L'/');
 
 
-                HelpRainDialog dialog (usage);
+                HelpRainDialog dialog (usage, m_settingsProvider);
 
 
 
@@ -202,7 +206,7 @@ namespace MatrixRainTests
                 UsageText usage (L'/');
 
 
-                HelpRainDialog dialog (usage);
+                HelpRainDialog dialog (usage, m_settingsProvider);
 
 
 
@@ -218,7 +222,7 @@ namespace MatrixRainTests
                 UsageText usage (L'/');
 
 
-                HelpRainDialog dialog (usage);
+                HelpRainDialog dialog (usage, m_settingsProvider);
 
                 // With one-char-per-column-per-frame, columns may need
                 // multiple full sweeps to reveal all stacked characters.
@@ -247,7 +251,7 @@ namespace MatrixRainTests
                 UsageText usage (L'/');
 
 
-                HelpRainDialog dialog (usage);
+                HelpRainDialog dialog (usage, m_settingsProvider);
 
                 // Transition to Background happens as soon as all characters
                 // are revealed (columns respawn during Revealing).  Same
@@ -275,7 +279,7 @@ namespace MatrixRainTests
                 UsageText usage (L'/');
 
 
-                HelpRainDialog dialog (usage);
+                HelpRainDialog dialog (usage, m_settingsProvider);
 
                 float initialFront = dialog.GetRevealFrontY();
 

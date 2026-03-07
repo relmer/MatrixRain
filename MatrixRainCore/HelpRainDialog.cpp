@@ -3,7 +3,6 @@
 #include "HelpRainDialog.h"
 
 #include "CharacterSet.h"
-#include "RegistrySettingsProvider.h"
 #include "UnicodeSymbols.h"
 #include "Version.h"
 
@@ -20,8 +19,9 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-HelpRainDialog::HelpRainDialog (const UsageText & usageText) :
-    m_usageText (usageText)
+HelpRainDialog::HelpRainDialog (const UsageText & usageText, ISettingsProvider & settingsProvider) :
+    m_usageText        (usageText),
+    m_settingsProvider (settingsProvider)
 {
     // Pre-compute character positions using a temporary text layout
     InitializeTextLayout();
@@ -927,8 +927,8 @@ Error:
 
 HRESULT HelpRainDialog::LoadUserSettings ()
 {
-    // Load settings from registry — ignore failure (defaults are fine)
-    RegistrySettingsProvider::Load (m_settings);
+    // Load settings from provider — ignore failure (defaults are fine)
+    m_settingsProvider.Load (m_settings);
     m_settings.Clamp();
 
     m_colorScheme = ParseColorSchemeKey (m_settings.m_colorSchemeKey);

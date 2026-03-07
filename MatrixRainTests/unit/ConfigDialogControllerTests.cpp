@@ -3,7 +3,7 @@
 #include "..\..\MatrixRainCore\ApplicationState.h"
 #include "..\..\MatrixRainCore\ColorScheme.h"
 #include "..\..\MatrixRainCore\ConfigDialogController.h"
-#include "..\..\MatrixRainCore\RegistrySettingsProvider.h"
+#include "..\..\MatrixRainCore\InMemorySettingsProvider.h"
 
 
 
@@ -14,29 +14,12 @@ namespace MatrixRainTests
     TEST_CLASS (ConfigDialogControllerTests)
     {
     private:
-        static constexpr LPCWSTR TEST_REGISTRY_KEY_PATH = L"Software\\relmer\\MatrixRain_ConfigDialogTest";
-        
-        static void DeleteTestRegistryKey()
-        {
-            RegDeleteTreeW (HKEY_CURRENT_USER, TEST_REGISTRY_KEY_PATH);
-        }
-        
+        InMemorySettingsProvider m_settingsProvider;
+
     public:
-        TEST_CLASS_INITIALIZE (Initialize)
-        {
-            RegistrySettingsProvider::SetRegistryKeyPath (TEST_REGISTRY_KEY_PATH);
-        }
-        
-        TEST_CLASS_CLEANUP (Cleanup)
-        {
-            DeleteTestRegistryKey();
-            RegistrySettingsProvider::ResetRegistryKeyPath();
-        }
-        
         TEST_METHOD_INITIALIZE (MethodSetup)
         {
-            // Ensure clean registry state before each test
-            DeleteTestRegistryKey();
+            m_settingsProvider.Clear();
         }
 
 
@@ -60,12 +43,12 @@ namespace MatrixRainTests
             };
             
             HRESULT                hr         = S_OK; 
-            ConfigDialogController controller;
+            ConfigDialogController controller (m_settingsProvider);
             
 
             
-            hr = RegistrySettingsProvider::Save (settings);
-            Assert::AreEqual (S_OK, hr, L"Registry save should succeed");
+            hr = m_settingsProvider.Save (settings);
+            Assert::AreEqual (S_OK, hr, L"Settings save should succeed");
 
             // Act: Create controller and initialize
             hr = controller.Initialize();
@@ -91,11 +74,11 @@ namespace MatrixRainTests
         TEST_METHOD (TestConfigDialogControllerUsesDefaultsWhenNoRegistry)
         {
             HRESULT                hr         = S_OK; 
-            ConfigDialogController controller;
+            ConfigDialogController controller (m_settingsProvider);
 
 
 
-            // Arrange: Ensure no registry key exists (already done in MethodSetup)
+            // Arrange: Ensure no saved data exists (already done in MethodSetup)
 
             // Act: Create controller and initialize
             
@@ -121,7 +104,7 @@ namespace MatrixRainTests
         TEST_METHOD (TestConfigDialogControllerClampsDensitySliderUpdates)
         {
             HRESULT                hr         = S_OK;
-            ConfigDialogController controller;
+            ConfigDialogController controller (m_settingsProvider);
 
 
 
@@ -154,7 +137,7 @@ namespace MatrixRainTests
         TEST_METHOD (TestConfigDialogControllerClampsAnimationSpeedUpdates)
         {
             HRESULT                hr         = S_OK; 
-            ConfigDialogController controller;
+            ConfigDialogController controller (m_settingsProvider);
             
             
             
@@ -187,7 +170,7 @@ namespace MatrixRainTests
         TEST_METHOD (TestConfigDialogControllerClampsGlowIntensityUpdates)
         {
             HRESULT                hr         = S_OK; 
-            ConfigDialogController controller;
+            ConfigDialogController controller (m_settingsProvider);
             
             
             
@@ -220,7 +203,7 @@ namespace MatrixRainTests
         TEST_METHOD (TestConfigDialogControllerClampsGlowSizeUpdates)
         {
             HRESULT                hr         = S_OK; 
-            ConfigDialogController controller;
+            ConfigDialogController controller (m_settingsProvider);
             
             
             
@@ -253,7 +236,7 @@ namespace MatrixRainTests
         TEST_METHOD (TestConfigDialogControllerUpdatesColorScheme)
         {
             HRESULT                hr         = S_OK; 
-            ConfigDialogController controller;
+            ConfigDialogController controller (m_settingsProvider);
             
             
             
@@ -287,7 +270,7 @@ namespace MatrixRainTests
         {
             // Arrange
             HRESULT                hr         = S_OK; 
-            ConfigDialogController controller;
+            ConfigDialogController controller (m_settingsProvider);
             
             
             
@@ -314,7 +297,7 @@ namespace MatrixRainTests
         {
             // Arrange
             HRESULT                hr         = S_OK;
-            ConfigDialogController controller;
+            ConfigDialogController controller (m_settingsProvider);
 
 
 
@@ -352,7 +335,7 @@ namespace MatrixRainTests
         {
             // Arrange
             HRESULT                hr         = S_OK; 
-            ConfigDialogController controller;
+            ConfigDialogController controller (m_settingsProvider);
             
             
             
@@ -371,10 +354,10 @@ namespace MatrixRainTests
             hr = controller.ApplyChanges();
             Assert::AreEqual (S_OK, hr, L"ApplyChanges should succeed");
 
-            // Assert: Verify settings were saved to registry
+            // Assert: Verify settings were saved
             ScreenSaverSettings loadedSettings;
-            hr = RegistrySettingsProvider::Load (loadedSettings);
-            Assert::AreEqual (S_OK, hr, L"Registry load should succeed");
+            hr = m_settingsProvider.Load (loadedSettings);
+            Assert::AreEqual (S_OK, hr, L"Settings load should succeed");
 
             Assert::AreEqual (80,     loadedSettings.m_densityPercent,        L"Density should be saved");
             Assert::AreEqual (L"red", loadedSettings.m_colorSchemeKey.c_str(), L"Color scheme should be saved");
@@ -391,7 +374,7 @@ namespace MatrixRainTests
         // T019.11: Test ConfigDialogController discards changes on Cancel
         TEST_METHOD (TestConfigDialogControllerDiscardsChangesOnCancel)
         {
-            // Arrange: Save initial settings to registry
+            // Arrange: Save initial settings
             ScreenSaverSettings initialSettings
             {
                 .m_densityPercent        = 50,
@@ -399,10 +382,10 @@ namespace MatrixRainTests
                 .m_animationSpeedPercent = 75
             };
             
-            HRESULT hr = RegistrySettingsProvider::Save (initialSettings);
+            HRESULT hr = m_settingsProvider.Save (initialSettings);
             Assert::AreEqual (S_OK, hr);
 
-            ConfigDialogController controller;
+            ConfigDialogController controller (m_settingsProvider);
             hr = controller.Initialize();
             Assert::AreEqual (S_OK, hr);
 
@@ -414,9 +397,9 @@ namespace MatrixRainTests
             // Act: Cancel changes
             controller.CancelChanges();
 
-            // Assert: Verify registry still contains original settings
+            // Assert: Verify saved settings still contain original values
             ScreenSaverSettings loadedSettings;
-            hr = RegistrySettingsProvider::Load (loadedSettings);
+            hr = m_settingsProvider.Load (loadedSettings);
             Assert::AreEqual (S_OK, hr);
 
             Assert::AreEqual (50,       loadedSettings.m_densityPercent,        L"Density should remain unchanged");
@@ -433,7 +416,7 @@ namespace MatrixRainTests
         {
             // Arrange
             HRESULT                hr         = S_OK;
-            ConfigDialogController controller;
+            ConfigDialogController controller (m_settingsProvider);
 
 
 
@@ -470,8 +453,8 @@ namespace MatrixRainTests
         {
             // Arrange: Set up initial settings in registry
             HRESULT                hr              = S_OK;
-            ConfigDialogController controller;
-            ApplicationState       appState;
+            ConfigDialogController controller (m_settingsProvider);
+            ApplicationState       appState (m_settingsProvider);
             ScreenSaverSettings    initialSettings
             {
                 .m_densityPercent        = 70,
@@ -483,7 +466,7 @@ namespace MatrixRainTests
             
 
 
-            hr = RegistrySettingsProvider::Save (initialSettings);
+            hr = m_settingsProvider.Save (initialSettings);
             Assert::AreEqual (S_OK, hr);
 
             hr = controller.Initialize();
@@ -509,8 +492,8 @@ namespace MatrixRainTests
         {
             // Arrange
             HRESULT                hr         = S_OK;
-            ConfigDialogController controller;
-            ApplicationState       appState;
+            ConfigDialogController controller (m_settingsProvider);
+            ApplicationState       appState (m_settingsProvider);
 
 
 
@@ -538,8 +521,8 @@ namespace MatrixRainTests
         {
             // Arrange
             HRESULT                 hr         = S_OK;
-            ConfigDialogController  controller;
-            ApplicationState        appState;
+            ConfigDialogController  controller (m_settingsProvider);
+            ApplicationState        appState (m_settingsProvider);
 
 
 
@@ -579,11 +562,11 @@ namespace MatrixRainTests
             };
             
             HRESULT                 hr = S_OK;
-            ConfigDialogController  controller;
-            ApplicationState        appState;
+            ConfigDialogController  controller (m_settingsProvider);
+            ApplicationState        appState (m_settingsProvider);
 
 
-            hr = RegistrySettingsProvider::Save (initialSettings);
+            hr = m_settingsProvider.Save (initialSettings);
             Assert::AreEqual (S_OK, hr);
 
             hr = controller.Initialize();
@@ -599,13 +582,13 @@ namespace MatrixRainTests
             hr = controller.ApplyLiveMode();
             Assert::AreEqual (S_OK, hr);
 
-            // Assert: Should persist to registry and exit live mode
+            // Assert: Should persist and exit live mode
             Assert::IsFalse (controller.IsLiveMode(), L"Should exit live mode after apply");
 
             ScreenSaverSettings savedSettings;
-            hr = RegistrySettingsProvider::Load (savedSettings);
+            hr = m_settingsProvider.Load (savedSettings);
             Assert::AreEqual (S_OK, hr);
-            Assert::AreEqual (75, savedSettings.m_densityPercent, L"Changes should be saved to registry");
+            Assert::AreEqual (75, savedSettings.m_densityPercent, L"Changes should be saved");
         }
 
 
@@ -628,10 +611,10 @@ namespace MatrixRainTests
                 .m_showFadeTimers        = true
             };
             
-            HRESULT hr = RegistrySettingsProvider::Save (settings);
+            HRESULT hr = m_settingsProvider.Save (settings);
             Assert::AreEqual (S_OK, hr);
 
-            ConfigDialogController controller;
+            ConfigDialogController controller (m_settingsProvider);
             hr = controller.Initialize();
             Assert::AreEqual (S_OK, hr);
 
@@ -647,7 +630,7 @@ namespace MatrixRainTests
         TEST_METHOD (TestLiveModeRejectsModalOperations)
         {
             // Arrange
-            ConfigDialogController controller;
+            ConfigDialogController controller (m_settingsProvider);
             HRESULT                hr         = S_OK;
 
 
@@ -678,11 +661,11 @@ namespace MatrixRainTests
             };
             
             HRESULT                hr = S_OK;
-            ConfigDialogController controller;
-            ApplicationState       appState;
+            ConfigDialogController controller (m_settingsProvider);
+            ApplicationState       appState (m_settingsProvider);
 
 
-            hr = RegistrySettingsProvider::Save (initialSettings);
+            hr = m_settingsProvider.Save (initialSettings);
             Assert::AreEqual (S_OK, hr);
 
             hr = controller.Initialize();
@@ -708,9 +691,9 @@ namespace MatrixRainTests
         TEST_METHOD (TestLiveModePropagatesColorSchemeChanges)
         {
             // Arrange
-            ConfigDialogController controller;
+            ConfigDialogController controller (m_settingsProvider);
             HRESULT                hr       = S_OK;
-            ApplicationState       appState;
+            ApplicationState       appState (m_settingsProvider);
 
 
 
@@ -739,9 +722,9 @@ namespace MatrixRainTests
         TEST_METHOD (TestLiveModePropagatesAnimationSpeedChanges)
         {
             // Arrange
-            ConfigDialogController controller;
+            ConfigDialogController controller (m_settingsProvider);
             HRESULT                hr       = S_OK;
-            ApplicationState       appState;
+            ApplicationState       appState (m_settingsProvider);
 
 
 
@@ -768,9 +751,9 @@ namespace MatrixRainTests
         TEST_METHOD (TestLiveModePropagatesGlowIntensityChanges)
         {
             // Arrange
-            ConfigDialogController controller;
+            ConfigDialogController controller (m_settingsProvider);
             HRESULT                hr       = S_OK;
-            ApplicationState       appState;
+            ApplicationState       appState (m_settingsProvider);
 
 
 
@@ -797,9 +780,9 @@ namespace MatrixRainTests
         TEST_METHOD (TestLiveModePropagatesGlowSizeChanges)
         {
             // Arrange
-            ConfigDialogController controller;
+            ConfigDialogController controller (m_settingsProvider);
             HRESULT                hr       = S_OK;
-            ApplicationState       appState;
+            ApplicationState       appState (m_settingsProvider);
 
 
 
@@ -834,11 +817,11 @@ namespace MatrixRainTests
             };
             
             HRESULT                hr = S_OK;
-            ConfigDialogController controller;
-            ApplicationState       appState;
+            ConfigDialogController controller (m_settingsProvider);
+            ApplicationState       appState (m_settingsProvider);
 
 
-            hr = RegistrySettingsProvider::Save (initialSettings);
+            hr = m_settingsProvider.Save (initialSettings);
             Assert::AreEqual (S_OK, hr);
 
             hr = controller.Initialize();
@@ -885,8 +868,8 @@ namespace MatrixRainTests
             // 
             // This is a placeholder for manual/automated UI testing
 
-            ApplicationState       appState;
-            ConfigDialogController controller;
+            ApplicationState       appState (m_settingsProvider);
+            ConfigDialogController controller (m_settingsProvider);
             HRESULT                hr         = S_OK;
             
             

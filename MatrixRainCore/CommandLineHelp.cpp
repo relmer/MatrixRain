@@ -2,6 +2,8 @@
 
 #include "CommandLineHelp.h"
 
+#include "RegistrySettingsProvider.h"
+
 
 
 
@@ -17,17 +19,17 @@
 
 HRESULT CommandLineHelp::DisplayCommandLineHelp (wchar_t switchPrefix)
 {
-    HRESULT   hr = S_OK;
-    UsageText usage (switchPrefix);
+    HRESULT                  hr               = S_OK;
+    UsageText                usage              (switchPrefix);
+    RegistrySettingsProvider settingsProvider;
+    HelpRainDialog           dialog             (usage, settingsProvider);
 
 
+    
+    hr = dialog.Show();
+    CHR (hr);
 
-    {
-        HelpRainDialog dialog (usage);
-
-        hr = dialog.Show();
-        CHR (hr);
-    }
+    
 
 Error:
     return hr;

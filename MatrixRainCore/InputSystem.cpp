@@ -36,12 +36,14 @@ void InputSystem::ProcessKeyDown (int virtualKey)
             OnDensityDecrease();
             break;
 
-        case VK_OEM_3:              // Backtick/tilde key (`~)
+#ifdef _DEBUG
+        case VK_OEM_3:              // Backtick/tilde key (`~) — debug only
             if (m_appState)
             {
-                m_appState->ToggleStatistics();
+                m_appState->ToggleDebugFadeTimes();
             }
             break;
+#endif
 
         default:
             break;

@@ -1,6 +1,7 @@
 #include "Pch_MatrixRainTests.h"
 
 #include "..\..\MatrixRainCore\DensityController.h"
+#include "..\..\MatrixRainCore\InMemorySettingsProvider.h"
 #include "..\..\MatrixRainCore\InputSystem.h"
 #include "..\..\MatrixRainCore\AnimationSystem.h"
 #include "..\..\MatrixRainCore\ApplicationState.h"
@@ -30,7 +31,8 @@ namespace MatrixRainTests
             viewport.Resize (1920.0f, 1080.0f); // Max = 240 streaks
 
             DensityController densityController (viewport, 32.0f); // 80% of 240 = 192 streaks
-            ApplicationState  appState;
+            InMemorySettingsProvider settingsProvider;
+            ApplicationState  appState (settingsProvider);
             appState.Initialize (nullptr);
 
             InputSystem inputSystem;

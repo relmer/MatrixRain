@@ -3,6 +3,7 @@
 #include "..\..\MatrixRainCore\InputSystem.h"
 #include "..\..\MatrixRainCore\DensityController.h"
 #include "..\..\MatrixRainCore\ApplicationState.h"
+#include "..\..\MatrixRainCore\InMemorySettingsProvider.h"
 #include "..\..\MatrixRainCore\Viewport.h"
 
 
@@ -26,7 +27,9 @@ namespace MatrixRainTests
             viewport.Resize (1920.0f, 1080.0f); // Max = 240 streaks
 
             DensityController densityController (viewport, 32.0f); // 80%
-            ApplicationState appState;
+            InMemorySettingsProvider settingsProvider;
+            ApplicationState appState (settingsProvider);
+            appState.Initialize (nullptr);
 
             InputSystem inputSystem;
             inputSystem.Initialize (densityController, appState);
@@ -58,7 +61,9 @@ namespace MatrixRainTests
             viewport.Resize (1920.0f, 1080.0f); // Max = 240 streaks
 
             DensityController densityController (viewport, 32.0f); // 80%
-            ApplicationState appState;
+            InMemorySettingsProvider settingsProvider;
+            ApplicationState appState (settingsProvider);
+            appState.Initialize (nullptr);
 
             InputSystem inputSystem;
             inputSystem.Initialize (densityController, appState);
@@ -90,7 +95,9 @@ namespace MatrixRainTests
             viewport.Resize (1920.0f, 1080.0f);
 
             DensityController densityController (viewport, 32.0f);
-            ApplicationState appState;
+            InMemorySettingsProvider settingsProvider;
+            ApplicationState appState (settingsProvider);
+            appState.Initialize (nullptr);
 
             InputSystem inputSystem;
             inputSystem.Initialize (densityController, appState);
@@ -117,7 +124,9 @@ namespace MatrixRainTests
             viewport.Resize (1920.0f, 1080.0f);
 
             DensityController densityController (viewport, 32.0f);
-            ApplicationState appState;
+            InMemorySettingsProvider settingsProvider;
+            ApplicationState appState (settingsProvider);
+            appState.Initialize (nullptr);
 
             InputSystem inputSystem;
             inputSystem.Initialize (densityController, appState);
@@ -165,7 +174,9 @@ namespace MatrixRainTests
             viewport.Resize (1920.0f, 1080.0f);
 
             DensityController densityController (viewport, 32.0f);
-            ApplicationState appState;
+            InMemorySettingsProvider settingsProvider;
+            ApplicationState appState (settingsProvider);
+            appState.Initialize (nullptr);
 
             InputSystem inputSystem;
             inputSystem.Initialize (densityController, appState);

@@ -3,6 +3,7 @@
 #include "..\..\MatrixRainCore\Application.h"
 #include "..\..\MatrixRainCore\ApplicationState.h"
 #include "..\..\MatrixRainCore\ConfigDialogController.h"
+#include "..\..\MatrixRainCore\InMemorySettingsProvider.h"
 
 
 
@@ -12,7 +13,15 @@ namespace MatrixRainTests
 {
     TEST_CLASS (LiveDialogTests)
     {
+    private:
+        InMemorySettingsProvider m_settingsProvider;
+
     public:
+        TEST_METHOD_INITIALIZE (MethodSetup)
+        {
+            m_settingsProvider.Clear();
+        }
+
         // T054: Test live overlay dialog has WS_EX_TOPMOST styling
         TEST_METHOD (LiveOverlayDialog_HasTopmostZOrder)
         {
@@ -28,7 +37,7 @@ namespace MatrixRainTests
             // 
             // This is a placeholder for manual/automated UI testing
 
-            ApplicationState appState;
+            ApplicationState appState (m_settingsProvider);
             
             
             appState.Initialize (nullptr);
@@ -59,8 +68,8 @@ namespace MatrixRainTests
             // This is a placeholder for manual/automated UI testing
 
             HRESULT                hr         = S_OK;
-            ApplicationState       appState;
-            ConfigDialogController controller;
+            ApplicationState       appState (m_settingsProvider);
+            ConfigDialogController controller (m_settingsProvider);
             
             
             appState.Initialize (nullptr);
@@ -107,8 +116,8 @@ namespace MatrixRainTests
             // 
             // This is a placeholder for manual/automated UI testing
 
-            ApplicationState     appState;
-            ConfigDialogController controller;
+            ApplicationState     appState (m_settingsProvider);
+            ConfigDialogController controller (m_settingsProvider);
             HRESULT              hr = S_OK;
             
             
@@ -158,7 +167,7 @@ namespace MatrixRainTests
             // 
             // This is a placeholder for manual/automated UI testing on multi-monitor systems
 
-            ApplicationState appState;
+            ApplicationState appState (m_settingsProvider);
             
             
             appState.Initialize (nullptr);

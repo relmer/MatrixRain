@@ -90,11 +90,11 @@ void HotkeyOverlay::BuildHotkeyList ()
     {
         { L"Space",       L"Pause / Resume" },
         { L"Enter",       L"Settings dialog" },
-        { L"C",           L"Settings dialog" },
+        { L"C",           L"Cycle color scheme" },
+        { L"S",           L"Toggle statistics" },
         { L"?",           L"Help reference" },
         { L"+",           L"Increase rain density" },
         { L"-",           L"Decrease rain density" },
-        { L"`",           L"Toggle FPS counter" },
         { L"Alt+Enter",   L"Toggle fullscreen" },
         { L"Esc",         L"Exit" },
     };

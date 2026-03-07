@@ -4,6 +4,7 @@
 #include "CharacterConstants.h"
 #include "ColorScheme.h"
 #include "DensityController.h"
+#include "ISettingsProvider.h"
 #include "RenderSystem.h"
 #include "ScreenSaverSettings.h"
 #include "UsageText.h"
@@ -62,7 +63,7 @@ struct CharPosition
 class HelpRainDialog
 {
 public:
-    explicit HelpRainDialog (const UsageText & usageText);
+    explicit HelpRainDialog (const UsageText & usageText, ISettingsProvider & settingsProvider);
     ~HelpRainDialog();
 
 
@@ -128,6 +129,7 @@ private:
 
     // Text content
     const UsageText              & m_usageText;
+    ISettingsProvider            & m_settingsProvider;
 
 
     // GPU render pipeline (rain + bloom)

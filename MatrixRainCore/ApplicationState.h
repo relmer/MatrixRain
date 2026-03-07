@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ColorScheme.h"
+#include "ISettingsProvider.h"
 #include "ScreenSaverSettings.h"
 
 
@@ -29,6 +30,8 @@ enum class DisplayMode
 class ApplicationState
 {
 public:
+    explicit ApplicationState (ISettingsProvider & settingsProvider);
+
     /// <summary>
     /// Initialize application state with default values.
     /// Starts in Fullscreen display mode with Green color scheme.
@@ -131,6 +134,7 @@ public:
     HRESULT SaveSettings();
 
 private:
+    ISettingsProvider            & m_settingsProvider;                                        // Settings provider (not owned)
     DisplayMode                    m_displayMode                  = DisplayMode::Fullscreen; // Current display mode
     ColorScheme                    m_colorScheme                  = ColorScheme::Green;      // Current color scheme
     bool                           m_showDebugFadeTimes           = false;                   // Show debug fade time overlay

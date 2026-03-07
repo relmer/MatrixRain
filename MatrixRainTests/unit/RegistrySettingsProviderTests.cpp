@@ -12,7 +12,8 @@ namespace MatrixRainTests
     {
     private:
         static constexpr LPCWSTR TEST_REGISTRY_KEY_PATH = L"Software\\relmer\\MatrixRain_Test";
-        
+
+        RegistrySettingsProvider m_provider {TEST_REGISTRY_KEY_PATH};
         
         // Helper to delete test registry key for cleanup
         static void DeleteTestRegistryKey()
@@ -21,16 +22,9 @@ namespace MatrixRainTests
         }
         
     public:
-        TEST_CLASS_INITIALIZE (Initialize)
-        {
-            RegistrySettingsProvider::SetRegistryKeyPath (TEST_REGISTRY_KEY_PATH);
-        }
-        
-        
         TEST_CLASS_CLEANUP (Cleanup)
         {
             DeleteTestRegistryKey();
-            RegistrySettingsProvider::ResetRegistryKeyPath();
         }
         
         
@@ -44,7 +38,7 @@ namespace MatrixRainTests
             
             
             // Act
-            HRESULT hr = RegistrySettingsProvider::Load (settings);
+            HRESULT hr = m_provider.Load (settings);
             
             
             // Assert - Load should return S_FALSE when key doesn't exist
@@ -78,11 +72,10 @@ namespace MatrixRainTests
             settings.m_glowSizePercent       = 120;
             settings.m_startFullscreen       = false;
             settings.m_showDebugStats        = true;
-            settings.m_showFadeTimers        = true;
             
             
             // Act
-            HRESULT hr = RegistrySettingsProvider::Save (settings);
+            HRESULT hr = m_provider.Save (settings);
             
             
             // Assert
@@ -136,14 +129,14 @@ namespace MatrixRainTests
             saveSettings.m_startFullscreen       = false;
             saveSettings.m_showDebugStats        = true;
             
-            HRESULT hr = RegistrySettingsProvider::Save (saveSettings);
+            HRESULT hr = m_provider.Save (saveSettings);
             Assert::AreEqual (S_OK, hr, L"Save should succeed");
             
             
             // Act - Load into new settings object
             ScreenSaverSettings loadSettings;
             
-            hr = RegistrySettingsProvider::Load (loadSettings);
+            hr = m_provider.Load (loadSettings);
             
             
             // Assert
@@ -208,7 +201,7 @@ namespace MatrixRainTests
             
             // Act
             ScreenSaverSettings settings;
-            HRESULT             hr = RegistrySettingsProvider::Load (settings);
+            HRESULT             hr = m_provider.Load (settings);
             
             
             // Assert - Load should succeed but values should be clamped
@@ -229,7 +222,7 @@ namespace MatrixRainTests
             
             
             // Act
-            HRESULT hr = RegistrySettingsProvider::Save (settings);
+            HRESULT hr = m_provider.Save (settings);
             
             
             // Assert - Verify key was created in HKEY_CURRENT_USER

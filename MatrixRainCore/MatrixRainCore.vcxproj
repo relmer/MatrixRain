@@ -288,7 +288,9 @@
     <ClInclude Include="HelpHintOverlay.h" />
     <ClInclude Include="HelpRainDialog.h" />
     <ClInclude Include="HotkeyOverlay.h" />
+    <ClInclude Include="InMemorySettingsProvider.h" />
     <ClInclude Include="InputSystem.h" />
+    <ClInclude Include="ISettingsProvider.h" />
     <ClInclude Include="Math.h" />
     <ClInclude Include="RegistrySettingsProvider.h" />
     <ClInclude Include="RenderSystem.h" />

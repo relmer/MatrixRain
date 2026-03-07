@@ -2,7 +2,15 @@
 
 #include "ApplicationState.h"
 #include "ConfigDialogController.h"
-#include "RegistrySettingsProvider.h"
+
+
+
+
+
+ConfigDialogController::ConfigDialogController (ISettingsProvider & settingsProvider) :
+    m_settingsProvider (settingsProvider)
+{
+}
 
 
 
@@ -14,8 +22,8 @@ HRESULT ConfigDialogController::Initialize()
     
     
     
-    // Load settings from registry (falls back to defaults if key doesn't exist)
-    hr = RegistrySettingsProvider::Load (m_settings);
+    // Load settings from provider (falls back to defaults if no data exists)
+    hr = m_settingsProvider.Load (m_settings);
     
     // hr == S_FALSE means key didn't exist, used defaults (not an error)
     // hr == S_OK means loaded from registry successfully
@@ -158,7 +166,7 @@ HRESULT ConfigDialogController::ApplyChanges()
     
     
     // Persist settings to registry
-    hr = RegistrySettingsProvider::Save (m_settings);
+    hr = m_settingsProvider.Save (m_settings);
     CHR (hr);
     
     // Update original settings to match saved state
@@ -246,7 +254,7 @@ HRESULT ConfigDialogController::ApplyLiveMode()
     CBRA (m_snapshot.isLiveMode);
     
     // Persist settings to registry
-    hr = RegistrySettingsProvider::Save (m_settings);
+    hr = m_settingsProvider.Save (m_settings);
     CHR (hr);
     
     // Clear live mode state
