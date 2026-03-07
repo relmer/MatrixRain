@@ -631,6 +631,54 @@ Error:
 
 ////////////////////////////////////////////////////////////////////////////////
 //
+//  OnDestroy
+//
+////////////////////////////////////////////////////////////////////////////////
+
+static void OnDestroy (HWND hDlg)
+{
+    DialogContext          * pContext    = GetDialogContext (hDlg);
+    ConfigDialogController * pController = pContext ? pContext->m_controller.get() : nullptr;
+
+
+
+    if (pController && pController->IsLiveMode())
+    {
+        Application * pApp = GetApplicationFromDialog (hDlg);
+
+
+
+        if (pApp)
+        {
+            pApp->SetConfigDialog (nullptr);
+
+            // Only quit the app if it was launched in /c settings-only mode
+            if (pApp->GetScreenSaverMode() == ScreenSaverMode::SettingsDialog)
+            {
+                PostQuitMessage (0);
+            }
+        }
+    }
+
+
+
+    if (pContext)
+    {
+        SetWindowLongPtr (hDlg, DWLP_USER, 0);
+        
+        if (pContext->m_ownsContextMemory)
+        {
+            delete pContext;
+        }
+    }
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
 //  ConfigDialogProc
 //
 //  Dialog procedure for IDD_MATRIXRAIN_SAVER_CONFIG.
@@ -650,44 +698,20 @@ static INT_PTR CALLBACK ConfigDialogProc (HWND   hDlg,
     {
         case WM_INITDIALOG:
             result = OnInitDialog (hDlg, lParam);
-            goto Error;
+            break;
         
         case WM_HSCROLL:
             result = OnHScroll (hDlg, lParam);
-            goto Error;
+            break;
         
         case WM_COMMAND:
             result = OnCommand (hDlg, wParam);
-            goto Error;
+            break   ;
         
         case WM_DESTROY:
-        {
-            DialogContext * pContext = GetDialogContext (hDlg);
-            ConfigDialogController * pController = pContext ? pContext->m_controller.get() : nullptr;
-
-            if (pController && pController->IsLiveMode())
-            {
-                if (Application * pApp = GetApplicationFromDialog (hDlg))
-                {
-                    pApp->SetConfigDialog (nullptr);
-                }
-
-                PostQuitMessage (0);
-            }
-
-            if (pContext)
-            {
-                SetWindowLongPtr (hDlg, DWLP_USER, 0);
-                
-                if (pContext->m_ownsContextMemory)
-                {
-                    delete pContext;
-                }
-            }
-
+            OnDestroy (hDlg);
             result = TRUE;
-            goto Error;
-        }
+            break   ;
     }
 
 Error:

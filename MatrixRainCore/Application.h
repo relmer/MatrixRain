@@ -1,6 +1,7 @@
 #pragma once
 
 #include "RegistrySettingsProvider.h"
+#include "ScreenSaverModeContext.h"
 
 
 
@@ -16,7 +17,6 @@ class ApplicationState;
 class FPSCounter;
 class HelpHintOverlay;
 class HotkeyOverlay;
-struct ScreenSaverModeContext;
 
 
 
@@ -39,6 +39,7 @@ public:
     ApplicationState  * GetApplicationState() const                { return m_appState.get();         }
     ISettingsProvider & GetSettingsProvider()                      { return m_settingsProvider;       }
     void                SetConfigDialog       (HWND hConfigDialog) { m_hConfigDialog = hConfigDialog; }
+    ScreenSaverMode     GetScreenSaverMode()  const                { return m_pScreenSaverContext ? m_pScreenSaverContext->m_mode : ScreenSaverMode::Normal; }
     
     // Callback for opening config dialog from Enter key (set by main.cpp)
     void                SetOpenConfigDialogCallback (std::function<void()> callback) { m_openConfigDialogCallback = callback; }
