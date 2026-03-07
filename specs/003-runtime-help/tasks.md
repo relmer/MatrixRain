@@ -139,7 +139,36 @@ The following tasks were completed under the original console-based approach but
 - [X] T040 [US1] Add rain occlusion in AnimationSystem — pass HelpHintOverlay::GetBoundingRect() as exclusion zone, skip rendering rain streak characters inside the rect when overlay IsActive() — in MatrixRainCore/AnimationSystem.cpp and MatrixRainCore/RenderSystem.cpp
 - [X] T041 [US1] Add help hint enabled flag to ApplicationState in MatrixRainCore/ApplicationState.h — set based on screensaver mode in Application startup
 
-**Checkpoint**: Help hint overlay displays on startup with full reveal/hold/dissolve animation, rain occlusion, and feathered border. Screensaver modes suppressed.
+**Checkpoint**: Help hint overlay displays on startup with full reveal/hold/dismiss animation, rain occlusion, and feathered border. Screensaver modes suppressed.
+
+---
+
+## Phase 3a: TextSweepEffect — Shared Sweep Timing Oracle
+
+**Goal**: Extract per-row staggered horizontal sweep timing into a reusable class used by both HelpHintOverlay and HotkeyOverlay. Replaces the original per-character random resolve/dissolve model.
+
+### Completed Tasks
+
+- [X] T098 [P] Test TextSweepEffect initial state: phase is Idle, IsActive() returns false — in MatrixRainTests/unit/TextSweepEffectTests.cpp
+- [X] T099 [P] Test TextSweepEffect::StartReveal() transitions to Revealing, GetRevealProgress() advances per row — in MatrixRainTests/unit/TextSweepEffectTests.cpp
+- [X] T100 [P] Test TextSweepEffect::GetOpacity() returns 0→1 fade-in during reveal and 1→0 fade-out during dismiss — in MatrixRainTests/unit/TextSweepEffectTests.cpp
+- [X] T101 [P] Test TextSweepEffect::GetGlowIntensity() returns 1.0 at reveal moment, decays to 0.0 over time — in MatrixRainTests/unit/TextSweepEffectTests.cpp
+- [X] T102 [P] Test TextSweepEffect hold phase: after reveal completes, holds for holdDuration before auto-dismissing — in MatrixRainTests/unit/TextSweepEffectTests.cpp
+- [X] T103 [P] Test TextSweepEffect dismiss phase: right-to-left sweep, GetDismissProgress() advances per row — in MatrixRainTests/unit/TextSweepEffectTests.cpp
+- [X] T104 Implement TextSweepEffect class with Initialize(), StartReveal(), StartDismiss(), Reset(), Update(), and per-position queries — in MatrixRainCore/TextSweepEffect.h/.cpp
+- [X] T105 Refactor HelpHintOverlay to delegate timing to TextSweepEffect — remove per-character scramble/dissolve timers, use sweep-driven Update() — in MatrixRainCore/HelpHintOverlay.h/.cpp
+- [X] T106 Refactor HotkeyOverlay to delegate timing to TextSweepEffect — same pattern as HelpHintOverlay — in MatrixRainCore/HotkeyOverlay.h/.cpp
+
+### Completed Sweep Enhancements
+
+- [X] T107 Add margin columns to HelpHintOverlay (MARGIN_COLS=1) for smooth sweep entry/exit — in MatrixRainCore/HelpHintOverlay.h/.cpp
+- [X] T108 Add margin columns to HotkeyOverlay (MARGIN_COLS=2) for smooth sweep entry/exit — in MatrixRainCore/HotkeyOverlay.h/.cpp
+- [X] T109 Update RenderSystem to handle margin/space columns (skip rendering when currentGlyphIndex >= allGlyphs.size()) — in MatrixRainCore/RenderSystem.cpp
+- [X] T110 Replace headCol tracking with continuous head position from GetRevealProgress() — head extends past grid edge for smooth right-side settling — in HelpHintOverlay.cpp and HotkeyOverlay.cpp
+- [X] T111 Add dismiss sweep effect: right-to-left streak of random glyphs using GetDismissProgress() — in HelpHintOverlay.cpp and HotkeyOverlay.cpp
+- [X] T112 Set streak zone to full overlay width (streakLen = m_cols) for extended matrix effect — in HelpHintOverlay.cpp and HotkeyOverlay.cpp
+
+**Checkpoint**: Both overlays use TextSweepEffect for timing. Horizontal sweep with full-width streak zone, margin columns, and dismiss effect. Build succeeds (0W/0E), 318 tests pass.
 
 ---
 
@@ -230,7 +259,26 @@ The following tasks were completed under the original console-based approach but
 
 - [X] T060 [US5] Handle VK_OEM_2 (with Shift check) in Application::OnKeyDown — open usage display, guard against duplicate, call HelpHintOverlay::Dismiss()
 
-**Checkpoint**: `?` key shows hotkey reference overlay directly on the main window. No separate dialog. Overlay has dissolve animation. Help hint dissolves when `?` is pressed.
+**Checkpoint**: `?` key shows hotkey reference overlay directly on the main window. No separate dialog. Overlay has sweep reveal/dismiss animation matching HelpHintOverlay. Help hint dissolves when `?` is pressed.
+
+---
+
+## Phase 8: Visual Tuning — Sweep Animation Quality (Priority: P2)
+
+**Goal**: Tune the horizontal sweep reveal/dismiss effect for both overlays until the visual quality matches the desired matrix rain aesthetic.
+
+**Status**: IN PROGRESS — Sweep architecture is working (reveal + dismiss + margins + full-width streak), but visual quality needs iteration.
+
+### Known Issues (from manual testing 2026-03-06)
+
+- [ ] T113 [US1/US5] Evaluate and tune sweep speed and per-row stagger range — current values may be too fast or too slow. TextSweepEffect::Initialize() params: staggerRange=1.2, durationMin=1.0, durationMax=2.0, fadeInSpeed=2.5, glowDecaySpeed=1.5
+- [ ] T114 [US1/US5] Evaluate streak zone length — currently = full overlay width (m_cols). May want shorter or longer depending on visual effect
+- [ ] T115 [US1/US5] Evaluate whether characters in streak zone should cycle through multiple random glyphs over time versus showing one fixed random glyph — current implementation assigns one deterministic random glyph per position
+- [ ] T116 [US1/US5] Evaluate dismiss sweep visual quality — timing, speed, and whether opacity fade looks natural as characters transition from target → random → hidden
+- [ ] T117 [US1/US5] Evaluate green→white glow transition rate — glowDecaySpeed=1.5 may need adjustment for visual appeal
+- [ ] T118 [US1/US5] Evaluate margin column counts — MARGIN_COLS=1 for HelpHintOverlay, MARGIN_COLS=2 for HotkeyOverlay. May need more or fewer for smooth visual entry/exit
+
+**Checkpoint**: Sweep animations are visually polished and match the desired matrix rain aesthetic.
 
 ---
 
@@ -375,3 +423,15 @@ T082: Manual validation
 - UsageText serves `/?` only — HelpHintOverlay has its own hardcoded 3-line layout, HotkeyOverlay has its own hotkey list
 - UnicodeSymbols.h provides named constants for em dash and other Unicode characters
 - Superseded tasks (T001, T008–T009, T014–T019, T058–T059, T061–T063) remain listed for traceability but are struck through
+
+### Architectural Note: TextSweepEffect (added 2026-03-06)
+
+The original spec described per-character random resolve/dissolve (scramble timers, random selection for dissolve, per-character DissolveCycling/DissolveFading phases). During implementation this was replaced with a horizontal sweep model:
+
+- **TextSweepEffect** is a shared timing oracle with per-row staggered delays/durations
+- **Reveal**: left-to-right sweep; characters behind the head show a random glyph, characters past the head show their target
+- **Dismiss**: right-to-left sweep (mirror); characters behind the head show a random glyph then fade out
+- **CharPhase** reduced from 5 values to 2 (Resolved, Hidden) — sweep timing replaces per-character state machine
+- **HintCharacter** fields simplified: randomGlyphIndex (assigned once), glowIntensity (green→white), no scrambleTimer/dissolveStartOffset
+- **Margin columns**: invisible columns on each side for smooth sweep entry/exit at edges
+- Both overlays' `Update()` methods share identical sweep logic: two-pass (update phase/opacity, then determine glyph from sweep position)

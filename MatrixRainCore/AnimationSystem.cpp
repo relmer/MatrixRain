@@ -398,7 +398,7 @@ void AnimationSystem::SetAnimationSpeed (int speedPercent)
 //  AnimationSystem::SetCharacterSpacingOverride
 //
 //  Overrides the viewport-based character spacing calculation.
-//  Used by HelpRainDialog to force full-size rain characters in its
+//  Used by UsageDialog to force full-size rain characters in its
 //  smaller window.
 //
 ////////////////////////////////////////////////////////////////////////////////

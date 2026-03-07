@@ -5,7 +5,7 @@
 
 ## What This Feature Adds
 
-1. **Runtime help hint overlay** — A three-line help message appears on-screen when MatrixRain starts in Normal mode, showing key bindings (Settings/Enter, Help/?, Exit/Esc). Uses a matrix rain reveal effect (characters cycle through random glyphs before settling) and a dissolve effect (characters cycle again then fade out with staggered timing). Rain streaks pass behind the message area.
+1. **Runtime help hint overlay** — A three-line help message appears on-screen when MatrixRain starts in Normal mode, showing key bindings (Settings/Enter, Help/?, Exit/Esc). Uses a horizontal sweep reveal effect (a left-to-right sweep head moves across each row with per-row staggered timing — characters in the sweep's streak zone show a random glyph, characters behind the streak show their target glyph). Dismiss uses a mirrored right-to-left sweep. Rain streaks pass behind the message area.
 
 2. **Re-show on unrecognized key** — Pressing any unmapped key re-triggers the help hint animation.
 
@@ -21,24 +21,27 @@
 
 - **All new code in MatrixRainCore.lib** — follows Library-First Architecture (Constitution VI)
 - **All rendering is GPU-based** — D2D/DirectWrite for the in-app overlay, hotkey overlay, and graphical rain dialog. No console output, no ANSI escape codes, no `AttachConsole`.
+- **TextSweepEffect** — shared per-row horizontal sweep timing oracle, used by both HelpHintOverlay and HotkeyOverlay
 - **Flat parallel arrays** for per-character overlay state — cache-friendly, TDD-friendly
 - **`HelpRainDialog`** is a custom window with its own D3D11/D2D rendering context — independent of the main app's render pipeline. Used by `/?` only. Uses proportional font (Segoe UI), per-character queued reveal, two independent streak pools.
 - **`HotkeyOverlay`** renders hotkey reference directly on the main window — used by `?` key only. NOT `HelpRainDialog`.
 - **`UsageText`** is used by `HelpRainDialog` — single source of truth for command-line switch content (NOT hotkeys, NOT the runtime hint overlay)
 - **Graphical rain dialog runs before window creation** for `/?` — has its own D3D/D2D context, no dependency on main app initialization
-- **State machine** for overlay phases: Hidden → Revealing → Holding → Dissolving → Hidden
+- **State machine** for overlay phases: Hidden → Revealing → Holding → Dismissing → Hidden (driven by TextSweepEffect::SweepPhase)
 
 ## New Files
 
 | File | Project | Purpose |
 |------|---------|---------|
-| `HelpHintOverlay.h/cpp` | MatrixRainCore | Overlay state machine + per-character animation |
+| `HelpHintOverlay.h/cpp` | MatrixRainCore | Overlay state machine + sweep-driven per-character animation |
+| `TextSweepEffect.h/cpp` | MatrixRainCore | Shared per-row horizontal sweep timing oracle |
 | `HelpRainDialog.h/cpp` | MatrixRainCore | Custom graphical rain dialog with D3D/D2D rendering (`/?` only) |
 | `HotkeyOverlay.h/cpp` | MatrixRainCore | In-app hotkey reference overlay (`?` key only) |
 | `UsageText.h/cpp` | MatrixRainCore | Command-line switch text content + formatting (no hotkeys) |
 | `CommandLineHelp.h/cpp` | MatrixRainCore | /? orchestration — creates HelpRainDialog, exits process |
 | `UnicodeSymbols.h` | MatrixRain | Named constants for Unicode characters (em dash, etc.) |
 | `HelpHintOverlayTests.cpp` | MatrixRainTests | Unit tests for overlay state machine |
+| `TextSweepEffectTests.cpp` | MatrixRainTests | Unit tests for sweep timing oracle |
 | `HelpRainDialogTests.cpp` | MatrixRainTests | Unit tests for reveal queue, character positions, animation state |
 | `HotkeyOverlayTests.cpp` | MatrixRainTests | Unit tests for hotkey overlay state machine |
 | `UsageTextTests.cpp` | MatrixRainTests | Unit tests for text formatting, prefix detection, section grouping |

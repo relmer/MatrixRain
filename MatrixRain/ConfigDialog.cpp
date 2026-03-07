@@ -706,15 +706,14 @@ static INT_PTR CALLBACK ConfigDialogProc (HWND   hDlg,
         
         case WM_COMMAND:
             result = OnCommand (hDlg, wParam);
-            break   ;
+            break;
         
         case WM_DESTROY:
             OnDestroy (hDlg);
             result = TRUE;
-            break   ;
+            break;
     }
 
-Error:
     return result;
 }
 

@@ -36,10 +36,11 @@ enum class AnimationPhase
 
 struct CharPosition
 {
-    size_t  charIndex = 0;
-    float   x         = 0.0f;
-    float   y         = 0.0f;
-    wchar_t character = L'\0';
+    size_t  charIndex       = 0;
+    float   x               = 0.0f;
+    float   y               = 0.0f;
+    wchar_t character       = L'\0';
+    wchar_t randomCharacter = L'\0';
 };
 
 
@@ -47,7 +48,7 @@ struct CharPosition
 
 
 ////////////////////////////////////////////////////////////////////////////////
-//  HelpRainDialog — Custom graphical window with matrix rain reveal animation
+//  UsageDialog — Custom graphical window with matrix rain reveal animation
 //
 //  Displays command-line switches via GPU-rendered matrix rain with a
 //  horizontal tracer reveal.  Short rain-like streaks sweep left to right
@@ -60,11 +61,11 @@ struct CharPosition
 //  Used by /? and -? invocation only — the ? key uses an in-app overlay.
 ////////////////////////////////////////////////////////////////////////////////
 
-class HelpRainDialog
+class UsageDialog
 {
 public:
-    explicit HelpRainDialog (const UsageText & usageText, ISettingsProvider & settingsProvider);
-    ~HelpRainDialog();
+    explicit UsageDialog (const UsageText & usageText, ISettingsProvider & settingsProvider);
+    ~UsageDialog();
 
 
     // Display — blocking call, returns when dismissed
@@ -186,5 +187,5 @@ private:
     int                            m_windowHeight     = 0;
     bool                           m_dismissed        = false;
 
-    static constexpr LPCWSTR       kWindowClassName   = L"MatrixRainHelpDialog";
+    static constexpr LPCWSTR       kWindowClassName   = L"MatrixRainUsageDialog";
 };

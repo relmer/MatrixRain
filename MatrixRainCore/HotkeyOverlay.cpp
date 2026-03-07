@@ -67,9 +67,14 @@ HotkeyOverlay::HotkeyOverlay()
         maxDescChars  = std::max (maxDescChars,  static_cast<int> (entry.description.size()));
     }
 
-    m_cols = m_keyColChars + m_gapChars + maxDescChars;
+    m_cols     = m_keyColChars + m_gapChars + maxDescChars;
+    m_textCols = m_cols;
+    m_cols     = m_textCols + 2 * MARGIN_COLS;
 
     InitializeCharacters();
+
+    // holdDuration = -1 → hold indefinitely (dismissed by user)
+    m_sweep.Initialize (GetRows(), 1.2f, 1.0f, 2.0f, 2.5f, -1.0f, 1.5f);
 }
 
 
@@ -119,7 +124,7 @@ void HotkeyOverlay::InitializeCharacters ()
     m_chars.clear();
     m_chars.reserve (static_cast<size_t> (GetRows()) * m_cols);
 
-    int maxDescChars = m_cols - m_keyColChars - m_gapChars;
+    int maxDescChars = m_textCols - m_keyColChars - m_gapChars;
 
 
 
@@ -128,7 +133,7 @@ void HotkeyOverlay::InitializeCharacters ()
         // Build the full row string: key (right-padded) + gap + description (right-padded)
         std::wstring rowText;
 
-        rowText.reserve (m_cols);
+        rowText.reserve (m_textCols);
 
         // Key name, padded to m_keyColChars
         std::wstring key = m_hotkeys[row].keyName;
@@ -145,12 +150,27 @@ void HotkeyOverlay::InitializeCharacters ()
         desc.resize (maxDescChars, L' ');
         rowText += desc;
 
-        for (int col = 0; col < m_cols; col++)
+        // Left margin columns (fill PADDING area)
+        for (int m = 0; m < MARGIN_COLS; m++)
         {
             HintCharacter ch;
 
             ch.row     = row;
-            ch.col     = col;
+            ch.col     = m;
+            ch.isSpace = true;
+            ch.phase   = CharPhase::Hidden;
+            ch.opacity = 0.0f;
+
+            m_chars.push_back (ch);
+        }
+
+        // Text columns (key + gap + desc)
+        for (int col = 0; col < m_textCols; col++)
+        {
+            HintCharacter ch;
+
+            ch.row     = row;
+            ch.col     = MARGIN_COLS + col;
             ch.isSpace = (rowText[col] == L' ');
             ch.phase   = CharPhase::Hidden;
             ch.opacity = 0.0f;
@@ -175,43 +195,20 @@ void HotkeyOverlay::InitializeCharacters ()
 
             m_chars.push_back (ch);
         }
-    }
-}
 
-
-
-
-
-////////////////////////////////////////////////////////////////////////////////
-//
-//  HotkeyOverlay::InitializeCharactersForReveal
-//
-//  Resets all non-space characters to Scrambling with staggered timers.
-//
-////////////////////////////////////////////////////////////////////////////////
-
-void HotkeyOverlay::InitializeCharactersForReveal ()
-{
-    std::uniform_real_distribution<float> staggerDist  (0.0f, REVEAL_STAGGER_RANGE);
-    std::uniform_real_distribution<float> intervalDist (SCRAMBLE_MIN_INTERVAL, SCRAMBLE_MAX_INTERVAL);
-    std::uniform_int_distribution<size_t> glyphDist    (0, m_allGlyphs.size() - 1);
-
-
-
-    for (auto & ch : m_chars)
-    {
-        if (ch.isSpace)
+        // Right margin columns (fill PADDING area)
+        for (int m = 0; m < MARGIN_COLS; m++)
         {
+            HintCharacter ch;
+
+            ch.row     = row;
+            ch.col     = MARGIN_COLS + m_textCols + m;
+            ch.isSpace = true;
             ch.phase   = CharPhase::Hidden;
             ch.opacity = 0.0f;
-            continue;
-        }
 
-        ch.phase             = CharPhase::Scrambling;
-        ch.opacity           = 1.0f;
-        ch.scrambleTimer     = staggerDist (m_rng);
-        ch.scrambleInterval  = intervalDist (m_rng);
-        ch.currentGlyphIndex = glyphDist (m_rng);
+            m_chars.push_back (ch);
+        }
     }
 }
 
@@ -229,10 +226,15 @@ void HotkeyOverlay::InitializeCharactersForReveal ()
 
 void HotkeyOverlay::Show ()
 {
-    m_phase      = OverlayPhase::Revealing;
-    m_phaseTimer = 0.0f;
+    // Reset all characters to Hidden so the new sweep starts clean
+    for (auto & ch : m_chars)
+    {
+        ch.phase         = CharPhase::Hidden;
+        ch.opacity       = 0.0f;
+        ch.glowIntensity = 0.0f;
+    }
 
-    InitializeCharactersForReveal();
+    m_sweep.StartReveal();
 }
 
 
@@ -243,39 +245,14 @@ void HotkeyOverlay::Show ()
 //
 //  HotkeyOverlay::Dismiss
 //
-//  Triggers dissolve from Revealing or Holding. No-op from Dissolving/Hidden.
+//  Triggers dismiss sweep from Revealing or Holding.
+//  No-op from Dismissing/Idle/Done.
 //
 ////////////////////////////////////////////////////////////////////////////////
 
 void HotkeyOverlay::Dismiss ()
 {
-    if (m_phase == OverlayPhase::Revealing || m_phase == OverlayPhase::Holding)
-    {
-        m_phase      = OverlayPhase::Dissolving;
-        m_phaseTimer = 0.0f;
-
-        // Start all resolved characters dissolving with staggered offsets
-        std::uniform_real_distribution<float> staggerDist (0.0f, DISSOLVE_STAGGER_RANGE);
-
-        for (auto & ch : m_chars)
-        {
-            if (ch.isSpace)
-            {
-                continue;
-            }
-
-            if (ch.phase == CharPhase::Resolved || ch.phase == CharPhase::Scrambling)
-            {
-                ch.dissolveStartOffset = staggerDist (m_rng);
-
-                if (ch.phase == CharPhase::Scrambling)
-                {
-                    ch.phase         = CharPhase::DissolveCycling;
-                    ch.scrambleTimer = 0.0f;
-                }
-            }
-        }
-    }
+    m_sweep.StartDismiss();
 }
 
 
@@ -286,18 +263,19 @@ void HotkeyOverlay::Dismiss ()
 //
 //  HotkeyOverlay::Hide
 //
-//  Immediately hides the overlay with no fade animation.
+//  Immediately hides the overlay with no animation.
 //
 ////////////////////////////////////////////////////////////////////////////////
 
 void HotkeyOverlay::Hide ()
 {
-    m_phase = OverlayPhase::Hidden;
+    m_sweep.Reset();
 
     for (auto & ch : m_chars)
     {
-        ch.phase   = CharPhase::Hidden;
-        ch.opacity = 0.0f;
+        ch.phase         = CharPhase::Hidden;
+        ch.opacity       = 0.0f;
+        ch.glowIntensity = 0.0f;
     }
 }
 
@@ -309,84 +287,98 @@ void HotkeyOverlay::Hide ()
 //
 //  HotkeyOverlay::Update
 //
-//  Advances animation state based on delta time.
+//  Advances the sweep effect and derives per-character state from it.
 //
 ////////////////////////////////////////////////////////////////////////////////
 
 void HotkeyOverlay::Update (float deltaTime)
 {
-    switch (m_phase)
-    {
-        case OverlayPhase::Revealing:
-            UpdateRevealing (deltaTime);
-            break;
+    m_sweep.Update (deltaTime);
 
-        case OverlayPhase::Holding:
-            // Hotkey overlay holds indefinitely (dismissed by user)
-            break;
+    SweepPhase sweepPhase = m_sweep.GetPhase();
 
-        case OverlayPhase::Dissolving:
-            UpdateDissolving (deltaTime);
-            break;
-
-        case OverlayPhase::Hidden:
-        default:
-            break;
-    }
-}
-
-
-
-
-
-////////////////////////////////////////////////////////////////////////////////
-//
-//  HotkeyOverlay::UpdateRevealing
-//
-//  Cycles scrambling characters and resolves them when timer expires.
-//
-////////////////////////////////////////////////////////////////////////////////
-
-void HotkeyOverlay::UpdateRevealing (float deltaTime)
-{
-    std::uniform_int_distribution<size_t> glyphDist (0, m_allGlyphs.size() - 1);
-    bool                                  allResolved = true;
-
-
-
+    // Pass 1: update phase, opacity, glow for each character.
     for (auto & ch : m_chars)
     {
-        if (ch.isSpace || ch.phase == CharPhase::Resolved)
-        {
-            continue;
-        }
+        float normCol = (m_cols > 1)
+                       ? static_cast<float>(ch.col) / static_cast<float>(m_cols - 1)
+                       : 0.0f;
 
-        if (ch.phase == CharPhase::Scrambling)
-        {
-            ch.scrambleTimer -= deltaTime;
+        float opacity = m_sweep.GetOpacity (ch.row, normCol);
 
-            if (ch.scrambleTimer <= 0.0f)
+        if (opacity > 0.0f)
+        {
+            // Assign a random glyph once on first reveal (Hidden → Resolved)
+            if (ch.phase == CharPhase::Hidden)
             {
-                ch.phase             = CharPhase::Resolved;
-                ch.currentGlyphIndex = ch.targetGlyphIndex;
-                ch.opacity           = 1.0f;
+                size_t charIndex    = static_cast<size_t>(ch.row * m_cols + ch.col);
+                ch.randomGlyphIndex = (charIndex * 7 + 13) % m_allGlyphs.size();
             }
-            else
-            {
-                ch.currentGlyphIndex = glyphDist (m_rng);
-                allResolved          = false;
-            }
+
+            ch.phase         = CharPhase::Resolved;
+            ch.opacity       = opacity;
+            ch.glowIntensity = m_sweep.GetGlowIntensity (ch.row, normCol);
         }
         else
         {
-            allResolved = false;
+            ch.phase         = CharPhase::Hidden;
+            ch.opacity       = 0.0f;
+            ch.glowIntensity = 0.0f;
         }
     }
 
-    if (allResolved)
+    // Pass 2: determine which glyph to display.
+    //
+    //  During Revealing: a long streak of random glyphs sweeps left-to-right.
+    //  The head position extends past the grid edge so characters at the
+    //  right side correctly settle to their target glyph.
+    //
+    //  During Dismissing: a long streak of random glyphs sweeps
+    //  right-to-left before characters fade out.
+    //
+    //  Otherwise: all non-space characters show their target glyph.
+
+    float streakLen = static_cast<float>(m_cols);
+
+    for (auto & ch : m_chars)
     {
-        m_phase      = OverlayPhase::Holding;
-        m_phaseTimer = 0.0f;
+        if (ch.phase != CharPhase::Resolved)
+        {
+            continue;
+        }
+
+        bool inStreakZone = false;
+
+        if (sweepPhase == SweepPhase::Revealing)
+        {
+            float revealProg = m_sweep.GetRevealProgress (ch.row);
+            float headPos    = revealProg * (static_cast<float>(m_cols - 1) + streakLen);
+            float dist       = headPos - static_cast<float>(ch.col);
+
+            inStreakZone = (dist >= 0.0f && dist < streakLen);
+        }
+        else if (sweepPhase == SweepPhase::Dismissing)
+        {
+            float dismissProg = m_sweep.GetDismissProgress (ch.row);
+            // Right-to-left: head starts at rightmost column and moves left
+            float headPos     = static_cast<float>(m_cols - 1) - dismissProg * (static_cast<float>(m_cols - 1) + streakLen);
+            float dist        = static_cast<float>(ch.col) - headPos;
+
+            inStreakZone = (dist >= 0.0f && dist < streakLen);
+        }
+
+        if (inStreakZone)
+        {
+            ch.currentGlyphIndex = ch.randomGlyphIndex;
+        }
+        else if (ch.isSpace)
+        {
+            ch.currentGlyphIndex = SIZE_MAX;
+        }
+        else
+        {
+            ch.currentGlyphIndex = ch.targetGlyphIndex;
+        }
     }
 }
 
@@ -396,96 +388,23 @@ void HotkeyOverlay::UpdateRevealing (float deltaTime)
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-//  HotkeyOverlay::UpdateDissolving
+//  HotkeyOverlay::GetPhase
 //
-//  Per-character dissolve: Resolved → DissolveCycling → DissolveFading → Hidden.
+//  Maps TextSweepEffect's SweepPhase to the public OverlayPhase.
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void HotkeyOverlay::UpdateDissolving (float deltaTime)
+OverlayPhase HotkeyOverlay::GetPhase () const
 {
-    std::uniform_int_distribution<size_t> glyphDist (0, m_allGlyphs.size() - 1);
-
-
-
-    m_phaseTimer += deltaTime;
-
-    for (auto & ch : m_chars)
+    switch (m_sweep.GetPhase())
     {
-        if (ch.isSpace || ch.phase == CharPhase::Hidden)
-        {
-            continue;
-        }
+        case SweepPhase::Revealing:  return OverlayPhase::Revealing;
+        case SweepPhase::Holding:    return OverlayPhase::Holding;
+        case SweepPhase::Dismissing: return OverlayPhase::Dissolving;
 
-        float remaining = deltaTime;
-
-        if (ch.phase == CharPhase::Resolved)
-        {
-            if (remaining >= ch.dissolveStartOffset)
-            {
-                remaining -= ch.dissolveStartOffset;
-                ch.dissolveStartOffset = 0.0f;
-                ch.phase         = CharPhase::DissolveCycling;
-                ch.scrambleTimer = DISSOLVE_CYCLE_DURATION;
-            }
-            else
-            {
-                ch.dissolveStartOffset -= remaining;
-                remaining = 0.0f;
-            }
-        }
-
-        if (ch.phase == CharPhase::DissolveCycling)
-        {
-            ch.currentGlyphIndex = glyphDist (m_rng);
-
-            if (remaining >= ch.scrambleTimer)
-            {
-                remaining -= ch.scrambleTimer;
-                ch.scrambleTimer = 0.0f;
-                ch.phase         = CharPhase::DissolveFading;
-                ch.scrambleTimer = DISSOLVE_FADE_DURATION;
-                ch.opacity       = 1.0f;
-            }
-            else
-            {
-                ch.scrambleTimer -= remaining;
-                remaining = 0.0f;
-            }
-        }
-
-        if (ch.phase == CharPhase::DissolveFading)
-        {
-            ch.currentGlyphIndex = glyphDist (m_rng);
-
-            if (remaining >= ch.scrambleTimer)
-            {
-                ch.phase   = CharPhase::Hidden;
-                ch.opacity = 0.0f;
-            }
-            else
-            {
-                ch.scrambleTimer -= remaining;
-                ch.opacity = std::max (0.0f, ch.scrambleTimer / DISSOLVE_FADE_DURATION);
-            }
-        }
-    }
-
-    // Check if all non-space characters are now hidden
-    bool allHidden = true;
-
-    for (const auto & ch : m_chars)
-    {
-        if (!ch.isSpace && ch.phase != CharPhase::Hidden)
-        {
-            allHidden = false;
-            break;
-        }
-    }
-
-    if (allHidden)
-    {
-        m_phase = OverlayPhase::Hidden;
+        case SweepPhase::Idle:
+        case SweepPhase::Done:
+        default:                     return OverlayPhase::Hidden;
     }
 }
 

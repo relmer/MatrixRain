@@ -1,6 +1,6 @@
 #include "Pch_MatrixRainTests.h"
 
-#include "..\..\MatrixRainCore\HelpRainDialog.h"
+#include "..\..\MatrixRainCore\UsageDialog.h"
 #include "..\..\MatrixRainCore\InMemorySettingsProvider.h"
 
 
@@ -13,7 +13,7 @@ namespace MatrixRainTests
 
 
 
-    TEST_CLASS (HelpRainDialogTests)
+    TEST_CLASS (UsageDialogTests)
     {
         private:
             InMemorySettingsProvider m_settingsProvider;
@@ -32,7 +32,7 @@ namespace MatrixRainTests
                 UsageText usage (L'/');
 
 
-                SIZE size = HelpRainDialog::ComputeWindowSize (usage, 96.0f);
+                SIZE size = UsageDialog::ComputeWindowSize (usage, 96.0f);
 
 
 
@@ -49,7 +49,7 @@ namespace MatrixRainTests
 
 
                 // At default DPI (96), the window should be at least 2x the text content
-                SIZE size = HelpRainDialog::ComputeWindowSize (usage, 96.0f);
+                SIZE size = UsageDialog::ComputeWindowSize (usage, 96.0f);
 
 
 
@@ -75,7 +75,7 @@ namespace MatrixRainTests
                 int maxWidth  = static_cast<int> ((workArea.right - workArea.left) * 0.8f);
                 int maxHeight = static_cast<int> ((workArea.bottom - workArea.top) * 0.8f);
 
-                SIZE size = HelpRainDialog::ComputeWindowSize (usage, 96.0f);
+                SIZE size = UsageDialog::ComputeWindowSize (usage, 96.0f);
 
 
 
@@ -95,7 +95,7 @@ namespace MatrixRainTests
                 UsageText usage (L'/');
 
 
-                HelpRainDialog dialog (usage, m_settingsProvider);
+                UsageDialog dialog (usage, m_settingsProvider);
 
                 const auto & positions = dialog.GetCharacterPositions();
 
@@ -128,7 +128,7 @@ namespace MatrixRainTests
                 UsageText usage (L'/');
 
 
-                HelpRainDialog dialog (usage, m_settingsProvider);
+                UsageDialog dialog (usage, m_settingsProvider);
 
 
 
@@ -146,7 +146,7 @@ namespace MatrixRainTests
                 UsageText usage (L'/');
 
 
-                HelpRainDialog dialog (usage, m_settingsProvider);
+                UsageDialog dialog (usage, m_settingsProvider);
 
                 const auto & flags     = dialog.GetRevealedFlags();
                 const auto & positions = dialog.GetCharacterPositions();
@@ -170,7 +170,7 @@ namespace MatrixRainTests
                 UsageText usage (L'/');
 
 
-                HelpRainDialog dialog (usage, m_settingsProvider);
+                UsageDialog dialog (usage, m_settingsProvider);
 
 
 
@@ -186,7 +186,7 @@ namespace MatrixRainTests
                 UsageText usage (L'/');
 
 
-                HelpRainDialog dialog (usage, m_settingsProvider);
+                UsageDialog dialog (usage, m_settingsProvider);
 
 
 
@@ -206,7 +206,7 @@ namespace MatrixRainTests
                 UsageText usage (L'/');
 
 
-                HelpRainDialog dialog (usage, m_settingsProvider);
+                UsageDialog dialog (usage, m_settingsProvider);
 
 
 
@@ -222,7 +222,7 @@ namespace MatrixRainTests
                 UsageText usage (L'/');
 
 
-                HelpRainDialog dialog (usage, m_settingsProvider);
+                UsageDialog dialog (usage, m_settingsProvider);
 
                 // With one-char-per-column-per-frame, columns may need
                 // multiple full sweeps to reveal all stacked characters.
@@ -251,7 +251,7 @@ namespace MatrixRainTests
                 UsageText usage (L'/');
 
 
-                HelpRainDialog dialog (usage, m_settingsProvider);
+                UsageDialog dialog (usage, m_settingsProvider);
 
                 // Transition to Background happens as soon as all characters
                 // are revealed (columns respawn during Revealing).  Same
@@ -279,7 +279,7 @@ namespace MatrixRainTests
                 UsageText usage (L'/');
 
 
-                HelpRainDialog dialog (usage, m_settingsProvider);
+                UsageDialog dialog (usage, m_settingsProvider);
 
                 float initialFront = dialog.GetRevealFrontY();
 
@@ -298,7 +298,7 @@ namespace MatrixRainTests
                                 L"Reveal front should advance downward with each update");
 
                 // Verify approximate distance: 10 frames * (1/60)s * 150px/s ≈ 25px
-                float expectedAdvance = 10.0f * (1.0f / 60.0f) * HelpRainDialog::kRevealSpeed;
+                float expectedAdvance = 10.0f * (1.0f / 60.0f) * UsageDialog::kRevealSpeed;
                 float actualAdvance   = advancedFront - initialFront;
 
                 Assert::IsTrue (abs (actualAdvance - expectedAdvance) < 1.0f,

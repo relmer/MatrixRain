@@ -7,46 +7,50 @@
 
 ### 1. HelpHintOverlay
 
-The GPU-rendered overlay showing the three-line help hint with matrix rain reveal/dissolve animation.
+The GPU-rendered overlay showing the three-line help hint with horizontal sweep reveal/dismiss animation.
 
 **Lifecycle**: Created once at application startup (Normal mode only). Persists for app lifetime (can be re-triggered). Not created in screensaver modes.
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `phase` | `OverlayPhase` | Current overlay-level phase |
-| `phaseTimer` | `float` | Time elapsed in current phase (seconds) |
-| `holdDuration` | `float` | How long to hold at full visibility before dissolve |
-| `characters` | `vector<HintCharacter>` | Flat array of all characters in the hint text |
-| `rows` | `int` | Number of text rows (3) |
-| `cols` | `int` | Number of text columns (max width of formatted text) |
-| `boundingRect` | `D2D1_RECT_F` | Screen-space bounding rectangle for occlusion + feathered border |
-| `isActive` | `bool` | Whether the overlay is currently visible or animating |
+| `m_sweep` | `TextSweepEffect` | Per-row timing oracle for reveal/hold/dismiss sweep |
+| `m_chars` | `vector<HintCharacter>` | Flat array of all characters in the hint text (including margin columns) |
+| `m_rows` | `int` | Number of text rows (3) |
+| `m_cols` | `int` | Total columns including margins (`m_textCols + 2 * MARGIN_COLS`) |
+| `m_textCols` | `int` | Number of text columns (max width of formatted text, excluding margins) |
+| `m_boundingRect` | `D2D1_RECT_F` | Screen-space bounding rectangle for occlusion + feathered border |
+| `m_textLines` | `vector<wstring>` | The three lines of hint text |
+| `m_allGlyphs` | `vector<uint32_t>` | Glyph set for random glyph assignment (from CharacterConstants + extras) |
 
-**State transitions**:
+**State transitions** (managed by TextSweepEffect):
 ```
-Hidden → Revealing → Holding → Dissolving → Hidden
-  ↑         ↓           ↓          ↓
-  └─────────┴───────────┴──────────┘  (re-trigger: unrecognized key)
-            ↓           ↓          ↓
-            └───────────┴──────────┘  (recognized hotkey: jump to Dissolving)
+Idle → Revealing → Holding → Dismissing → Done
+ ↑                                          ↓
+ └──────────────────────────────────────────┘  (re-trigger: Show() restarts)
 ```
+
+**Layout constants**: `CHAR_WIDTH=16`, `CHAR_HEIGHT=28`, `PADDING=20`, `GLOW_LAYERS=4`, `MARGIN_COLS=1`
 
 ### 2. HintCharacter
 
-Per-character animation state for the overlay hint.
+Per-character animation state for overlay hints (used by both HelpHintOverlay and HotkeyOverlay).
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `targetGlyphIndex` | `size_t` | Index of the final intended character in the character set |
-| `currentGlyphIndex` | `size_t` | Index of the currently displayed character (random during scramble) |
-| `phase` | `CharPhase` | Per-character animation phase |
-| `opacity` | `float` | Current opacity (1.0 = fully visible, 0.0 = invisible) |
-| `scrambleTimer` | `float` | Time remaining in scramble/cycle phase |
-| `scrambleInterval` | `float` | Time between glyph changes during scramble |
-| `dissolveStartOffset` | `float` | Random delay before this character begins dissolving |
-| `row` | `int` | Row position in the hint grid |
-| `col` | `int` | Column position in the hint grid |
-| `isSpace` | `bool` | True if this position is a space (not rendered, no scramble) |
+| `targetGlyphIndex` | `size_t` | Index of the final intended character in the glyph set |
+| `currentGlyphIndex` | `size_t` | Index of the currently displayed glyph (random during sweep streak, target otherwise, `SIZE_MAX` for invisible) |
+| `randomGlyphIndex` | `size_t` | Fixed random glyph assigned once on first reveal (deterministic from position) |
+| `phase` | `CharPhase` | Per-character phase (Resolved or Hidden) |
+| `opacity` | `float` | Current opacity (0.0–1.0, driven by TextSweepEffect::GetOpacity) |
+| `glowIntensity` | `float` | Green→white transition (1.0 = bright green, 0.0 = settled white, driven by TextSweepEffect::GetGlowIntensity) |
+| `row` | `int` | Row position in the character grid |
+| `col` | `int` | Column position in the character grid (includes margin offset) |
+| `isSpace` | `bool` | True if this position is a space (renders as invisible when not in streak zone) |
+
+**Notes**:
+- Characters in the sweep streak zone display `randomGlyphIndex`
+- Characters past the streak zone display `targetGlyphIndex` (or `SIZE_MAX` if space)
+- Margin columns always render as invisible (`SIZE_MAX`) when outside streak zone
 
 ### 3. OverlayPhase (enum class)
 
@@ -61,11 +65,8 @@ Per-character animation state for the overlay hint.
 
 | Value | Description |
 |-------|-------------|
-| `Scrambling` | Cycling through random glyphs before reveal |
-| `Resolved` | Displaying the final target character at full opacity |
-| `DissolveCycling` | Re-cycling through random glyphs at full brightness |
-| `DissolveFading` | Cycling glyphs with decreasing opacity |
-| `Hidden` | Fully transparent, no longer rendered |
+| `Resolved` | Character is visible (opacity > 0); displaying target glyph or random glyph depending on sweep position |
+| `Hidden` | Fully transparent, not rendered |
 
 ### 5. HelpRainDialog
 
@@ -162,12 +163,64 @@ Shared text content and formatting for the graphical rain dialog (`/?`/`-?`). Bu
 | `keyName` | `wstring` | Display name (e.g., `Space`, `Enter`, `Esc`) |
 | `description` | `wstring` | Brief description of the hotkey action |
 
+### 9. TextSweepEffect
+
+Shared per-row horizontal sweep timing oracle. Manages reveal (left-to-right), hold, and dismiss (right-to-left) phases with per-row staggered delays/durations. Both `HelpHintOverlay` and `HotkeyOverlay` delegate all timing to this class.
+
+**Lifecycle**: Owned by each overlay instance. Initialized with row count and timing parameters. Drives the overlay's entire animation lifecycle.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `m_phase` | `SweepPhase` | Current phase: Idle, Revealing, Holding, Dismissing, Done |
+| `m_revealTimer` | `float` | Time elapsed during reveal phase |
+| `m_holdStartTime` | `float` | Time when hold phase began |
+| `m_dismissTimer` | `float` | Time elapsed during dismiss phase |
+| `m_fadeInSpeed` | `float` | Speed of opacity fade-in during reveal |
+| `m_holdDuration` | `float` | Hold time before auto-dismiss (-1.0 = hold indefinitely) |
+| `m_glowDecaySpeed` | `float` | Rate at which glow decays from 1.0 (green) to 0.0 (white) |
+| `m_rowCount` | `int` | Number of rows |
+| `m_rowRevealDelays` | `vector<float>` | Per-row random delay before reveal starts |
+| `m_rowRevealDurations` | `vector<float>` | Per-row random duration for reveal sweep |
+| `m_rowDismissDelays` | `vector<float>` | Per-row random delay before dismiss starts |
+| `m_rowDismissDurations` | `vector<float>` | Per-row random duration for dismiss sweep |
+| `m_staggerRange` | `float` | Range of per-row delay randomization |
+| `m_durationMin` | `float` | Minimum sweep duration per row |
+| `m_durationMax` | `float` | Maximum sweep duration per row |
+
+**SweepPhase enum**:
+
+| Value | Description |
+|-------|-------------|
+| `Idle` | Not started |
+| `Revealing` | Left-to-right sweep in progress |
+| `Holding` | Reveal complete, waiting for holdDuration |
+| `Dismissing` | Right-to-left sweep in progress |
+| `Done` | Dismiss complete |
+
+**Key queries**:
+- `GetRevealProgress(row)` → 0..1 (how far the reveal sweep has progressed on this row)
+- `GetDismissProgress(row)` → 0..1 (how far the dismiss sweep has progressed on this row)
+- `GetOpacity(row, normCol)` → 0..1 (combined reveal fade-in and dismiss fade-out)
+- `GetGlowIntensity(row, normCol)` → 0..1 (green→white decay since reveal)
+- `IsPositionRevealed(row, normCol)` → bool
+- `IsPositionDismissed(row, normCol)` → bool
+
+**Initialization parameters** (current values):
+- HelpHintOverlay: `Initialize(3, 1.2, 1.0, 2.0, 2.5, 3.0, 1.5)` — 3 rows, 3s hold
+- HotkeyOverlay: `Initialize(9, 1.2, 1.0, 2.0, 2.5, -1.0, 1.5)` — 9 rows, hold indefinitely (dismissed by keypress)
+
 ## Relationships
 
 ```
 UsageText ──────→ SwitchEntry (1:N)
 
-HelpHintOverlay ──→ HintCharacter (1:N, flat array)
+TextSweepEffect ←── HelpHintOverlay (1:1, timing oracle)
+TextSweepEffect ←── HotkeyOverlay   (1:1, timing oracle)
+
+HelpHintOverlay ──→ HintCharacter (1:N, flat array, includes margin columns)
+
+HotkeyOverlay ──┬──→ HintCharacter (1:N, flat array, includes margin columns)
+                └──→ HotkeyEntry (1:N, hotkey content)
 
 HelpRainDialog ──┬──→ UsageText (uses for formatted text content)
                  ├──→ CharPosition (1:N, pre-computed character positions)
@@ -178,7 +231,15 @@ HelpRainDialog ──┬──→ UsageText (uses for formatted text content)
 ## Validation Rules
 
 - `HintCharacter.opacity` must be in range [0.0, 1.0]
-- `HintCharacter.targetGlyphIndex` must be a valid index into `CharacterConstants::GetAllCodepoints()`
+- `HintCharacter.glowIntensity` must be in range [0.0, 1.0]
+- `HintCharacter.targetGlyphIndex` must be a valid index into the overlay's glyph set
+- `HintCharacter.currentGlyphIndex` must be a valid glyph index OR `SIZE_MAX` (invisible sentinel)
+- `HintCharacter.randomGlyphIndex` must be a valid index into the overlay's glyph set
+- `TextSweepEffect.m_rowCount` must match the overlay's row count
+- `TextSweepEffect` phase transitions must follow: Idle → Revealing → Holding → Dismissing → Done
+- `GetRevealProgress(row)` and `GetDismissProgress(row)` must return values in [0.0, 1.0]
+- `GetOpacity(row, normCol)` must return values in [0.0, 1.0]
+- Margin columns (col < MARGIN_COLS or col >= textCols + MARGIN_COLS) must render as invisible when outside sweep streak zone
 - `HelpRainDialog.characterPositions` must contain one entry per non-space character in the formatted text
 - `HelpRainDialog.revealQueue` must be a permutation of indices [0, characterPositions.size())
 - `HelpRainDialog.revealedFlags.size() == characterPositions.size()`
@@ -190,7 +251,6 @@ HelpRainDialog ──┬──→ UsageText (uses for formatted text content)
 - `DecorativeStreak.speed` must be positive
 - `DecorativeStreak.trailLength` must be in range [5, 10]
 - `UsageText.switchPrefix` must be either `/` or `-`
-- `OverlayPhase` transitions must follow the state machine (no skipping from Hidden to Holding)
-- Re-trigger (unrecognized key) from Revealing or Holding resets to `Revealing` (all chars back to Scrambling)
-- Re-trigger from Dissolving reverses the dissolve — partially faded characters materialize back toward `Resolved`, fully `Hidden` characters restart from `Scrambling`
-- Recognized hotkey transitions to `Dissolving` from `Revealing` or `Holding` (no-op if already `Dissolving`)
+- `OverlayPhase` maps from `SweepPhase`: Revealing→Revealing, Holding→Holding, Dismissing→Dissolving, Idle/Done→Hidden
+- Re-trigger (Show()) restarts TextSweepEffect from Idle → Revealing
+- Recognized hotkey (Dismiss()) calls TextSweepEffect::StartDismiss() from Revealing/Holding (no-op if already Dismissing/Done)

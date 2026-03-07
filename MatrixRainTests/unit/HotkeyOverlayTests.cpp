@@ -79,7 +79,7 @@ namespace MatrixRainTests
 
 
 
-            TEST_METHOD (Show_CharactersInitializedToScrambling)
+            TEST_METHOD (Show_CharactersInitializedToHiddenForSweep)
             {
                 HotkeyOverlay overlay;
 
@@ -87,20 +87,20 @@ namespace MatrixRainTests
                 overlay.Show();
 
                 auto chars = overlay.GetCharacters();
-                bool foundScrambling = false;
+                bool allHidden = true;
 
 
 
                 for (const auto & ch : chars)
                 {
-                    if (!ch.isSpace && ch.phase == CharPhase::Scrambling)
+                    if (!ch.isSpace && ch.phase != CharPhase::Hidden)
                     {
-                        foundScrambling = true;
+                        allHidden = false;
                         break;
                     }
                 }
 
-                Assert::IsTrue (foundScrambling, L"Non-space characters should be Scrambling after Show");
+                Assert::IsTrue (allHidden, L"Non-space characters should be Hidden (awaiting sweep) after Show");
             }
 
 
@@ -168,10 +168,7 @@ namespace MatrixRainTests
                 overlay.Show();
 
                 // Advance enough time for all characters to resolve
-                for (int i = 0; i < 100; i++)
-                {
-                    overlay.Update (0.02f);
-                }
+                overlay.Update (5.0f);
 
 
 
@@ -211,10 +208,7 @@ namespace MatrixRainTests
                 overlay.Show();
 
                 // Advance to Holding
-                for (int i = 0; i < 100; i++)
-                {
-                    overlay.Update (0.02f);
-                }
+                overlay.Update (5.0f);
 
                 overlay.Dismiss();
 
@@ -327,10 +321,7 @@ namespace MatrixRainTests
                 overlay.Show();
 
                 // Advance to Holding
-                for (int i = 0; i < 100; i++)
-                {
-                    overlay.Update (0.02f);
-                }
+                overlay.Update (5.0f);
 
                 Assert::IsTrue (overlay.GetPhase() == OverlayPhase::Holding,
                                 L"Should be in Holding");
@@ -361,10 +352,7 @@ namespace MatrixRainTests
                 Assert::IsTrue (overlay.GetPhase() == OverlayPhase::Revealing);
 
                 // Advance to Holding
-                for (int i = 0; i < 100; i++)
-                {
-                    overlay.Update (0.02f);
-                }
+                overlay.Update (5.0f);
                 Assert::IsTrue (overlay.GetPhase() == OverlayPhase::Holding);
 
                 // Dismiss → Dissolving

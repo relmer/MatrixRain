@@ -286,7 +286,8 @@
     <ClInclude Include="DensityController.h" />
     <ClInclude Include="FPSCounter.h" />
     <ClInclude Include="HelpHintOverlay.h" />
-    <ClInclude Include="HelpRainDialog.h" />
+    <ClInclude Include="UsageDialog.h" />
+    <ClInclude Include="TextSweepEffect.h" />
     <ClInclude Include="HotkeyOverlay.h" />
     <ClInclude Include="InMemorySettingsProvider.h" />
     <ClInclude Include="InputSystem.h" />
@@ -332,8 +333,9 @@
     <ClCompile Include="UsageText.cpp" />
     <ClCompile Include="CommandLineHelp.cpp" />
     <ClCompile Include="HelpHintOverlay.cpp" />
-    <ClCompile Include="HelpRainDialog.cpp" />
+    <ClCompile Include="UsageDialog.cpp" />
     <ClCompile Include="HotkeyOverlay.cpp" />
+    <ClCompile Include="TextSweepEffect.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

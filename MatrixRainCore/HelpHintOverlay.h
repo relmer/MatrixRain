@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CharacterConstants.h"
+#include "TextSweepEffect.h"
 
 
 
@@ -32,10 +33,7 @@ enum class OverlayPhase
 
 enum class CharPhase
 {
-    Scrambling,
     Resolved,
-    DissolveCycling,
-    DissolveFading,
     Hidden
 };
 
@@ -51,16 +49,15 @@ enum class CharPhase
 
 struct HintCharacter
 {
-    size_t   targetGlyphIndex   = 0;
-    size_t   currentGlyphIndex  = 0;
+    size_t    targetGlyphIndex  = 0;
+    size_t    currentGlyphIndex = 0;
+    size_t    randomGlyphIndex  = 0;
     CharPhase phase             = CharPhase::Hidden;
-    float    opacity            = 0.0f;
-    float    scrambleTimer      = 0.0f;
-    float    scrambleInterval   = 0.05f;
-    float    dissolveStartOffset = 0.0f;
-    int      row                = 0;
-    int      col                = 0;
-    bool     isSpace            = false;
+    float     opacity           = 0.0f;
+    float     glowIntensity     = 0.0f;
+    int       row               = 0;
+    int       col               = 0;
+    bool      isSpace           = false;
 };
 
 
@@ -81,6 +78,14 @@ struct HintCharacter
 class HelpHintOverlay
 {
 public:
+    // Layout constants
+    static constexpr float CHAR_WIDTH   = 16.0f;
+    static constexpr float CHAR_HEIGHT  = 28.0f;
+    static constexpr float PADDING      = 20.0f;
+    static constexpr int   GLOW_LAYERS  = 4;
+    static constexpr int   MARGIN_COLS  = 1;
+
+
     HelpHintOverlay();
 
 
@@ -99,8 +104,8 @@ public:
 
 
     // Queries
-    bool                             IsActive()        const { return m_phase != OverlayPhase::Hidden;          }
-    OverlayPhase                     GetPhase()         const { return m_phase;                                  }
+    bool                             IsActive()        const { return m_sweep.IsActive();                       }
+    OverlayPhase                     GetPhase()         const;
     D2D1_RECT_F                      GetBoundingRect()  const { return m_boundingRect;                           }
     std::span<const HintCharacter>   GetCharacters()    const { return std::span<const HintCharacter>(m_chars);  }
     std::span<const uint32_t>        GetAllGlyphs()     const { return std::span<const uint32_t>(m_allGlyphs);   }
@@ -110,39 +115,23 @@ public:
 
 private:
     void InitializeCharacters();
-    void InitializeCharactersForReveal();
-    void UpdateRevealing  (float deltaTime);
-    void UpdateHolding    (float deltaTime);
-    void UpdateDissolving (float deltaTime);
 
 
-    // Overlay state
-    OverlayPhase                 m_phase        = OverlayPhase::Hidden;
-    float                        m_phaseTimer   = 0.0f;
-    float                        m_holdDuration = 3.0f;
+    // Sweep effect (handles all timing / phase transitions)
+    TextSweepEffect                  m_sweep;
 
     // Character grid
-    std::vector<HintCharacter>   m_chars;
-    int                          m_rows = 0;
-    int                          m_cols = 0;
+    std::vector<HintCharacter>       m_chars;
+    int                              m_rows     = 0;
+    int                              m_cols     = 0;
+    int                              m_textCols = 0;
 
     // Text content
-    std::vector<std::wstring>    m_textLines;
+    std::vector<std::wstring>        m_textLines;
 
     // Bounding rect for rendering / occlusion
-    D2D1_RECT_F                  m_boundingRect = {};
+    D2D1_RECT_F                      m_boundingRect = {};
 
     // Glyph set for scrambling
-    std::vector<uint32_t>        m_allGlyphs;
-
-    // RNG
-    std::mt19937                 m_rng { std::random_device{}() };
-
-    // Timing constants
-    static constexpr float SCRAMBLE_MIN_INTERVAL = 0.03f;
-    static constexpr float SCRAMBLE_MAX_INTERVAL = 0.08f;
-    static constexpr float REVEAL_STAGGER_RANGE  = 0.8f;
-    static constexpr float DISSOLVE_STAGGER_RANGE = 1.0f;
-    static constexpr float DISSOLVE_CYCLE_DURATION = 0.3f;
-    static constexpr float DISSOLVE_FADE_DURATION  = 0.4f;
+    std::vector<uint32_t>            m_allGlyphs;
 };

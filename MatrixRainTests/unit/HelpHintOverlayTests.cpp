@@ -73,7 +73,7 @@ namespace MatrixRainTests
 
 
 
-            TEST_METHOD (Show_CharactersInitializedToScrambling)
+            TEST_METHOD (Show_CharactersInitializedToHiddenForSweep)
             {
                 HelpHintOverlay overlay;
 
@@ -82,18 +82,18 @@ namespace MatrixRainTests
 
 
                 auto chars = overlay.GetCharacters();
-                bool hasScrambling = false;
+                bool allHidden = true;
 
                 for (const auto & ch : chars)
                 {
-                    if (!ch.isSpace && ch.phase == CharPhase::Scrambling)
+                    if (!ch.isSpace && ch.phase != CharPhase::Hidden)
                     {
-                        hasScrambling = true;
+                        allHidden = false;
                         break;
                     }
                 }
 
-                Assert::IsTrue (hasScrambling, L"Non-space characters should be Scrambling after Show");
+                Assert::IsTrue (allHidden, L"Non-space characters should be Hidden (awaiting sweep) after Show");
             }
 
 
@@ -318,7 +318,7 @@ namespace MatrixRainTests
             //  T042: Show() while Revealing resets to Scrambling
             ////////////////////////////////////////////////////////////
 
-            TEST_METHOD (Show_WhileRevealing_ResetsToScrambling)
+            TEST_METHOD (Show_WhileRevealing_ResetsToHidden)
             {
                 HelpHintOverlay overlay;
 
@@ -335,16 +335,16 @@ namespace MatrixRainTests
                 Assert::AreEqual (static_cast<int>(OverlayPhase::Revealing), static_cast<int>(overlay.GetPhase()), L"Should be Revealing after re-trigger");
 
                 auto chars = overlay.GetCharacters();
-                bool hasScrambling = false;
+                bool allHidden = true;
                 for (const auto & ch : chars)
                 {
-                    if (!ch.isSpace && ch.phase == CharPhase::Scrambling)
+                    if (!ch.isSpace && ch.phase != CharPhase::Hidden)
                     {
-                        hasScrambling = true;
+                        allHidden = false;
                         break;
                     }
                 }
-                Assert::IsTrue (hasScrambling, L"Characters should be reset to Scrambling");
+                Assert::IsTrue (allHidden, L"Characters should be reset to Hidden for sweep");
             }
 
 

@@ -60,9 +60,10 @@ specs/003-runtime-help/
 
 ```text
 MatrixRainCore/                    # Static library — all new feature code here
-├── HelpHintOverlay.h/cpp          # NEW: Overlay state machine + per-character animation
+├── HelpHintOverlay.h/cpp          # NEW: Overlay state machine + per-character animation (3-line hint)
 ├── HelpRainDialog.h/cpp           # NEW: Custom graphical rain dialog with D3D/D2D rendering (/? only)
 ├── HotkeyOverlay.h/cpp            # NEW: In-app hotkey reference overlay (? key, rendered on main window)
+├── TextSweepEffect.h/cpp          # NEW: Shared per-row horizontal sweep timing oracle (reveal/hold/dismiss)
 ├── UsageText.h/cpp                # NEW: Command-line switch text content + formatting
 ├── CommandLineHelp.h/cpp          # NEW: /? orchestration — creates HelpRainDialog, exits process
 ├── UnicodeSymbols.h               # NEW: Named constants for Unicode characters (em dash, etc.)
@@ -84,13 +85,14 @@ MatrixRainTests/                   # Test project
 │   ├── HelpHintOverlayTests.cpp   # NEW: Overlay state machine tests
 │   ├── HelpRainDialogTests.cpp    # NEW: Reveal queue + animation state tests
 │   ├── HotkeyOverlayTests.cpp     # NEW: ? key overlay state tests
+│   ├── TextSweepEffectTests.cpp   # NEW: Sweep timing oracle tests
 │   ├── UsageTextTests.cpp          # NEW: Text formatting + prefix detection tests
 │   ├── CommandLineHelpTests.cpp    # NEW: Orchestration tests
 │   └── ...existing tests...
 └── ...existing files...
 ```
 
-**Structure Decision**: Single solution with 3 projects (MatrixRainCore.lib, MatrixRain.exe, MatrixRainTests.dll). All new logic in the core library per Constitution VI. `HelpRainDialog` creates its own D3D11/D2D rendering context for the graphical rain dialog — independent of the main application's render pipeline. The `?` key hotkey overlay (`HotkeyOverlay`) renders directly on the main window via the existing D2D render pipeline. Five new module pairs (`.h`/`.cpp`) plus `UnicodeSymbols.h` in the core library, five new test files. Minimal changes to the .exe project (main.cpp early exit only).
+**Structure Decision**: Single solution with 3 projects (MatrixRainCore.lib, MatrixRain.exe, MatrixRainTests.dll). All new logic in the core library per Constitution VI. `TextSweepEffect` is the shared timing oracle for all overlay reveal/dismiss animations — drives per-row staggered horizontal sweeps with configurable stagger, duration, fade, and glow parameters. Both `HelpHintOverlay` and `HotkeyOverlay` delegate all timing to `TextSweepEffect` and render characters based on its queries. `HelpRainDialog` creates its own D3D11/D2D rendering context for the graphical rain dialog — independent of the main application's render pipeline. The `?` key hotkey overlay (`HotkeyOverlay`) renders directly on the main window via the existing D2D render pipeline. Six new module pairs (`.h`/`.cpp`) plus `UnicodeSymbols.h` in the core library, six new test files. Minimal changes to the .exe project (main.cpp early exit only).
 
 ## Complexity Tracking
 

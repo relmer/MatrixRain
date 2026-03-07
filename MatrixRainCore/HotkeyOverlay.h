@@ -22,6 +22,14 @@
 class HotkeyOverlay
 {
 public:
+    // Layout constants
+    static constexpr float ROW_HEIGHT   = 28.0f;
+    static constexpr float PADDING      = 30.0f;
+    static constexpr float GAP          = 16.0f;
+    static constexpr int   GLOW_LAYERS  = 4;
+    static constexpr int   MARGIN_COLS  = 2;
+
+
     HotkeyOverlay();
 
 
@@ -40,8 +48,8 @@ public:
 
 
     // Queries
-    bool                                      IsActive ()          const { return m_phase != OverlayPhase::Hidden;                     }
-    OverlayPhase                              GetPhase ()           const { return m_phase;                                             }
+    bool                                      IsActive ()           const { return m_sweep.IsActive();                                  }
+    OverlayPhase                              GetPhase ()           const;
     D2D1_RECT_F                               GetBoundingRect ()    const { return m_boundingRect;                                      }
     float                                     GetKeyColumnWidth ()  const { return m_keyColumnWidth;                                    }
     const std::vector<HotkeyEntry>          & GetHotkeys ()         const { return m_hotkeys;                                           }
@@ -55,39 +63,25 @@ public:
 private:
     void BuildHotkeyList();
     void InitializeCharacters();
-    void InitializeCharactersForReveal();
-    void UpdateRevealing  (float deltaTime);
-    void UpdateDissolving (float deltaTime);
 
 
-    // Overlay state
-    OverlayPhase                    m_phase      = OverlayPhase::Hidden;
-    float                           m_phaseTimer = 0.0f;
+    // Sweep effect (handles all timing / phase transitions)
+    TextSweepEffect                 m_sweep;
 
     // Content
     std::vector<HotkeyEntry>        m_hotkeys;
 
-    // Character grid (key column + gap + desc column per row)
+    // Character grid (margin + key column + gap + desc column + margin per row)
     std::vector<HintCharacter>      m_chars;
     int                             m_cols          = 0;
+    int                             m_textCols      = 0;
     int                             m_keyColChars   = 0;
     int                             m_gapChars      = 2;
 
     // Glyph set for scrambling
     std::vector<uint32_t>           m_allGlyphs;
 
-    // RNG
-    std::mt19937                    m_rng { std::random_device{}() };
-
     // Bounding rect for rendering
     D2D1_RECT_F                     m_boundingRect    = {};
     float                           m_keyColumnWidth  = 0.0f;
-
-    // Timing constants
-    static constexpr float SCRAMBLE_MIN_INTERVAL   = 0.03f;
-    static constexpr float SCRAMBLE_MAX_INTERVAL   = 0.08f;
-    static constexpr float REVEAL_STAGGER_RANGE    = 0.8f;
-    static constexpr float DISSOLVE_STAGGER_RANGE  = 1.0f;
-    static constexpr float DISSOLVE_CYCLE_DURATION = 0.3f;
-    static constexpr float DISSOLVE_FADE_DURATION  = 0.4f;
 };

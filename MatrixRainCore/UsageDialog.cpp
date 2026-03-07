@@ -1,6 +1,6 @@
 #include "pch.h"
 
-#include "HelpRainDialog.h"
+#include "UsageDialog.h"
 
 #include "CharacterSet.h"
 #include "UnicodeSymbols.h"
@@ -12,14 +12,14 @@
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-//  HelpRainDialog::HelpRainDialog
+//  UsageDialog::UsageDialog
 //
 //  Pre-computes character positions for the reveal mechanism.
 //  Does NOT create the window or start animation — call Show() to begin.
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-HelpRainDialog::HelpRainDialog (const UsageText & usageText, ISettingsProvider & settingsProvider) :
+UsageDialog::UsageDialog (const UsageText & usageText, ISettingsProvider & settingsProvider) :
     m_usageText        (usageText),
     m_settingsProvider (settingsProvider)
 {
@@ -35,11 +35,11 @@ HelpRainDialog::HelpRainDialog (const UsageText & usageText, ISettingsProvider &
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-//  HelpRainDialog::~HelpRainDialog
+//  UsageDialog::~UsageDialog
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-HelpRainDialog::~HelpRainDialog()
+UsageDialog::~UsageDialog()
 {
     // Release D2D brushes before RenderSystem shutdown
     m_textBrush.Reset();
@@ -67,7 +67,7 @@ HelpRainDialog::~HelpRainDialog()
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-//  HelpRainDialog::IsRevealComplete
+//  UsageDialog::IsRevealComplete
 //
 //  Returns true when all characters have been revealed AND all per-line
 //  tracer trails have fully swept past the text.  This prevents the
@@ -76,7 +76,7 @@ HelpRainDialog::~HelpRainDialog()
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-bool HelpRainDialog::IsRevealComplete () const
+bool UsageDialog::IsRevealComplete () const
 {
     for (float opacity : m_revealedFlags)
     {
@@ -114,14 +114,14 @@ bool HelpRainDialog::IsRevealComplete () const
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-//  HelpRainDialog::ComputeWindowSize
+//  UsageDialog::ComputeWindowSize
 //
 //  Measures text content bounding box using IDWriteTextLayout::GetMetrics().
 //  Multiplies by 2x, caps at 80% of primary monitor work area per dimension.
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-SIZE HelpRainDialog::ComputeWindowSize (const UsageText & usageText, float dpi)
+SIZE UsageDialog::ComputeWindowSize (const UsageText & usageText, float dpi)
 {
     HRESULT                    hr      = S_OK;
     ComPtr<IDWriteFactory>     factory;
@@ -209,14 +209,14 @@ Error:
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-//  HelpRainDialog::Show
+//  UsageDialog::Show
 //
 //  Creates the dialog window, initializes the GPU render pipeline, and runs
 //  the message loop.  Blocking call — returns when dismissed.
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-HRESULT HelpRainDialog::Show ()
+HRESULT UsageDialog::Show ()
 {
     HRESULT hr     = S_OK;
     MSG     msg    = {};
@@ -288,14 +288,14 @@ Error:
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-//  HelpRainDialog::Update
+//  UsageDialog::Update
 //
 //  Advances the animation state by deltaTime seconds.
 //  Delegates rain spawning/updating to AnimationSystem.
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void HelpRainDialog::Update (float deltaTime)
+void UsageDialog::Update (float deltaTime)
 {
     m_phaseTimer   += deltaTime;
     m_elapsedTime  += deltaTime;
@@ -332,7 +332,7 @@ void HelpRainDialog::Update (float deltaTime)
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-//  HelpRainDialog::UpdateRevealPhase
+//  UsageDialog::UpdateRevealPhase
 //
 //  Advances horizontal tracer streaks left to right across each text line.
 //  Characters are revealed as the tracer head passes their X position.
@@ -341,7 +341,7 @@ void HelpRainDialog::Update (float deltaTime)
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void HelpRainDialog::UpdateRevealPhase (float deltaTime)
+void UsageDialog::UpdateRevealPhase (float deltaTime)
 {
     // Always advance the reveal front (used by sweep-front fallback
     // and exposed via GetRevealFrontY for test observability).
@@ -369,6 +369,10 @@ void HelpRainDialog::UpdateRevealPhase (float deltaTime)
             {
                 m_revealedFlags[i] = 0.01f;  // Start fade-in
                 m_revealTimes[i]   = m_elapsedTime;
+
+                // Assign a random katakana glyph once, on first reveal
+                size_t katIndex = (i * 7 + 13) % CharacterConstants::HALFWIDTH_KATAKANA_COUNT;
+                m_characterPositions[i].randomCharacter = static_cast<wchar_t> (CharacterConstants::HALFWIDTH_KATAKANA_CODEPOINTS[katIndex]);
             }
         }
 
@@ -390,6 +394,10 @@ void HelpRainDialog::UpdateRevealPhase (float deltaTime)
             {
                 m_revealedFlags[i] = 0.01f;  // Start fade-in
                 m_revealTimes[i]   = m_elapsedTime;
+
+                // Assign a random katakana glyph once, on first reveal
+                size_t katIndex = (i * 7 + 13) % CharacterConstants::HALFWIDTH_KATAKANA_COUNT;
+                m_characterPositions[i].randomCharacter = static_cast<wchar_t> (CharacterConstants::HALFWIDTH_KATAKANA_CODEPOINTS[katIndex]);
             }
         }
     }
@@ -418,14 +426,14 @@ void HelpRainDialog::UpdateRevealPhase (float deltaTime)
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-//  HelpRainDialog::UpdateBackgroundPhase
+//  UsageDialog::UpdateBackgroundPhase
 //
 //  Ambient rain continues at reduced density — AnimationSystem handles
 //  all streak lifecycle.  Nothing additional to do here.
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void HelpRainDialog::UpdateBackgroundPhase (float /* deltaTime */)
+void UsageDialog::UpdateBackgroundPhase (float /* deltaTime */)
 {
     // Background rain runs at steady-state — AnimationSystem handles
     // all streak lifecycle.  Nothing additional to do here.
@@ -440,14 +448,14 @@ void HelpRainDialog::UpdateBackgroundPhase (float /* deltaTime */)
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-//  HelpRainDialog::ComputeLineYPositions
+//  UsageDialog::ComputeLineYPositions
 //
 //  Extracts the unique Y coordinates from character positions to know
 //  which text lines exist.  Used to spawn one tracer per line.
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void HelpRainDialog::ComputeLineYPositions()
+void UsageDialog::ComputeLineYPositions()
 {
     m_lineYPositions.clear();
     m_textMinX =  std::numeric_limits<float>::max();
@@ -520,14 +528,14 @@ void HelpRainDialog::ComputeLineYPositions()
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-//  HelpRainDialog::FindLineIndex
+//  UsageDialog::FindLineIndex
 //
 //  Returns the index into m_lineYPositions that matches the given
 //  character Y position (within 1px tolerance).  Returns 0 if no match.
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-size_t HelpRainDialog::FindLineIndex (float charY) const
+size_t UsageDialog::FindLineIndex (float charY) const
 {
     for (size_t j = 0; j < m_lineYPositions.size(); j++)
     {
@@ -546,14 +554,14 @@ size_t HelpRainDialog::FindLineIndex (float charY) const
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-//  HelpRainDialog::ComputeLineTracerX
+//  UsageDialog::ComputeLineTracerX
 //
 //  Computes the current tracer X position for a given line, accounting
 //  for that line's random stagger delay.
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-float HelpRainDialog::ComputeLineTracerX (size_t lineIndex) const
+float UsageDialog::ComputeLineTracerX (size_t lineIndex) const
 {
     float delay    = (lineIndex < m_lineTracerDelays.size())    ? m_lineTracerDelays[lineIndex]    : 0.0f;
     float duration = (lineIndex < m_lineTracerDurations.size()) ? m_lineTracerDurations[lineIndex] : kTracerDurationMax;
@@ -578,14 +586,14 @@ float HelpRainDialog::ComputeLineTracerX (size_t lineIndex) const
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-//  HelpRainDialog::InitializeTextLayout
+//  UsageDialog::InitializeTextLayout
 //
 //  Creates an IDWriteTextLayout from the formatted text for measurement
 //  and character position computation.
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-HRESULT HelpRainDialog::InitializeTextLayout ()
+HRESULT UsageDialog::InitializeTextLayout ()
 {
     HRESULT hr       = S_OK;
     float   fontSize = 15.0f;
@@ -666,14 +674,14 @@ Error:
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-//  HelpRainDialog::ComputeCharacterPositions
+//  UsageDialog::ComputeCharacterPositions
 //
 //  Iterates every non-space character in the formatted text and calls
 //  IDWriteTextLayout::HitTestTextPosition to get (x, y) pixel coordinates.
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void HelpRainDialog::ComputeCharacterPositions ()
+void UsageDialog::ComputeCharacterPositions ()
 {
     m_characterPositions.clear();
 
@@ -728,14 +736,14 @@ void HelpRainDialog::ComputeCharacterPositions ()
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-//  HelpRainDialog::CreateDialogWindow
+//  UsageDialog::CreateDialogWindow
 //
 //  Registers window class and creates the popup window.
 //  Non-resizable with close button, centered on primary monitor.
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-HRESULT HelpRainDialog::CreateDialogWindow ()
+HRESULT UsageDialog::CreateDialogWindow ()
 {
     HRESULT    hr        = S_OK;
     WNDCLASSW  wc        = {};
@@ -820,14 +828,14 @@ Error:
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-//  HelpRainDialog::CreateDeviceResources
+//  UsageDialog::CreateDeviceResources
 //
 //  Creates the GPU render pipeline: RenderSystem, CharacterSet, AnimationSystem,
 //  Viewport, DensityController, and D2D text overlay brushes.
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-HRESULT HelpRainDialog::CreateRenderPipeline ()
+HRESULT UsageDialog::CreateRenderPipeline ()
 {
     HRESULT hr = S_OK;
 
@@ -918,14 +926,14 @@ Error:
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-//  HelpRainDialog::LoadUserSettings
+//  UsageDialog::LoadUserSettings
 //
 //  Loads the user's screensaver settings from the registry to pick up
 //  color scheme, glow intensity, and glow size.
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-HRESULT HelpRainDialog::LoadUserSettings ()
+HRESULT UsageDialog::LoadUserSettings ()
 {
     // Load settings from provider — ignore failure (defaults are fine)
     m_settingsProvider.Load (m_settings);
@@ -942,13 +950,13 @@ HRESULT HelpRainDialog::LoadUserSettings ()
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-//  HelpRainDialog::RenderFrame
+//  UsageDialog::RenderFrame
 //
 //  Renders one frame: GPU rain (via RenderSystem) → D2D text overlay → present.
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void HelpRainDialog::RenderFrame ()
+void UsageDialog::RenderFrame ()
 {
     if (!m_renderSystem || !m_animationSystem || !m_viewport)
     {
@@ -978,7 +986,7 @@ void HelpRainDialog::RenderFrame ()
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-//  HelpRainDialog::RenderTextOverlay
+//  UsageDialog::RenderTextOverlay
 //
 //  Draws revealed usage text on top of the GPU-rendered rain using D2D.
 //  Two passes: dark glow halos first, then white foreground text.
@@ -986,7 +994,7 @@ void HelpRainDialog::RenderFrame ()
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void HelpRainDialog::RenderTextOverlay ()
+void UsageDialog::RenderTextOverlay ()
 {
     if (!m_renderSystem || !m_textBrush || !m_glowBrush || !m_tracerBrush || !m_textFormat)
     {
@@ -1051,10 +1059,7 @@ void HelpRainDialog::RenderTextOverlay ()
         // Compute per-line tracer X to support staggered line reveals
         size_t lineIdx       = FindLineIndex (pos.y);
         float  lineTracerX   = ComputeLineTracerX (lineIdx);
-        float  lineDelay     = (lineIdx < m_lineTracerDelays.size())    ? m_lineTracerDelays[lineIdx]    : 0.0f;
-        float  lineDuration  = (lineIdx < m_lineTracerDurations.size()) ? m_lineTracerDurations[lineIdx] : kTracerDurationMax;
         float  lineTrail     = (lineIdx < m_lineTrailPixels.size())     ? m_lineTrailPixels[lineIdx]     : kTracerTrailMax;
-        float  lineProgress  = std::clamp ((m_phaseTimer - lineDelay) / lineDuration, 0.0f, 1.0f);
 
         // Determine character color based on distance from tracer head
         float distFromTracer = lineTracerX - drawX;
@@ -1064,20 +1069,16 @@ void HelpRainDialog::RenderTextOverlay ()
             // Character is in the tracer trail zone
             float t = distFromTracer / lineTrail;  // 0 = head, 1 = tail end
 
-            // Pick a random katakana character that changes each frame.
-            // Use a hash of index + scaled progress to create frame-to-frame variation.
-            size_t  charSeed    = i * 7 + static_cast<size_t> (lineProgress * 1000.0f);
-            size_t  katIndex    = charSeed % CharacterConstants::HALFWIDTH_KATAKANA_COUNT;
-            wchar_t randomChar  = static_cast<wchar_t> (CharacterConstants::HALFWIDTH_KATAKANA_CODEPOINTS[katIndex]);
-            wchar_t randomStr[2] = { randomChar, L'\0' };
+            // Use the one-time random katakana assigned at reveal.
+            wchar_t randomStr[2] = { pos.randomCharacter, L'\0' };
             wchar_t actualStr[2] = { pos.character, L'\0' };
 
             if (t < 0.5f)
             {
                 // First half: random matrix character (white head → fading green trail)
-                if (t < 0.10f)
+                if (distFromTracer < kCharWidth)
                 {
-                    // Head: bright white random char
+                    // Head: bright white random char (exactly one character)
                     m_textBrush->SetOpacity (1.0f);
                     d2dContext->DrawText (randomStr, 1, m_textFormat.Get(), charRect, m_textBrush.Get());
                 }
@@ -1146,7 +1147,7 @@ void HelpRainDialog::RenderTextOverlay ()
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-//  HelpRainDialog::DrawCharacterGlow
+//  UsageDialog::DrawCharacterGlow
 //
 //  Renders only the feathered dark glow halo for a single character.
 //  The foreground text is drawn separately in a second pass so that
@@ -1154,7 +1155,7 @@ void HelpRainDialog::RenderTextOverlay ()
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void HelpRainDialog::DrawCharacterGlow (ID2D1DeviceContext * pContext, wchar_t ch, float x, float y, float opacity)
+void UsageDialog::DrawCharacterGlow (ID2D1DeviceContext * pContext, wchar_t ch, float x, float y, float opacity)
 {
     if (!pContext || !m_textFormat || !m_glowBrush)
     {
@@ -1204,27 +1205,27 @@ void HelpRainDialog::DrawCharacterGlow (ID2D1DeviceContext * pContext, wchar_t c
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-//  HelpRainDialog::WndProc
+//  UsageDialog::WndProc
 //
 //  Window procedure — handles WM_KEYDOWN (Enter/Escape to dismiss),
 //  WM_CLOSE, WM_DESTROY, close button (X).
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-LRESULT CALLBACK HelpRainDialog::WndProc (HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
+LRESULT CALLBACK UsageDialog::WndProc (HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
-    HelpRainDialog * pDialog = nullptr;
+    UsageDialog * pDialog = nullptr;
 
     if (msg == WM_CREATE)
     {
         CREATESTRUCTW * pCreate = reinterpret_cast<CREATESTRUCTW *> (lParam);
-        pDialog = static_cast<HelpRainDialog *> (pCreate->lpCreateParams);
+        pDialog = static_cast<UsageDialog *> (pCreate->lpCreateParams);
         SetWindowLongPtrW (hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR> (pDialog));
 
         return 0;
     }
 
-    pDialog = reinterpret_cast<HelpRainDialog *> (GetWindowLongPtrW (hwnd, GWLP_USERDATA));
+    pDialog = reinterpret_cast<UsageDialog *> (GetWindowLongPtrW (hwnd, GWLP_USERDATA));
 
     switch (msg)
     {

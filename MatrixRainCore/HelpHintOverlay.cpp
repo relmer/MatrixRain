@@ -68,10 +68,14 @@ HelpHintOverlay::HelpHintOverlay()
         line.resize (maxLen, L' ');
     }
 
-    m_rows = static_cast<int>(m_textLines.size());
-    m_cols = static_cast<int>(maxLen);
+    m_rows     = static_cast<int>(m_textLines.size());
+    m_textCols = static_cast<int>(maxLen);
+    m_cols     = m_textCols + 2 * MARGIN_COLS;
 
     InitializeCharacters();
+
+    // holdDuration = 3.0 → auto-dismiss after 3 seconds of holding
+    m_sweep.Initialize (m_rows, 1.2f, 1.0f, 2.0f, 2.5f, 3.0f, 1.5f);
 }
 
 
@@ -96,12 +100,27 @@ void HelpHintOverlay::InitializeCharacters ()
 
     for (int row = 0; row < m_rows; row++)
     {
-        for (int col = 0; col < m_cols; col++)
+        // Left margin columns (fill PADDING area)
+        for (int m = 0; m < MARGIN_COLS; m++)
         {
             HintCharacter ch;
 
             ch.row     = row;
-            ch.col     = col;
+            ch.col     = m;
+            ch.isSpace = true;
+            ch.phase   = CharPhase::Hidden;
+            ch.opacity = 0.0f;
+
+            m_chars.push_back (ch);
+        }
+
+        // Text columns
+        for (int col = 0; col < m_textCols; col++)
+        {
+            HintCharacter ch;
+
+            ch.row     = row;
+            ch.col     = MARGIN_COLS + col;
             ch.isSpace = (m_textLines[row][col] == L' ');
             ch.phase   = CharPhase::Hidden;
             ch.opacity = 0.0f;
@@ -127,43 +146,20 @@ void HelpHintOverlay::InitializeCharacters ()
 
             m_chars.push_back (ch);
         }
-    }
-}
 
-
-
-
-
-////////////////////////////////////////////////////////////////////////////////
-//
-//  HelpHintOverlay::InitializeCharactersForReveal
-//
-//  Resets all non-space characters to Scrambling with staggered timers.
-//
-////////////////////////////////////////////////////////////////////////////////
-
-void HelpHintOverlay::InitializeCharactersForReveal ()
-{
-    std::uniform_real_distribution<float> staggerDist (0.0f, REVEAL_STAGGER_RANGE);
-    std::uniform_real_distribution<float> intervalDist (SCRAMBLE_MIN_INTERVAL, SCRAMBLE_MAX_INTERVAL);
-    std::uniform_int_distribution<size_t> glyphDist (0, m_allGlyphs.size() - 1);
-
-
-
-    for (auto & ch : m_chars)
-    {
-        if (ch.isSpace)
+        // Right margin columns (fill PADDING area)
+        for (int m = 0; m < MARGIN_COLS; m++)
         {
+            HintCharacter ch;
+
+            ch.row     = row;
+            ch.col     = MARGIN_COLS + m_textCols + m;
+            ch.isSpace = true;
             ch.phase   = CharPhase::Hidden;
             ch.opacity = 0.0f;
-            continue;
-        }
 
-        ch.phase            = CharPhase::Scrambling;
-        ch.opacity          = 1.0f;
-        ch.scrambleTimer    = staggerDist (m_rng);
-        ch.scrambleInterval = intervalDist (m_rng);
-        ch.currentGlyphIndex = glyphDist (m_rng);
+            m_chars.push_back (ch);
+        }
     }
 }
 
@@ -181,10 +177,15 @@ void HelpHintOverlay::InitializeCharactersForReveal ()
 
 void HelpHintOverlay::Show ()
 {
-    m_phase      = OverlayPhase::Revealing;
-    m_phaseTimer = 0.0f;
+    // Reset all characters to Hidden so the new sweep starts clean
+    for (auto & ch : m_chars)
+    {
+        ch.phase         = CharPhase::Hidden;
+        ch.opacity       = 0.0f;
+        ch.glowIntensity = 0.0f;
+    }
 
-    InitializeCharactersForReveal();
+    m_sweep.StartReveal();
 }
 
 
@@ -195,41 +196,14 @@ void HelpHintOverlay::Show ()
 //
 //  HelpHintOverlay::Dismiss
 //
-//  Triggers dissolve from Revealing or Holding. No-op from Dissolving/Hidden.
+//  Triggers dismiss sweep from Revealing or Holding.
+//  No-op from Dismissing/Idle/Done.
 //
 ////////////////////////////////////////////////////////////////////////////////
 
 void HelpHintOverlay::Dismiss ()
 {
-    if (m_phase == OverlayPhase::Revealing || m_phase == OverlayPhase::Holding)
-    {
-        m_phase      = OverlayPhase::Dissolving;
-        m_phaseTimer = 0.0f;
-
-        // Start all resolved characters dissolving with staggered offsets
-        std::uniform_real_distribution<float> staggerDist (0.0f, DISSOLVE_STAGGER_RANGE);
-
-        for (auto & ch : m_chars)
-        {
-            if (ch.isSpace)
-            {
-                continue;
-            }
-
-            if (ch.phase == CharPhase::Resolved || ch.phase == CharPhase::Scrambling)
-            {
-                ch.dissolveStartOffset = staggerDist (m_rng);
-                // Characters will transition in UpdateDissolving when their offset expires
-                if (ch.phase == CharPhase::Scrambling)
-                {
-                    // Scrambling characters go straight to dissolve cycling
-                    ch.phase = CharPhase::DissolveCycling;
-                    ch.scrambleTimer = 0.0f;
-                }
-            }
-        }
-    }
-    // No-op if already Dissolving or Hidden
+    m_sweep.StartDismiss();
 }
 
 
@@ -246,12 +220,13 @@ void HelpHintOverlay::Dismiss ()
 
 void HelpHintOverlay::Hide ()
 {
-    m_phase = OverlayPhase::Hidden;
+    m_sweep.Reset();
 
     for (auto & ch : m_chars)
     {
-        ch.phase   = CharPhase::Hidden;
-        ch.opacity = 0.0f;
+        ch.phase         = CharPhase::Hidden;
+        ch.opacity       = 0.0f;
+        ch.glowIntensity = 0.0f;
     }
 }
 
@@ -263,222 +238,124 @@ void HelpHintOverlay::Hide ()
 //
 //  HelpHintOverlay::Update
 //
-//  Advances animation state based on delta time.
+//  Advances the sweep effect and derives per-character state from it.
 //
 ////////////////////////////////////////////////////////////////////////////////
 
 void HelpHintOverlay::Update (float deltaTime)
 {
-    switch (m_phase)
-    {
-        case OverlayPhase::Revealing:
-            UpdateRevealing (deltaTime);
-            break;
+    m_sweep.Update (deltaTime);
 
-        case OverlayPhase::Holding:
-            UpdateHolding (deltaTime);
-            break;
+    SweepPhase sweepPhase = m_sweep.GetPhase();
 
-        case OverlayPhase::Dissolving:
-            UpdateDissolving (deltaTime);
-            break;
-
-        case OverlayPhase::Hidden:
-        default:
-            break;
-    }
-}
-
-
-
-
-
-////////////////////////////////////////////////////////////////////////////////
-//
-//  HelpHintOverlay::UpdateRevealing
-//
-//  Cycles scrambling characters and resolves them when timer expires.
-//
-////////////////////////////////////////////////////////////////////////////////
-
-void HelpHintOverlay::UpdateRevealing (float deltaTime)
-{
-    std::uniform_int_distribution<size_t> glyphDist (0, m_allGlyphs.size() - 1);
-    bool                                  allResolved = true;
-
-
-
+    // Pass 1: update phase, opacity, glow for each character.
     for (auto & ch : m_chars)
     {
-        if (ch.isSpace || ch.phase == CharPhase::Resolved)
-        {
-            continue;
-        }
+        float normCol = (m_cols > 1)
+                       ? static_cast<float>(ch.col) / static_cast<float>(m_cols - 1)
+                       : 0.0f;
 
-        if (ch.phase == CharPhase::Scrambling)
-        {
-            ch.scrambleTimer -= deltaTime;
+        float opacity = m_sweep.GetOpacity (ch.row, normCol);
 
-            if (ch.scrambleTimer <= 0.0f)
+        if (opacity > 0.0f)
+        {
+            // Assign a random glyph once on first reveal (Hidden → Resolved)
+            if (ch.phase == CharPhase::Hidden)
             {
-                // Resolve this character
-                ch.phase             = CharPhase::Resolved;
-                ch.currentGlyphIndex = ch.targetGlyphIndex;
-                ch.opacity           = 1.0f;
+                size_t charIndex    = static_cast<size_t>(ch.row * m_cols + ch.col);
+                ch.randomGlyphIndex = (charIndex * 7 + 13) % m_allGlyphs.size();
             }
-            else
-            {
-                // Cycle to a random glyph
-                ch.currentGlyphIndex = glyphDist (m_rng);
-                allResolved          = false;
-            }
+
+            ch.phase         = CharPhase::Resolved;
+            ch.opacity       = opacity;
+            ch.glowIntensity = m_sweep.GetGlowIntensity (ch.row, normCol);
         }
         else
         {
-            allResolved = false;
+            ch.phase         = CharPhase::Hidden;
+            ch.opacity       = 0.0f;
+            ch.glowIntensity = 0.0f;
         }
     }
 
-    if (allResolved)
-    {
-        m_phase      = OverlayPhase::Holding;
-        m_phaseTimer = 0.0f;
-    }
-}
+    // Pass 2: determine which glyph to display.
+    //
+    //  During Revealing: a long streak of random glyphs sweeps left-to-right.
+    //  The head position extends past the grid edge so characters at the
+    //  right side correctly settle to their target glyph.
+    //
+    //  During Dismissing: a long streak of random glyphs sweeps
+    //  right-to-left before characters fade out.
+    //
+    //  Otherwise: all non-space characters show their target glyph.
 
-
-
-
-
-////////////////////////////////////////////////////////////////////////////////
-//
-//  HelpHintOverlay::UpdateHolding
-//
-//  Counts down the hold timer, then transitions to Dissolving.
-//
-////////////////////////////////////////////////////////////////////////////////
-
-void HelpHintOverlay::UpdateHolding (float deltaTime)
-{
-    m_phaseTimer += deltaTime;
-
-    if (m_phaseTimer >= m_holdDuration)
-    {
-        m_phase      = OverlayPhase::Dissolving;
-        m_phaseTimer = 0.0f;
-
-        // Assign staggered dissolve offsets
-        std::uniform_real_distribution<float> staggerDist (0.0f, DISSOLVE_STAGGER_RANGE);
-
-        for (auto & ch : m_chars)
-        {
-            if (!ch.isSpace && ch.phase == CharPhase::Resolved)
-            {
-                ch.dissolveStartOffset = staggerDist (m_rng);
-            }
-        }
-    }
-}
-
-
-
-
-
-////////////////////////////////////////////////////////////////////////////////
-//
-//  HelpHintOverlay::UpdateDissolving
-//
-//  Manages per-character dissolve: Resolved → DissolveCycling → DissolveFading → Hidden.
-//
-////////////////////////////////////////////////////////////////////////////////
-
-void HelpHintOverlay::UpdateDissolving (float deltaTime)
-{
-    std::uniform_int_distribution<size_t> glyphDist (0, m_allGlyphs.size() - 1);
-    bool                                  allHidden = true;
-
-
-
-    m_phaseTimer += deltaTime;
+    float streakLen = static_cast<float>(m_cols);
 
     for (auto & ch : m_chars)
     {
-        if (ch.isSpace || ch.phase == CharPhase::Hidden)
+        if (ch.phase != CharPhase::Resolved)
         {
             continue;
         }
 
-        // Allow cascading through multiple phases in a single frame
-        float remaining = deltaTime;
+        bool inStreakZone = false;
 
-        if (ch.phase == CharPhase::Resolved)
+        if (sweepPhase == SweepPhase::Revealing)
         {
-            // Wait for staggered offset
-            if (remaining >= ch.dissolveStartOffset)
-            {
-                remaining -= ch.dissolveStartOffset;
-                ch.dissolveStartOffset = 0.0f;
-                ch.phase         = CharPhase::DissolveCycling;
-                ch.scrambleTimer = DISSOLVE_CYCLE_DURATION;
-            }
-            else
-            {
-                ch.dissolveStartOffset -= remaining;
-                remaining = 0.0f;
-            }
+            float revealProg = m_sweep.GetRevealProgress (ch.row);
+            float headPos    = revealProg * (static_cast<float>(m_cols - 1) + streakLen);
+            float dist       = headPos - static_cast<float>(ch.col);
+
+            inStreakZone = (dist >= 0.0f && dist < streakLen);
+        }
+        else if (sweepPhase == SweepPhase::Dismissing)
+        {
+            float dismissProg = m_sweep.GetDismissProgress (ch.row);
+            // Right-to-left: head starts at rightmost column and moves left
+            float headPos     = static_cast<float>(m_cols - 1) - dismissProg * (static_cast<float>(m_cols - 1) + streakLen);
+            float dist        = static_cast<float>(ch.col) - headPos;
+
+            inStreakZone = (dist >= 0.0f && dist < streakLen);
         }
 
-        if (ch.phase == CharPhase::DissolveCycling)
+        if (inStreakZone)
         {
-            ch.currentGlyphIndex = glyphDist (m_rng);
-
-            if (remaining >= ch.scrambleTimer)
-            {
-                remaining -= ch.scrambleTimer;
-                ch.scrambleTimer = 0.0f;
-                ch.phase         = CharPhase::DissolveFading;
-                ch.scrambleTimer = DISSOLVE_FADE_DURATION;
-                ch.opacity       = 1.0f;
-            }
-            else
-            {
-                ch.scrambleTimer -= remaining;
-                remaining = 0.0f;
-            }
+            ch.currentGlyphIndex = ch.randomGlyphIndex;
         }
-
-        if (ch.phase == CharPhase::DissolveFading)
+        else if (ch.isSpace)
         {
-            ch.currentGlyphIndex = glyphDist (m_rng);
-
-            if (remaining >= ch.scrambleTimer)
-            {
-                ch.phase   = CharPhase::Hidden;
-                ch.opacity = 0.0f;
-            }
-            else
-            {
-                ch.scrambleTimer -= remaining;
-                ch.opacity = std::max (0.0f, ch.scrambleTimer / DISSOLVE_FADE_DURATION);
-            }
+            ch.currentGlyphIndex = SIZE_MAX;
+        }
+        else
+        {
+            ch.currentGlyphIndex = ch.targetGlyphIndex;
         }
     }
+}
 
-    // Check if all non-space characters are now hidden
-    allHidden = true;
 
-    for (const auto & ch : m_chars)
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  HelpHintOverlay::GetPhase
+//
+//  Maps TextSweepEffect's SweepPhase to the public OverlayPhase.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+OverlayPhase HelpHintOverlay::GetPhase () const
+{
+    switch (m_sweep.GetPhase())
     {
-        if (!ch.isSpace && ch.phase != CharPhase::Hidden)
-        {
-            allHidden = false;
-            break;
-        }
-    }
+        case SweepPhase::Revealing:  return OverlayPhase::Revealing;
+        case SweepPhase::Holding:    return OverlayPhase::Holding;
+        case SweepPhase::Dismissing: return OverlayPhase::Dissolving;
 
-    if (allHidden)
-    {
-        m_phase = OverlayPhase::Hidden;
+        case SweepPhase::Idle:
+        case SweepPhase::Done:
+        default:                     return OverlayPhase::Hidden;
     }
 }
 
@@ -498,14 +375,12 @@ void HelpHintOverlay::UpdateLayout (float viewportWidth, float viewportHeight)
 {
     //
     // Estimate text block size based on character dimensions.
-    // Use approximate character cell size (will be refined by render system).
+    // Margin columns fill part of the padding area; any remainder
+    // is kept as edge padding.
     //
 
-    static constexpr float CHAR_WIDTH  = 16.0f;
-    static constexpr float CHAR_HEIGHT = 28.0f;
-    static constexpr float PADDING     = 20.0f;
-
-    float blockWidth  = m_cols * CHAR_WIDTH  + PADDING * 2.0f;
+    float edgePadding = std::max (0.0f, PADDING - MARGIN_COLS * CHAR_WIDTH);
+    float blockWidth  = m_cols * CHAR_WIDTH  + edgePadding * 2.0f;
     float blockHeight = m_rows * CHAR_HEIGHT + PADDING * 2.0f;
 
     m_boundingRect.left   = (viewportWidth  - blockWidth)  / 2.0f;

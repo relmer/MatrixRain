@@ -2,7 +2,7 @@
 
 **Feature Branch**: `003-runtime-help`  
 **Created**: 2026-03-02  
-**Status**: Draft  
+**Status**: In Progress  
 **Input**: User description: "Add command-line help display (/?/-?) that dumps all supported switches, similar to TCDir. When MatrixRain starts in normal mode, show a centered three-line help hint (Settings/Enter, ?/Help, Esc/Exit) using a matrix rain character reveal effect — characters cycle through random glyphs before settling on the final character. Re-show on unrecognized key press. Do not show in any screensaver mode. Pressing Enter opens the config dialog; pressing ? shows a usage dialog listing command-line switches."
 
 ## Clarifications
@@ -30,11 +30,27 @@
 - Q: Should `/c` be in the Screensaver Options section? → A: No. `/c` (show settings dialog) stays in general Options. Only `/s`, `/p`, `/a` are in Screensaver Options.
 - Q: Unicode symbols? → A: All Unicode characters go in `UnicodeSymbols.h` with named constants — same pattern as TCDir.
 
+### Session 2026-03-06 — Sweep-Based Animation Redesign
+
+- The original per-character random resolve/dissolve model was replaced during implementation with a horizontal sweep model.
+- **Reveal**: A left-to-right sweep crosses each row. Behind the sweep head, a wide streak zone (full overlay width) displays random glyphs. As the sweep passes each column, the character transitions from random → target glyph with a green→white color fade (`glowIntensity`). The head extends past the right edge so rightmost characters settle smoothly.
+- **Dismiss**: A right-to-left sweep (mirror of reveal) crosses each row. The sweep head leads a streak zone of random glyphs. As it passes each column, the character transitions back to a random glyph and fades out.
+- **TextSweepEffect**: Shared timing oracle used by both `HelpHintOverlay` and `HotkeyOverlay`. Manages per-row staggered delays, reveal/hold/dismiss phase transitions, opacity, and glow intensity. Overlays query `GetRevealProgress(row)`, `GetDismissProgress(row)`, `GetOpacity(row, normCol)`, `GetGlowIntensity(row, normCol)` to drive character state.
+- **Margin columns**: Invisible columns added on each side (`MARGIN_COLS=1` for HelpHintOverlay, `MARGIN_COLS=2` for HotkeyOverlay) so the sweep enters/exits the visible area smoothly rather than starting/ending abruptly at the first/last text character.
+- **Random glyph assignment**: Each character is assigned one random glyph index on first reveal (deterministic from position). Characters in the streak zone show this fixed random glyph, not a rapidly cycling animation.
+- **CharPhase simplified**: Reduced from 5 values (Scrambling, Resolved, DissolveCycling, DissolveFading, Hidden) to 2 (Resolved, Hidden). The sweep timing oracle handles all intermediate states.
+- **Known visual tuning areas (in progress)**:
+  - Sweep speed and per-row stagger range
+  - Streak zone length (currently = full overlay width)
+  - Glow decay speed (green→white transition rate)
+  - Dismiss sweep timing relative to fade-out opacity
+  - Whether characters should visually cycle through multiple random glyphs or show one fixed glyph in the streak zone
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Runtime Help Hint on Startup (Priority: P2)
 
-A user launches MatrixRain in normal mode (no screensaver arguments) and sees a brief, visually integrated help hint in the center of the screen showing available key bindings. The hint uses a matrix rain character reveal effect — each character position rapidly cycles through random matrix glyphs before resolving to the correct character. After a brief hold, the message dissolves using the same matrix rain visual language: characters are chosen at random and begin cycling through rain glyphs again, then fade away individually with staggered timing, similar to how a stationary rain streak has a full-brightness phase followed by a fade phase. The message area has a feathered border and rain streaks pass behind it, keeping the message legible without interrupting the surrounding animation.
+A user launches MatrixRain in normal mode (no screensaver arguments) and sees a brief, visually integrated help hint in the center of the screen showing available key bindings. The hint uses a horizontal sweep reveal effect — a left-to-right sweep crosses each row with per-row stagger, and behind the sweep head a wide streak zone displays random matrix glyphs. As the sweep passes each column position, the character transitions from a random glyph to its target character with a green→white color fade. After a brief hold, a right-to-left dismiss sweep mirrors the reveal: a streak zone of random glyphs sweeps across each row, and as it passes each column the character transitions back to a random glyph and fades out. The message area has a feathered border and rain streaks pass behind it, keeping the message legible without interrupting the surrounding animation.
 
 **Why this priority**: Provides visual discoverability for first-time users. Deferred behind CLI help (US3) because the overlay involves more unknowns (D2D rendering, per-character animation, rain occlusion) while the CLI path is self-contained and lower-risk.
 
@@ -50,9 +66,9 @@ A user launches MatrixRain in normal mode (no screensaver arguments) and sees a 
    ```
    The left column (labels) is right-justified and the right column (keys) is left-justified, with the entire block centered horizontally and vertically on screen.
 
-2. **Given** the help hint is appearing, **When** each character position is being revealed, **Then** the character cycles through random matrix rain glyphs (from the existing character set) at a rapid rate before settling on the final intended character, mimicking the visual style of a matrix rain streak that is stationary rather than falling.
+2. **Given** the help hint is appearing, **When** the reveal sweep runs, **Then** a horizontal left-to-right sweep progresses across each row (with per-row staggered timing). The sweep head leads a wide streak zone of random matrix rain glyphs (from `CharacterConstants`). As the sweep front passes each column position, the character transitions from a random glyph to its target glyph. Characters just revealed glow green and transition to white as they settle (green → white color fade driven by `glowIntensity`). The streak zone spans the full overlay width, so the head extends well past the right edge before all characters have settled. Invisible margin columns on each side ensure the sweep enters and exits the visible area smoothly.
 
-3. **Given** the help hint is fully revealed and the hold time has elapsed, **When** the dissolve phase begins, **Then** individual characters are chosen at random and begin cycling through matrix rain glyphs again. After a brief full-brightness cycling phase, each dissolving character fades away with decreasing opacity, similar to how a stationary rain streak transitions from full brightness to transparent. Characters begin dissolving with slightly staggered timing so the message breaks apart organically rather than disappearing all at once.
+3. **Given** the help hint is fully revealed and the hold time has elapsed, **When** the dismiss phase begins, **Then** a horizontal right-to-left sweep progresses across each row (mirroring the reveal). The dismiss sweep head leads a wide streak zone of random glyphs sweeping from right to left. As the sweep front passes each column, the character transitions from its target glyph back to a random glyph, then fades out with decreasing opacity. Each row has staggered timing so the message dissolves organically rather than disappearing all at once. Characters that have been swept past fully fade to transparent.
 
 4. **Given** the help hint is visible on screen, **When** rain streaks fall through the area occupied by the message, **Then** the streaks pass behind the message's bounding area and are not visible within it. The message area has a feathered border (soft gradient at the edges) that blends smoothly with the surrounding rain, similar to the glow effect used by the performance counter overlay.
 
@@ -75,8 +91,8 @@ A user presses a key that is not mapped to any existing hotkey. Instead of being
 1. **Given** the help hint has faded away, **When** the user presses a key that is not a recognized hotkey, **Then** the help hint reappears with the same matrix reveal animation, hold, and dissolve behavior as the initial display.
 
 2. **Given** the help hint is currently visible, **When** the user presses an unrecognized key, **Then**:
-   - If the hint is in the **reveal** or **hold** phase: the animation resets and replays from the beginning.
-   - If the hint is in the **dissolve** phase: the dissolve smoothly reverses — characters that are still visible begin materializing back toward their resolved state, while characters that have already fully faded restart from the scrambling phase. The overall effect is a seamless transition from dissolving to materializing.
+   - If the hint is in the **reveal** or **hold** phase: the animation resets and replays from the beginning (TextSweepEffect restarts).
+   - If the hint is in the **dismiss** phase: the TextSweepEffect restarts a fresh reveal sweep.
 
 3. **Given** the user presses a recognized hotkey (Space, C, S, +, -, `, Escape, Alt+Enter, Enter, ?), **When** the help hint is visible, **Then** the hotkey performs its normal function AND triggers the dissolve phase of the help hint (characters begin rain-cycling and fading with staggered timing). If the hint is not visible, the hotkey simply performs its normal function without triggering the hint.
 
@@ -162,7 +178,7 @@ A user presses `?` during normal mode to see a hotkey reference rendered directl
 - The help hint bounding area must have a feathered border that blends seamlessly with the surrounding rain — no hard rectangular edges.
 - If the user presses a recognized hotkey while the hint is in any phase (reveal, hold, or dissolve), the hotkey must still execute its action.
 - Window resize or display mode change (Alt+Enter) while the help hint is visible must reposition/resize the hint to remain centered.
-- If a dissolve is in progress and the hint is retriggered (unrecognized key), the dissolve smoothly reverses — partially faded characters begin materializing back toward full brightness and resolve to their target glyph, while fully hidden characters restart from the scrambling phase. The animation does not abruptly reset.
+- If a dismiss sweep is in progress and the hint is retriggered (unrecognized key), the TextSweepEffect restarts a fresh reveal sweep from the beginning.
 - The graphical rain dialog (`/?` and `?` key) must render correctly on high-DPI displays with no blurry text or misaligned rain characters.
 - The graphical rain dialog must be centered on the primary monitor and sized appropriately for the text content. If the text content exceeds the monitor dimensions, it should be scaled or scrollable.
 - Closing the graphical rain dialog via Alt+F4, close button, Enter, or Escape must all behave identically — clean dismiss.
@@ -174,13 +190,13 @@ A user presses `?` during normal mode to see a hotkey reference rendered directl
 - **FR-001**: All command-line switches MUST accept both `/` and `-` as the switch prefix interchangeably (e.g., `/s` and `-s` are equivalent, `/?` and `-?` are equivalent). Switch characters MUST be case-insensitive.
 - **FR-002**: Application MUST accept `/?` and `-?` as command-line arguments to display formatted help text listing all supported switches and their descriptions, then exit without launching the animation. The help output MUST present all switches using the same prefix style (`/` or `-`) that the user used to invoke help. The help text MUST be displayed in a custom graphical rain dialog where matrix rain streaks reveal the text (see FR-015).
 - **FR-003**: When launched in Normal mode (no screensaver arguments), the application MUST display a three-line help hint centered on screen showing key bindings in two columns: labels right-justified in the left column, key names left-justified in the right column.
-- **FR-004**: The help hint MUST use a matrix rain character reveal effect where each character position cycles through random matrix glyphs before settling on the final intended character.
-- **FR-005**: The help hint MUST dissolve automatically after the reveal animation completes, with a brief hold at full visibility before dissolving begins. During dissolve, characters are chosen at random and begin cycling through matrix rain glyphs, then fade away individually with staggered timing — each character has a full-brightness cycling phase followed by an opacity fade, analogous to a stationary rain streak's lifecycle.
+- **FR-004**: The help hint MUST use a horizontal sweep reveal effect. A left-to-right sweep crosses each row with per-row staggered timing (`TextSweepEffect`). Behind the sweep head, a wide streak zone displays random matrix rain glyphs. As the sweep passes each column, the character resolves from a random glyph to its target glyph with a green→white color transition. Invisible margin columns extend the sweep past the visible text edges for smooth entry/exit.
+- **FR-005**: The help hint MUST dismiss automatically after the reveal animation completes, with a brief hold at full visibility before dismissal begins. A right-to-left sweep (mirroring the reveal) crosses each row with per-row staggered timing. The sweep head leads a wide streak zone of random glyphs. As the sweep passes each column, the character transitions back to a random glyph and fades out with decreasing opacity. The overlay becomes hidden when all characters have fully faded.
 - **FR-006**: When the user presses any key that is not mapped to a recognized hotkey, the application MUST re-display the help hint with the full matrix reveal animation.
 - **FR-007**: The help hint MUST NOT appear when MatrixRain is launched with any screensaver argument (`/s`, `/p`, `/c`, `/c:<HWND>`, `/a`).
 - **FR-008**: Pressing Enter in Normal mode MUST open the configuration dialog as a live modeless overlay, with the same behavior as launching with `/c`.
 - **FR-009**: Pressing `?` (Shift+/) in Normal mode MUST display a hotkey reference overlay rendered directly on the main window, listing all runtime hotkeys with brief descriptions. This is an in-app overlay — NOT a separate dialog window.
-- **FR-010**: Only one help hint instance may be active at a time. Triggering the hint while it is in the reveal or hold phase MUST restart the animation from the beginning. Triggering while in the dissolve phase MUST smoothly reverse the dissolve back into a reveal.
+- **FR-010**: Only one help hint instance may be active at a time. Triggering the hint while it is in the reveal or hold phase MUST restart the animation from the beginning. Triggering while in the dismiss phase MUST restart a fresh reveal.
 - **FR-011**: The help hint bounding area MUST have a feathered border (soft gradient at edges) that blends smoothly into the surrounding rain, similar to the glow effect used by the performance counter overlay.
 - **FR-012**: Rain streaks MUST pass behind the help hint's bounding area while the message is visible. Streaks entering the message area are occluded and not rendered within it. When the message fully dissolves, occluded streak characters become visible again.
 - **FR-013**: The help hint MUST remain centered after window resize or display mode transitions.
@@ -195,7 +211,7 @@ A user presses `?` during normal mode to see a hotkey reference rendered directl
 
 ### Key Entities
 
-- **HelpHintOverlay**: The on-screen three-line help message with matrix reveal and dissolve animation state, including per-character scramble timers, final target characters, current display characters, per-character dissolve state (not started, cycling, fading), per-character opacity, dissolve start time offsets (staggered), overall phase (reveal, hold, dissolve, hidden), and bounding area dimensions for feathered border rendering and rain streak occlusion.
+- **HelpHintOverlay**: The on-screen three-line help message with horizontal sweep reveal/dismiss animation. Uses `TextSweepEffect` as a per-row timing oracle for staggered horizontal sweeps. Per-character state includes target glyph index, current glyph index (random during sweep streak zone, target otherwise), a single assigned random glyph index, phase (Resolved/Hidden), opacity, and glow intensity (green→white transition). Invisible margin columns (`MARGIN_COLS=1`) extend the sweep past text edges. Bounding area with feathered border for rain streak occlusion. Overall lifecycle: Hidden → Revealing → Holding → Dismissing → Hidden.
 - **HelpRainDialog**: A custom graphical window used to display command-line switches (no hotkeys) with a two-phase matrix rain animation. Has its own D3D11/D2D rendering context, black background, proportional font (Segoe UI), and two independent streak pools (reveal + decorative). Pre-computes per-character (x, y) positions via DirectWrite, shuffles into a randomized reveal queue that drains over ~3 seconds. Decorative rain spawns at random pixel x-positions across the full window. Provides feathered dark glow on resolved text for readability. Used by `/?` invocation only — the `?` key uses an in-app overlay instead.
 - **UsageText**: The shared module that builds formatted help text content — switch names, arguments, and descriptions grouped into Options and Screensaver Options sections. Provides text formatting and a plain text view. Used by `HelpRainDialog` for its content. Does NOT contain hotkeys (those are managed by the in-app hotkey overlay).
 - **CommandLineHelp**: The orchestration module for `/?`/`-?` handling — detects the switch prefix, creates a `HelpRainDialog`, and exits the process after the dialog is dismissed.
