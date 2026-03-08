@@ -143,14 +143,14 @@ namespace MatrixRainTests
                 {
                     if (ch.isSpace) continue;
 
-                    if (ch.phase != CharPhase::Resolved)
+                    if (ch.phase != CharPhase::Settled)
                     {
                         allResolved = false;
                         break;
                     }
                 }
 
-                Assert::IsTrue (allResolved, L"All non-space characters should be Resolved after large Update");
+                Assert::IsTrue (allResolved, L"All non-space characters should be Settled after large Update");
             }
 
 

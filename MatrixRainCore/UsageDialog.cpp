@@ -27,7 +27,14 @@ UsageDialog::UsageDialog (const UsageText & usageText, ISettingsProvider & setti
     // Pre-compute character positions using a temporary text layout
     InitializeTextLayout();
     ComputeCharacterPositions();
-    ComputeLineYPositions();
+
+    // Initialize the scramble-reveal effect for all character cells.
+    // UsageDialog's m_characterPositions excludes spaces, so every
+    // cell is a non-space character that will cycle random glyphs.
+    int cellCount = static_cast<int>(m_characterPositions.size());
+
+    m_scramble.Initialize (cellCount, kRevealDuration, 0.0f, kCycleInterval, kFlashDuration, -1.0f);
+    m_scramble.StartReveal();
 }
 
 
@@ -70,43 +77,19 @@ UsageDialog::~UsageDialog()
 //
 //  UsageDialog::IsRevealComplete
 //
-//  Returns true when all characters have been revealed AND all per-line
-//  tracer trails have fully swept past the text.  This prevents the
-//  trail animation from being cut short when the head passes the last
-//  character but the trail is still visible.
+//  Returns true when all characters have locked onto their target
+//  glyphs (every cell has reached Settled or later).
 //
 ////////////////////////////////////////////////////////////////////////////////
 
 bool UsageDialog::IsRevealComplete () const
 {
-    for (float opacity : m_revealedFlags)
-    {
-        if (opacity <= 0.0f)
-        {
-            return false;
-        }
-    }
-
-    if (m_revealedFlags.empty())
+    if (m_characterPositions.empty())
     {
         return false;
     }
 
-    // All characters revealed — now ensure every line's trail has
-    // finished sweeping (lineProgress == 1.0 for all lines).
-    for (size_t j = 0; j < m_lineTracerDelays.size(); j++)
-    {
-        float delay    = m_lineTracerDelays[j];
-        float duration = (j < m_lineTracerDurations.size()) ? m_lineTracerDurations[j] : kTracerDurationMax;
-        float progress = (m_phaseTimer - delay) / duration;
-
-        if (progress < 1.0f)
-        {
-            return false;
-        }
-    }
-
-    return true;
+    return m_scramble.IsRevealComplete();
 }
 
 
@@ -236,7 +219,14 @@ HRESULT UsageDialog::Show ()
     m_textLayout.Reset();
     InitializeTextLayout();
     ComputeCharacterPositions();
-    ComputeLineYPositions();
+
+    // Re-initialize scramble effect for the updated character count
+    {
+        int cellCount = static_cast<int>(m_characterPositions.size());
+
+        m_scramble.Initialize (cellCount, kRevealDuration, 0.0f, kCycleInterval, kFlashDuration, -1.0f);
+        m_scramble.StartReveal();
+    }
 
     ShowWindow (m_hWnd, SW_SHOW);
     UpdateWindow (m_hWnd);
@@ -301,6 +291,10 @@ void UsageDialog::Update (float deltaTime)
     m_phaseTimer   += deltaTime;
     m_elapsedTime  += deltaTime;
 
+    // Always advance the scramble-reveal effect so the post-reveal
+    // white pulse continues during Background phase.
+    m_scramble.Update (deltaTime);
+
     if (m_animationPhase == AnimationPhase::Revealing)
     {
         UpdateRevealPhase (deltaTime);
@@ -308,15 +302,6 @@ void UsageDialog::Update (float deltaTime)
     else
     {
         UpdateBackgroundPhase (deltaTime);
-    }
-
-    // Ramp up opacity on all revealed characters
-    for (float & opacity : m_revealedFlags)
-    {
-        if (opacity > 0.0f && opacity < 1.0f)
-        {
-            opacity = std::min (1.0f, opacity + kRevealFadeInSpeed * deltaTime);
-        }
     }
 
     // Let AnimationSystem handle streak spawning, updating, and despawning
@@ -335,71 +320,32 @@ void UsageDialog::Update (float deltaTime)
 //
 //  UsageDialog::UpdateRevealPhase
 //
-//  Advances horizontal tracer streaks left to right across each text line.
-//  Characters are revealed as the tracer head passes their X position.
-//  When no AnimationSystem is available (unit-test path), falls back to
-//  a simple time-based sweep front at kRevealSpeed.
+//  Advances the scramble-reveal effect and syncs per-character opacity
+//  and display glyphs.  When all cells settle, transitions to Background.
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void UsageDialog::UpdateRevealPhase (float deltaTime)
+void UsageDialog::UpdateRevealPhase (float /* deltaTime */)
 {
-    // Always advance the reveal front (used by sweep-front fallback
-    // and exposed via GetRevealFrontY for test observability).
-    m_revealFrontY += kRevealSpeed * deltaTime;
 
-    // Advance tracer progress (0 = left edge, 1 = right edge)
-    m_tracerProgress = std::min (1.0f, m_phaseTimer / kTracerDurationMax);
+    int cellCount = m_scramble.GetCellCount();
 
-    if (m_animationSystem)
+
+
+    for (int i = 0; i < cellCount; i++)
     {
-        // Production path: tracer reveals characters as it sweeps right.
-        // Each line has its own staggered tracer position.
-        for (size_t i = 0; i < m_characterPositions.size(); i++)
+        const auto & cell = m_scramble.GetCell (i);
+
+        // Sync opacity from the scramble effect
+        m_revealedFlags[i] = cell.opacity;
+
+        // Pick a new random katakana when the effect says to cycle.
+        // Seed changes with position and cycle count for variety.
+        if (cell.needsCycle)
         {
-            if (m_revealedFlags[i] > 0.0f)
-            {
-                continue;
-            }
-
-            float  charWorldX = m_characterPositions[i].x + m_textOffsetX;
-            size_t lineIdx    = FindLineIndex (m_characterPositions[i].y);
-            float  lineTracerX = ComputeLineTracerX (lineIdx);
-
-            if (charWorldX <= lineTracerX)
-            {
-                m_revealedFlags[i] = 0.01f;  // Start fade-in
-                m_revealTimes[i]   = m_elapsedTime;
-
-                // Assign a random katakana glyph once, on first reveal
-                size_t katIndex = (i * 7 + 13) % CharacterConstants::HALFWIDTH_KATAKANA_COUNT;
-                m_characterPositions[i].randomCharacter = static_cast<wchar_t> (CharacterConstants::HALFWIDTH_KATAKANA_CODEPOINTS[katIndex]);
-            }
-        }
-
-        // Tracer coloring is handled in RenderTextOverlay via D2D
-    }
-    else
-    {
-        // Test fallback: sweep-front reveals characters by Y position
-        for (size_t i = 0; i < m_characterPositions.size(); i++)
-        {
-            if (m_revealedFlags[i] > 0.0f)
-            {
-                continue;
-            }
-
-            float charWorldY = m_characterPositions[i].y + m_textOffsetY;
-
-            if (charWorldY <= m_revealFrontY)
-            {
-                m_revealedFlags[i] = 0.01f;  // Start fade-in
-                m_revealTimes[i]   = m_elapsedTime;
-
-                // Assign a random katakana glyph once, on first reveal
-                size_t katIndex = (i * 7 + 13) % CharacterConstants::HALFWIDTH_KATAKANA_COUNT;
-                m_characterPositions[i].randomCharacter = static_cast<wchar_t> (CharacterConstants::HALFWIDTH_KATAKANA_CODEPOINTS[katIndex]);
-            }
+            size_t cycle    = static_cast<size_t>(m_elapsedTime / kCycleInterval);
+            size_t katIndex = (static_cast<size_t>(i) * 7 + cycle * 13) % CharacterConstants::HALFWIDTH_KATAKANA_COUNT;
+            m_characterPositions[i].randomCharacter = static_cast<wchar_t> (CharacterConstants::HALFWIDTH_KATAKANA_CODEPOINTS[katIndex]);
         }
     }
 
@@ -440,146 +386,6 @@ void UsageDialog::UpdateBackgroundPhase (float /* deltaTime */)
     // all streak lifecycle.  Nothing additional to do here.
 }
 
-
-
-
-
-
-
-
-////////////////////////////////////////////////////////////////////////////////
-//
-//  UsageDialog::ComputeLineYPositions
-//
-//  Extracts the unique Y coordinates from character positions to know
-//  which text lines exist.  Used to spawn one tracer per line.
-//
-////////////////////////////////////////////////////////////////////////////////
-
-void UsageDialog::ComputeLineYPositions()
-{
-    m_lineYPositions.clear();
-    m_textMinX =  std::numeric_limits<float>::max();
-    m_textMaxX = -std::numeric_limits<float>::max();
-
-
-
-    for (const auto & pos : m_characterPositions)
-    {
-        // Track overall X bounds
-        float worldX = pos.x + m_textOffsetX;
-
-        if (worldX < m_textMinX) m_textMinX = worldX;
-        if (worldX > m_textMaxX) m_textMaxX = worldX;
-
-        // Collect unique Y values (within 1px tolerance for float rounding)
-        bool found = false;
-
-        for (float existing : m_lineYPositions)
-        {
-            if (std::abs (existing - pos.y) < 1.0f)
-            {
-                found = true;
-                break;
-            }
-        }
-
-        if (!found)
-        {
-            m_lineYPositions.push_back (pos.y);
-        }
-    }
-
-    // Sort top to bottom for visual consistency
-    std::sort (m_lineYPositions.begin(), m_lineYPositions.end());
-
-    // Generate random per-line parameters so each streak has its own
-    // start delay, sweep speed, and trail length.
-    size_t lineCount = m_lineYPositions.size();
-
-    std::mt19937 rng (42);
-    std::uniform_real_distribution<float> delayDist    (0.0f, kTracerStaggerRange);
-    std::uniform_real_distribution<float> durationDist (kTracerDurationMin, kTracerDurationMax);
-    std::uniform_real_distribution<float> trailDist    (kTracerTrailMin, kTracerTrailMax);
-
-    m_lineTracerDelays.resize    (lineCount);
-    m_lineTracerDurations.resize (lineCount);
-    m_lineTrailPixels.resize     (lineCount);
-    m_lineFadeDurations.resize   (lineCount);
-
-    float textWidth = m_textMaxX - m_textMinX;
-
-    for (size_t j = 0; j < lineCount; j++)
-    {
-        m_lineTracerDelays[j]    = delayDist (rng);
-        m_lineTracerDurations[j] = durationDist (rng);
-        m_lineTrailPixels[j]     = trailDist (rng);
-
-        // Fade-to-white duration matches the time a character dwells in the trail
-        float sweepSpan          = textWidth + m_lineTrailPixels[j];
-        m_lineFadeDurations[j]   = (sweepSpan > 0.0f)
-                                   ? m_lineTrailPixels[j] * m_lineTracerDurations[j] / sweepSpan
-                                   : 1.0f;
-    }
-}
-
-
-
-
-
-////////////////////////////////////////////////////////////////////////////////
-//
-//  UsageDialog::FindLineIndex
-//
-//  Returns the index into m_lineYPositions that matches the given
-//  character Y position (within 1px tolerance).  Returns 0 if no match.
-//
-////////////////////////////////////////////////////////////////////////////////
-
-size_t UsageDialog::FindLineIndex (float charY) const
-{
-    for (size_t j = 0; j < m_lineYPositions.size(); j++)
-    {
-        if (std::abs (m_lineYPositions[j] - charY) < 1.0f)
-        {
-            return j;
-        }
-    }
-
-    return 0;
-}
-
-
-
-
-
-////////////////////////////////////////////////////////////////////////////////
-//
-//  UsageDialog::ComputeLineTracerX
-//
-//  Computes the current tracer X position for a given line, accounting
-//  for that line's random stagger delay.
-//
-////////////////////////////////////////////////////////////////////////////////
-
-float UsageDialog::ComputeLineTracerX (size_t lineIndex) const
-{
-    float delay    = (lineIndex < m_lineTracerDelays.size())    ? m_lineTracerDelays[lineIndex]    : 0.0f;
-    float duration = (lineIndex < m_lineTracerDurations.size()) ? m_lineTracerDurations[lineIndex] : kTracerDurationMax;
-    float trail    = (lineIndex < m_lineTrailPixels.size())     ? m_lineTrailPixels[lineIndex]     : kTracerTrailMax;
-
-    // Tracer hasn't started for this line yet — return a position
-    // far enough left that no characters will match.
-    if (m_phaseTimer < delay)
-    {
-        return m_textMinX - trail - 1.0f;
-    }
-
-    float lineProgress = std::clamp ((m_phaseTimer - delay) / duration, 0.0f, 1.0f);
-    float textWidth    = m_textMaxX - m_textMinX;
-
-    return m_textMinX + lineProgress * (textWidth + trail);
-}
 
 
 
@@ -723,12 +529,8 @@ void UsageDialog::ComputeCharacterPositions ()
         }
     }
 
-    // Initialize revealed flags and reveal times
+    // Initialize revealed flags (opacity per character)
     m_revealedFlags.assign (m_characterPositions.size(), 0.0f);
-    m_revealTimes.assign   (m_characterPositions.size(), 0.0f);
-
-    // Initialize the reveal front above the window
-    m_revealFrontY = -50.0f;
 }
 
 
@@ -990,8 +792,8 @@ void UsageDialog::RenderFrame ()
 //  UsageDialog::RenderTextOverlay
 //
 //  Draws revealed usage text on top of the GPU-rendered rain using D2D.
-//  Two passes: dark glow halos first, then white foreground text.
-//  Uses RenderSystem's D2D context for rendering.
+//  Two passes: dark glow halos first, then colored foreground text.
+//  Color is derived from the scramble-reveal cell state.
 //
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -1014,7 +816,7 @@ void UsageDialog::RenderTextOverlay ()
     static constexpr float kCharWidth  = 20.0f;
     static constexpr float kCharHeight = 24.0f;
 
-    bool  isTracing = (m_animationPhase == AnimationPhase::Revealing && m_animationSystem != nullptr);
+    float postRevealTimer = m_scramble.GetPostRevealTimer();
 
     // Pass 1: Draw all feathered dark glows
     for (size_t i = 0; i < m_characterPositions.size(); i++)
@@ -1033,10 +835,9 @@ void UsageDialog::RenderTextOverlay ()
         DrawCharacterGlow (d2dContext, pos.character, drawX, drawY, opacity);
     }
 
-    // Pass 2: Draw all foreground text on top
-    // Characters in the tracer zone show random matrix rain characters (katakana)
-    // that transition to the actual text character halfway through the trail.
-    // Color uses the shared rain-model sweep function (ComputeSweepColor).
+    // Pass 2: Draw all foreground text on top.
+    // Cycling cells show random katakana; settled cells show actual text.
+    // Color is computed per-cell from the scramble-reveal phase.
     for (size_t i = 0; i < m_characterPositions.size(); i++)
     {
         float opacity = m_revealedFlags[i];
@@ -1046,59 +847,28 @@ void UsageDialog::RenderTextOverlay ()
             continue;
         }
 
-        const CharPosition & pos = m_characterPositions[i];
-        float drawX              = pos.x + m_textOffsetX;
-        float drawY              = pos.y + m_textOffsetY;
+        const CharPosition & pos  = m_characterPositions[i];
+        const CellState    & cell = m_scramble.GetCell (static_cast<int>(i));
+        float drawX               = pos.x + m_textOffsetX;
+        float drawY               = pos.y + m_textOffsetY;
 
         D2D1_RECT_F charRect = D2D1::RectF (drawX, drawY, drawX + kCharWidth, drawY + kCharHeight);
 
-        // Compute per-line tracer X to support staggered line reveals
-        size_t lineIdx     = FindLineIndex (pos.y);
-        float  lineTracerX = ComputeLineTracerX (lineIdx);
-        float  lineTrail   = (lineIdx < m_lineTrailPixels.size()) ? m_lineTrailPixels[lineIdx] : kTracerTrailMax;
+        // Scramble-reveal color model
+        SweepColor color = ComputeScrambleColor (cell.phase, cell.flashTimer, cell.flashDuration, postRevealTimer);
 
-        // Compute sweep state from pixel distance
-        float distFromTracer  = lineTracerX - drawX;
-        bool  inStreakZone    = (isTracing && distFromTracer >= 0.0f && distFromTracer < lineTrail);
-        bool  isHead          = (inStreakZone && distFromTracer < kCharWidth);
-        float streakIntensity = 0.0f;
-        float brightenTimer   = 0.0f;
-
-        if (inStreakZone)
-        {
-            // Rain model: front half = full brightness, back half fades
-            float halfTrail = lineTrail * 0.5f;
-
-            streakIntensity = (distFromTracer < halfTrail)
-                            ? 1.0f
-                            : std::clamp (1.0f - (distFromTracer - halfTrail) / halfTrail, 0.0f, 1.0f);
-        }
-        else
-        {
-            // Time since trail exited (for settled-text brightening)
-            float timeSinceReveal = m_elapsedTime - m_revealTimes[i];
-            float lineFade        = (lineIdx < m_lineFadeDurations.size()) ? m_lineFadeDurations[lineIdx] : 1.0f;
-
-            brightenTimer = std::max (0.0f, timeSinceReveal - lineFade);
-        }
-
-        // Shared rain-model color
-        SweepColor color = ComputeSweepColor (isHead, inStreakZone, streakIntensity, brightenTimer);
-
-        // Select character: random katakana in first half of streak, actual in second half
+        // Select character: cycling/dismissing → random katakana, settled → actual
         wchar_t displayChar = pos.character;
 
-        if (inStreakZone)
+        if (cell.phase == CellPhase::Cycling || cell.phase == CellPhase::Dismissing)
         {
-            float t = distFromTracer / lineTrail;
-
-            displayChar = (t < 0.5f) ? pos.randomCharacter : pos.character;
+            displayChar = pos.randomCharacter;
         }
 
         wchar_t str[2] = { displayChar, L'\0' };
 
         m_tracerBrush->SetColor (D2D1::ColorF (color.r, color.g, color.b, 1.0f));
-        m_tracerBrush->SetOpacity (inStreakZone ? 1.0f : opacity);
+        m_tracerBrush->SetOpacity (opacity);
         d2dContext->DrawText (str, 1, m_textFormat.Get(), charRect, m_tracerBrush.Get());
     }
 
@@ -1212,29 +982,11 @@ LRESULT CALLBACK UsageDialog::WndProc (HWND hwnd, UINT msg, WPARAM wParam, LPARA
                 {
                     pDialog->m_animationPhase = AnimationPhase::Revealing;
                     pDialog->m_phaseTimer     = 0.0f;
-                    pDialog->m_revealFrontY   = -50.0f;
                     pDialog->m_elapsedTime    = 0.0f;
-                    pDialog->m_tracerProgress = 0.0f;
                     pDialog->m_revealedFlags.assign (pDialog->m_characterPositions.size(), 0.0f);
-                    pDialog->m_revealTimes.assign   (pDialog->m_characterPositions.size(), 0.0f);
 
-                    // Regenerate per-line stagger delays for variety on each replay
-                    std::mt19937 rng (static_cast<unsigned> (std::chrono::steady_clock::now().time_since_epoch().count()));
-                    std::uniform_real_distribution<float> delayDist    (0.0f, kTracerStaggerRange);
-                    std::uniform_real_distribution<float> durationDist (kTracerDurationMin, kTracerDurationMax);
-                    std::uniform_real_distribution<float> trailDist    (kTracerTrailMin, kTracerTrailMax);
-
-                    for (size_t j = 0; j < pDialog->m_lineTracerDelays.size(); j++)
-                    {
-                        pDialog->m_lineTracerDelays[j]    = delayDist (rng);
-                        pDialog->m_lineTracerDurations[j] = durationDist (rng);
-                        pDialog->m_lineTrailPixels[j]     = trailDist (rng);
-
-                        float sweepSpan                   = (pDialog->m_textMaxX - pDialog->m_textMinX) + pDialog->m_lineTrailPixels[j];
-                        pDialog->m_lineFadeDurations[j]   = (sweepSpan > 0.0f)
-                                                            ? pDialog->m_lineTrailPixels[j] * pDialog->m_lineTracerDurations[j] / sweepSpan
-                                                            : 1.0f;
-                    }
+                    // Restart scramble-reveal
+                    pDialog->m_scramble.StartReveal();
 
                     // Reset AnimationSystem — no rain during reveal
                     if (pDialog->m_animationSystem)

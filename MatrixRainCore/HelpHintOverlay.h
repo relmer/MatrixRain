@@ -1,7 +1,7 @@
 #pragma once
 
 #include "CharacterConstants.h"
-#include "TextSweepEffect.h"
+#include "ScrambleRevealEffect.h"
 
 
 
@@ -33,8 +33,12 @@ enum class OverlayPhase
 
 enum class CharPhase
 {
-    Resolved,
-    Hidden
+    Hidden,
+    Resolved,       // Legacy: used by old sweep code (will be removed)
+    Cycling,
+    LockFlash,
+    Settled,
+    Dismissing
 };
 
 
@@ -57,6 +61,9 @@ struct HintCharacter
     float     glowIntensity     = 0.0f;
     float     brightenTimer     = 0.0f;
     float     streakIntensity   = 0.0f;
+    float     colorR            = 0.0f;
+    float     colorG            = 0.0f;
+    float     colorB            = 0.0f;
     int       row               = 0;
     int       col               = 0;
     bool      isSpace           = false;
@@ -108,7 +115,7 @@ public:
 
 
     // Queries
-    bool                             IsActive()        const { return m_sweep.IsActive();                       }
+    bool                             IsActive()        const { return m_scramble.IsActive();                    }
     OverlayPhase                     GetPhase()         const;
     D2D1_RECT_F                      GetBoundingRect()  const { return m_boundingRect;                           }
     std::span<const HintCharacter>   GetCharacters()    const { return std::span<const HintCharacter>(m_chars);  }
@@ -122,7 +129,7 @@ private:
 
 
     // Sweep effect (handles all timing / phase transitions)
-    TextSweepEffect                  m_sweep;
+    ScrambleRevealEffect                 m_scramble;
 
     // Character grid
     std::vector<HintCharacter>       m_chars;

@@ -1,6 +1,8 @@
 #pragma once
 
 #include "HelpHintOverlay.h"
+#include "ScrambleRevealEffect.h"
+#include "TextSweepEffect.h"
 
 
 
@@ -78,3 +80,26 @@ void UpdateSweepStreaks (std::span<HintCharacter>  chars,
                         const TextSweepEffect    & sweep,
                         size_t                     glyphCount,
                         float                      deltaTime);
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  ComputeScrambleColor
+//
+//  Computes the RGB color for a character based on its scramble-reveal
+//  cell phase:
+//
+//    Cycling:      Medium green (0, 0.5, 0)
+//    LockFlash:    Bright yellow-green → bright green (flashTimer decay)
+//    Settled:      Bright green, with optional white pulse (postRevealTimer)
+//    Dismissing:   Medium green fading to dark green (via opacity)
+//
+////////////////////////////////////////////////////////////////////////////////
+
+SweepColor ComputeScrambleColor (CellPhase cellPhase,
+                                 float     flashTimer,
+                                 float     flashDuration,
+                                 float     postRevealTimer);

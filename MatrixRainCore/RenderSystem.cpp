@@ -1756,9 +1756,7 @@ void RenderSystem::RenderOverlayCharacters (std::span<const HintCharacter> chars
 
         D2D1_RECT_F charRect = computeCharRect (ch);
 
-        SweepColor color = ComputeSweepColor (ch.isHead, ch.inStreakZone, ch.streakIntensity, ch.brightenTimer);
-
-        m_fpsBrush->SetColor (D2D1::ColorF (color.r, color.g, color.b, ch.opacity));
+        m_fpsBrush->SetColor (D2D1::ColorF (ch.colorR, ch.colorG, ch.colorB, ch.opacity));
 
         m_d2dContext->DrawText (glyphStr,
                                 static_cast<UINT32> (glyphLen),

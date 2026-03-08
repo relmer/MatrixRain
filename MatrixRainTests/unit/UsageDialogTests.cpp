@@ -181,22 +181,6 @@ namespace MatrixRainTests
 
 
 
-            TEST_METHOD (Constructor_RevealFrontStartsAboveWindow)
-            {
-                UsageText usage (L'/');
-
-
-                UsageDialog dialog (usage, m_settingsProvider);
-
-
-
-                Assert::IsTrue (dialog.GetRevealFrontY() < 0.0f,
-                                L"Reveal front should start above the window");
-            }
-
-
-
-
             ////////////////////////////////////////////////////////////
             //  T069: IsRevealComplete
             ////////////////////////////////////////////////////////////
@@ -224,11 +208,11 @@ namespace MatrixRainTests
 
                 UsageDialog dialog (usage, m_settingsProvider);
 
-                // With one-char-per-column-per-frame, columns may need
-                // multiple full sweeps to reveal all stacked characters.
-                // At 150px/s and 60fps, one sweep ≈ 240 frames.  Use 3600
-                // frames (~60s) for ample margin.
-                for (int i = 0; i < 3600; i++)
+                // Scramble-reveal: all cells cycle random glyphs, then each
+                // locks at a random time in [0, revealDuration].  After
+                // revealDuration + flashDuration all should be Settled.
+                // Use 200 frames at 60fps (3.3s) for comfortable margin.
+                for (int i = 0; i < 200; i++)
                 {
                     dialog.Update (1.0f / 60.0f);
                 }
@@ -253,10 +237,10 @@ namespace MatrixRainTests
 
                 UsageDialog dialog (usage, m_settingsProvider);
 
-                // Transition to Background happens as soon as all characters
-                // are revealed (columns respawn during Revealing).  Same
-                // timing as IsRevealComplete test.  Use 3600 frames (60s).
-                for (int i = 0; i < 3600; i++)
+                // Transition to Background happens as soon as all cells
+                // settle.  200 frames at 60fps (3.3s) exceeds
+                // revealDuration(2.5) + flash(0.15) comfortably.
+                for (int i = 0; i < 200; i++)
                 {
                     dialog.Update (1.0f / 60.0f);
                 }
@@ -271,38 +255,29 @@ namespace MatrixRainTests
 
 
             ////////////////////////////////////////////////////////////
-            //  T085: Reveal queue drain rate
+            //  T085: Scramble-reveal makes characters visible
             ////////////////////////////////////////////////////////////
 
-            TEST_METHOD (RevealFrontY_AdvancesWithUpdate)
+            TEST_METHOD (Update_AllCharactersBecomeVisible)
             {
                 UsageText usage (L'/');
 
 
                 UsageDialog dialog (usage, m_settingsProvider);
 
-                float initialFront = dialog.GetRevealFrontY();
+                // After one update, all cells should be cycling at full
+                // opacity (scramble-reveal starts all cells immediately).
+                dialog.Update (1.0f / 60.0f);
 
-                // Simulate 10 frames at 60 fps
-                for (int i = 0; i < 10; i++)
+                const auto & flags = dialog.GetRevealedFlags();
+
+
+
+                for (size_t i = 0; i < flags.size(); i++)
                 {
-                    dialog.Update (1.0f / 60.0f);
+                    Assert::AreEqual (1.0f, flags[i],
+                                      L"All characters should be visible after first update");
                 }
-
-                float advancedFront = dialog.GetRevealFrontY();
-
-
-
-                // Reveal front should have moved downward (increasing Y)
-                Assert::IsTrue (advancedFront > initialFront,
-                                L"Reveal front should advance downward with each update");
-
-                // Verify approximate distance: 10 frames * (1/60)s * 150px/s ≈ 25px
-                float expectedAdvance = 10.0f * (1.0f / 60.0f) * UsageDialog::kRevealSpeed;
-                float actualAdvance   = advancedFront - initialFront;
-
-                Assert::IsTrue (abs (actualAdvance - expectedAdvance) < 1.0f,
-                                L"Reveal front should advance at kRevealSpeed");
             }
     };
 

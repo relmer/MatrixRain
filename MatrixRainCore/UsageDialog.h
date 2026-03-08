@@ -6,6 +6,7 @@
 #include "DensityController.h"
 #include "ISettingsProvider.h"
 #include "RenderSystem.h"
+#include "ScrambleRevealEffect.h"
 #include "ScreenSaverSettings.h"
 #include "UsageText.h"
 #include "Viewport.h"
@@ -77,7 +78,6 @@ public:
     AnimationPhase                        GetAnimationPhase ()      const { return m_animationPhase;      }
     const std::vector<CharPosition>     & GetCharacterPositions ()  const { return m_characterPositions;  }
     const std::vector<float>            & GetRevealedFlags ()       const { return m_revealedFlags;       }
-    float                                 GetRevealFrontY ()        const { return m_revealFrontY;        }
     const AnimationSystem               * GetAnimationSystem ()     const { return m_animationSystem.get(); }
 
 
@@ -90,14 +90,9 @@ public:
 
 
     // Tunable constants — reveal phase
-    static constexpr float kRevealSpeed              = 150.0f;
-    static constexpr float kRevealFadeInSpeed        = 2.5f;
-    static constexpr float kTracerDurationMin        = 2.0f;
-    static constexpr float kTracerDurationMax        = 4.0f;
-    static constexpr int   kRevealSpeedPercent       = 100;
-    static constexpr float kTracerTrailMin           = 250.0f;
-    static constexpr float kTracerTrailMax           = 550.0f;
-    static constexpr float kTracerStaggerRange       = 0.8f;
+    static constexpr float kRevealDuration           = 1.8f;
+    static constexpr float kCycleInterval            = 0.065f;
+    static constexpr float kFlashDuration            = 1.0f;
 
     // Tunable constants — background phase
     static constexpr float kBgDensityMultiplier     = 0.15f;
@@ -118,11 +113,8 @@ private:
     void    DrawCharacterGlow (ID2D1DeviceContext * pContext, wchar_t ch, float x, float y, float opacity);
 
     // Animation update helpers
-    void    UpdateRevealPhase (float deltaTime);
+    void    UpdateRevealPhase (float /* deltaTime */);
     void    UpdateBackgroundPhase (float deltaTime);
-    void    ComputeLineYPositions();
-    size_t  FindLineIndex (float charY) const;
-    float   ComputeLineTracerX (size_t lineIndex) const;
 
     // Window procedure
     static LRESULT CALLBACK WndProc (HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
@@ -148,20 +140,11 @@ private:
     // Animation state
     AnimationPhase                 m_animationPhase  = AnimationPhase::Revealing;
     float                          m_phaseTimer      = 0.0f;
-    float                          m_revealFrontY    = -50.0f;
     float                          m_elapsedTime     = 0.0f;
-    float                          m_tracerProgress  = 0.0f;
+    ScrambleRevealEffect           m_scramble;
 
     std::vector<CharPosition>      m_characterPositions;
     std::vector<float>             m_revealedFlags;
-    std::vector<float>             m_revealTimes;
-    std::vector<float>             m_lineYPositions;
-    std::vector<float>             m_lineTracerDelays;
-    std::vector<float>             m_lineTracerDurations;
-    std::vector<float>             m_lineTrailPixels;
-    std::vector<float>             m_lineFadeDurations;
-    float                          m_textMinX        = 0.0f;
-    float                          m_textMaxX        = 0.0f;
 
 
     // Text layout (DWrite — independent of RenderSystem D2D)

@@ -48,7 +48,7 @@ public:
 
 
     // Queries
-    bool                                      IsActive ()           const { return m_sweep.IsActive();                                  }
+    bool                                      IsActive ()           const { return m_scramble.IsActive();                               }
     OverlayPhase                              GetPhase ()           const;
     D2D1_RECT_F                               GetBoundingRect ()    const { return m_boundingRect;                                      }
     float                                     GetKeyColumnWidth ()  const { return m_keyColumnWidth;                                    }
@@ -66,7 +66,7 @@ private:
 
 
     // Sweep effect (handles all timing / phase transitions)
-    TextSweepEffect                 m_sweep;
+    ScrambleRevealEffect            m_scramble;
 
     // Content
     std::vector<HotkeyEntry>        m_hotkeys;

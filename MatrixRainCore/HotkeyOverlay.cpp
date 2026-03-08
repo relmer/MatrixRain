@@ -75,8 +75,18 @@ HotkeyOverlay::HotkeyOverlay()
 
     InitializeCharacters();
 
-    // holdDuration = -1 → hold indefinitely (dismissed by user)
-    m_sweep.Initialize (GetRows(), 1.2f, 1.0f, 2.0f, 2.5f, -1.0f, 1.5f);
+    // Initialize the scramble-reveal effect (holdDuration = -1 → hold indefinitely)
+    int cellCount = static_cast<int>(m_chars.size());
+
+    m_scramble.Initialize (cellCount, 1.2f, 1.0f, 0.065f, 1.0f, -1.0f);
+
+    for (int i = 0; i < cellCount; i++)
+    {
+        if (m_chars[i].isSpace)
+        {
+            m_scramble.MarkSpace (i);
+        }
+    }
 }
 
 
@@ -228,7 +238,7 @@ void HotkeyOverlay::InitializeCharacters ()
 
 void HotkeyOverlay::Show ()
 {
-    // Reset all characters to Hidden so the new sweep starts clean
+    // Reset all characters to Hidden so the new reveal starts clean
     for (auto & ch : m_chars)
     {
         ch.phase         = CharPhase::Hidden;
@@ -236,7 +246,7 @@ void HotkeyOverlay::Show ()
         ch.glowIntensity = 0.0f;
     }
 
-    m_sweep.StartReveal();
+    m_scramble.StartReveal();
 }
 
 
@@ -254,7 +264,7 @@ void HotkeyOverlay::Show ()
 
 void HotkeyOverlay::Dismiss ()
 {
-    m_sweep.StartDismiss();
+    m_scramble.StartDismiss();
 }
 
 
@@ -271,7 +281,7 @@ void HotkeyOverlay::Dismiss ()
 
 void HotkeyOverlay::Hide ()
 {
-    m_sweep.Reset();
+    m_scramble.Reset();
 
     for (auto & ch : m_chars)
     {
@@ -295,45 +305,87 @@ void HotkeyOverlay::Hide ()
 
 void HotkeyOverlay::Update (float deltaTime)
 {
-    m_sweep.Update (deltaTime);
+    m_scramble.Update (deltaTime);
 
-    // Pass 1: update phase, opacity, glow for each character.
-    for (auto & ch : m_chars)
+    float postRevealTimer = m_scramble.GetPostRevealTimer();
+    int   cellCount       = m_scramble.GetCellCount();
+
+
+
+    for (int i = 0; i < cellCount; i++)
     {
-        float normCol = (m_cols > 1)
-                       ? static_cast<float>(ch.col) / static_cast<float>(m_cols - 1)
-                       : 0.0f;
+        auto       & ch   = m_chars[i];
+        const auto & cell = m_scramble.GetCell (i);
 
-        float opacity = m_sweep.GetOpacity (ch.row, normCol);
+        ch.opacity = cell.opacity;
 
-        // Reset streak fields each frame
-        ch.inStreakZone    = false;
-        ch.streakIntensity = 0.0f;
-        ch.isHead          = false;
-
-        if (opacity > 0.0f)
+        // Map CellPhase to CharPhase and update display glyph
+        switch (cell.phase)
         {
-            // Assign a random glyph once on first reveal (Hidden → Resolved)
-            if (ch.phase == CharPhase::Hidden)
+            case CellPhase::Cycling:
             {
-                size_t charIndex    = static_cast<size_t>(ch.row * m_cols + ch.col);
-                ch.randomGlyphIndex = (charIndex * 7 + 13) % m_allGlyphs.size();
+                ch.phase = CharPhase::Cycling;
+
+                if (cell.needsCycle)
+                {
+                    ch.randomGlyphIndex  = (ch.randomGlyphIndex + 7) % m_allGlyphs.size();
+                    ch.currentGlyphIndex = ch.randomGlyphIndex;
+                }
+
+                ch.glowIntensity = 0.3f;
+                break;
             }
 
-            ch.phase         = CharPhase::Resolved;
-            ch.opacity       = opacity;
-            ch.glowIntensity = m_sweep.GetGlowIntensity (ch.row, normCol);
-        }
-        else
-        {
-            ch.phase         = CharPhase::Hidden;
-            ch.opacity       = 0.0f;
-            ch.glowIntensity = 0.0f;
-        }
-    }
+            case CellPhase::LockFlash:
+            {
+                ch.phase             = CharPhase::LockFlash;
+                ch.currentGlyphIndex = ch.targetGlyphIndex;
+                ch.glowIntensity     = 1.0f;
+                break;
+            }
 
-    // Pass 2: streak detection, glyph selection, brightness computation.
-    UpdateSweepStreaks (std::span<HintCharacter>(m_chars), m_cols, m_sweep, m_allGlyphs.size(), deltaTime);
+            case CellPhase::Settled:
+            {
+                ch.phase             = CharPhase::Settled;
+                ch.currentGlyphIndex = ch.targetGlyphIndex;
+                ch.glowIntensity     = 0.0f;
+                break;
+            }
+
+            case CellPhase::Dismissing:
+            {
+                ch.phase = CharPhase::Dismissing;
+
+                if (cell.needsCycle)
+                {
+                    ch.randomGlyphIndex  = (ch.randomGlyphIndex + 7) % m_allGlyphs.size();
+                    ch.currentGlyphIndex = ch.randomGlyphIndex;
+                }
+                else
+                {
+                    ch.currentGlyphIndex = ch.randomGlyphIndex;
+                }
+
+                ch.glowIntensity = 0.0f;
+                break;
+            }
+
+            case CellPhase::Hidden:
+            default:
+            {
+                ch.phase         = CharPhase::Hidden;
+                ch.glowIntensity = 0.0f;
+                break;
+            }
+        }
+
+        // Pre-compute color for rendering
+        SweepColor color = ComputeScrambleColor (cell.phase, cell.flashTimer, cell.flashDuration, postRevealTimer);
+
+        ch.colorR = color.r;
+        ch.colorG = color.g;
+        ch.colorB = color.b;
+    }
 }
 
 
@@ -350,15 +402,15 @@ void HotkeyOverlay::Update (float deltaTime)
 
 OverlayPhase HotkeyOverlay::GetPhase () const
 {
-    switch (m_sweep.GetPhase())
+    switch (m_scramble.GetPhase())
     {
-        case SweepPhase::Revealing:  return OverlayPhase::Revealing;
-        case SweepPhase::Holding:    return OverlayPhase::Holding;
-        case SweepPhase::Dismissing: return OverlayPhase::Dissolving;
+        case ScramblePhase::Revealing:  return OverlayPhase::Revealing;
+        case ScramblePhase::Holding:    return OverlayPhase::Holding;
+        case ScramblePhase::Dismissing: return OverlayPhase::Dissolving;
 
-        case SweepPhase::Idle:
-        case SweepPhase::Done:
-        default:                     return OverlayPhase::Hidden;
+        case ScramblePhase::Idle:
+        case ScramblePhase::Done:
+        default:                        return OverlayPhase::Hidden;
     }
 }
 
