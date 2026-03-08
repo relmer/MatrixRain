@@ -3,6 +3,7 @@
 #include "UsageDialog.h"
 
 #include "CharacterSet.h"
+#include "SweepCommon.h"
 #include "UnicodeSymbols.h"
 #include "Version.h"
 
@@ -1035,12 +1036,7 @@ void UsageDialog::RenderTextOverlay ()
     // Pass 2: Draw all foreground text on top
     // Characters in the tracer zone show random matrix rain characters (katakana)
     // that transition to the actual text character halfway through the trail.
-    // This creates the iconic "decoding" effect:
-    //   Head        — bright white random char
-    //   Early trail — green random chars, brightness fading
-    //   Mid trail   — crossfade from random to actual char
-    //   Late trail  — actual text char in green, settling to white
-    //   Behind      — normal white text (fully revealed)
+    // Color uses the shared rain-model sweep function (ComputeSweepColor).
     for (size_t i = 0; i < m_characterPositions.size(); i++)
     {
         float opacity = m_revealedFlags[i];
@@ -1057,85 +1053,53 @@ void UsageDialog::RenderTextOverlay ()
         D2D1_RECT_F charRect = D2D1::RectF (drawX, drawY, drawX + kCharWidth, drawY + kCharHeight);
 
         // Compute per-line tracer X to support staggered line reveals
-        size_t lineIdx       = FindLineIndex (pos.y);
-        float  lineTracerX   = ComputeLineTracerX (lineIdx);
-        float  lineTrail     = (lineIdx < m_lineTrailPixels.size())     ? m_lineTrailPixels[lineIdx]     : kTracerTrailMax;
+        size_t lineIdx     = FindLineIndex (pos.y);
+        float  lineTracerX = ComputeLineTracerX (lineIdx);
+        float  lineTrail   = (lineIdx < m_lineTrailPixels.size()) ? m_lineTrailPixels[lineIdx] : kTracerTrailMax;
 
-        // Determine character color based on distance from tracer head
-        float distFromTracer = lineTracerX - drawX;
+        // Compute sweep state from pixel distance
+        float distFromTracer  = lineTracerX - drawX;
+        bool  inStreakZone    = (isTracing && distFromTracer >= 0.0f && distFromTracer < lineTrail);
+        bool  isHead          = (inStreakZone && distFromTracer < kCharWidth);
+        float streakIntensity = 0.0f;
+        float brightenTimer   = 0.0f;
 
-        if (isTracing && distFromTracer >= 0.0f && distFromTracer < lineTrail)
+        if (inStreakZone)
         {
-            // Character is in the tracer trail zone
-            float t = distFromTracer / lineTrail;  // 0 = head, 1 = tail end
+            // Rain model: front half = full brightness, back half fades
+            float halfTrail = lineTrail * 0.5f;
 
-            // Use the one-time random katakana assigned at reveal.
-            wchar_t randomStr[2] = { pos.randomCharacter, L'\0' };
-            wchar_t actualStr[2] = { pos.character, L'\0' };
-
-            if (t < 0.5f)
-            {
-                // First half: random matrix character (white head → fading green trail)
-                if (distFromTracer < kCharWidth)
-                {
-                    // Head: bright white random char (exactly one character)
-                    m_textBrush->SetOpacity (1.0f);
-                    d2dContext->DrawText (randomStr, 1, m_textFormat.Get(), charRect, m_textBrush.Get());
-                }
-                else
-                {
-                    // Early trail: green random char, brightness proportional to position
-                    float greenBrightness = 1.0f - (t - 0.10f) / 0.40f;  // 1.0 → 0.0 over 10%–50%
-
-                    m_tracerBrush->SetColor (D2D1::ColorF (0.0f, 0.3f + 0.7f * greenBrightness, 0.0f, 1.0f));
-                    m_tracerBrush->SetOpacity (1.0f);
-                    d2dContext->DrawText (randomStr, 1, m_textFormat.Get(), charRect, m_tracerBrush.Get());
-                }
-            }
-            else
-            {
-                // Second half: actual text character stays green
-                // (matching the dim green at the end of the first half)
-                // and brightens slightly toward the tail.
-                float settleT = (t - 0.5f) / 0.5f;  // 0 → 1 over the second half
-                float g       = 0.3f + 0.2f * settleT;   // 0.3 → 0.5
-
-                m_tracerBrush->SetColor (D2D1::ColorF (0.0f, g, 0.0f, 1.0f));
-                m_tracerBrush->SetOpacity (1.0f);
-                d2dContext->DrawText (actualStr, 1, m_textFormat.Get(), charRect, m_tracerBrush.Get());
-            }
+            streakIntensity = (distFromTracer < halfTrail)
+                            ? 1.0f
+                            : std::clamp (1.0f - (distFromTracer - halfTrail) / halfTrail, 0.0f, 1.0f);
         }
         else
         {
-            // Revealed text behind the trail — fade from green to white
-            // using time since reveal, so the fade continues even after
-            // the tracer phase ends.
-            wchar_t str[2] = { pos.character, L'\0' };
-
+            // Time since trail exited (for settled-text brightening)
             float timeSinceReveal = m_elapsedTime - m_revealTimes[i];
             float lineFade        = (lineIdx < m_lineFadeDurations.size()) ? m_lineFadeDurations[lineIdx] : 1.0f;
-            float timeSinceExit   = timeSinceReveal - lineFade;  // Offset by trail dwell time
-            float fadeT           = std::clamp (timeSinceExit / 0.3f, 0.0f, 1.0f);
 
-            if (fadeT < 1.0f)
-            {
-                // Lerp from dim green (matching trail tail) to white
-                float r = fadeT;
-                float g = 0.5f + 0.5f * fadeT;
-                float b = fadeT;
-
-                m_tracerBrush->SetColor (D2D1::ColorF (r, g, b, 1.0f));
-                m_tracerBrush->SetOpacity (opacity);
-                d2dContext->DrawText (str, 1, m_textFormat.Get(), charRect, m_tracerBrush.Get());
-            }
-            else
-            {
-                // Fully settled: white
-                m_textBrush->SetOpacity (opacity);
-                d2dContext->DrawText (str, 1, m_textFormat.Get(), charRect, m_textBrush.Get());
-                m_textBrush->SetOpacity (1.0f);
-            }
+            brightenTimer = std::max (0.0f, timeSinceReveal - lineFade);
         }
+
+        // Shared rain-model color
+        SweepColor color = ComputeSweepColor (isHead, inStreakZone, streakIntensity, brightenTimer);
+
+        // Select character: random katakana in first half of streak, actual in second half
+        wchar_t displayChar = pos.character;
+
+        if (inStreakZone)
+        {
+            float t = distFromTracer / lineTrail;
+
+            displayChar = (t < 0.5f) ? pos.randomCharacter : pos.character;
+        }
+
+        wchar_t str[2] = { displayChar, L'\0' };
+
+        m_tracerBrush->SetColor (D2D1::ColorF (color.r, color.g, color.b, 1.0f));
+        m_tracerBrush->SetOpacity (inStreakZone ? 1.0f : opacity);
+        d2dContext->DrawText (str, 1, m_textFormat.Get(), charRect, m_tracerBrush.Get());
     }
 
     d2dContext->EndDraw();

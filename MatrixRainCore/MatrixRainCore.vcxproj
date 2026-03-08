@@ -287,6 +287,7 @@
     <ClInclude Include="FPSCounter.h" />
     <ClInclude Include="HelpHintOverlay.h" />
     <ClInclude Include="UsageDialog.h" />
+    <ClInclude Include="SweepCommon.h" />
     <ClInclude Include="TextSweepEffect.h" />
     <ClInclude Include="HotkeyOverlay.h" />
     <ClInclude Include="InMemorySettingsProvider.h" />
@@ -335,6 +336,7 @@
     <ClCompile Include="HelpHintOverlay.cpp" />
     <ClCompile Include="UsageDialog.cpp" />
     <ClCompile Include="HotkeyOverlay.cpp" />
+    <ClCompile Include="SweepCommon.cpp" />
     <ClCompile Include="TextSweepEffect.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

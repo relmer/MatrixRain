@@ -7,6 +7,7 @@
 #include "ColorScheme.h"
 #include "HelpHintOverlay.h"
 #include "HotkeyOverlay.h"
+#include "SweepCommon.h"
 
 using Microsoft::WRL::ComPtr;
 
@@ -1013,13 +1014,16 @@ void RenderSystem::RenderFullscreenPass(ID3D11RenderTargetView* pRenderTarget,
                                         ID3D11ShaderResourceView* const* ppShaderResources,
                                         UINT numResources)
 {
+    ID3D11ShaderResourceView * nullSRVs[D3D11_COMMONSHADER_INPUT_RESOURCE_SLOT_COUNT] = {};
+
+
+
     m_context->OMSetRenderTargets   (1, &pRenderTarget, nullptr);
     m_context->PSSetShader          (pPixelShader, nullptr, 0);
     m_context->PSSetShaderResources (0, numResources, ppShaderResources);
     m_context->Draw (6, 0);
     
     // Unbind shader resources to avoid hazards
-    ID3D11ShaderResourceView* nullSRVs[D3D11_COMMONSHADER_INPUT_RESOURCE_SLOT_COUNT] = {};
     m_context->PSSetShaderResources (0, numResources, nullSRVs);
 }
 
@@ -1055,9 +1059,10 @@ void RenderSystem::SetViewport(UINT width, UINT height)
 
 HRESULT RenderSystem::ApplyBloom()
 {
-    HRESULT                    hr      = S_OK;
+    HRESULT                    hr            = S_OK;
     ID3D11ShaderResourceView * srvs[2];
-    ID3D11Buffer             * nullCB  = nullptr;
+    ID3D11Buffer             * nullCB        = nullptr;
+    D3D11_MAPPED_SUBRESOURCE   mappedBloomCB;
 
 
 
@@ -1091,15 +1096,18 @@ HRESULT RenderSystem::ApplyBloom()
     SetViewport (m_renderWidth, m_renderHeight);
     
     // Update bloom constant buffer with current intensity
-    D3D11_MAPPED_SUBRESOURCE mappedBloomCB;
     hr = m_context->Map (m_bloomConstantBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedBloomCB);
     if (SUCCEEDED (hr))
     {
-        float* bloomData = static_cast<float*> (mappedBloomCB.pData);
+        float * bloomData = static_cast<float*> (mappedBloomCB.pData);
+        
+        
+        
         bloomData[0] = m_glowIntensity;  // Bloom intensity
         bloomData[1] = 0.0f;             // Padding
         bloomData[2] = 0.0f;             // Padding
         bloomData[3] = 0.0f;             // Padding
+        
         m_context->Unmap (m_bloomConstantBuffer.Get(), 0);
     }
     
@@ -1138,13 +1146,16 @@ Error:
 
 void RenderSystem::ClearRenderTarget()
 {
+    // Clear to black
+    constexpr float clearColor[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
+
+
+
     if (!m_renderTargetView)
     {
         return;  // Skip if render target is being recreated during resize
     }
     
-    // Clear to black
-    float clearColor[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
     m_context->ClearRenderTargetView (m_renderTargetView.Get(), clearColor);
 }
 
@@ -1244,12 +1255,16 @@ HRESULT RenderSystem::UpdateInstanceBuffer (const AnimationSystem& animationSyst
     // Build instance data
     for (const CharacterStreak* streak : m_streakPtrs)
     {
-        const auto& characters = streak->GetCharacters();
-        Vector3 streakPos = streak->GetPosition();
+        const auto & characters = streak->GetCharacters();
+        Vector3      streakPos  = streak->GetPosition();
 
         // Render all characters (they manage their own fading/removal)
-        for (const auto& character : characters)
+        for (const auto & character : characters)
         {
+            CharacterInstanceData data;
+
+
+
             // Skip characters occluded by the help hint overlay
             if (pOcclusionRect)
             {
@@ -1263,7 +1278,6 @@ HRESULT RenderSystem::UpdateInstanceBuffer (const AnimationSystem& animationSyst
                 }
             }
 
-            CharacterInstanceData data;
             BuildCharacterInstanceData (character, streakPos, schemeColor, data);
             m_instanceData.push_back (data);
         }
@@ -1274,6 +1288,9 @@ HRESULT RenderSystem::UpdateInstanceBuffer (const AnimationSystem& animationSyst
     for (const auto & overlay : animationSystem.GetOverlayCharacters())
     {
         CharacterInstanceData data;
+
+
+
         BuildCharacterInstanceData (overlay.character, overlay.position, schemeColor, data);
         m_instanceData.push_back (data);
     }
@@ -1285,6 +1302,7 @@ HRESULT RenderSystem::UpdateInstanceBuffer (const AnimationSystem& animationSyst
     {
         UINT newCapacity = static_cast<UINT> (m_instanceData.size() * 2);
         
+
         
         m_instanceBuffer.Reset();
         m_instanceBufferCapacity = newCapacity;
@@ -1299,6 +1317,7 @@ HRESULT RenderSystem::UpdateInstanceBuffer (const AnimationSystem& animationSyst
 
     bytesToCopy = sizeof (CharacterInstanceData) * m_instanceData.size();
     memcpy (mappedResource.pData, m_instanceData.data(), bytesToCopy);
+    
     m_context->Unmap (m_instanceBuffer.Get(), 0);
 
 Error:
@@ -1323,6 +1342,7 @@ void RenderSystem::Render (const AnimationSystem & animationSystem, const Viewpo
     const Matrix4x4          & projection = viewport.GetProjectionMatrix();
     D3D11_MAPPED_SUBRESOURCE   mappedResource;
     HRESULT                    hr = m_context->Map (m_constantBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
+
     if (SUCCEEDED (hr))
     {
         ConstantBufferData* cbData = reinterpret_cast<ConstantBufferData*> (mappedResource.pData);
@@ -1567,6 +1587,196 @@ Error:
 
 ////////////////////////////////////////////////////////////////////////////////
 //
+//  RenderSystem::CodepointToUtf16
+//
+//  Converts a Unicode codepoint to a UTF-16 wchar_t string.
+//  Returns the number of wchar_t units written (1 for BMP, 2 for surrogate).
+//
+////////////////////////////////////////////////////////////////////////////////
+
+int RenderSystem::CodepointToUtf16 (uint32_t codepoint, wchar_t * glyphStr)
+{
+    int glyphLen = 0;
+
+
+
+    glyphStr[0] = L'\0';
+    glyphStr[1] = L'\0';
+    glyphStr[2] = L'\0';
+
+    if (codepoint <= 0xFFFF)
+    {
+        glyphStr[0] = static_cast<wchar_t> (codepoint);
+        glyphLen    = 1;
+    }
+    else
+    {
+        glyphStr[0] = static_cast<wchar_t> (0xD800 + ((codepoint - 0x10000) >> 10));
+        glyphStr[1] = static_cast<wchar_t> (0xDC00 + ((codepoint - 0x10000) & 0x3FF));
+        glyphLen    = 2;
+    }
+
+    return glyphLen;
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  RenderSystem::DrawFeatheredBackground
+//
+//  Draws a feathered dark background with expanding layers of decreasing
+//  opacity, plus a solid dark center.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+void RenderSystem::DrawFeatheredBackground (const D2D1_RECT_F & boundingRect)
+{
+    const int   featherLayers = 12;
+    const float maxExpand     = 20.0f;
+
+
+
+    for (int i = featherLayers; i > 0; --i)
+    {
+        float expand  = maxExpand * (static_cast<float>(i) / static_cast<float>(featherLayers));
+        float opacity = 0.7f * (1.0f - (static_cast<float>(i) / static_cast<float>(featherLayers)));
+
+        D2D1_RECT_F expandedRect = D2D1::RectF (boundingRect.left   - expand,
+                                                boundingRect.top    - expand,
+                                                boundingRect.right  + expand,
+                                                boundingRect.bottom + expand);
+
+        m_fpsGlowBrush->SetColor (D2D1::ColorF (D2D1::ColorF::Black, opacity));
+        m_d2dContext->FillRectangle (expandedRect, m_fpsGlowBrush.Get());
+    }
+
+    // Solid dark center
+    m_fpsGlowBrush->SetColor (D2D1::ColorF (D2D1::ColorF::Black, 0.7f));
+    m_d2dContext->FillRectangle (boundingRect, m_fpsGlowBrush.Get());
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  RenderSystem::DrawCharacterGlow
+//
+//  Draws an 8-directional dark glow around a single character glyph.
+//  Used by overlay renderers for the glow pass.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+void RenderSystem::DrawCharacterGlow (const wchar_t * glyphStr, int glyphLen, const D2D1_RECT_F & charRect, int glowLayers, float opacity)
+{
+    for (int i = glowLayers; i > 0; --i)
+    {
+        float offset    = static_cast<float>(i);
+        float baseAlpha = 0.9f - (static_cast<float>(i) / static_cast<float>(glowLayers));
+
+
+
+        m_fpsGlowBrush->SetColor (D2D1::ColorF (D2D1::ColorF::Black, baseAlpha * opacity));
+
+        for (int dy = -1; dy <= 1; ++dy)
+        {
+            for (int dx = -1; dx <= 1; ++dx)
+            {
+                if (dx == 0 && dy == 0)
+                {
+                    continue;
+                }
+
+                D2D1_RECT_F glowRect = D2D1::RectF (charRect.left   + offset * dx,
+                                                    charRect.top    + offset * dy,
+                                                    charRect.right  + offset * dx,
+                                                    charRect.bottom + offset * dy);
+
+                m_d2dContext->DrawText (glyphStr,
+                                        static_cast<UINT32> (glyphLen),
+                                        m_fpsTextFormat.Get(),
+                                        glowRect,
+                                        m_fpsGlowBrush.Get());
+            }
+        }
+    }
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  RenderSystem::RenderOverlayCharacters
+//
+//  Two-pass character rendering shared by all overlay renderers.
+//  Pass 1 draws dark glow halos; pass 2 draws sweep-colored foreground text.
+//  The caller supplies a lambda that maps each HintCharacter to its D2D rect.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+void RenderSystem::RenderOverlayCharacters (std::span<const HintCharacter> chars,
+                                            std::span<const uint32_t> allGlyphs,
+                                            int glowLayers,
+                                            const std::function<D2D1_RECT_F (const HintCharacter &)> & computeCharRect)
+{
+    // Pass 1: Dark glow — drawn first so adjacent glow layers
+    //         cannot dim already-drawn foreground text.
+    for (const auto & ch : chars)
+    {
+        if (ch.phase == CharPhase::Hidden || ch.opacity <= 0.01f || ch.currentGlyphIndex >= allGlyphs.size())
+        {
+            continue;
+        }
+
+        wchar_t glyphStr[3] = {};
+        int     glyphLen    = CodepointToUtf16 (allGlyphs[ch.currentGlyphIndex], glyphStr);
+
+        D2D1_RECT_F charRect = computeCharRect (ch);
+
+        DrawCharacterGlow (glyphStr, glyphLen, charRect, glowLayers, ch.opacity);
+    }
+
+    // Pass 2: Foreground text.
+    //         Color computed by shared rain-model sweep function.
+    for (const auto & ch : chars)
+    {
+        if (ch.phase == CharPhase::Hidden || ch.opacity <= 0.01f || ch.currentGlyphIndex >= allGlyphs.size())
+        {
+            continue;
+        }
+
+        wchar_t glyphStr[3] = {};
+        int     glyphLen    = CodepointToUtf16 (allGlyphs[ch.currentGlyphIndex], glyphStr);
+
+        D2D1_RECT_F charRect = computeCharRect (ch);
+
+        SweepColor color = ComputeSweepColor (ch.isHead, ch.inStreakZone, ch.streakIntensity, ch.brightenTimer);
+
+        m_fpsBrush->SetColor (D2D1::ColorF (color.r, color.g, color.b, ch.opacity));
+
+        m_d2dContext->DrawText (glyphStr,
+                                static_cast<UINT32> (glyphLen),
+                                m_fpsTextFormat.Get(),
+                                charRect,
+                                m_fpsBrush.Get());
+    }
+
+    // Reset brush color back to white for FPS counter
+    m_fpsBrush->SetColor (D2D1::ColorF (D2D1::ColorF::White, 1.0f));
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
 //  RenderSystem::RenderHelpHintOverlay
 //
 //  Renders the help hint overlay using D2D/DirectWrite.
@@ -1577,198 +1787,45 @@ Error:
 
 void RenderSystem::RenderHelpHintOverlay (const HelpHintOverlay & overlay)
 {
-    HRESULT                   hr      = S_OK;
-    bool                      drawing = false;
+    constexpr float CHAR_WIDTH   = HelpHintOverlay::CHAR_WIDTH;
+    constexpr float CHAR_HEIGHT  = HelpHintOverlay::CHAR_HEIGHT;
+    constexpr float PADDING      = HelpHintOverlay::PADDING;
+    constexpr int   MARGIN_COLS  = HelpHintOverlay::MARGIN_COLS;
+    constexpr float EDGE_PADDING = std::max (0.0f, PADDING - MARGIN_COLS * CHAR_WIDTH);
+
+    HRESULT                        hr           = S_OK;
+    bool                           drawing      = false;
     std::span<const HintCharacter> chars;
-    int                       rows    = 0;
-    int                       cols    = 0;
-    D2D1_RECT_F               boundingRect = {};
-    std::vector<uint32_t>     allGlyphs;
+    D2D1_RECT_F                    boundingRect = {};
+    float                          baseX        = 0.0f;
+    float                          baseY        = 0.0f;
 
 
 
     CBRAEx (m_d2dContext && m_fpsBrush && m_fpsTextFormat && m_fpsGlowBrush && m_dwriteFactory, E_UNEXPECTED);
 
     chars = overlay.GetCharacters();
-    rows  = overlay.GetRows();
-    cols  = overlay.GetCols();
-
     BAIL_OUT_IF (chars.empty(), S_OK);
 
     m_d2dContext->BeginDraw();
     drawing = true;
 
-    //
-    // Get the bounding rect and draw a feathered dark background
-    //
-
     boundingRect = overlay.GetBoundingRect();
+    DrawFeatheredBackground (boundingRect);
 
-    {
-        const int   featherLayers = 12;
-        const float maxExpand     = 20.0f;
+    baseX = boundingRect.left + EDGE_PADDING;
+    baseY = boundingRect.top  + PADDING;
 
-        for (int i = featherLayers; i > 0; --i)
+    RenderOverlayCharacters (chars, overlay.GetAllGlyphs(), HelpHintOverlay::GLOW_LAYERS,
+        [baseX, baseY] (const HintCharacter & ch) -> D2D1_RECT_F
         {
-            float expand  = maxExpand * (static_cast<float>(i) / static_cast<float>(featherLayers));
-            float opacity = 0.7f * (1.0f - (static_cast<float>(i) / static_cast<float>(featherLayers)));
-
-            D2D1_RECT_F expandedRect = D2D1::RectF (boundingRect.left   - expand,
-                                                      boundingRect.top    - expand,
-                                                      boundingRect.right  + expand,
-                                                      boundingRect.bottom + expand);
-
-            m_fpsGlowBrush->SetColor (D2D1::ColorF (D2D1::ColorF::Black, opacity));
-            m_d2dContext->FillRectangle (expandedRect, m_fpsGlowBrush.Get());
-        }
-
-        // Solid dark center
-        m_fpsGlowBrush->SetColor (D2D1::ColorF (D2D1::ColorF::Black, 0.7f));
-        m_d2dContext->FillRectangle (boundingRect, m_fpsGlowBrush.Get());
-    }
-
-    //
-    // Render each non-hidden character (two-pass for glow + foreground)
-    //
-
-    {
-        constexpr float CHAR_WIDTH  = HelpHintOverlay::CHAR_WIDTH;
-        constexpr float CHAR_HEIGHT = HelpHintOverlay::CHAR_HEIGHT;
-        constexpr float PADDING     = HelpHintOverlay::PADDING;
-        constexpr int   GLOW_LAYERS = HelpHintOverlay::GLOW_LAYERS;
-        constexpr int   MARGIN_COLS = HelpHintOverlay::MARGIN_COLS;
-
-        // Get the all-glyphs list for codepoint lookup
-        // Use the overlay's glyph set (which includes any extra characters
-        // like '?' appended during construction) rather than the base set.
-        auto glyphSpan = overlay.GetAllGlyphs();
-        allGlyphs.assign (glyphSpan.begin(), glyphSpan.end());
-
-        float edgePadding = std::max (0.0f, PADDING - MARGIN_COLS * CHAR_WIDTH);
-        float baseX       = boundingRect.left + edgePadding;
-        float baseY       = boundingRect.top  + PADDING;
-
-        // Pass 1: Dark glow halos — drawn first so adjacent glow layers
-        //         cannot dim already-drawn foreground text.
-        for (const auto & ch : chars)
-        {
-            if (ch.phase == CharPhase::Hidden || ch.opacity <= 0.01f || ch.currentGlyphIndex >= allGlyphs.size())
-            {
-                continue;
-            }
-
-            uint32_t codepoint = 0;
-
-            if (ch.currentGlyphIndex < allGlyphs.size())
-            {
-                codepoint = allGlyphs[ch.currentGlyphIndex];
-            }
-
-            wchar_t glyphStr[3] = {};
-            int     glyphLen    = 0;
-
-            if (codepoint <= 0xFFFF)
-            {
-                glyphStr[0] = static_cast<wchar_t>(codepoint);
-                glyphLen    = 1;
-            }
-            else
-            {
-                glyphStr[0] = static_cast<wchar_t>(0xD800 + ((codepoint - 0x10000) >> 10));
-                glyphStr[1] = static_cast<wchar_t>(0xDC00 + ((codepoint - 0x10000) & 0x3FF));
-                glyphLen    = 2;
-            }
-
             float charX = baseX + ch.col * CHAR_WIDTH;
             float charY = baseY + ch.row * CHAR_HEIGHT;
 
-            D2D1_RECT_F charRect = D2D1::RectF (charX, charY, charX + CHAR_WIDTH, charY + CHAR_HEIGHT);
+            return D2D1::RectF (charX, charY, charX + CHAR_WIDTH, charY + CHAR_HEIGHT);
+        });
 
-            for (int i = GLOW_LAYERS; i > 0; --i)
-            {
-                float offset    = static_cast<float>(i);
-                float baseAlpha = 0.9f - (static_cast<float>(i) / static_cast<float>(GLOW_LAYERS));
 
-                m_fpsGlowBrush->SetColor (D2D1::ColorF (D2D1::ColorF::Black, baseAlpha * ch.opacity));
-
-                for (int dy = -1; dy <= 1; ++dy)
-                {
-                    for (int dx = -1; dx <= 1; ++dx)
-                    {
-                        if (dx == 0 && dy == 0)
-                        {
-                            continue;
-                        }
-
-                        D2D1_RECT_F glowRect = D2D1::RectF (charRect.left   + offset * dx,
-                                                              charRect.top    + offset * dy,
-                                                              charRect.right  + offset * dx,
-                                                              charRect.bottom + offset * dy);
-
-                        m_d2dContext->DrawText (glyphStr,
-                                                static_cast<UINT32>(glyphLen),
-                                                m_fpsTextFormat.Get(),
-                                                glowRect,
-                                                m_fpsGlowBrush.Get());
-                    }
-                }
-            }
-        }
-
-        // Pass 2: Foreground text with green→white color fade.
-        //         glowIntensity = 1.0 at reveal (green) → 0.0 settled (white).
-        for (const auto & ch : chars)
-        {
-            if (ch.phase == CharPhase::Hidden || ch.opacity <= 0.01f || ch.currentGlyphIndex >= allGlyphs.size())
-            {
-                continue;
-            }
-
-            uint32_t codepoint = 0;
-
-            if (ch.currentGlyphIndex < allGlyphs.size())
-            {
-                codepoint = allGlyphs[ch.currentGlyphIndex];
-            }
-
-            wchar_t glyphStr[3] = {};
-            int     glyphLen    = 0;
-
-            if (codepoint <= 0xFFFF)
-            {
-                glyphStr[0] = static_cast<wchar_t>(codepoint);
-                glyphLen    = 1;
-            }
-            else
-            {
-                glyphStr[0] = static_cast<wchar_t>(0xD800 + ((codepoint - 0x10000) >> 10));
-                glyphStr[1] = static_cast<wchar_t>(0xDC00 + ((codepoint - 0x10000) & 0x3FF));
-                glyphLen    = 2;
-            }
-
-            float charX = baseX + ch.col * CHAR_WIDTH;
-            float charY = baseY + ch.row * CHAR_HEIGHT;
-
-            D2D1_RECT_F charRect = D2D1::RectF (charX, charY, charX + CHAR_WIDTH, charY + CHAR_HEIGHT);
-
-            // Lerp from green (just revealed) to white (settled)
-            float glow = ch.glowIntensity;
-            float r    = 1.0f - glow;
-            float g    = 1.0f - 0.2f * glow;
-            float b    = 1.0f - glow;
-
-            m_fpsBrush->SetColor (D2D1::ColorF (r, g, b, ch.opacity));
-
-            m_d2dContext->DrawText (glyphStr,
-                                    static_cast<UINT32>(glyphLen),
-                                    m_fpsTextFormat.Get(),
-                                    charRect,
-                                    m_fpsBrush.Get());
-        }
-
-        // Reset brush color back to white for FPS counter
-        m_fpsBrush->SetColor (D2D1::ColorF (D2D1::ColorF::White, 1.0f));
-    }
 
 Error:
     if (drawing)
@@ -1871,6 +1928,141 @@ void RenderSystem::ComputeHotkeyOverlayLayout (HotkeyOverlay & overlay, float vi
 
 
 
+////////////////////////////////////////////////////////////////////////////////
+//
+//  HotkeyColumnLayout — Pre-computed column geometry for hotkey overlay.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+struct HotkeyColumnLayout
+{
+    float baseX             = 0.0f;
+    float baseY             = 0.0f;
+    float padding           = 0.0f;
+    float gap               = 0.0f;
+    float rowHeight         = 0.0f;
+    float keyColPixelWidth  = 0.0f;
+    float descColPixelWidth = 0.0f;
+    float keyCharWidth      = 0.0f;
+    float descCharWidth     = 0.0f;
+    float marginCharWidth   = 0.0f;
+    float gapCharWidth      = 0.0f;
+    int   keyStart          = 0;
+    int   gapStart          = 0;
+    int   descStart         = 0;
+    int   descEnd           = 0;
+};
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  ComputeHotkeyCharRect
+//
+//  Maps a HintCharacter's grid position to a D2D pixel rect using the
+//  pre-computed column layout.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+static D2D1_RECT_F ComputeHotkeyCharRect (const HotkeyColumnLayout & layout, const HintCharacter & ch)
+{
+    float charX = 0.0f;
+    float charW = 0.0f;
+    float charY = layout.baseY + static_cast<float> (ch.row) * layout.rowHeight;
+
+
+
+    if (ch.col < layout.keyStart)
+    {
+        charX = layout.baseX + static_cast<float> (ch.col) * layout.marginCharWidth;
+        charW = layout.marginCharWidth;
+    }
+    else if (ch.col < layout.gapStart)
+    {
+        charX = layout.baseX + layout.padding + static_cast<float> (ch.col - layout.keyStart) * layout.keyCharWidth;
+        charW = layout.keyCharWidth;
+    }
+    else if (ch.col < layout.descStart)
+    {
+        charX = layout.baseX + layout.padding + layout.keyColPixelWidth + static_cast<float> (ch.col - layout.gapStart) * layout.gapCharWidth;
+        charW = layout.gapCharWidth;
+    }
+    else if (ch.col < layout.descEnd)
+    {
+        charX = layout.baseX + layout.padding + layout.keyColPixelWidth + layout.gap + static_cast<float> (ch.col - layout.descStart) * layout.descCharWidth;
+        charW = layout.descCharWidth;
+    }
+    else
+    {
+        charX = layout.baseX + layout.padding + layout.keyColPixelWidth + layout.gap + layout.descColPixelWidth + static_cast<float> (ch.col - layout.descEnd) * layout.marginCharWidth;
+        charW = layout.marginCharWidth;
+    }
+
+    return D2D1::RectF (charX, charY, charX + charW, charY + layout.rowHeight);
+}
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  ComputeHotkeyColumnLayout
+//
+//  Populates a HotkeyColumnLayout from the overlay's bounding rect, measured
+//  key-column width, and hotkey entry sizes.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+static HotkeyColumnLayout ComputeHotkeyColumnLayout (const HotkeyOverlay & overlay)
+{
+    constexpr float PADDING     = HotkeyOverlay::PADDING;
+    constexpr float GAP         = HotkeyOverlay::GAP;
+    constexpr int   MARGIN_COLS = HotkeyOverlay::MARGIN_COLS;
+
+    HotkeyColumnLayout layout;
+    D2D1_RECT_F        boundingRect = overlay.GetBoundingRect();
+    int                cols         = overlay.GetCols();
+    int                maxKeyChars  = 0;
+    int                maxDescChars = 0;
+    int                gapChars     = 0;
+    float              contentWidth = 0.0f;
+
+
+
+    layout.baseX            = boundingRect.left;
+    layout.baseY            = boundingRect.top + PADDING;
+    layout.padding          = PADDING;
+    layout.gap              = GAP;
+    layout.rowHeight        = HotkeyOverlay::ROW_HEIGHT;
+    layout.keyColPixelWidth = overlay.GetKeyColumnWidth();
+
+    for (const auto & entry : overlay.GetHotkeys())
+    {
+        maxKeyChars  = std::max (maxKeyChars,  static_cast<int> (entry.keyName.size()));
+        maxDescChars = std::max (maxDescChars, static_cast<int> (entry.description.size()));
+    }
+
+    gapChars     = cols - 2 * MARGIN_COLS - maxKeyChars - maxDescChars;
+    contentWidth = boundingRect.right - boundingRect.left;
+
+    layout.keyCharWidth      = (maxKeyChars  > 0) ? layout.keyColPixelWidth / static_cast<float> (maxKeyChars)   : 0.0f;
+    layout.descColPixelWidth = contentWidth - PADDING - layout.keyColPixelWidth - GAP - PADDING;
+    layout.descCharWidth     = (maxDescChars > 0) ? layout.descColPixelWidth / static_cast<float> (maxDescChars) : 0.0f;
+    layout.marginCharWidth   = (MARGIN_COLS  > 0) ? PADDING / static_cast<float> (MARGIN_COLS)                   : 0.0f;
+    layout.gapCharWidth      = (gapChars     > 0) ? GAP / static_cast<float> (gapChars)                          : 0.0f;
+
+    layout.keyStart  = MARGIN_COLS;
+    layout.gapStart  = MARGIN_COLS + maxKeyChars;
+    layout.descStart = MARGIN_COLS + maxKeyChars + gapChars;
+    layout.descEnd   = MARGIN_COLS + maxKeyChars + gapChars + maxDescChars;
+
+    return layout;
+}
+
+
+
+
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -1884,324 +2076,42 @@ void RenderSystem::ComputeHotkeyOverlayLayout (HotkeyOverlay & overlay, float vi
 
 void RenderSystem::RenderHotkeyOverlay (const HotkeyOverlay & overlay)
 {
-    HRESULT                        hr      = S_OK;
-    bool                           drawing = false;
+    HRESULT                        hr             = S_OK;
+    bool                           drawing        = false;
     std::span<const HintCharacter> chars;
-    D2D1_RECT_F                    boundingRect = {};
-    std::vector<uint32_t>          allGlyphs;
-    int                            cols         = 0;
-    int                            keyColChars  = 0;
+    HotkeyColumnLayout             columnLayout;
+    DWRITE_TEXT_ALIGNMENT          savedTextAlign = DWRITE_TEXT_ALIGNMENT_LEADING;
+    DWRITE_PARAGRAPH_ALIGNMENT     savedParaAlign = DWRITE_PARAGRAPH_ALIGNMENT_NEAR;
 
 
 
     CBRAEx (m_d2dContext && m_fpsBrush && m_fpsTextFormat && m_fpsGlowBrush && m_dwriteFactory, E_UNEXPECTED);
 
     chars = overlay.GetCharacters();
-    cols  = overlay.GetCols();
-
     BAIL_OUT_IF (chars.empty(), S_OK);
 
-    boundingRect = overlay.GetBoundingRect();
-
-    // Determine key column character count from the overlay's internal layout
-    keyColChars = static_cast<int> (overlay.GetKeyColumnWidth());
+    columnLayout = ComputeHotkeyColumnLayout (overlay);
 
     m_d2dContext->BeginDraw();
     drawing = true;
 
-    //
-    // Feathered dark background
-    //
+    DrawFeatheredBackground (overlay.GetBoundingRect());
 
-    {
-        const int   featherLayers = 12;
-        const float maxExpand     = 20.0f;
+    // Save and set text format
+    savedTextAlign = m_fpsTextFormat->GetTextAlignment();
+    savedParaAlign = m_fpsTextFormat->GetParagraphAlignment();
 
-        for (int i = featherLayers; i > 0; --i)
-        {
-            float expand     = maxExpand * (static_cast<float>(i) / static_cast<float>(featherLayers));
-            float layerAlpha = 0.7f * (1.0f - (static_cast<float>(i) / static_cast<float>(featherLayers)));
+    m_fpsTextFormat->SetTextAlignment (DWRITE_TEXT_ALIGNMENT_LEADING);
+    m_fpsTextFormat->SetParagraphAlignment (DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
+    m_fpsTextFormat->SetWordWrapping (DWRITE_WORD_WRAPPING_NO_WRAP);
 
-            D2D1_RECT_F expandedRect = D2D1::RectF (boundingRect.left   - expand,
-                                                      boundingRect.top    - expand,
-                                                      boundingRect.right  + expand,
-                                                      boundingRect.bottom + expand);
+    RenderOverlayCharacters (chars, overlay.GetAllGlyphs(), HotkeyOverlay::GLOW_LAYERS,
+        [&columnLayout] (const HintCharacter & ch) { return ComputeHotkeyCharRect (columnLayout, ch); });
 
-            m_fpsGlowBrush->SetColor (D2D1::ColorF (D2D1::ColorF::Black, layerAlpha));
-            m_d2dContext->FillRectangle (expandedRect, m_fpsGlowBrush.Get());
-        }
-
-        // Solid dark center
-        m_fpsGlowBrush->SetColor (D2D1::ColorF (D2D1::ColorF::Black, 0.7f));
-        m_d2dContext->FillRectangle (boundingRect, m_fpsGlowBrush.Get());
-    }
-
-    //
-    // Render each non-hidden character (two-pass for glow + foreground)
-    //
-
-    {
-        constexpr float ROW_HEIGHT  = HotkeyOverlay::ROW_HEIGHT;
-        constexpr float PADDING     = HotkeyOverlay::PADDING;
-        constexpr float GAP         = HotkeyOverlay::GAP;
-        constexpr int   GLOW_LAYERS = HotkeyOverlay::GLOW_LAYERS;
-        constexpr int   MARGIN_COLS = HotkeyOverlay::MARGIN_COLS;
-
-        // Use the DWrite-measured key column pixel width for positioning
-        float keyColPixelWidth = overlay.GetKeyColumnWidth();
-
-        // Get the all-glyphs list for codepoint lookup
-        auto glyphSpan = overlay.GetAllGlyphs();
-        allGlyphs.assign (glyphSpan.begin(), glyphSpan.end());
-
-        float baseX = boundingRect.left;
-        float baseY = boundingRect.top  + PADDING;
-
-        // Measure the average character width for key and desc columns
-        float keyCharWidth  = 0.0f;
-        float descCharWidth = 0.0f;
-
-        // Key column: compute char width from measured pixel width / max key chars
-        const auto & hotkeys = overlay.GetHotkeys();
-
-        int maxKeyChars  = 0;
-        int maxDescChars = 0;
-
-        for (const auto & entry : hotkeys)
-        {
-            maxKeyChars  = std::max (maxKeyChars,  static_cast<int> (entry.keyName.size()));
-            maxDescChars = std::max (maxDescChars, static_cast<int> (entry.description.size()));
-        }
-
-        int gapChars = cols - 2 * MARGIN_COLS - maxKeyChars - maxDescChars;
-
-        // Total content width for computing margin char width
-        float contentWidth = boundingRect.right - boundingRect.left;
-
-        if (maxKeyChars > 0)
-        {
-            keyCharWidth = keyColPixelWidth / static_cast<float> (maxKeyChars);
-        }
-
-        // Measure desc column pixel width
-        float descColPixelWidth = contentWidth - PADDING - keyColPixelWidth - GAP - PADDING;
-
-        if (maxDescChars > 0)
-        {
-            descCharWidth = descColPixelWidth / static_cast<float> (maxDescChars);
-        }
-
-        // Margin char width: spread PADDING across margin columns
-        float marginCharWidth = (MARGIN_COLS > 0)
-                              ? PADDING / static_cast<float> (MARGIN_COLS)
-                              : 0.0f;
-
-        // Gap char width: spread GAP across gap columns
-        float gapCharWidth = (gapChars > 0)
-                           ? GAP / static_cast<float> (gapChars)
-                           : 0.0f;
-
-        // Save and set text format
-        DWRITE_TEXT_ALIGNMENT      savedTextAlign = m_fpsTextFormat->GetTextAlignment();
-        DWRITE_PARAGRAPH_ALIGNMENT savedParaAlign = m_fpsTextFormat->GetParagraphAlignment();
-
-        m_fpsTextFormat->SetTextAlignment (DWRITE_TEXT_ALIGNMENT_LEADING);
-        m_fpsTextFormat->SetParagraphAlignment (DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
-        m_fpsTextFormat->SetWordWrapping (DWRITE_WORD_WRAPPING_NO_WRAP);
-
-        // Column zone boundaries (in grid col indices, accounting for margin)
-        int keyStart  = MARGIN_COLS;
-        int gapStart  = MARGIN_COLS + maxKeyChars;
-        int descStart = MARGIN_COLS + maxKeyChars + gapChars;
-        int descEnd   = MARGIN_COLS + maxKeyChars + gapChars + maxDescChars;
-
-        // Helper: compute horizontal position and width for any column index
-        auto ComputeCharXAndWidth = [&] (int col, float & outX, float & outW)
-        {
-            if (col < keyStart)
-            {
-                // Left margin
-                outX = baseX + static_cast<float> (col) * marginCharWidth;
-                outW = marginCharWidth;
-            }
-            else if (col < gapStart)
-            {
-                // Key column
-                int keyCol = col - keyStart;
-
-                outX = baseX + PADDING + static_cast<float> (keyCol) * keyCharWidth;
-                outW = keyCharWidth;
-            }
-            else if (col < descStart)
-            {
-                // Gap column
-                int gCol = col - gapStart;
-
-                outX = baseX + PADDING + keyColPixelWidth + static_cast<float> (gCol) * gapCharWidth;
-                outW = gapCharWidth;
-            }
-            else if (col < descEnd)
-            {
-                // Description column
-                int descCol = col - descStart;
-
-                outX = baseX + PADDING + keyColPixelWidth + GAP + static_cast<float> (descCol) * descCharWidth;
-                outW = descCharWidth;
-            }
-            else
-            {
-                // Right margin
-                int rMargin = col - descEnd;
-
-                outX = baseX + PADDING + keyColPixelWidth + GAP + descColPixelWidth + static_cast<float> (rMargin) * marginCharWidth;
-                outW = marginCharWidth;
-            }
-        };
-
-        // Pass 1: Dark glow halos
-        for (const auto & ch : chars)
-        {
-            if (ch.phase == CharPhase::Hidden || ch.opacity <= 0.01f || ch.currentGlyphIndex >= allGlyphs.size())
-            {
-                continue;
-            }
-
-            uint32_t codepoint = 0;
-
-            if (ch.currentGlyphIndex < allGlyphs.size())
-            {
-                codepoint = allGlyphs[ch.currentGlyphIndex];
-            }
-
-            wchar_t glyphStr[3] = {};
-            int     glyphLen    = 0;
-
-            if (codepoint <= 0xFFFF)
-            {
-                glyphStr[0] = static_cast<wchar_t> (codepoint);
-                glyphLen    = 1;
-            }
-            else
-            {
-                glyphStr[0] = static_cast<wchar_t> (0xD800 + ((codepoint - 0x10000) >> 10));
-                glyphStr[1] = static_cast<wchar_t> (0xDC00 + ((codepoint - 0x10000) & 0x3FF));
-                glyphLen    = 2;
-            }
-
-            // Determine column position
-            float charX     = 0.0f;
-            float charWidth = 0.0f;
-
-            ComputeCharXAndWidth (ch.col, charX, charWidth);
-
-            float charY = baseY + static_cast<float> (ch.row) * ROW_HEIGHT;
-
-            D2D1_RECT_F charRect = D2D1::RectF (charX, charY, charX + charWidth, charY + ROW_HEIGHT);
-
-            for (int i = GLOW_LAYERS; i > 0; --i)
-            {
-                float offset    = static_cast<float>(i);
-                float baseAlpha = 0.9f - (static_cast<float>(i) / static_cast<float>(GLOW_LAYERS));
-
-                m_fpsGlowBrush->SetColor (D2D1::ColorF (D2D1::ColorF::Black, baseAlpha * ch.opacity));
-
-                for (int dy = -1; dy <= 1; ++dy)
-                {
-                    for (int dx = -1; dx <= 1; ++dx)
-                    {
-                        if (dx == 0 && dy == 0)
-                        {
-                            continue;
-                        }
-
-                        D2D1_RECT_F glowRect = D2D1::RectF (charRect.left   + offset * dx,
-                                                              charRect.top    + offset * dy,
-                                                              charRect.right  + offset * dx,
-                                                              charRect.bottom + offset * dy);
-
-                        m_d2dContext->DrawText (glyphStr,
-                                                static_cast<UINT32> (glyphLen),
-                                                m_fpsTextFormat.Get(),
-                                                glowRect,
-                                                m_fpsGlowBrush.Get());
-                    }
-                }
-            }
-        }
-
-        // Pass 2: Foreground text with green→white color fade
-        for (const auto & ch : chars)
-        {
-            if (ch.phase == CharPhase::Hidden || ch.opacity <= 0.01f || ch.currentGlyphIndex >= allGlyphs.size())
-            {
-                continue;
-            }
-
-            uint32_t codepoint = 0;
-
-            if (ch.currentGlyphIndex < allGlyphs.size())
-            {
-                codepoint = allGlyphs[ch.currentGlyphIndex];
-            }
-
-            wchar_t glyphStr[3] = {};
-            int     glyphLen    = 0;
-
-            if (codepoint <= 0xFFFF)
-            {
-                glyphStr[0] = static_cast<wchar_t> (codepoint);
-                glyphLen    = 1;
-            }
-            else
-            {
-                glyphStr[0] = static_cast<wchar_t> (0xD800 + ((codepoint - 0x10000) >> 10));
-                glyphStr[1] = static_cast<wchar_t> (0xDC00 + ((codepoint - 0x10000) & 0x3FF));
-                glyphLen    = 2;
-            }
-
-            // Determine column position and color
-            float charX     = 0.0f;
-            float charWidth = 0.0f;
-
-            ComputeCharXAndWidth (ch.col, charX, charWidth);
-
-            // Color: key column gets green→white fade, desc column is white,
-            //        margin/gap/space positions use green→white (sweep color)
-            bool isDescColumn = (ch.col >= descStart && ch.col < descEnd);
-
-            if (isDescColumn && !ch.isSpace)
-            {
-                m_fpsBrush->SetColor (D2D1::ColorF (D2D1::ColorF::White, ch.opacity));
-            }
-            else
-            {
-                float glow = ch.glowIntensity;
-                float r    = 1.0f - glow;
-                float g    = 1.0f - 0.1f * glow;
-                float b    = 1.0f - glow;
-
-                m_fpsBrush->SetColor (D2D1::ColorF (r, g, b, ch.opacity));
-            }
-
-            float charY = baseY + static_cast<float> (ch.row) * ROW_HEIGHT;
-
-            D2D1_RECT_F charRect = D2D1::RectF (charX, charY, charX + charWidth, charY + ROW_HEIGHT);
-
-            m_d2dContext->DrawText (glyphStr,
-                                    static_cast<UINT32> (glyphLen),
-                                    m_fpsTextFormat.Get(),
-                                    charRect,
-                                    m_fpsBrush.Get());
-        }
-
-        // Restore text format settings
-        m_fpsTextFormat->SetTextAlignment (savedTextAlign);
-        m_fpsTextFormat->SetParagraphAlignment (savedParaAlign);
-        m_fpsTextFormat->SetWordWrapping (DWRITE_WORD_WRAPPING_WRAP);
-
-        // Reset brush color back to white
-        m_fpsBrush->SetColor (D2D1::ColorF (D2D1::ColorF::White, 1.0f));
-    }
+    // Restore text format settings
+    m_fpsTextFormat->SetTextAlignment (savedTextAlign);
+    m_fpsTextFormat->SetParagraphAlignment (savedParaAlign);
+    m_fpsTextFormat->SetWordWrapping (DWRITE_WORD_WRAPPING_WRAP);
 
 Error:
     if (drawing)
@@ -2488,10 +2398,11 @@ void RenderSystem::ReleaseDirectXResources()
 
 HRESULT RenderSystem::RecreateDirect2DBitmap()
 {
-    HRESULT                                  hr = S_OK;
+    HRESULT                                  hr          = S_OK;
     Microsoft::WRL::ComPtr<ID3D11Texture2D>  backBuffer;
     Microsoft::WRL::ComPtr<IDXGISurface>     dxgiSurface;
     D2D1_BITMAP_PROPERTIES1                  bitmapProps;
+
 
 
     if (!m_d2dContext)

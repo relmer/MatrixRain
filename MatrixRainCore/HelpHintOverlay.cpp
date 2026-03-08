@@ -2,6 +2,8 @@
 
 #include "HelpHintOverlay.h"
 
+#include "SweepCommon.h"
+
 
 
 
@@ -246,8 +248,6 @@ void HelpHintOverlay::Update (float deltaTime)
 {
     m_sweep.Update (deltaTime);
 
-    SweepPhase sweepPhase = m_sweep.GetPhase();
-
     // Pass 1: update phase, opacity, glow for each character.
     for (auto & ch : m_chars)
     {
@@ -256,6 +256,11 @@ void HelpHintOverlay::Update (float deltaTime)
                        : 0.0f;
 
         float opacity = m_sweep.GetOpacity (ch.row, normCol);
+
+        // Reset streak fields each frame
+        ch.inStreakZone    = false;
+        ch.streakIntensity = 0.0f;
+        ch.isHead          = false;
 
         if (opacity > 0.0f)
         {
@@ -278,59 +283,8 @@ void HelpHintOverlay::Update (float deltaTime)
         }
     }
 
-    // Pass 2: determine which glyph to display.
-    //
-    //  During Revealing: a long streak of random glyphs sweeps left-to-right.
-    //  The head position extends past the grid edge so characters at the
-    //  right side correctly settle to their target glyph.
-    //
-    //  During Dismissing: a long streak of random glyphs sweeps
-    //  right-to-left before characters fade out.
-    //
-    //  Otherwise: all non-space characters show their target glyph.
-
-    float streakLen = static_cast<float>(m_cols);
-
-    for (auto & ch : m_chars)
-    {
-        if (ch.phase != CharPhase::Resolved)
-        {
-            continue;
-        }
-
-        bool inStreakZone = false;
-
-        if (sweepPhase == SweepPhase::Revealing)
-        {
-            float revealProg = m_sweep.GetRevealProgress (ch.row);
-            float headPos    = revealProg * (static_cast<float>(m_cols - 1) + streakLen);
-            float dist       = headPos - static_cast<float>(ch.col);
-
-            inStreakZone = (dist >= 0.0f && dist < streakLen);
-        }
-        else if (sweepPhase == SweepPhase::Dismissing)
-        {
-            float dismissProg = m_sweep.GetDismissProgress (ch.row);
-            // Right-to-left: head starts at rightmost column and moves left
-            float headPos     = static_cast<float>(m_cols - 1) - dismissProg * (static_cast<float>(m_cols - 1) + streakLen);
-            float dist        = static_cast<float>(ch.col) - headPos;
-
-            inStreakZone = (dist >= 0.0f && dist < streakLen);
-        }
-
-        if (inStreakZone)
-        {
-            ch.currentGlyphIndex = ch.randomGlyphIndex;
-        }
-        else if (ch.isSpace)
-        {
-            ch.currentGlyphIndex = SIZE_MAX;
-        }
-        else
-        {
-            ch.currentGlyphIndex = ch.targetGlyphIndex;
-        }
-    }
+    // Pass 2: streak detection, glyph selection, brightness computation.
+    UpdateSweepStreaks (std::span<HintCharacter>(m_chars), m_cols, m_sweep, m_allGlyphs.size(), deltaTime);
 }
 
 

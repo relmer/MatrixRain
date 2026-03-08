@@ -6,6 +6,7 @@
 
 #include "AnimationSystem.h"
 #include "CharacterInstance.h"
+#include "HelpHintOverlay.h"
 #include "Viewport.h"
 #include "ColorScheme.h"
 
@@ -195,12 +196,16 @@ private:
     void    RenderHelpHintOverlay    (const HelpHintOverlay & overlay);
     void    RenderHotkeyOverlay      (const HotkeyOverlay & overlay);
     void    DrawFeatheredGlow        (const wchar_t * fpsText, UINT32 textLength, const D2D1_RECT_F & textRect);
+    void    DrawFeatheredBackground  (const D2D1_RECT_F & boundingRect);
+    void    DrawCharacterGlow        (const wchar_t * glyphStr, int glyphLen, const D2D1_RECT_F & charRect, int glowLayers, float opacity);
+    void    RenderOverlayCharacters  (std::span<const HintCharacter> chars, std::span<const uint32_t> allGlyphs, int glowLayers, const std::function<D2D1_RECT_F (const HintCharacter &)> & computeCharRect);
     void    RenderDebugFadeTimes     (const AnimationSystem & animationSystem);
     HRESULT ApplyBloom();
     void    RenderFullscreenPass     (ID3D11RenderTargetView * pRenderTarget, ID3D11PixelShader * pPixelShader, ID3D11ShaderResourceView * const * ppShaderResources, UINT numResources);
     void    SetRenderPipelineState   (ID3D11InputLayout * pInputLayout, D3D11_PRIMITIVE_TOPOLOGY topology, ID3D11Buffer * pVertexBuffer, UINT stride, ID3D11VertexShader * pVertexShader, ID3D11Buffer * pConstantBuffer, ID3D11PixelShader * pPixelShader);
     void    SetViewport              (UINT width, UINT height);
     
+    static int  CodepointToUtf16           (uint32_t codepoint, wchar_t * glyphStr);
     static void BuildCharacterInstanceData (const CharacterInstance & character, const Vector3 & streakPos, const Color4 & schemeColor, CharacterInstanceData & data);
 
     // Resource cleanup helpers

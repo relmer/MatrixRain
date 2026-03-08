@@ -55,9 +55,13 @@ struct HintCharacter
     CharPhase phase             = CharPhase::Hidden;
     float     opacity           = 0.0f;
     float     glowIntensity     = 0.0f;
+    float     brightenTimer     = 0.0f;
+    float     streakIntensity   = 0.0f;
     int       row               = 0;
     int       col               = 0;
     bool      isSpace           = false;
+    bool      inStreakZone      = false;
+    bool      isHead            = false;
 };
 
 
