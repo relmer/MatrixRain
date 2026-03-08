@@ -51,7 +51,11 @@ if ($content -match '#define VERSION_BUILD (\d+)') {
     $buildNumber = [int]$matches[1] + 1
     $newContent = $content -replace '#define VERSION_BUILD \d+', "#define VERSION_BUILD $buildNumber"
 
-    # Update the year
+    # Update the year (only report if it actually changed)
+    $yearChanged = $false
+    if ($content -match '#define VERSION_YEAR (\d+)') {
+        $yearChanged = ([int]$matches[1] -ne $currentYear)
+    }
     $newContent = $newContent -replace '#define VERSION_YEAR \d+', "#define VERSION_YEAR $currentYear"
 
     # Write to temp file first (atomic write pattern)
@@ -82,7 +86,9 @@ if ($content -match '#define VERSION_BUILD (\d+)') {
             Remove-Item $backupFile -Force -ErrorAction SilentlyContinue
 
             Write-Host "Build number incremented to: $buildNumber" -ForegroundColor Green
-            Write-Host "Year updated to: $currentYear" -ForegroundColor Green
+            if ($yearChanged) {
+                Write-Host "Year updated to: $currentYear" -ForegroundColor Green
+            }
             exit 0
         } catch {
             Write-Warning "Attempt $($i + 1) failed: $_"
