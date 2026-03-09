@@ -34,7 +34,6 @@ enum class OverlayPhase
 enum class CharPhase
 {
     Hidden,
-    Resolved,       // Legacy: used by old sweep code (will be removed)
     Cycling,
     LockFlash,
     Settled,
@@ -59,16 +58,12 @@ struct HintCharacter
     CharPhase phase             = CharPhase::Hidden;
     float     opacity           = 0.0f;
     float     glowIntensity     = 0.0f;
-    float     brightenTimer     = 0.0f;
-    float     streakIntensity   = 0.0f;
     float     colorR            = 0.0f;
     float     colorG            = 0.0f;
     float     colorB            = 0.0f;
     int       row               = 0;
     int       col               = 0;
     bool      isSpace           = false;
-    bool      inStreakZone      = false;
-    bool      isHead            = false;
 };
 
 
@@ -128,7 +123,7 @@ private:
     void InitializeCharacters();
 
 
-    // Sweep effect (handles all timing / phase transitions)
+    // Scramble-reveal effect (handles all timing / phase transitions)
     ScrambleRevealEffect                 m_scramble;
 
     // Character grid

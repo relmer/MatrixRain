@@ -79,7 +79,7 @@ namespace MatrixRainTests
 
 
 
-            TEST_METHOD (Show_CharactersInitializedToHiddenForSweep)
+            TEST_METHOD (Show_CharactersInitializedToHiddenForReveal)
             {
                 HotkeyOverlay overlay;
 
@@ -100,7 +100,7 @@ namespace MatrixRainTests
                     }
                 }
 
-                Assert::IsTrue (allHidden, L"Non-space characters should be Hidden (awaiting sweep) after Show");
+                Assert::IsTrue (allHidden, L"Non-space characters should be Hidden (awaiting reveal) after Show");
             }
 
 

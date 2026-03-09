@@ -5,7 +5,7 @@
 
 ## Summary
 
-Add runtime help overlay with matrix rain reveal/dissolve effects (GPU-rendered via D2D/DirectWrite) and command-line help (`/?`/`-?`) via a custom graphical rain dialog window with its own D3D/D2D rendering context. Adds Enter key → config dialog, ? key → in-app hotkey overlay (rendered directly on the main window), unrecognized key → re-show hint. All rendering is GPU-based — no console output, no ANSI escape codes, no `AttachConsole`.
+Add runtime help overlay with matrix rain reveal/dissolve effects (GPU-rendered via D2D/DirectWrite) and command-line help (`/?`/`-?`) via a custom usage dialog window with its own D3D/D2D rendering context. Adds Enter key → config dialog, ? key → in-app hotkey overlay (rendered directly on the main window), unrecognized key → re-show hint. All rendering is GPU-based — no console output, no ANSI escape codes, no `AttachConsole`.
 
 ## Technical Context
 
@@ -15,8 +15,8 @@ Add runtime help overlay with matrix rain reveal/dissolve effects (GPU-rendered 
 **Testing**: Microsoft C++ Native Unit Test Framework (`CppUnitTest.h`), VSTest runner
 **Target Platform**: Windows 11 x64
 **Project Type**: Single solution — 3 projects (MatrixRainCore.lib, MatrixRain.exe, MatrixRainTests.dll)
-**Performance Goals**: 60 FPS render loop unaffected by overlay; graphical rain dialog renders at 60 FPS independently
-**Constraints**: Overlay rendering on render thread under `m_renderMutex`; CLI help (`/?`) runs before main window creation; graphical rain dialog has its own D3D/D2D rendering context
+**Performance Goals**: 60 FPS render loop unaffected by overlay; usage dialog renders at 60 FPS independently
+**Constraints**: Overlay rendering on render thread under `m_renderMutex`; CLI help (`/?`) runs before main window creation; usage dialog has its own D3D/D2D rendering context
 **Scale/Scope**: ~15 FRs, 5 user stories; touches input handling, render system, command-line parser; all new code in MatrixRainCore.lib
 
 ## Constitution Check
@@ -26,10 +26,10 @@ Add runtime help overlay with matrix rain reveal/dissolve effects (GPU-rendered 
 
 | # | Principle | Status | Notes |
 |---|-----------|--------|-------|
-| I | Test-Driven Development | PASS | All new classes (`HelpHintOverlay`, `HelpRainDialog`, `UsageText`) in MatrixRainCore.lib — testable via TDD. Overlay and dialog animation state is pure logic (timers, phase transitions, per-char state) — fully unit-testable without D2D. |
-| II | Performance-First Architecture | PASS | Overlay rendered as part of existing D2D pass after bloom composite — no extra draw calls beyond text rendering. Per-character state is flat arrays (cache-friendly). Graphical rain dialog has its own lightweight D3D/D2D context. `?` key overlay rendered inline in the main render loop. |
+| I | Test-Driven Development | PASS | All new classes (`HelpHintOverlay`, `UsageDialog`, `UsageText`) in MatrixRainCore.lib — testable via TDD. Overlay and dialog animation state is pure logic (timers, phase transitions, per-cell state) — fully unit-testable without D2D. |
+| II | Performance-First Architecture | PASS | Overlay rendered as part of existing D2D pass after bloom composite — no extra draw calls beyond text rendering. Per-character state is flat arrays (cache-friendly). Usage dialog has its own lightweight D3D/D2D context. `?` key overlay rendered inline in the main render loop. |
 | III | C++23 and Windows Native Platform | PASS | Uses C++23, targets Windows 11 x64, Win32 API, D3D11/D2D1 for all rendering. No console output or ANSI escape codes. |
-| IV | Modular Architecture | PASS | New modules: `HelpHintOverlay` (overlay state machine + per-char animation), `HelpRainDialog` (graphical rain dialog renderer), `UsageText` (shared text/layout). Clear boundaries, one responsibility each. No circular deps. |
+| IV | Modular Architecture | PASS | New modules: `HelpHintOverlay` (overlay state machine + per-char animation), `UsageDialog` (usage dialog with scramble-reveal renderer), `UsageText` (shared text/layout). Clear boundaries, one responsibility each. No circular deps. |
 | V | Type Safety and Modern C++ | PASS | `enum class` for overlay phases, `std::optional` for stagger offsets, `std::span` for character grid views, `constexpr` for timing constants. |
 | VI | Library-First Architecture | PASS | All new logic in MatrixRainCore.lib. |
 | VII | Precompiled Headers Strategy | PASS | No new system headers needed — existing pch.h already includes `<chrono>`, `<random>`, `<string>`, `<vector>`, `<algorithm>`, Windows.h, D2D, DirectWrite. |
@@ -48,7 +48,7 @@ specs/003-runtime-help/
 ├── quickstart.md        # Phase 1 output
 ├── contracts/           # Phase 1 output
 │   ├── help-hint-overlay.md
-│   ├── help-rain-dialog.md
+│   ├── usage-dialog.md
 │   ├── usage-text.md
 │   └── command-line-help.md
 ├── checklists/
@@ -61,11 +61,11 @@ specs/003-runtime-help/
 ```text
 MatrixRainCore/                    # Static library — all new feature code here
 ├── HelpHintOverlay.h/cpp          # NEW: Overlay state machine + per-character animation (3-line hint)
-├── HelpRainDialog.h/cpp           # NEW: Custom graphical rain dialog with D3D/D2D rendering (/? only)
+├── UsageDialog.h/cpp             # NEW: Custom usage dialog with D3D/D2D rendering and scramble-reveal (/? only)
 ├── HotkeyOverlay.h/cpp            # NEW: In-app hotkey reference overlay (? key, rendered on main window)
-├── TextSweepEffect.h/cpp          # NEW: Shared per-row horizontal sweep timing oracle (reveal/hold/dismiss)
+├── ScrambleRevealEffect.h/cpp     # NEW: Shared per-cell scramble-reveal timing oracle (reveal/hold/dismiss)
 ├── UsageText.h/cpp                # NEW: Command-line switch text content + formatting
-├── CommandLineHelp.h/cpp          # NEW: /? orchestration — creates HelpRainDialog, exits process
+├── CommandLineHelp.h/cpp          # NEW: /? orchestration — creates UsageDialog, exits process
 ├── UnicodeSymbols.h               # NEW: Named constants for Unicode characters (em dash, etc.)
 ├── ScreenSaverModeParser.h/cpp    # MODIFIED: Add /? parsing, prefix detection
 ├── Application.h/cpp              # MODIFIED: Enter/? keys, overlay show/dismiss
@@ -83,16 +83,16 @@ MatrixRain/                        # Executable — minimal changes
 MatrixRainTests/                   # Test project
 ├── unit/
 │   ├── HelpHintOverlayTests.cpp   # NEW: Overlay state machine tests
-│   ├── HelpRainDialogTests.cpp    # NEW: Reveal queue + animation state tests
+│   ├── UsageDialogTests.cpp       # NEW: Scramble-reveal animation + character position tests
 │   ├── HotkeyOverlayTests.cpp     # NEW: ? key overlay state tests
-│   ├── TextSweepEffectTests.cpp   # NEW: Sweep timing oracle tests
+│   ├── ScrambleRevealEffectTests.cpp  # NEW: Scramble-reveal timing oracle tests
 │   ├── UsageTextTests.cpp          # NEW: Text formatting + prefix detection tests
 │   ├── CommandLineHelpTests.cpp    # NEW: Orchestration tests
 │   └── ...existing tests...
 └── ...existing files...
 ```
 
-**Structure Decision**: Single solution with 3 projects (MatrixRainCore.lib, MatrixRain.exe, MatrixRainTests.dll). All new logic in the core library per Constitution VI. `TextSweepEffect` is the shared timing oracle for all overlay reveal/dismiss animations — drives per-row staggered horizontal sweeps with configurable stagger, duration, fade, and glow parameters. Both `HelpHintOverlay` and `HotkeyOverlay` delegate all timing to `TextSweepEffect` and render characters based on its queries. `HelpRainDialog` creates its own D3D11/D2D rendering context for the graphical rain dialog — independent of the main application's render pipeline. The `?` key hotkey overlay (`HotkeyOverlay`) renders directly on the main window via the existing D2D render pipeline. Six new module pairs (`.h`/`.cpp`) plus `UnicodeSymbols.h` in the core library, six new test files. Minimal changes to the .exe project (main.cpp early exit only).
+**Structure Decision**: Single solution with 3 projects (MatrixRainCore.lib, MatrixRain.exe, MatrixRainTests.dll). All new logic in the core library per Constitution VI. `ScrambleRevealEffect` is the shared timing oracle for all overlay reveal/dismiss animations — drives per-cell staggered scramble-reveal with configurable timing parameters. `HelpHintOverlay`, `HotkeyOverlay`, and `UsageDialog` delegate all timing to `ScrambleRevealEffect` and render characters based on its queries. `UsageDialog` creates its own D3D11/D2D rendering context for the usage dialog — independent of the main application's render pipeline. The `?` key hotkey overlay (`HotkeyOverlay`) renders directly on the main window via the existing D2D render pipeline. Six new module pairs (`.h`/`.cpp`) plus `UnicodeSymbols.h` in the core library, six new test files. Minimal changes to the .exe project (main.cpp early exit only).
 
 ## Complexity Tracking
 

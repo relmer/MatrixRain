@@ -2,7 +2,7 @@
 
 #include "HotkeyOverlay.h"
 
-#include "SweepCommon.h"
+#include "OverlayColor.h"
 
 
 
@@ -257,7 +257,7 @@ void HotkeyOverlay::Show ()
 //
 //  HotkeyOverlay::Dismiss
 //
-//  Triggers dismiss sweep from Revealing or Holding.
+//  Triggers dismiss from Revealing or Holding.
 //  No-op from Dismissing/Idle/Done.
 //
 ////////////////////////////////////////////////////////////////////////////////
@@ -299,7 +299,7 @@ void HotkeyOverlay::Hide ()
 //
 //  HotkeyOverlay::Update
 //
-//  Advances the sweep effect and derives per-character state from it.
+//  Advances the scramble-reveal effect and derives per-character state from it.
 //
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -380,7 +380,7 @@ void HotkeyOverlay::Update (float deltaTime)
         }
 
         // Pre-compute color for rendering
-        SweepColor color = ComputeScrambleColor (cell.phase, cell.flashTimer, cell.flashDuration, postRevealTimer);
+        OverlayColor color = ComputeScrambleColor (cell.phase, cell.flashTimer, cell.flashDuration, postRevealTimer);
 
         ch.colorR = color.r;
         ch.colorG = color.g;
@@ -396,7 +396,7 @@ void HotkeyOverlay::Update (float deltaTime)
 //
 //  HotkeyOverlay::GetPhase
 //
-//  Maps TextSweepEffect's SweepPhase to the public OverlayPhase.
+//  Maps ScrambleRevealEffect's ScramblePhase to the public OverlayPhase.
 //
 ////////////////////////////////////////////////////////////////////////////////
 

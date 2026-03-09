@@ -1,19 +1,19 @@
 ````markdown
-# API Contracts: HelpRainDialog
+# API Contracts: UsageDialog
 
-**Module**: `HelpRainDialog` (MatrixRainCore.lib)
-**Date**: 2026-03-04
+**Module**: `UsageDialog` (MatrixRainCore.lib)
+**Date**: 2026-03-04 (updated 2026-03-06)
 
 ## Public Interface
 
 ### Construction
 
 ```
-HelpRainDialog (usageText: const UsageText &)
+UsageDialog (usageText: const UsageText &)
 ```
 - Takes a `UsageText` reference for text content (switches only — no hotkeys)
 - Pre-computes character positions via `IDWriteTextLayout::HitTestTextPosition`
-- Builds randomized reveal queue from all non-space character positions
+- Creates `ScrambleRevealEffect` for per-cell animation
 - Does NOT create the window or start animation — call `Show()` to begin
 
 ### Display
@@ -26,6 +26,7 @@ Show () → HRESULT
 - Sizes the window using 2x text bounding box, capped at 80% of primary monitor work area per dimension
 - Centers window on primary monitor
 - Registers window class, creates window, shows it
+- Initializes `ScrambleRevealEffect` with cell count from non-space characters, then calls `StartReveal()`
 - Enters a message loop that drives both Win32 message handling and the render loop
 - Returns `S_OK` when the user dismisses the dialog (Enter, Escape, close button)
 - Returns error HRESULT if D3D/D2D initialization fails
@@ -36,7 +37,8 @@ Show () → HRESULT
 ```
 IsRevealComplete () → bool
 ```
-- Returns `true` when all characters in the reveal queue have been locked in
+- Delegates to `ScrambleRevealEffect::IsRevealComplete()`
+- Returns `true` when all cells have reached `Settled` phase
 
 ## Window Behavior
 
@@ -75,73 +77,55 @@ Switches are split into two sections: general **Options** and **Screensaver Opti
 
 ## Animation Phases
 
-The rain animation has two distinct phases, driven by two **independent streak pools**.
+The dialog uses `ScrambleRevealEffect` for a per-cell scramble-reveal animation with background matrix rain.
 
-### Phase 1: Text Reveal
+### Phase 1: Text Reveal (Scramble-Reveal)
 
-**Goal**: Usage text materializes through per-character rain streaks.
+**Goal**: Usage text materializes through per-cell scramble-reveal animation.
 
-**Reveal queue mechanic**:
-1. Pre-compute the (x, y) pixel position of every non-space character in the usage text using `IDWriteTextLayout::HitTestTextPosition`
-2. Shuffle the list into a randomized queue
-3. Each tick, dequeue the next character(s) — spawn a short reveal streak at that character's x-position, starting ~4 cells above its y-position
-4. The streak falls downward. When the streak head reaches the character's y-position, the character **locks in** — rendered in its final color/intensity from that point forward
-5. The streak continues ~3 cells below the lock-in point and fades out
+**Scramble-reveal mechanic**:
+1. Each non-space character cell starts in `Hidden` phase
+2. Cells transition to `Cycling` — displaying rapidly changing random glyphs in dark green
+3. Each cell receives a random lock time within the reveal duration (1.8s)
+4. When a cell's lock time arrives, it enters `LockFlash` — the final character appears with a yellow flash that decays to mid green
+5. After the flash, the cell enters `Settled` — displaying the resolved character, pulsing from mid green through white to grey
 
-**Reveal pool (Pool 1)**:
-- Exactly N streaks total (one per non-space character)
-- Queue drains at a fixed rate calibrated so the last character locks in at t ≈ 3 seconds (`kRevealDurationSeconds`)
-- Each streak spawns at its target character's exact x-position
-- This pool is completely independent — decorative streaks do not affect its timing
-
-**Pacing**: The spawn rate is calculated as `N / kRevealDurationSeconds` characters per second. At 60fps with ~200 non-space characters, that's ~4 spawns per frame. Characters materialize scattered across the text like random raindrops.
+**ScrambleRevealEffect initialization**:
+```cpp
+m_scramble.Initialize (cellCount, kRevealDuration, 1.0f, kCycleInterval, kFlashDuration, -1.0f)
+```
+- `cellCount` = total non-space characters
+- `kRevealDuration = 1.8f` — all cells lock within this window
+- `kCycleInterval = 0.065f` — random glyph change interval during cycling
+- `kFlashDuration = 1.0f` — yellow→green flash duration at lock-in
+- `holdDuration = -1.0f` — hold indefinitely (dialog stays until dismissed)
 
 ### Phase 2: Background Rain
 
-**Goal**: Continuous ambient rain throughout the entire window.
+**Goal**: Continuous ambient matrix rain throughout the entire window.
 
-- After reveal completes, decorative streak density/speed **backs off** to lower values via tunable multipliers
+- Background rain runs throughout both phases via the main `AnimationSystem`
+- After reveal completes, rain density is reduced via `kBgDensityMultiplier = 0.15f` and speed is increased via `kPhase2SpeedMultiplier = 1.5f`
 - Rain fills the entire window — passes through the text area, not just around it
 - Resolved text stays readable because the feathered dark glow creates a local contrast zone around each character
 - The effect is text floating in rain, not text in a clear bubble
 
-### Decorative Streaks (Pool 2)
-
-**Present during both phases** — purely aesthetic rain across the entire window.
-
-- Spawn at **random pixel x-positions** across the full window width (no column grid — same as the main app's rain where streaks overlap naturally)
-- During Phase 1: use the **same** density/speed as the reveal pool for consistent visual intensity
-- During Phase 2: density/speed backs off via `kPhase2DensityMultiplier` and `kPhase2SpeedMultiplier`
-- Never lock in characters — purely visual
-- Completely independent of the reveal pool
-
 ### Text Rendering
 
-- **Resolved text color**: White or near-white for maximum legibility against the green rain
+- **Resolved text color**: Driven by `ComputeScrambleColor` — transitions through dark green (cycling) → yellow flash → mid green → white pulse → grey (settled)
 - **Feathered glow**: Each resolved text character uses a feathered dark glow effect (concentric shadow layers at decreasing opacity) — same technique as the main app's FPS counter overlay via `DrawFeatheredGlow`. This creates a dark "halo" that ensures text remains readable even when rain passes through the text area
 - **Text font**: Proportional (Segoe UI) via DirectWrite, with explicit x-offsets for columnar alignment
 
-### Rain Parameters
-
-| Parameter         | Phase 1 (Reveal)        | Phase 2 (Background)    |
-|-------------------|-------------------------|-------------------------|
-| Reveal spawn rate | N / 3.0s (guaranteed)   | N/A (reveal complete)   |
-| Decorative density| Same as reveal rate     | Reduced by `kPhase2DensityMultiplier` |
-| Decorative speed  | Same as reveal streaks  | Slowed by `kPhase2SpeedMultiplier` |
-| Trail length      | Short (2-4 chars)       | Standard (5-10 chars)   |
-| Head color        | Bright green/white      | Bright green/white      |
-| Trail color       | Dimming green           | Dimming green           |
-
 ### Tunable Constants
 
-All timing/density parameters are centralized as named constants for easy adjustment:
+All timing/density parameters are centralized as named constants:
 
 ```cpp
-constexpr float  kRevealDurationSeconds    = 3.0f;    // Guaranteed reveal completion time
-constexpr int    kStreakLeadCells           = 4;       // Cells above target before lock-in
-constexpr int    kStreakTrailCells          = 3;       // Cells below target that fade out
-constexpr float  kPhase2DensityMultiplier  = 0.15f;   // Phase 2 decorative density reduction
-constexpr float  kPhase2SpeedMultiplier    = 1.5f;    // Phase 2 speed factor (>1 = slower)
+constexpr float  kRevealDuration           = 1.8f;    // Time window for all cells to lock in
+constexpr float  kCycleInterval            = 0.065f;  // Random glyph change interval
+constexpr float  kFlashDuration            = 1.0f;    // Yellow→green flash at lock-in
+constexpr float  kBgDensityMultiplier      = 0.15f;   // Phase 2 background rain density
+constexpr float  kPhase2SpeedMultiplier    = 1.5f;    // Phase 2 rain speed factor
 ```
 
 ## Render Loop (Internal)
@@ -150,17 +134,17 @@ The render loop runs inside the message loop using `PeekMessage` for non-blockin
 
 1. Process all pending Windows messages
 2. If `WM_QUIT` received, break
-3. Clear render target to black
-4. Render all active decorative streaks (both phases — these render first, behind everything)
-5. Render all active reveal streaks (Phase 1 only):
-   - Head character: bright green/white random glyph
-   - Trail: dimming green random glyphs behind head
-6. Render resolved text characters with feathered glow — these draw last (on top of rain)
+3. Call `ScrambleRevealEffect::Update(deltaTime)` to advance cell phases
+4. Clear render target to black
+5. Render background matrix rain (present during both phases)
+6. For each non-space character, query `ScrambleRevealEffect::GetCell(index)`:
+   - `Hidden` cells: not rendered
+   - `Cycling` cells: render random glyph in dark green
+   - `LockFlash` cells: render resolved glyph with yellow→green flash color
+   - `Settled` cells: render resolved glyph with feathered glow, color from `ComputeScrambleColor`
 7. Present swap chain
-8. Dequeue next reveal characters and spawn their streaks
-9. Advance all streak positions, lock in newly-revealed characters
-10. Transition to Phase 2 when reveal queue is exhausted and all reveal streaks have completed
-11. Repeat until dismissed
+8. Transition to Phase 2 rain density when `IsRevealComplete()` returns true
+9. Repeat until dismissed
 
 ## D3D/D2D Initialization (Internal)
 
@@ -169,7 +153,7 @@ Minimal GPU setup — no 3D geometry, no compute shaders, no bloom:
 - `IDXGIFactory::CreateSwapChain` targeting the dialog's HWND
 - `ID2D1Factory::CreateDxgiSurfaceRenderTarget` for 2D drawing
 - `IDWriteFactory::CreateTextFormat` with Segoe UI (proportional, 14-16pt, DPI-scaled)
-- `ID2D1SolidColorBrush` instances for text (white), rain head (bright green), trail (dim green), glow (black with variable opacity)
+- `ID2D1SolidColorBrush` instances for text colors (per `ComputeScrambleColor`), rain (green), glow (black with variable opacity)
 
 ## Sizing (Internal)
 

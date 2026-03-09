@@ -7,7 +7,7 @@
 #include "ColorScheme.h"
 #include "HelpHintOverlay.h"
 #include "HotkeyOverlay.h"
-#include "SweepCommon.h"
+#include "OverlayColor.h"
 
 using Microsoft::WRL::ComPtr;
 
@@ -1715,7 +1715,7 @@ void RenderSystem::DrawCharacterGlow (const wchar_t * glyphStr, int glyphLen, co
 //  RenderSystem::RenderOverlayCharacters
 //
 //  Two-pass character rendering shared by all overlay renderers.
-//  Pass 1 draws dark glow halos; pass 2 draws sweep-colored foreground text.
+//  Pass 1 draws dark glow halos; pass 2 draws overlay-colored foreground text.
 //  The caller supplies a lambda that maps each HintCharacter to its D2D rect.
 //
 ////////////////////////////////////////////////////////////////////////////////
@@ -1743,7 +1743,7 @@ void RenderSystem::RenderOverlayCharacters (std::span<const HintCharacter> chars
     }
 
     // Pass 2: Foreground text.
-    //         Color computed by shared rain-model sweep function.
+    //         Color computed by shared overlay color function.
     for (const auto & ch : chars)
     {
         if (ch.phase == CharPhase::Hidden || ch.opacity <= 0.01f || ch.currentGlyphIndex >= allGlyphs.size())

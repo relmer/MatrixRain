@@ -55,11 +55,12 @@
 - Single animation curve applied uniformly: Can't achieve per-character stagger. Rejected.
 
 **Key details**:
-- Phase enum: `Scrambling`, `Resolved`, `DissolveCycling`, `DissolveFading`, `Hidden`
-- Each character has: current glyph index, target glyph index, opacity (0.0–1.0), phase timer, dissolve start offset
-- Overlay-level phase: `Revealing`, `Holding`, `Dissolving`, `Hidden`
-- Reveal: all characters start `Scrambling`, transition to `Resolved` when their scramble timer expires (staggered)
-- Dissolve: characters chosen randomly transition `Resolved` → `DissolveCycling` → `DissolveFading` → `Hidden`
+- Cell phase enum (`CellPhase`): `Hidden`, `Cycling`, `LockFlash`, `Settled`, `Dismissing`
+- Each cell has: phase, lockTime, flashTimer, flashDuration, cycleTimer, opacity, needsCycle, isSpace
+- Overlay-level phase (`ScramblePhase`): `Idle`, `Revealing`, `Holding`, `Dismissing`, `Done`
+- Reveal: all cells start `Hidden`, transition to `Cycling` (random glyphs), then `LockFlash` (yellow flash at lock time), then `Settled` (resolved character)
+- Dismiss: cells transition `Settled` → `Dismissing` (random glyphs, fading) → `Hidden`
+- Color driven by `ComputeScrambleColor`: Cycling=dark green, LockFlash=yellow→mid green, Settled=mid green→white pulse→grey, Dismissing=dark green
 - Update logic is pure (no rendering calls) — fully unit-testable
 
 ## R7: ~~Console Rain Character Grid and Column Mapping~~ (SUPERSEDED)
@@ -75,7 +76,7 @@
 
 ## R8: Graphical Rain Dialog for Help Display
 
-**Decision**: Replace console-based help output with a custom graphical dialog window that has its own D3D11/D2D rendering context and displays command-line switches via a two-phase GPU-rendered matrix rain animation with proportional font and per-character reveal.
+**Decision**: Replace console-based help output with a custom graphical dialog window (`UsageDialog`) that has its own D3D11/D2D rendering context and displays command-line switches via a two-phase GPU-rendered scramble-reveal animation with proportional font and per-cell reveal driven by `ScrambleRevealEffect`.
 
 **Rationale**: Console output from a `/SUBSYSTEM:WINDOWS` app is fundamentally broken — the shell doesn't wait for the process, causing output to race with the next shell prompt. A graphical dialog avoids all console issues, provides a visually impressive presentation consistent with the application's identity, and works identically regardless of launch context (terminal, double-click, shortcut, etc.).
 
@@ -99,32 +100,32 @@
 - Text columns flow naturally with proportional metrics — no padding to uniform width
 
 *Window and GPU setup:*
-- `HelpRainDialog` creates a standalone top-level window (not a child of the main app window)
+- `UsageDialog` creates a standalone top-level window (not a child of the main app window)
 - Window has `WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU` style — non-resizable, with close button
 - Background is solid black
 - The window creates its own `ID3D11Device`, `IDXGISwapChain`, `ID2D1RenderTarget` — minimal setup, no 3D geometry, no compute shaders, no bloom
 - Window sizing: 2x text bounding box (from `IDWriteTextLayout::GetMetrics()`), capped at 80% of primary monitor work area per dimension. Text block centered in window.
 - High-DPI: use per-monitor DPI awareness (already enabled for the main app)
 
-*Two-phase animation with two independent streak pools:*
-- **Pool 1 — Reveal streaks**: Exactly N streaks (one per non-space character). Pre-compute (x, y) for every non-space character, shuffle indices into a randomized queue, drain queue at a fixed rate calibrated for 3-second total reveal. Each reveal streak spawns above its character's y-position, falls downward at the character's x-position, and locks in the character when the head reaches the target y. Lead cells: 4, trail cells: 3 (tunable).
-- **Pool 2 — Decorative streaks**: Independent of reveal. Spawn at random pixel x-positions across the full window width (same as the main app — no column grid). During Phase 1, run at the same density/speed as reveal streaks. During Phase 2, density and speed are reduced via tunable multipliers (`kPhase2DensityMultiplier = 0.15f`, `kPhase2SpeedMultiplier = 1.5f`). Never lock in characters — purely atmospheric.
-- **Phase transition**: Phase 1 → Phase 2 when all characters in the reveal queue have been revealed (all `revealedFlags` true).
-- **Rain fills the entire window** — streaks pass through the text area, not just around it. Text is "floating in rain, not in a clear bubble."
+*Two-phase animation with ScrambleRevealEffect:*
+- **Phase 1 — Scramble-reveal**: Each non-space character cell starts `Hidden`, transitions to `Cycling` (random glyphs in dark green), receives a random lock time within `kRevealDuration = 1.8f`. At lock time, cell enters `LockFlash` (yellow flash decaying to mid green over `kFlashDuration = 1.0f`), then `Settled` (resolved character, pulsing mid green → white → grey via `ComputeScrambleColor`). `holdDuration = -1.0f` (hold indefinitely until dialog dismissed).
+- **Background rain**: Runs independently throughout both phases via `AnimationSystem`. During Phase 1, normal density. After reveal completes, density reduced via `kBgDensityMultiplier = 0.15f` and speed increased via `kPhase2SpeedMultiplier = 1.5f`.
+- **Phase transition**: Phase 1 → Phase 2 when `ScrambleRevealEffect::IsRevealComplete()` returns true (all cells `Settled`).
+- **Rain fills the entire window** — passes through the text area, not just around it. Text is "floating in rain, not in a clear bubble."
 
 *Text rendering:*
-- Resolved text is rendered in white/near-white for maximum legibility
+- Resolved text is rendered with color driven by `ComputeScrambleColor` (mid green → white pulse → grey for settled cells)
 - Each resolved character gets a feathered dark glow effect — concentric shadow layers at decreasing opacity (same technique as the main app's `DrawFeatheredGlow` for the FPS counter overlay). This creates a local contrast zone ensuring readability even when rain passes through the text area.
 
 *Dialog lifecycle:*
 - Dialog runs its own message loop (`PeekMessage`-based for render-on-idle) — blocks the calling thread until dismissed
 - Used by `/?` only — dismiss exits the process
-- The `?` key uses a separate in-app overlay on the main window (NOT `HelpRainDialog`)
+- The `?` key uses a separate in-app overlay on the main window (NOT `UsageDialog`)
 - Dismiss triggers: Enter, Escape, close button (X), Alt+F4
 
 *Tunable constants:*
-- `kRevealDurationSeconds = 3.0f` — total time to drain the reveal queue
-- `kStreakLeadCells = 4` — glyph cells above the reveal streak head
-- `kStreakTrailCells = 3` — dimming cells below the reveal streak head
-- `kPhase2DensityMultiplier = 0.15f` — decorative streak density reduction in Phase 2
-- `kPhase2SpeedMultiplier = 1.5f` — decorative streak speed multiplier in Phase 2 (faster = less visual noise)
+- `kRevealDuration = 1.8f` — time window for all cells to lock in
+- `kCycleInterval = 0.065f` — random glyph change interval during cycling
+- `kFlashDuration = 1.0f` — yellow→green flash duration at lock-in
+- `kBgDensityMultiplier = 0.15f` — background rain density reduction in Phase 2
+- `kPhase2SpeedMultiplier = 1.5f` — rain speed factor in Phase 2

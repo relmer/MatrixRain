@@ -5,44 +5,44 @@
 
 ## What This Feature Adds
 
-1. **Runtime help hint overlay** — A three-line help message appears on-screen when MatrixRain starts in Normal mode, showing key bindings (Settings/Enter, Help/?, Exit/Esc). Uses a horizontal sweep reveal effect (a left-to-right sweep head moves across each row with per-row staggered timing — characters in the sweep's streak zone show a random glyph, characters behind the streak show their target glyph). Dismiss uses a mirrored right-to-left sweep. Rain streaks pass behind the message area.
+1. **Runtime help hint overlay** — A three-line help message appears on-screen when MatrixRain starts in Normal mode, showing key bindings (Settings/Enter, Help/?, Exit/Esc). Uses a scramble-reveal effect (characters appear as random cycling glyphs that lock into their target glyphs with per-cell staggered timing). Dismiss reverses the animation. Rain streaks pass behind the message area.
 
 2. **Re-show on unrecognized key** — Pressing any unmapped key re-triggers the help hint animation.
 
 3. **Hotkey-triggered dissolve** — Any recognized hotkey dismisses the hint via the dissolve effect.
 
-4. **Command-line help (`/?`/`-?`)** — Displays formatted usage text (command-line switches only — Options and Screensaver Options, no hotkeys) in a custom graphical rain dialog window with its own D3D/D2D rendering. Uses proportional font (Segoe UI) with per-character queued reveal and two independent streak pools (reveal + decorative). Works identically regardless of launch context.
+4. **Command-line help (`/?`/`-?`)** — Displays formatted usage text (command-line switches only — Options and Screensaver Options, no hotkeys) in a custom usage dialog window with its own D3D/D2D rendering. Uses proportional font (Segoe UI) with scramble-reveal animation (ScrambleRevealEffect) and background matrix rain. Works identically regardless of launch context.
 
 5. **Enter key opens config dialog** — Opens the settings dialog as a live modeless overlay.
 
-6. **? key shows hotkey reference overlay** — Renders hotkey information directly on the main MatrixRain window as an in-app overlay. This is NOT a dialog — it's rendered inline on the main window. Distinct from `/?` which shows switches in a standalone `HelpRainDialog`.
+6. **? key shows hotkey reference overlay** — Renders hotkey information directly on the main MatrixRain window as an in-app overlay. This is NOT a dialog — it's rendered inline on the main window. Distinct from `/?` which shows switches in a standalone `UsageDialog`.
 
 ## Key Architecture Decisions
 
 - **All new code in MatrixRainCore.lib** — follows Library-First Architecture (Constitution VI)
-- **All rendering is GPU-based** — D2D/DirectWrite for the in-app overlay, hotkey overlay, and graphical rain dialog. No console output, no ANSI escape codes, no `AttachConsole`.
-- **TextSweepEffect** — shared per-row horizontal sweep timing oracle, used by both HelpHintOverlay and HotkeyOverlay
+- **All rendering is GPU-based** — D2D/DirectWrite for the in-app overlay, hotkey overlay, and usage dialog. No console output, no ANSI escape codes, no `AttachConsole`.
+- **ScrambleRevealEffect** — shared per-cell scramble-reveal timing oracle, used by HelpHintOverlay, HotkeyOverlay, and UsageDialog
 - **Flat parallel arrays** for per-character overlay state — cache-friendly, TDD-friendly
-- **`HelpRainDialog`** is a custom window with its own D3D11/D2D rendering context — independent of the main app's render pipeline. Used by `/?` only. Uses proportional font (Segoe UI), per-character queued reveal, two independent streak pools.
-- **`HotkeyOverlay`** renders hotkey reference directly on the main window — used by `?` key only. NOT `HelpRainDialog`.
-- **`UsageText`** is used by `HelpRainDialog` — single source of truth for command-line switch content (NOT hotkeys, NOT the runtime hint overlay)
-- **Graphical rain dialog runs before window creation** for `/?` — has its own D3D/D2D context, no dependency on main app initialization
-- **State machine** for overlay phases: Hidden → Revealing → Holding → Dismissing → Hidden (driven by TextSweepEffect::SweepPhase)
+- **`UsageDialog`** is a custom window with its own D3D11/D2D rendering context — independent of the main app's render pipeline. Used by `/?` only. Uses proportional font (Segoe UI), scramble-reveal animation via ScrambleRevealEffect.
+- **`HotkeyOverlay`** renders hotkey reference directly on the main window — used by `?` key only. NOT `UsageDialog`.
+- **`UsageText`** is used by `UsageDialog` — single source of truth for command-line switch content (NOT hotkeys, NOT the runtime hint overlay)
+- **Usage dialog runs before window creation** for `/?` — has its own D3D/D2D context, no dependency on main app initialization
+- **State machine** for overlay phases: Hidden → Revealing → Holding → Dismissing → Hidden (driven by ScrambleRevealEffect::ScramblePhase)
 
 ## New Files
 
 | File | Project | Purpose |
 |------|---------|---------|
-| `HelpHintOverlay.h/cpp` | MatrixRainCore | Overlay state machine + sweep-driven per-character animation |
-| `TextSweepEffect.h/cpp` | MatrixRainCore | Shared per-row horizontal sweep timing oracle |
-| `HelpRainDialog.h/cpp` | MatrixRainCore | Custom graphical rain dialog with D3D/D2D rendering (`/?` only) |
+| `HelpHintOverlay.h/cpp` | MatrixRainCore | Overlay state machine + scramble-reveal per-character animation |
+| `ScrambleRevealEffect.h/cpp` | MatrixRainCore | Shared per-cell scramble-reveal timing oracle |
+| `UsageDialog.h/cpp` | MatrixRainCore | Custom usage dialog with D3D/D2D rendering and scramble-reveal (`/?` only) |
 | `HotkeyOverlay.h/cpp` | MatrixRainCore | In-app hotkey reference overlay (`?` key only) |
 | `UsageText.h/cpp` | MatrixRainCore | Command-line switch text content + formatting (no hotkeys) |
-| `CommandLineHelp.h/cpp` | MatrixRainCore | /? orchestration — creates HelpRainDialog, exits process |
+| `CommandLineHelp.h/cpp` | MatrixRainCore | /? orchestration — creates UsageDialog, exits process |
 | `UnicodeSymbols.h` | MatrixRain | Named constants for Unicode characters (em dash, etc.) |
 | `HelpHintOverlayTests.cpp` | MatrixRainTests | Unit tests for overlay state machine |
-| `TextSweepEffectTests.cpp` | MatrixRainTests | Unit tests for sweep timing oracle |
-| `HelpRainDialogTests.cpp` | MatrixRainTests | Unit tests for reveal queue, character positions, animation state |
+| `ScrambleRevealEffectTests.cpp` | MatrixRainTests | Unit tests for scramble-reveal timing oracle |
+| `UsageDialogTests.cpp` | MatrixRainTests | Unit tests for scramble-reveal animation, character positions, animation state |
 | `HotkeyOverlayTests.cpp` | MatrixRainTests | Unit tests for hotkey overlay state machine |
 | `UsageTextTests.cpp` | MatrixRainTests | Unit tests for text formatting, prefix detection, section grouping |
 | `CommandLineHelpTests.cpp` | MatrixRainTests | Unit tests for orchestration |
@@ -71,8 +71,8 @@ vstest.console.exe x64\Debug\MatrixRainTests.dll
 # Manual test: overlay
 .\x64\Debug\MatrixRain.exe          # Normal mode — expect hint overlay
 
-# Manual test: CLI help (graphical rain dialog)
-.\x64\Debug\MatrixRain.exe /?       # Graphical rain dialog — switches only, proportional font
+# Manual test: CLI help (usage dialog)
+.\x64\Debug\MatrixRain.exe /?       # Usage dialog — switches only, proportional font
 
 # Manual test: screensaver mode (no hint)
 .\x64\Debug\MatrixRain.exe /s       # No help hint
@@ -84,8 +84,8 @@ Priority: CLI help (US3) is P1 MVP; overlay (US1/US2) is P2.
 
 1. `UnicodeSymbols.h` — named Unicode constants (em dash, etc.)
 2. `UsageText` — text content and section-grouped formatting (foundation for dialog)
-3. `HelpRainDialog` — custom graphical window with D3D/D2D rendering + per-character queued reveal + two independent streak pools
-4. `CommandLineHelp` — orchestration for `/?` using `HelpRainDialog`
+3. `UsageDialog` — custom graphical window with D3D/D2D rendering + scramble-reveal animation (ScrambleRevealEffect + ComputeScrambleColor + background matrix rain)
+4. `CommandLineHelp` — orchestration for `/?` using `UsageDialog`
 5. `HelpHintOverlay` — overlay state machine (pure logic, no rendering)
 6. Render integration — D2D rendering of overlay, rain occlusion, feathered border
 7. Input integration — Enter/? keys, unrecognized key → show, hotkey → dismiss

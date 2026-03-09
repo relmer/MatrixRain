@@ -3,7 +3,7 @@
 #include "UsageDialog.h"
 
 #include "CharacterSet.h"
-#include "SweepCommon.h"
+#include "OverlayColor.h"
 #include "UnicodeSymbols.h"
 #include "Version.h"
 
@@ -855,7 +855,7 @@ void UsageDialog::RenderTextOverlay ()
         D2D1_RECT_F charRect = D2D1::RectF (drawX, drawY, drawX + kCharWidth, drawY + kCharHeight);
 
         // Scramble-reveal color model
-        SweepColor color = ComputeScrambleColor (cell.phase, cell.flashTimer, cell.flashDuration, postRevealTimer);
+        OverlayColor color = ComputeScrambleColor (cell.phase, cell.flashTimer, cell.flashDuration, postRevealTimer);
 
         // Select character: cycling/dismissing → random katakana, settled → actual
         wchar_t displayChar = pos.character;

@@ -288,8 +288,7 @@
     <ClInclude Include="HelpHintOverlay.h" />
     <ClInclude Include="UsageDialog.h" />
     <ClInclude Include="ScrambleRevealEffect.h" />
-    <ClInclude Include="SweepCommon.h" />
-    <ClInclude Include="TextSweepEffect.h" />
+    <ClInclude Include="OverlayColor.h" />
     <ClInclude Include="HotkeyOverlay.h" />
     <ClInclude Include="InMemorySettingsProvider.h" />
     <ClInclude Include="InputSystem.h" />
@@ -338,8 +337,7 @@
     <ClCompile Include="UsageDialog.cpp" />
     <ClCompile Include="HotkeyOverlay.cpp" />
     <ClCompile Include="ScrambleRevealEffect.cpp" />
-    <ClCompile Include="SweepCommon.cpp" />
-    <ClCompile Include="TextSweepEffect.cpp" />
+    <ClCompile Include="OverlayColor.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

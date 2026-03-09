@@ -52,7 +52,7 @@ struct CharPosition
 //  UsageDialog — Custom graphical window with matrix rain reveal animation
 //
 //  Displays command-line switches via GPU-rendered matrix rain with a
-//  horizontal tracer reveal.  Short rain-like streaks sweep left to right
+//  horizontal tracer reveal.  Short rain-like streaks move left to right
 //  along each text line, revealing characters in their wake.  Background
 //  rain runs at the user's configured steady-state density throughout.
 //

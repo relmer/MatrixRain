@@ -25,21 +25,21 @@
 
 ---
 
-## Phase 2: User Story 3 — Command-Line Help with Graphical Rain Dialog (Priority: P1) 🎯 MVP
+## Phase 2: User Story 3 — Command-Line Help with Usage Dialog (Priority: P1) 🎯 MVP
 
-**Goal**: `MatrixRain.exe /?` displays a custom graphical window with matrix rain animation that reveals the usage text, then exits after the user dismisses it.
+**Goal**: `MatrixRain.exe /?` displays a custom graphical window with scramble-reveal animation that reveals the usage text, then exits after the user dismisses it.
 
-**Independent Test**: Run `MatrixRain.exe /?` → custom window opens with matrix rain animation revealing usage text → press Enter or Esc to dismiss → app exits. Run `MatrixRain.exe -?` → same behavior with `-` prefix.
+**Independent Test**: Run `MatrixRain.exe /?` → custom window opens with scramble-reveal animation revealing usage text → press Enter or Esc to dismiss → app exits. Run `MatrixRain.exe -?` → same behavior with `-` prefix.
 
 ### Superseded Tasks (Console Approach Abandoned)
 
-The following tasks were completed under the original console-based approach but are now superseded by the graphical rain dialog:
+The following tasks were completed under the original console-based approach but are now superseded by the usage dialog:
 
-- [X] ~~T008 ConsoleRainEffect construction tests — SUPERSEDED (replaced by HelpRainDialog)~~
-- [X] ~~T009 ConsoleRainEffect shutdown test — SUPERSEDED (replaced by HelpRainDialog)~~
-- [X] ~~T014 ConsoleRainEffect constructor — SUPERSEDED (replaced by HelpRainDialog)~~
+- [X] ~~T008 ConsoleRainEffect construction tests — SUPERSEDED (replaced by UsageDialog)~~
+- [X] ~~T009 ConsoleRainEffect shutdown test — SUPERSEDED (replaced by UsageDialog)~~
+- [X] ~~T014 ConsoleRainEffect constructor — SUPERSEDED (replaced by UsageDialog)~~
 - [X] ~~T015 IsInteractiveConsole/EnableVTProcessing — SUPERSEDED (no console detection)~~
-- [X] ~~T016 ConsoleRainEffect::Run() — SUPERSEDED (replaced by HelpRainDialog render loop)~~
+- [X] ~~T016 ConsoleRainEffect::Run() — SUPERSEDED (replaced by UsageDialog render loop)~~
 - [X] ~~T017 AttachParentConsole — SUPERSEDED (no console attachment)~~
 - [X] ~~T018 DisplayCommandLineHelp orchestration — SUPERSEDED (simplified, no console paths)~~
 - [X] ~~T019 ConsoleCtrlHandler — SUPERSEDED (no Ctrl+C handling needed)~~
@@ -72,33 +72,33 @@ The following tasks were completed under the original console-based approach but
 
 - [X] ~~T013 Implement UsageText::BuildTextGrid() and BuildColumnActivityMap() — SUPERSEDED (proportional font, no text grid or column map)~~
 
-### New Tests for HelpRainDialog
+### New Tests for UsageDialog
 
 > **Write tests FIRST, verify they FAIL, then implement**
 
-- [X] T067 [P] [US3] Test HelpRainDialog window sizing — ComputeWindowSize() returns 2x text bounding box dimensions (from IDWriteTextLayout metrics), capped at 80% of primary monitor work area per dimension — in MatrixRainTests/unit/HelpRainDialogTests.cpp
-- [X] T068 [P] [US3] Test HelpRainDialog Phase 1 (reveal) animation state — pre-compute CharPosition for every non-space character, shuffle into revealQueue, spawn RevealStreak at each character's (x, y), character locks in when streak head reaches targetPixelY — in MatrixRainTests/unit/HelpRainDialogTests.cpp
-- [X] T069 [P] [US3] Test HelpRainDialog::IsRevealComplete() returns true when all revealedFlags are true — in MatrixRainTests/unit/HelpRainDialogTests.cpp
-- [X] T083 [P] [US3] Test HelpRainDialog Phase 2 (background) — after reveal completes, decorative streaks density and speed reduce via tunable multipliers (kPhase2DensityMultiplier, kPhase2SpeedMultiplier), decorative streaks never lock in characters — in MatrixRainTests/unit/HelpRainDialogTests.cpp
-- [X] T085 [P] [US3] Test HelpRainDialog reveal queue drain rate — verify queue drains completely within kRevealDurationSeconds (3.0f), fixed rate = N characters / duration — in MatrixRainTests/unit/HelpRainDialogTests.cpp
+- [X] T067 [P] [US3] Test UsageDialog window sizing — ComputeWindowSize() returns 2x text bounding box dimensions (from IDWriteTextLayout metrics), capped at 80% of primary monitor work area per dimension — in MatrixRainTests/unit/UsageDialogTests.cpp
+- [X] T068 [P] [US3] Test UsageDialog scramble-reveal animation state — pre-compute CharPosition for every non-space character, characters cycle through random glyphs and lock at random times via ScrambleRevealEffect — in MatrixRainTests/unit/UsageDialogTests.cpp
+- [X] T069 [P] [US3] Test UsageDialog::IsRevealComplete() returns true when all revealedFlags are true — in MatrixRainTests/unit/UsageDialogTests.cpp
+- [X] T083 [P] [US3] Test UsageDialog Phase 2 (background) — after reveal completes, background matrix rain density reduces via kBgDensityMultiplier (0.15f), speed increases via kPhase2SpeedMultiplier (1.5f) — in MatrixRainTests/unit/UsageDialogTests.cpp
+- [X] T085 [P] [US3] Test UsageDialog scramble-reveal timing — verify reveal completes within kRevealDuration (1.8f) — in MatrixRainTests/unit/UsageDialogTests.cpp
 - [X] T086 [P] [US3] Test UsageText section grouping — GetFormattedText() produces "Options:" section with /c and /?, "Screensaver Options:" section with /s, /p, /a — no hotkeys — in MatrixRainTests/unit/UsageTextTests.cpp
 
-### New Implementation for HelpRainDialog
+### New Implementation for UsageDialog
 
 - [X] T087 [US3] Create UnicodeSymbols.h in MatrixRain/ — namespace UnicodeSymbols with static constexpr WCHAR constants for em dash (\u2014) and other Unicode symbols, following TCDir's pattern
 - [X] T088 [US3] Update UsageText to produce section-grouped content — "Options:" section (/c, /?), "Screensaver Options:" section (/s, /p, /a), no hotkeys, em dash from UnicodeSymbols.h, remove BuildTextGrid()/BuildColumnActivityMap() — in MatrixRainCore/UsageText.h/.cpp
-- [X] T070 [US3] Implement HelpRainDialog class declaration in MatrixRainCore/HelpRainDialog.h — window handle, D3D11 device/swap chain, D2D render target, revealQueue, characterPositions (vector<CharPosition>), revealedFlags, activeRevealStreaks, decorativeStreaks, D2D brushes (text/glow/head/trail), textLayout (IDWriteTextLayout), animation phase enum (Revealing/Background), tunable constants
-- [X] T071 [US3] Implement HelpRainDialog window creation in MatrixRainCore/HelpRainDialog.cpp — register WNDCLASS, create popup window with WS_OVERLAPPED|WS_CAPTION|WS_SYSMENU (close button, non-resizable), size to 2x text bounding box capped at 80% work area, center on primary monitor
-- [X] T072 [US3] Implement HelpRainDialog D3D11 and D2D initialization in MatrixRainCore/HelpRainDialog.cpp — create device, swap chain, DXGI surface, D2D render target, DirectWrite Segoe UI proportional text format (14-16pt DPI-scaled), IDWriteTextLayout for formatted text, create brushes: white text brush, black glow brush (variable opacity), bright green head brush, dim green trail brush
-- [X] T089 [US3] Implement HelpRainDialog character position computation in MatrixRainCore/HelpRainDialog.cpp — iterate every non-space character in formatted text, call IDWriteTextLayout::HitTestTextPosition to get (x, y), build characterPositions vector, shuffle indices into revealQueue, compute drain rate = N / kRevealDurationSeconds
-- [X] T073 [US3] Implement HelpRainDialog Phase 1 render logic in MatrixRainCore/HelpRainDialog.cpp — drain revealQueue at fixed rate, spawn RevealStreak at each dequeued character's (x, y) with kStreakLeadCells above and kStreakTrailCells below, lock in character when head reaches targetPixelY (set revealedFlags), render streak heads (bright green/white random glyph) and trails (dimming green), render resolved characters with feathered dark glow (DrawFeatheredGlow technique), render decorative streaks at random pixel x across full window at same density/speed, transition to Phase 2 when all revealedFlags true
-- [X] T084 [US3] Implement HelpRainDialog Phase 2 render logic in MatrixRainCore/HelpRainDialog.cpp — reduce decorative streak density via kPhase2DensityMultiplier (0.15f) and increase speed via kPhase2SpeedMultiplier (1.5f), continue rendering resolved text with feathered glow, rain fills entire window — streaks pass through text area
-- [X] T074 [US3] Implement HelpRainDialog input handling in MatrixRainCore/HelpRainDialog.cpp — WndProc handles WM_KEYDOWN (VK_RETURN, VK_ESCAPE to dismiss), WM_CLOSE, WM_DESTROY, close button (X)
-- [X] T075 [US3] Implement HelpRainDialog::Show() in MatrixRainCore/HelpRainDialog.cpp — show window, run PeekMessage-based message pump with render-on-idle pattern, block until dismissed
-- [X] T076 [US3] Update CommandLineHelp::DisplayCommandLineHelp() in MatrixRainCore/CommandLineHelp.cpp — create UsageText, create HelpRainDialog with const UsageText&, call Show(), no console attachment or detection
+- [X] T070 [US3] Implement UsageDialog class declaration in MatrixRainCore/UsageDialog.h — window handle, D3D11 device/swap chain, D2D render target, characterPositions (vector<CharPosition>), revealedFlags, ScrambleRevealEffect, D2D brushes, textLayout (IDWriteTextLayout), animation phase enum (Revealing/Background), tunable constants
+- [X] T071 [US3] Implement UsageDialog window creation in MatrixRainCore/UsageDialog.cpp — register WNDCLASS, create popup window with WS_OVERLAPPED|WS_CAPTION|WS_SYSMENU (close button, non-resizable), size to 2x text bounding box capped at 80% work area, center on primary monitor
+- [X] T072 [US3] Implement UsageDialog D3D11 and D2D initialization in MatrixRainCore/UsageDialog.cpp — create device, swap chain, DXGI surface, D2D render target, DirectWrite Segoe UI proportional text format (14-16pt DPI-scaled), IDWriteTextLayout for formatted text, create brushes: white text brush, black glow brush (variable opacity), bright green head brush, dim green trail brush
+- [X] T089 [US3] Implement UsageDialog character position computation in MatrixRainCore/UsageDialog.cpp — iterate every non-space character in formatted text, call IDWriteTextLayout::HitTestTextPosition to get (x, y), build characterPositions vector with randomCharacter field
+- [X] T073 [US3] Implement UsageDialog scramble-reveal animation in MatrixRainCore/UsageDialog.cpp — ScrambleRevealEffect drives per-cell reveal (characters cycle through random glyphs and lock at random times), ComputeScrambleColor drives color transitions (dark green → yellow flash → mid green → white pulse → grey), render resolved characters with feathered dark glow, render background matrix rain, transition to Phase 2 when all characters revealed
+- [X] T084 [US3] Implement UsageDialog Phase 2 render logic in MatrixRainCore/UsageDialog.cpp — reduce background rain density via kBgDensityMultiplier (0.15f) and increase speed via kPhase2SpeedMultiplier (1.5f), continue rendering resolved text with feathered glow, rain fills entire window
+- [X] T074 [US3] Implement UsageDialog input handling in MatrixRainCore/UsageDialog.cpp — WndProc handles WM_KEYDOWN (VK_RETURN, VK_ESCAPE to dismiss), WM_CLOSE, WM_DESTROY, close button (X)
+- [X] T075 [US3] Implement UsageDialog::Show() in MatrixRainCore/UsageDialog.cpp — show window, run PeekMessage-based message pump with render-on-idle pattern, block until dismissed
+- [X] T076 [US3] Update CommandLineHelp::DisplayCommandLineHelp() in MatrixRainCore/CommandLineHelp.cpp — create UsageText, create UsageDialog with const UsageText&, call Show(), no console attachment or detection
 - [X] T077 [US3] Remove dead console code — delete ConsoleRainEffect.h/.cpp, remove AttachParentConsole/ConsoleCtrlHandler from CommandLineHelp, remove BuildTextGrid/BuildColumnActivityMap from UsageText if still present, remove AnsiCodes.h if unused elsewhere
 
-**Checkpoint**: `/?` and `-?` launch a custom graphical window with proportional font, per-character queued reveal (~3s), two independent streak pools (reveal + decorative), feathered dark glow, switches only (Options + Screensaver Options, no hotkeys). Enter/Esc dismisses. No console output. MVP complete.
+**Checkpoint**: `/?` and `-?` launch a custom graphical window with proportional font, scramble-reveal animation (characters cycle through random glyphs and lock at random times via ScrambleRevealEffect), background matrix rain, feathered dark glow, switches only (Options + Screensaver Options, no hotkeys). Enter/Esc dismisses. No console output. MVP complete.
 
 ---
 
@@ -110,27 +110,27 @@ The following tasks were completed under the original console-based approach but
 
 ### Setup for Overlay Types
 
-- [X] T022 [P] [US1] Define OverlayPhase enum class (Hidden, Revealing, Holding, Dissolving) and CharPhase enum class (Scrambling, Resolved, DissolveCycling, DissolveFading, Hidden) in MatrixRainCore/HelpHintOverlay.h
-- [X] T023 [P] [US1] Define HintCharacter struct (targetGlyphIndex, currentGlyphIndex, phase, opacity, scrambleTimer, scrambleInterval, dissolveStartOffset, row, col, isSpace) in MatrixRainCore/HelpHintOverlay.h
+- [X] T022 [P] [US1] Define OverlayPhase enum class (Hidden, Revealing, Holding, Dissolving) and CharPhase enum class (Hidden, Cycling, LockFlash, Settled, Dismissing) in MatrixRainCore/HelpHintOverlay.h — *CharPhase originally Scrambling/Resolved/DissolveCycling/DissolveFading; replaced by CellPhase-mapped values in Phase 3a*
+- [X] T023 [P] [US1] Define HintCharacter struct (targetGlyphIndex, currentGlyphIndex, randomGlyphIndex, phase, opacity, row, col, isSpace) in MatrixRainCore/HelpHintOverlay.h — *originally had scrambleTimer/scrambleInterval/dissolveStartOffset; timing now managed by ScrambleRevealEffect*
 
 ### Tests for User Story 1
 
 > **Write tests FIRST, verify they FAIL, then implement**
 
 - [X] T024 [P] [US1] Test HelpHintOverlay initial state: phase is Hidden, IsActive() returns false, characters empty — in MatrixRainTests/unit/HelpHintOverlayTests.cpp
-- [X] T025 [P] [US1] Test Show() transitions phase to Revealing, IsActive() returns true, characters initialized to Scrambling with staggered timers (spaces marked isSpace) — in MatrixRainTests/unit/HelpHintOverlayTests.cpp
-- [X] T026 [P] [US1] Test Update() during Revealing: scrambling characters cycle currentGlyphIndex, characters resolve to targetGlyphIndex when scrambleTimer expires — in MatrixRainTests/unit/HelpHintOverlayTests.cpp
-- [X] T027 [P] [US1] Test Revealing→Holding transition: once all characters are Resolved, overlay phase becomes Holding — in MatrixRainTests/unit/HelpHintOverlayTests.cpp
-- [X] T028 [P] [US1] Test Holding→Dissolving transition: after holdDuration elapses, overlay phase becomes Dissolving, characters begin transitioning to DissolveCycling with staggered dissolveStartOffset — in MatrixRainTests/unit/HelpHintOverlayTests.cpp
-- [X] T029 [P] [US1] Test Dissolving→Hidden transition: all characters progress DissolveCycling→DissolveFading→Hidden, once all Hidden the overlay phase becomes Hidden — in MatrixRainTests/unit/HelpHintOverlayTests.cpp
+- [X] T025 [P] [US1] Test Show() transitions phase to Revealing, IsActive() returns true, characters initialized to Cycling via ScrambleRevealEffect (spaces marked isSpace) — in MatrixRainTests/unit/HelpHintOverlayTests.cpp
+- [X] T026 [P] [US1] Test Update() during Revealing: cycling characters display randomGlyphIndex, characters lock to targetGlyphIndex when ScrambleRevealEffect cell reaches LockFlash/Settled — in MatrixRainTests/unit/HelpHintOverlayTests.cpp
+- [X] T027 [P] [US1] Test Revealing→Holding transition: once all cells are Settled, overlay phase becomes Holding — in MatrixRainTests/unit/HelpHintOverlayTests.cpp
+- [X] T028 [P] [US1] Test Holding→Dissolving transition: after holdDuration elapses, overlay phase becomes Dissolving, ScrambleRevealEffect begins dismiss with staggered cell timing — in MatrixRainTests/unit/HelpHintOverlayTests.cpp
+- [X] T029 [P] [US1] Test Dissolving→Hidden transition: all cells progress Dismissing→Hidden (CellPhase), once all Hidden the overlay phase becomes Hidden — in MatrixRainTests/unit/HelpHintOverlayTests.cpp
 - [X] T030 [P] [US1] Test UpdateLayout() computes centered bounding rect for given viewport dimensions — in MatrixRainTests/unit/HelpHintOverlayTests.cpp
 - [X] T031 [P] [US1] Test GetCharacters() returns span with correct row/col layout matching the three-line hint format — in MatrixRainTests/unit/HelpHintOverlayTests.cpp
 
 ### Implementation for User Story 1
 
 - [X] T032 [US1] Implement HelpHintOverlay constructor, Show(), Hide(), and IsActive()/GetPhase()/GetRows()/GetCols() in MatrixRainCore/HelpHintOverlay.cpp — initialize 3-line hint text grid ("Settings Enter" / "Help ?" / "Exit Esc") with right-justified left column and left-justified right column
-- [X] T033 [US1] Implement HelpHintOverlay::Update() reveal logic in MatrixRainCore/HelpHintOverlay.cpp — scramble cycling, per-character resolution with staggered timers, Revealing→Holding transition
-- [X] T034 [US1] Implement HelpHintOverlay::Update() hold and dissolve logic in MatrixRainCore/HelpHintOverlay.cpp — hold timer countdown, Dissolving phase with per-character DissolveCycling→DissolveFading→Hidden, overlay Hidden when all characters done
+- [X] T033 [US1] Implement HelpHintOverlay::Update() reveal logic in MatrixRainCore/HelpHintOverlay.cpp — delegates to ScrambleRevealEffect::Update(), per-cell Cycling→LockFlash→Settled, Revealing→Holding transition
+- [X] T034 [US1] Implement HelpHintOverlay::Update() hold and dissolve logic in MatrixRainCore/HelpHintOverlay.cpp — hold timer countdown, Dissolving phase with per-cell Settled→Dismissing→Hidden (CellPhase), overlay Hidden when all cells done
 - [X] T035 [US1] Implement HelpHintOverlay::UpdateLayout() and GetBoundingRect() in MatrixRainCore/HelpHintOverlay.cpp — center bounding rect in viewport, recompute on resize
 - [X] T036 [US1] Implement HelpHintOverlay::GetCharacters() returning span<const HintCharacter> in MatrixRainCore/HelpHintOverlay.cpp
 - [X] T037 [US1] Add HelpHintOverlay member to Application, call Show() on startup in Normal mode only (skip for /s, /p, /c, /a) in MatrixRainCore/Application.cpp — wire UpdateLayout() on resize
@@ -143,32 +143,32 @@ The following tasks were completed under the original console-based approach but
 
 ---
 
-## Phase 3a: TextSweepEffect — Shared Sweep Timing Oracle
+## Phase 3a: ScrambleRevealEffect — Shared Timing Oracle
 
-**Goal**: Extract per-row staggered horizontal sweep timing into a reusable class used by both HelpHintOverlay and HotkeyOverlay. Replaces the original per-character random resolve/dissolve model.
+**Goal**: Extract per-cell staggered timing into a reusable class used by HelpHintOverlay, HotkeyOverlay, and UsageDialog. Replaces the original per-character random resolve/dissolve model.
 
 ### Completed Tasks
 
-- [X] T098 [P] Test TextSweepEffect initial state: phase is Idle, IsActive() returns false — in MatrixRainTests/unit/TextSweepEffectTests.cpp
-- [X] T099 [P] Test TextSweepEffect::StartReveal() transitions to Revealing, GetRevealProgress() advances per row — in MatrixRainTests/unit/TextSweepEffectTests.cpp
-- [X] T100 [P] Test TextSweepEffect::GetOpacity() returns 0→1 fade-in during reveal and 1→0 fade-out during dismiss — in MatrixRainTests/unit/TextSweepEffectTests.cpp
-- [X] T101 [P] Test TextSweepEffect::GetGlowIntensity() returns 1.0 at reveal moment, decays to 0.0 over time — in MatrixRainTests/unit/TextSweepEffectTests.cpp
-- [X] T102 [P] Test TextSweepEffect hold phase: after reveal completes, holds for holdDuration before auto-dismissing — in MatrixRainTests/unit/TextSweepEffectTests.cpp
-- [X] T103 [P] Test TextSweepEffect dismiss phase: right-to-left sweep, GetDismissProgress() advances per row — in MatrixRainTests/unit/TextSweepEffectTests.cpp
-- [X] T104 Implement TextSweepEffect class with Initialize(), StartReveal(), StartDismiss(), Reset(), Update(), and per-position queries — in MatrixRainCore/TextSweepEffect.h/.cpp
-- [X] T105 Refactor HelpHintOverlay to delegate timing to TextSweepEffect — remove per-character scramble/dissolve timers, use sweep-driven Update() — in MatrixRainCore/HelpHintOverlay.h/.cpp
-- [X] T106 Refactor HotkeyOverlay to delegate timing to TextSweepEffect — same pattern as HelpHintOverlay — in MatrixRainCore/HotkeyOverlay.h/.cpp
+- [X] T098 [P] Test ScrambleRevealEffect initial state: phase is Idle, IsActive() returns false — in MatrixRainTests/unit/ScrambleRevealEffectTests.cpp
+- [X] T099 [P] Test ScrambleRevealEffect::StartReveal() transitions to Revealing, cells begin Cycling phase — in MatrixRainTests/unit/ScrambleRevealEffectTests.cpp
+- [X] T100 [P] Test ScrambleRevealEffect per-cell opacity: 1.0 during reveal, fades to 0.0 during dismiss — in MatrixRainTests/unit/ScrambleRevealEffectTests.cpp
+- [X] T101 [P] Test ScrambleRevealEffect CellPhase transitions: Cycling → LockFlash → Settled during reveal — in MatrixRainTests/unit/ScrambleRevealEffectTests.cpp
+- [X] T102 [P] Test ScrambleRevealEffect hold phase: after reveal completes, holds for holdDuration before auto-dismissing — in MatrixRainTests/unit/ScrambleRevealEffectTests.cpp
+- [X] T103 [P] Test ScrambleRevealEffect dismiss phase: cells transition Settled → Dismissing → Hidden — in MatrixRainTests/unit/ScrambleRevealEffectTests.cpp
+- [X] T104 Implement ScrambleRevealEffect class with Initialize(), StartReveal(), StartDismiss(), Reset(), Update(), GetCell(), and per-cell queries — in MatrixRainCore/ScrambleRevealEffect.h/.cpp
+- [X] T105 Refactor HelpHintOverlay to delegate timing to ScrambleRevealEffect — remove per-character scramble/dissolve timers, use scramble-reveal Update() — in MatrixRainCore/HelpHintOverlay.h/.cpp
+- [X] T106 Refactor HotkeyOverlay to delegate timing to ScrambleRevealEffect — same pattern as HelpHintOverlay — in MatrixRainCore/HotkeyOverlay.h/.cpp
 
-### Completed Sweep Enhancements
+### Completed Enhancements
 
-- [X] T107 Add margin columns to HelpHintOverlay (MARGIN_COLS=1) for smooth sweep entry/exit — in MatrixRainCore/HelpHintOverlay.h/.cpp
-- [X] T108 Add margin columns to HotkeyOverlay (MARGIN_COLS=2) for smooth sweep entry/exit — in MatrixRainCore/HotkeyOverlay.h/.cpp
+- [X] T107 Add margin columns to HelpHintOverlay (MARGIN_COLS=1) for smooth reveal entry/exit — in MatrixRainCore/HelpHintOverlay.h/.cpp
+- [X] T108 Add margin columns to HotkeyOverlay (MARGIN_COLS=2) for smooth reveal entry/exit — in MatrixRainCore/HotkeyOverlay.h/.cpp
 - [X] T109 Update RenderSystem to handle margin/space columns (skip rendering when currentGlyphIndex >= allGlyphs.size()) — in MatrixRainCore/RenderSystem.cpp
 - [X] T110 Replace headCol tracking with continuous head position from GetRevealProgress() — head extends past grid edge for smooth right-side settling — in HelpHintOverlay.cpp and HotkeyOverlay.cpp
-- [X] T111 Add dismiss sweep effect: right-to-left streak of random glyphs using GetDismissProgress() — in HelpHintOverlay.cpp and HotkeyOverlay.cpp
-- [X] T112 Set streak zone to full overlay width (streakLen = m_cols) for extended matrix effect — in HelpHintOverlay.cpp and HotkeyOverlay.cpp
+- [X] T111 Add dismiss effect: random glyphs using GetDismissProgress() — in HelpHintOverlay.cpp and HotkeyOverlay.cpp
+- [X] T112 Set cycling zone to full overlay width (m_cols) for extended matrix effect — in HelpHintOverlay.cpp and HotkeyOverlay.cpp
 
-**Checkpoint**: Both overlays use TextSweepEffect for timing. Horizontal sweep with full-width streak zone, margin columns, and dismiss effect. Build succeeds (0W/0E), 318 tests pass.
+**Checkpoint**: All overlays use ScrambleRevealEffect for timing. Per-cell staggered scramble-reveal with margin columns and dismiss effect. Build succeeds (0W/0E), 318 tests pass.
 
 ---
 
@@ -180,9 +180,9 @@ The following tasks were completed under the original console-based approach but
 
 ### Tests for User Story 2
 
-- [X] T042 [P] [US2] Test Show() while Revealing resets all characters to Scrambling (re-trigger from reveal phase) — in MatrixRainTests/unit/HelpHintOverlayTests.cpp
+- [X] T042 [P] [US2] Test Show() while Revealing resets ScrambleRevealEffect (re-trigger from reveal phase) — in MatrixRainTests/unit/HelpHintOverlayTests.cpp
 - [X] T043 [P] [US2] Test Show() while Holding resets to Revealing (re-trigger from hold phase) — in MatrixRainTests/unit/HelpHintOverlayTests.cpp
-- [X] T044 [P] [US2] Test Show() while Dissolving reverses the dissolve — characters at DissolveFading reverse opacity trend and materialize back, characters at DissolveCycling transition to Scrambling, fully Hidden characters restart from Scrambling — in MatrixRainTests/unit/HelpHintOverlayTests.cpp
+- [X] T044 [P] [US2] Test Show() while Dismissing restarts ScrambleRevealEffect with a fresh reveal — in MatrixRainTests/unit/HelpHintOverlayTests.cpp
 - [X] T045 [P] [US2] Test Dismiss() from Revealing transitions to Dissolving — in MatrixRainTests/unit/HelpHintOverlayTests.cpp
 - [X] T046 [P] [US2] Test Dismiss() from Holding transitions to Dissolving — in MatrixRainTests/unit/HelpHintOverlayTests.cpp
 - [X] T047 [P] [US2] Test Dismiss() from Dissolving is a no-op (does not restart dissolve) — in MatrixRainTests/unit/HelpHintOverlayTests.cpp
@@ -190,7 +190,7 @@ The following tasks were completed under the original console-based approach but
 
 ### Implementation for User Story 2
 
-- [X] T049 [US2] Implement HelpHintOverlay::Dismiss() in MatrixRainCore/HelpHintOverlay.cpp — transition to Dissolving from Revealing/Holding, no-op from Dissolving/Hidden
+- [X] T049 [US2] Implement HelpHintOverlay::Dismiss() in MatrixRainCore/HelpHintOverlay.cpp — calls ScrambleRevealEffect::StartDismiss() from Revealing/Holding, no-op from Dissolving/Hidden
 - [X] T050 [US2] Route unrecognized keys to HelpHintOverlay::Show() — modify InputSystem::ProcessKeyDown to call Show() for any key not in the recognized set, in MatrixRainCore/InputSystem.cpp
 - [X] T051 [US2] Route recognized hotkeys to HelpHintOverlay::Dismiss() — modify Application::OnKeyDown to call Dismiss() when processing any recognized hotkey (Space, C, S, +, -, backtick, Escape, Alt+Enter), in MatrixRainCore/Application.cpp
 
@@ -220,7 +220,7 @@ The following tasks were completed under the original console-based approach but
 
 ## Phase 6: User Story 5 — Show Hotkey Reference via ? Key (Priority: P2)
 
-**Goal**: Pressing `?` displays a hotkey reference overlay rendered directly on the main MatrixRain window — NOT in a separate dialog. This is distinct from `/?` which uses `HelpRainDialog`.
+**Goal**: Pressing `?` displays a hotkey reference overlay rendered directly on the main MatrixRain window — NOT in a separate dialog. This is distinct from `/?` which uses `UsageDialog`.
 
 **Independent Test**: Launch MatrixRain → press `?` → hotkey reference overlay appears directly on the main window showing all runtime hotkeys with descriptions. Press any key → overlay begins dissolving. Help hint dissolves when `?` is pressed.
 
@@ -229,9 +229,9 @@ The following tasks were completed under the original console-based approach but
 - [X] ~~T058 Add usage dialog resource template — SUPERSEDED (using in-app overlay instead of dialog)~~
 - [X] ~~T059 Implement usage dialog proc — SUPERSEDED (using in-app overlay instead of dialog)~~
 
-### Superseded Tasks (HelpRainDialog Approach Abandoned for ? Key)
+### Superseded Tasks (UsageDialog Approach Abandoned for ? Key)
 
-- [X] ~~T078 Wire ? key to HelpRainDialog — SUPERSEDED (? key uses in-app overlay, not HelpRainDialog)~~
+- [X] ~~T078 Wire ? key to UsageDialog — SUPERSEDED (? key uses in-app overlay, not UsageDialog)~~
 - [X] ~~T079 Remove old usage dialog resource template — SUPERSEDED (already cleaned up)~~
 
 ### Retained Tests for User Story 5
@@ -259,26 +259,26 @@ The following tasks were completed under the original console-based approach but
 
 - [X] T060 [US5] Handle VK_OEM_2 (with Shift check) in Application::OnKeyDown — open usage display, guard against duplicate, call HelpHintOverlay::Dismiss()
 
-**Checkpoint**: `?` key shows hotkey reference overlay directly on the main window. No separate dialog. Overlay has sweep reveal/dismiss animation matching HelpHintOverlay. Help hint dissolves when `?` is pressed.
+**Checkpoint**: `?` key shows hotkey reference overlay directly on the main window. No separate dialog. Overlay has scramble-reveal animation matching HelpHintOverlay. Help hint dissolves when `?` is pressed.
 
 ---
 
-## Phase 8: Visual Tuning — Sweep Animation Quality (Priority: P2)
+## Phase 8: Visual Tuning — Animation Quality (Priority: P2)
 
-**Goal**: Tune the horizontal sweep reveal/dismiss effect for both overlays until the visual quality matches the desired matrix rain aesthetic.
+**Goal**: Tune the scramble-reveal effect for all overlays until the visual quality matches the desired matrix rain aesthetic.
 
-**Status**: IN PROGRESS — Sweep architecture is working (reveal + dismiss + margins + full-width streak), but visual quality needs iteration.
+**Status**: IN PROGRESS — Scramble-reveal architecture is working (reveal + dismiss + margins), but visual quality needs iteration.
 
 ### Known Issues (from manual testing 2026-03-06)
 
-- [ ] T113 [US1/US5] Evaluate and tune sweep speed and per-row stagger range — current values may be too fast or too slow. TextSweepEffect::Initialize() params: staggerRange=1.2, durationMin=1.0, durationMax=2.0, fadeInSpeed=2.5, glowDecaySpeed=1.5
-- [ ] T114 [US1/US5] Evaluate streak zone length — currently = full overlay width (m_cols). May want shorter or longer depending on visual effect
-- [ ] T115 [US1/US5] Evaluate whether characters in streak zone should cycle through multiple random glyphs over time versus showing one fixed random glyph — current implementation assigns one deterministic random glyph per position
-- [ ] T116 [US1/US5] Evaluate dismiss sweep visual quality — timing, speed, and whether opacity fade looks natural as characters transition from target → random → hidden
-- [ ] T117 [US1/US5] Evaluate green→white glow transition rate — glowDecaySpeed=1.5 may need adjustment for visual appeal
+- [ ] T113 [US1/US5] Evaluate and tune reveal speed and per-cell stagger — current values may be too fast or too slow. ScrambleRevealEffect::Initialize() params: revealDuration=1.5, dismissDuration=1.0, cycleInterval=0.045, flashDuration=0.15
+- [ ] T114 [US1/US5] Evaluate margin column visual effect — whether margin columns provide enough smooth entry/exit for the cycling zone
+- [ ] T115 [US1/US5] Evaluate whether characters in cycling phase should cycle through multiple random glyphs over time versus showing one fixed random glyph — current implementation cycles glyphs at cycleInterval
+- [ ] T116 [US1/US5] Evaluate dismiss visual quality — timing, speed, and whether opacity fade looks natural as cells transition Settled → Dismissing → Hidden
+- [ ] T117 [US1/US5] Evaluate ComputeScrambleColor transitions — yellow flash intensity, white pulse timing (rampUp=0.8, hold=1.5, rampDown=1.0), final grey level (0.75)
 - [ ] T118 [US1/US5] Evaluate margin column counts — MARGIN_COLS=1 for HelpHintOverlay, MARGIN_COLS=2 for HotkeyOverlay. May need more or fewer for smooth visual entry/exit
 
-**Checkpoint**: Sweep animations are visually polished and match the desired matrix rain aesthetic.
+**Checkpoint**: Scramble-reveal animations are visually polished and match the desired matrix rain aesthetic.
 
 ---
 
@@ -294,9 +294,9 @@ The following tasks were completed under the original console-based approach but
 
 ### Active Tasks
 
-- [X] T080 Add HelpRainDialog.h/.cpp, HotkeyOverlay.h/.cpp, UnicodeSymbols.h to MatrixRainCore.vcxproj and HelpRainDialogTests.cpp, HotkeyOverlayTests.cpp to MatrixRainTests.vcxproj — verify build with `MSBuild MatrixRain.sln /p:Configuration=Debug /p:Platform=x64`
+- [X] T080 Add UsageDialog.h/.cpp, HotkeyOverlay.h/.cpp, UnicodeSymbols.h to MatrixRainCore.vcxproj and UsageDialogTests.cpp, HotkeyOverlayTests.cpp to MatrixRainTests.vcxproj — verify build with `MSBuild MatrixRain.sln /p:Configuration=Debug /p:Platform=x64`
 - [X] T081 Run full test suite and fix any failures — `vstest.console.exe x64\Debug\MatrixRainTests.dll`
-- [X] T082 Run manual validation scenarios — overlay startup, `/?` graphical dialog (switches only, proportional font, per-character reveal, two pools), `-?` graphical dialog, screensaver mode suppression, Enter key config dialog, `?` key hotkey overlay (in-app, not dialog)
+- [X] T082 Run manual validation scenarios — overlay startup, `/?` usage dialog (switches only, proportional font, scramble-reveal animation), `-?` usage dialog, screensaver mode suppression, Enter key config dialog, `?` key hotkey overlay (in-app, not dialog)
 
 ---
 
@@ -304,17 +304,17 @@ The following tasks were completed under the original console-based approach but
 
 ### Phase Dependencies
 
-- **User Story 3 (Phase 2)**: No external dependencies — **MVP, start here**. Retained tasks (UsageText, ScreenSaverModeParser, main.cpp wiring) already complete. New work: UsageText section grouping (T086–T088), HelpRainDialog (T067–T077, T083–T085, T089)
+- **User Story 3 (Phase 2)**: No external dependencies — **MVP, start here**. Retained tasks (UsageText, ScreenSaverModeParser, main.cpp wiring) already complete. New work: UsageText section grouping (T086–T088), UsageDialog (T067–T077, T083–T085, T089)
 - **User Story 1 (Phase 3)**: Independent of US3 — already complete
 - **User Story 2 (Phase 4)**: Depends on User Story 1 (needs HelpHintOverlay with Show/Dismiss) — already complete
 - **User Story 4 (Phase 5)**: Depends on User Story 2 (needs Dismiss() wired for recognized hotkeys) — already complete
-- **User Story 5 (Phase 6)**: Independent of US3 (uses its own HotkeyOverlay, NOT HelpRainDialog) — new tasks T090–T097
+- **User Story 5 (Phase 6)**: Independent of US3 (uses its own HotkeyOverlay, NOT UsageDialog) — new tasks T090–T097
 - **Polish (Phase 7)**: Depends on all user stories being complete — new tasks T080–T082
 
 ### Remaining Work Dependency Graph
 
 ```
-US3 HelpRainDialog (T067–T077, T083–T089) 🎯 MVP
+US3 UsageDialog (T067–T077, T083–T089) 🎯 MVP
    └──→ Polish (T080–T082)
 
 US5 HotkeyOverlay (T090–T097) [independent of US3]
@@ -336,26 +336,26 @@ US5 HotkeyOverlay (T090–T097) [independent of US3]
 
 ---
 
-## Parallel Example: HelpRainDialog (MVP)
+## Parallel Example: UsageDialog (MVP)
 
 ```
 # Tests (all parallel — independent methods):
 T067: Window sizing test (2x bounding box, 80% cap)
-T068: Phase 1 reveal animation state test (queued per-character reveal)
+T068: Scramble-reveal animation state test (per-cell cycling and lock)
 T069: IsRevealComplete() test (all revealedFlags true)
-T083: Phase 2 decorative rain test (density/speed back off)
-T085: Reveal queue drain rate test (guaranteed 3s)
+T083: Phase 2 background rain test (density/speed back off)
+T085: Scramble-reveal timing test (completes within kRevealDuration)
 T086: UsageText section grouping test (Options + Screensaver Options)
 
 # Implementation (sequential — each builds on previous):
 T087: Create UnicodeSymbols.h (em dash, etc.)
 T088: Update UsageText (section grouping, remove grid/map)
-T070: Class declaration (HelpRainDialog.h) — revealQueue, characterPositions, two pool types
+T070: Class declaration (UsageDialog.h) — characterPositions, ScrambleRevealEffect
 T071: Window creation (2x bounding box, 80% cap, centered)
 T072: D3D11/D2D initialization (Segoe UI proportional, DPI-scaled)
-T089: Character position computation (HitTestTextPosition, shuffle queue)
-T073: Phase 1 render — drain reveal queue, spawn streaks, feathered glow
-T084: Phase 2 render — decorative rain density/speed back off
+T089: Character position computation (HitTestTextPosition)
+T073: Scramble-reveal animation — per-cell cycling, lock, ComputeScrambleColor
+T084: Phase 2 render — background rain density/speed back off
 T074: Input handling (WndProc)
 T075: Show() message pump
 T076: Update CommandLineHelp orchestration
@@ -365,7 +365,7 @@ T077: Remove dead console code
 ## Post-MVP: US5 (Hotkey Overlay) + Polish
 
 ```
-After HelpRainDialog is working for /?:
+After UsageDialog is working for /?:
 
 # US5 Tests (all parallel):
 T090: HotkeyOverlay initial state
@@ -389,18 +389,18 @@ T082: Manual validation
 
 ## Implementation Strategy
 
-### MVP First (User Story 3 — HelpRainDialog)
+### MVP First (User Story 3 — UsageDialog)
 
 1. Create UnicodeSymbols.h (T087) and update UsageText for section grouping (T088)
-2. Write HelpRainDialog tests (T067–T069, T083, T085) — verify they fail
-3. Implement HelpRainDialog class (T070–T075, T089, T084) — window (with close button), D3D/D2D (Segoe UI proportional), character position computation (HitTestTextPosition), Phase 1 queued reveal (two independent pools + feathered glow), Phase 2 decorative rain (density/speed back off), input, Show()
-4. Update CommandLineHelp orchestration (T076) — wire HelpRainDialog into `/?` path
+2. Write UsageDialog tests (T067–T069, T083, T085) — verify they fail
+3. Implement UsageDialog class (T070–T075, T089, T084) — window (with close button), D3D/D2D (Segoe UI proportional), character position computation (HitTestTextPosition), scramble-reveal animation (ScrambleRevealEffect + ComputeScrambleColor + background rain), input, Show()
+4. Update CommandLineHelp orchestration (T076) — wire UsageDialog into `/?` path
 5. Remove dead console code (T077) — clean up ConsoleRainEffect, console attachment, Ctrl+C handler, BuildTextGrid/BuildColumnActivityMap
-6. **STOP and VALIDATE**: `/?` launches graphical rain dialog with proportional font, per-character queued reveal (~3s), two independent streak pools, switches only (no hotkeys), enter/esc/close dismisses, app exits
+6. **STOP and VALIDATE**: `/?` launches usage dialog with proportional font, scramble-reveal animation (per-cell cycling and lock via ScrambleRevealEffect), switches only (no hotkeys), enter/esc/close dismisses, app exits
 
 ### Incremental Delivery
 
-1. US3 HelpRainDialog → `/?` works with two-pool graphical rain dialog and proportional font → **MVP!**
+1. US3 UsageDialog → `/?` works with scramble-reveal usage dialog and proportional font → **MVP!**
 2. US5 → `?` key shows hotkey reference as in-app overlay on the main window (NOT dialog)
 3. Polish → Files in vcxproj, test suite, manual validation
 
@@ -413,25 +413,26 @@ T082: Manual validation
 - Constitution I (TDD): ALL core library code follows Red-Green-Refactor
 - Constitution VI (Library-First): ALL logic in MatrixRainCore.lib — .exe only gets main.cpp wiring
 - Constitution IX (Commit Discipline): One task = one commit, each commit builds and passes all tests
-- HelpRainDialog creates its own D3D11 device/swap chain — independent of main app's rendering context
-- HelpRainDialog uses proportional font (Segoe UI 14-16pt DPI-scaled) with per-character positioning via IDWriteTextLayout::HitTestTextPosition
-- HelpRainDialog has two independent streak pools: reveal (queued per-character, guaranteed 3s) and decorative (random pixel x, backs off in Phase 2)
+- UsageDialog creates its own D3D11 device/swap chain — independent of main app's rendering context
+- UsageDialog uses proportional font (Segoe UI 14-16pt DPI-scaled) with per-character positioning via IDWriteTextLayout::HitTestTextPosition
+- UsageDialog uses ScrambleRevealEffect for per-cell scramble-reveal animation with background matrix rain
 - Rain fills the entire window — no column grid, random pixel x-positions, streaks pass through text area
 - Resolved text uses feathered dark glow (DrawFeatheredGlow technique) for readability against rain
 - `/?` content: switches only (Options + Screensaver Options), no hotkeys
-- `?` key: in-app overlay (HotkeyOverlay) on the main window, NOT HelpRainDialog
+- `?` key: in-app overlay (HotkeyOverlay) on the main window, NOT UsageDialog
 - UsageText serves `/?` only — HelpHintOverlay has its own hardcoded 3-line layout, HotkeyOverlay has its own hotkey list
 - UnicodeSymbols.h provides named constants for em dash and other Unicode characters
 - Superseded tasks (T001, T008–T009, T014–T019, T058–T059, T061–T063) remain listed for traceability but are struck through
 
-### Architectural Note: TextSweepEffect (added 2026-03-06)
+### Architectural Note: ScrambleRevealEffect (added 2026-03-06)
 
-The original spec described per-character random resolve/dissolve (scramble timers, random selection for dissolve, per-character DissolveCycling/DissolveFading phases). During implementation this was replaced with a horizontal sweep model:
+The original spec described per-character random resolve/dissolve (scramble timers, random selection for dissolve, per-character DissolveCycling/DissolveFading phases). During implementation this was replaced with a scramble-reveal model:
 
-- **TextSweepEffect** is a shared timing oracle with per-row staggered delays/durations
-- **Reveal**: left-to-right sweep; characters behind the head show a random glyph, characters past the head show their target
-- **Dismiss**: right-to-left sweep (mirror); characters behind the head show a random glyph then fade out
-- **CharPhase** reduced from 5 values to 2 (Resolved, Hidden) — sweep timing replaces per-character state machine
-- **HintCharacter** fields simplified: randomGlyphIndex (assigned once), glowIntensity (green→white), no scrambleTimer/dissolveStartOffset
-- **Margin columns**: invisible columns on each side for smooth sweep entry/exit at edges
-- Both overlays' `Update()` methods share identical sweep logic: two-pass (update phase/opacity, then determine glyph from sweep position)
+- **ScrambleRevealEffect** is a shared timing oracle with per-cell staggered timing
+- **Reveal**: all non-space cells start cycling through random glyphs, each locks onto its target at a random time within revealDuration
+- **Dismiss**: settled cells randomly unlock back into cycling, then fade out
+- **CellPhase** has 5 values: Hidden, Cycling, LockFlash, Settled, Dismissing
+- **CharPhase** (overlay-level) mirrors CellPhase: Hidden, Cycling, LockFlash, Settled, Dismissing
+- **Color**: ComputeScrambleColor drives per-cell color — Cycling=dark green, LockFlash=yellow→mid green, Settled=mid green→white pulse→grey, Dismissing=dark green
+- **Margin columns**: invisible columns on each side for smooth reveal entry/exit at edges
+- All overlays' `Update()` methods share identical reveal logic: query per-cell state from ScrambleRevealEffect to determine phase, glyph, and color

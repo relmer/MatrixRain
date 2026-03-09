@@ -65,7 +65,7 @@ private:
     void InitializeCharacters();
 
 
-    // Sweep effect (handles all timing / phase transitions)
+    // Scramble-reveal effect (handles all timing / phase transitions)
     ScrambleRevealEffect            m_scramble;
 
     // Content
