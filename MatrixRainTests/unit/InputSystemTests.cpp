@@ -24,9 +24,9 @@ namespace MatrixRainTests
             // Then: DensityController percentage should increase by 5% to 85%
 
             Viewport viewport;
-            viewport.Resize (1920.0f, 1080.0f); // Max = 240 streaks
+            viewport.Resize (1920.0f, 1080.0f); // Max = 320 streaks
 
-            DensityController densityController (viewport, 32.0f); // 80%
+            DensityController densityController (viewport, 24.0f); // 80%
             InMemorySettingsProvider settingsProvider;
             ApplicationState appState (settingsProvider);
             appState.Initialize (nullptr);
@@ -34,16 +34,16 @@ namespace MatrixRainTests
             InputSystem inputSystem;
             inputSystem.Initialize (densityController, appState);
 
-            // Verify initial state (80% of 240 = 192 streaks)
+            // Verify initial state (80% of 320 = 256 streaks)
             Assert::AreEqual (80, densityController.GetPercentage (), L"Initial percentage should be 80");
-            Assert::AreEqual (192, densityController.GetTargetStreakCount (), L"Initial should be 192 streaks at 80%");
+            Assert::AreEqual (256, densityController.GetTargetStreakCount (), L"Initial should be 256 streaks at 80%");
 
             // Process VK_ADD
             inputSystem.ProcessKeyDown (VK_ADD);
 
-            // Verify percentage increased (85% of 240 = 204 streaks)
+            // Verify percentage increased (85% of 320 = 272 streaks)
             Assert::AreEqual (85, densityController.GetPercentage (), L"VK_ADD should increase to 85%");
-            Assert::AreEqual (204, densityController.GetTargetStreakCount (), L"Should be 204 streaks at 85%");
+            Assert::AreEqual (272, densityController.GetTargetStreakCount (), L"Should be 272 streaks at 85%");
         }
 
 
@@ -58,9 +58,9 @@ namespace MatrixRainTests
             // Then: DensityController percentage should decrease by 5% to 75%
 
             Viewport viewport;
-            viewport.Resize (1920.0f, 1080.0f); // Max = 240 streaks
+            viewport.Resize (1920.0f, 1080.0f); // Max = 320 streaks
 
-            DensityController densityController (viewport, 32.0f); // 80%
+            DensityController densityController (viewport, 24.0f); // 80%
             InMemorySettingsProvider settingsProvider;
             ApplicationState appState (settingsProvider);
             appState.Initialize (nullptr);
@@ -68,16 +68,16 @@ namespace MatrixRainTests
             InputSystem inputSystem;
             inputSystem.Initialize (densityController, appState);
 
-            // Verify initial state (80% of 240 = 192 streaks)
+            // Verify initial state (80% of 320 = 256 streaks)
             Assert::AreEqual (80, densityController.GetPercentage (), L"Initial percentage should be 80");
-            Assert::AreEqual (192, densityController.GetTargetStreakCount (), L"Initial should be 192 streaks at 80%");
+            Assert::AreEqual (256, densityController.GetTargetStreakCount (), L"Initial should be 256 streaks at 80%");
 
             // Process VK_SUBTRACT
             inputSystem.ProcessKeyDown (VK_SUBTRACT);
 
-            // Verify percentage decreased (75% of 240 = 180 streaks)
+            // Verify percentage decreased (75% of 320 = 240 streaks)
             Assert::AreEqual (75, densityController.GetPercentage (), L"VK_SUBTRACT should decrease to 75%");
-            Assert::AreEqual (180, densityController.GetTargetStreakCount (), L"Should be 180 streaks at 75%");
+            Assert::AreEqual (240, densityController.GetTargetStreakCount (), L"Should be 240 streaks at 75%");
         }
 
 
@@ -94,7 +94,7 @@ namespace MatrixRainTests
             Viewport viewport;
             viewport.Resize (1920.0f, 1080.0f);
 
-            DensityController densityController (viewport, 32.0f);
+            DensityController densityController (viewport, 24.0f);
             InMemorySettingsProvider settingsProvider;
             ApplicationState appState (settingsProvider);
             appState.Initialize (nullptr);
@@ -123,7 +123,7 @@ namespace MatrixRainTests
             Viewport viewport;
             viewport.Resize (1920.0f, 1080.0f);
 
-            DensityController densityController (viewport, 32.0f);
+            DensityController densityController (viewport, 24.0f);
             InMemorySettingsProvider settingsProvider;
             ApplicationState appState (settingsProvider);
             appState.Initialize (nullptr);
@@ -173,7 +173,7 @@ namespace MatrixRainTests
             Viewport viewport;
             viewport.Resize (1920.0f, 1080.0f);
 
-            DensityController densityController (viewport, 32.0f);
+            DensityController densityController (viewport, 24.0f);
             InMemorySettingsProvider settingsProvider;
             ApplicationState appState (settingsProvider);
             appState.Initialize (nullptr);

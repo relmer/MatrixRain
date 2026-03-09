@@ -62,7 +62,7 @@ namespace MatrixRainTests
             InMemorySettingsProvider settingsProvider;
             ApplicationState  appState (settingsProvider);
             Viewport          viewport;
-            DensityController densityController (viewport, 32.0f);
+            DensityController densityController (viewport, 24.0f);
             InputSystem       inputSystem;
 
 
@@ -88,7 +88,7 @@ namespace MatrixRainTests
             InMemorySettingsProvider settingsProvider;
             ApplicationState  appState (settingsProvider);
             Viewport          viewport;
-            DensityController densityController (viewport, 32.0f);
+            DensityController densityController (viewport, 24.0f);
             InputSystem       inputSystem;
 
 
@@ -120,7 +120,7 @@ namespace MatrixRainTests
             InMemorySettingsProvider settingsProvider;
             ApplicationState  appState (settingsProvider);
             Viewport          viewport;
-            DensityController densityController (viewport, 32.0f);
+            DensityController densityController (viewport, 24.0f);
             InputSystem       inputSystem;
 
 
@@ -152,7 +152,7 @@ namespace MatrixRainTests
             InMemorySettingsProvider settingsProvider;
             ApplicationState  appState (settingsProvider);
             Viewport          viewport;
-            DensityController densityController (viewport, 32.0f);
+            DensityController densityController (viewport, 24.0f);
             InputSystem       inputSystem;
 
 

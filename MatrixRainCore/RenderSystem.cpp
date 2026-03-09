@@ -65,6 +65,9 @@ HRESULT RenderSystem::Initialize (HWND hwnd, UINT width, UINT height)
     hr = CreateSamplerState();
     CHR (hr);
 
+    // Compute DPI scale BEFORE creating D2D resources so font sizes are correct
+    UpdateDpiScale();
+
     hr = CreateDirect2DResources();
     CHR (hr);
 
@@ -80,9 +83,6 @@ HRESULT RenderSystem::Initialize (HWND hwnd, UINT width, UINT height)
     viewport.MaxDepth = 1.0f;
 
     m_context->RSSetViewports (1, &viewport);
-
-    // Compute initial DPI scale factor from the window's monitor
-    UpdateDpiScale();
 
 Error:
     return hr;
@@ -255,7 +255,7 @@ static const char* s_kszVertexShaderSource = R"(
             float2 quadPos = quadVertices[vertexID % 6];
             
             // Character size in world space (scaled for viewport and per-character)
-            float2 charSize = float2(32.0, 48.0) * input.scale * characterScale;
+            float2 charSize = float2(24.0, 36.0) * input.scale * characterScale;
             float2 worldPos = input.position.xy + quadPos * charSize;
             
             // Apply projection
@@ -1490,7 +1490,7 @@ void RenderSystem::Render (const AnimationSystem & animationSystem, const Viewpo
                     viewportBaseScale = 0.5f;
             }
 
-            cbData->characterScale = viewportBaseScale * m_dpiScale * 0.75f;
+            cbData->characterScale = viewportBaseScale * m_dpiScale;
         }
 
         m_context->Unmap (m_constantBuffer.Get(), 0);

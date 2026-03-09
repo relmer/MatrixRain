@@ -182,7 +182,7 @@ namespace MatrixRainTests
 
             viewport.Resize (1920.0f, 1080.0f);
 
-            DensityController densityController (viewport, 32.0f);
+            DensityController densityController (viewport, 24.0f);
             densityController.SetPercentage (20);  // Low density for testing
 
             AnimationSystem animationSystem;

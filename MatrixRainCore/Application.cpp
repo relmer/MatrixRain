@@ -50,7 +50,7 @@ HRESULT Application::Initialize (HINSTANCE hInstance, int nCmdShow, const Screen
     m_hInstance         = hInstance;
     m_appState          = std::make_unique<ApplicationState> (m_settingsProvider);
     m_viewport          = std::make_unique<Viewport>();
-    m_densityController = std::make_unique<DensityController> (*m_viewport, 32.0f);  // Character width matches horizontal spacing
+    m_densityController = std::make_unique<DensityController> (*m_viewport, 24.0f);  // Character width matches horizontal spacing
     m_animationSystem   = std::make_unique<AnimationSystem>();
     m_renderSystem      = std::make_unique<RenderSystem>();
     m_inputSystem       = std::make_unique<InputSystem>();

@@ -478,7 +478,7 @@ void AnimationSystem::SetOverlayCharacters (std::vector<OverlayCharacter> overla
 
 float AnimationSystem::CalculateCharacterSpacing() const
 {
-    constexpr float BASE_SPACING     = 32.0f;
+    constexpr float BASE_SPACING     = 24.0f;
     constexpr float REFERENCE_HEIGHT = 1080.0f;
     constexpr float MIN_SCALE        = 0.5f;
 
@@ -494,7 +494,7 @@ float AnimationSystem::CalculateCharacterSpacing() const
 
     if (!m_viewport)
     {
-        return BASE_SPACING * m_dpiScale * 0.75f;
+        return BASE_SPACING * m_dpiScale;
     }
 
     viewportHeight = static_cast<float> (m_viewport->GetHeight ());
@@ -512,10 +512,10 @@ float AnimationSystem::CalculateCharacterSpacing() const
             scale = MIN_SCALE;
         }
 
-        return BASE_SPACING * scale * m_dpiScale * 0.75f;
+        return BASE_SPACING * scale * m_dpiScale;
     }
 
-    return BASE_SPACING * m_dpiScale * 0.75f;
+    return BASE_SPACING * m_dpiScale;
 }
 
 

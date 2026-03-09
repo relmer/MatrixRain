@@ -679,7 +679,7 @@ HRESULT UsageDialog::CreateRenderPipeline ()
     m_viewport->Resize (static_cast<float> (m_windowWidth),
                         static_cast<float> (m_windowHeight));
 
-    m_densityController = std::make_unique<DensityController> (*m_viewport, 32.0f);
+    m_densityController = std::make_unique<DensityController> (*m_viewport, 24.0f);
     m_densityController->SetPercentage (0);  // No rain during reveal; starts after text is fully revealed
 
     // Create AnimationSystem — steady-state density and speed from the start.
@@ -720,9 +720,9 @@ HRESULT UsageDialog::CreateRenderPipeline ()
                 viewportScale = 0.5f;
         }
 
-        float dialogScale = viewportScale * dpiScale * 0.75f;
+        float dialogScale = viewportScale * dpiScale;
 
-        m_animationSystem->SetCharacterSpacingOverride (32.0f * dialogScale);
+        m_animationSystem->SetCharacterSpacingOverride (24.0f * dialogScale);
         m_renderSystem->SetCharacterScaleOverride (dialogScale);
     }
 

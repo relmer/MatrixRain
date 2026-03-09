@@ -39,7 +39,7 @@ namespace MatrixRainTests
             viewport.Resize (1920.0f, 1080.0f);
 
             // Create density controller
-            DensityController densityController (viewport, 32.0f);
+            DensityController densityController (viewport, 24.0f);
 
             // Initialize AnimationSystem
             AnimationSystem animationSystem;
@@ -83,7 +83,7 @@ namespace MatrixRainTests
 
             viewport.Resize (1920.0f, 1080.0f);
 
-            DensityController densityController (viewport, 32.0f);
+            DensityController densityController (viewport, 24.0f);
 
             AnimationSystem animationSystem;
 
@@ -118,7 +118,7 @@ namespace MatrixRainTests
 
             viewport.Resize (800.0f, 600.0f);
 
-            DensityController densityController (viewport, 32.0f);
+            DensityController densityController (viewport, 24.0f);
 
             AnimationSystem animationSystem;
 
@@ -167,7 +167,7 @@ namespace MatrixRainTests
 
             viewport.Resize (1920.0f, 1080.0f);
 
-            DensityController densityController (viewport, 32.0f);
+            DensityController densityController (viewport, 24.0f);
 
             AnimationSystem animationSystem;
 
@@ -203,7 +203,7 @@ namespace MatrixRainTests
 
             viewport.Resize (1920.0f, 1080.0f);
 
-            DensityController densityController (viewport, 32.0f);
+            DensityController densityController (viewport, 24.0f);
 
             AnimationSystem animationSystem;
 
