@@ -22,15 +22,22 @@
 class HotkeyOverlay
 {
 public:
-    // Layout constants
-    static constexpr float ROW_HEIGHT   = 28.0f;
-    static constexpr float PADDING      = 30.0f;
-    static constexpr float GAP          = 16.0f;
-    static constexpr int   GLOW_LAYERS  = 4;
-    static constexpr int   MARGIN_COLS  = 2;
+    // Layout base constants (at 96 DPI / 100%)
+    static constexpr float BASE_ROW_HEIGHT = 28.0f;
+    static constexpr float BASE_PADDING    = 30.0f;
+    static constexpr float BASE_GAP        = 16.0f;
+    static constexpr int   GLOW_LAYERS     = 4;
+    static constexpr int   MARGIN_COLS     = 2;
 
 
     HotkeyOverlay();
+
+
+    // DPI scaling
+    void  SetDpiScale  (float dpiScale);
+    float GetRowHeight() const { return BASE_ROW_HEIGHT * m_dpiScale; }
+    float GetPadding()   const { return BASE_PADDING    * m_dpiScale; }
+    float GetGap()       const { return BASE_GAP        * m_dpiScale; }
 
 
     // State control
@@ -84,4 +91,7 @@ private:
     // Bounding rect for rendering
     D2D1_RECT_F                     m_boundingRect    = {};
     float                           m_keyColumnWidth  = 0.0f;
+
+    // DPI scale factor (1.0 at 96 DPI / 100%)
+    float                           m_dpiScale        = 1.0f;
 };

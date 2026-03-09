@@ -385,12 +385,32 @@ void HelpHintOverlay::UpdateLayout (float viewportWidth, float viewportHeight)
     // is kept as edge padding.
     //
 
-    float edgePadding = std::max (0.0f, PADDING - MARGIN_COLS * CHAR_WIDTH);
-    float blockWidth  = m_cols * CHAR_WIDTH  + edgePadding * 2.0f;
-    float blockHeight = m_rows * CHAR_HEIGHT + PADDING * 2.0f;
+    float charWidth   = GetCharWidth();
+    float charHeight  = GetCharHeight();
+    float padding     = GetPadding();
+    float edgePadding = std::max (0.0f, padding - MARGIN_COLS * charWidth);
+    float blockWidth  = m_cols * charWidth  + edgePadding * 2.0f;
+    float blockHeight = m_rows * charHeight + padding * 2.0f;
 
     m_boundingRect.left   = (viewportWidth  - blockWidth)  / 2.0f;
     m_boundingRect.top    = (viewportHeight - blockHeight) / 2.0f;
     m_boundingRect.right  = m_boundingRect.left + blockWidth;
     m_boundingRect.bottom = m_boundingRect.top  + blockHeight;
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  HelpHintOverlay::SetDpiScale
+//
+//  Updates the DPI scale factor used by the scaled layout accessors.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+void HelpHintOverlay::SetDpiScale (float dpiScale)
+{
+    m_dpiScale = dpiScale;
 }

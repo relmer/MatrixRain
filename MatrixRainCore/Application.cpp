@@ -168,6 +168,15 @@ HRESULT Application::InitializeApplicationWindow()
     hr = m_renderSystem->Initialize (m_hwnd, size.cx, size.cy);
     CHR (hr);
 
+    // Propagate the initial DPI scale to overlay classes so layout
+    // computations use the correct scaling from the very first frame.
+    {
+        float dpiScale = m_renderSystem->GetDpiScale();
+
+        m_helpHintOverlay->SetDpiScale (dpiScale);
+        m_hotkeyOverlay->SetDpiScale (dpiScale);
+    }
+
 
 
 Error:
@@ -553,6 +562,10 @@ LRESULT Application::HandleMessage (UINT uMsg, WPARAM wParam, LPARAM lParam)
             OnSize (lParam);
             return 0;
 
+        case WM_DPICHANGED:
+            OnDpiChanged (wParam, lParam);
+            return 0;
+
         case WM_NCHITTEST:
         {
             LRESULT result = DefWindowProc (m_hwnd, uMsg, wParam, lParam);
@@ -776,6 +789,67 @@ void Application::OnSize (LPARAM lParam)
         if (m_hotkeyOverlay && m_hotkeyOverlay->IsActive())
         {
             m_renderSystem->ComputeHotkeyOverlayLayout (*m_hotkeyOverlay, static_cast<float>(width), static_cast<float>(height));
+        }
+    }
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  Application::OnDpiChanged
+//
+//  Handles WM_DPICHANGED — triggered when the window moves to a monitor
+//  with a different DPI.  Resizes the window per the Windows-suggested rect
+//  and propagates the new DPI to the render system and overlays.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+void Application::OnDpiChanged (WPARAM wParam, LPARAM lParam)
+{
+    UINT              newDpi   = HIWORD (wParam);
+    float             dpiScale = static_cast<float> (newDpi) / 96.0f;
+    const RECT      * pRect   = reinterpret_cast<const RECT *> (lParam);
+
+
+    // Resize window to the rect Windows suggests for the new DPI
+    if (pRect)
+    {
+        SetWindowPos (m_hwnd,
+                      nullptr,
+                      pRect->left,
+                      pRect->top,
+                      pRect->right  - pRect->left,
+                      pRect->bottom - pRect->top,
+                      SWP_NOZORDER | SWP_NOACTIVATE);
+    }
+
+    // Propagate new DPI scale to the render system
+    if (m_renderSystem)
+    {
+        m_renderSystem->OnDpiChanged (newDpi);
+    }
+
+    // Propagate new DPI scale to overlays
+    if (m_helpHintOverlay)
+    {
+        m_helpHintOverlay->SetDpiScale (dpiScale);
+
+        if (m_viewport)
+        {
+            m_helpHintOverlay->UpdateLayout (m_viewport->GetWidth(), m_viewport->GetHeight());
+        }
+    }
+
+    if (m_hotkeyOverlay)
+    {
+        m_hotkeyOverlay->SetDpiScale (dpiScale);
+
+        if (m_hotkeyOverlay->IsActive() && m_renderSystem && m_viewport)
+        {
+            m_renderSystem->ComputeHotkeyOverlayLayout (*m_hotkeyOverlay, m_viewport->GetWidth(), m_viewport->GetHeight());
         }
     }
 }

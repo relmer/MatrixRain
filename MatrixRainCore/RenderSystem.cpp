@@ -31,6 +31,7 @@ HRESULT RenderSystem::Initialize (HWND hwnd, UINT width, UINT height)
 
 
     // Store dimensions for viewport and render target sizing
+    m_hwnd         = hwnd;
     m_renderWidth  = width;
     m_renderHeight = height;
     
@@ -79,6 +80,9 @@ HRESULT RenderSystem::Initialize (HWND hwnd, UINT width, UINT height)
     viewport.MaxDepth = 1.0f;
 
     m_context->RSSetViewports (1, &viewport);
+
+    // Compute initial DPI scale factor from the window's monitor
+    UpdateDpiScale();
 
 Error:
     return hr;
@@ -608,18 +612,8 @@ HRESULT RenderSystem::CreateDirect2DResources()
     CHRA (hr);
 
     // Create text format for FPS display (small, top-right aligned)
-    hr = m_dwriteFactory->CreateTextFormat (L"Consolas",
-                                            nullptr,
-                                            DWRITE_FONT_WEIGHT_NORMAL,
-                                            DWRITE_FONT_STYLE_NORMAL,
-                                            DWRITE_FONT_STRETCH_NORMAL,
-                                            20.0f,
-                                            L"en-us",
-                                            &m_fpsTextFormat);
-    CHRA (hr);
-
-    m_fpsTextFormat->SetTextAlignment (DWRITE_TEXT_ALIGNMENT_TRAILING);
-    m_fpsTextFormat->SetParagraphAlignment (DWRITE_PARAGRAPH_ALIGNMENT_FAR);
+    hr = CreateFpsTextFormat();
+    CHR (hr);
 
     // Create white brush for FPS text
     hr = m_d2dContext->CreateSolidColorBrush (D2D1::ColorF (D2D1::ColorF::White), &m_fpsBrush);
@@ -631,6 +625,92 @@ HRESULT RenderSystem::CreateDirect2DResources()
 
 Error:
     return hr;
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  RenderSystem::CreateFpsTextFormat
+//
+//  Creates (or recreates) the DirectWrite text format used by the FPS counter
+//  and overlay text measurement.  The font size is scaled by m_dpiScale so
+//  the text maintains a consistent logical size across DPI settings.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+HRESULT RenderSystem::CreateFpsTextFormat()
+{
+    HRESULT hr       = S_OK;
+    float   fontSize = 20.0f * m_dpiScale;
+
+
+    CBRAEx (m_dwriteFactory.Get() != nullptr, E_UNEXPECTED);
+
+    m_fpsTextFormat.Reset();
+
+    hr = m_dwriteFactory->CreateTextFormat (L"Consolas",
+                                            nullptr,
+                                            DWRITE_FONT_WEIGHT_NORMAL,
+                                            DWRITE_FONT_STYLE_NORMAL,
+                                            DWRITE_FONT_STRETCH_NORMAL,
+                                            fontSize,
+                                            L"en-us",
+                                            &m_fpsTextFormat);
+    CHRA (hr);
+
+    m_fpsTextFormat->SetTextAlignment (DWRITE_TEXT_ALIGNMENT_TRAILING);
+    m_fpsTextFormat->SetParagraphAlignment (DWRITE_PARAGRAPH_ALIGNMENT_FAR);
+
+Error:
+    return hr;
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  RenderSystem::UpdateDpiScale
+//
+//  Queries the window's current DPI and updates m_dpiScale accordingly.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+void RenderSystem::UpdateDpiScale()
+{
+    if (m_hwnd)
+    {
+        UINT dpi   = GetDpiForWindow (m_hwnd);
+        m_dpiScale = static_cast<float> (dpi) / 96.0f;
+    }
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  RenderSystem::OnDpiChanged
+//
+//  Called when the system notifies us of a DPI change (WM_DPICHANGED).
+//  Updates the DPI scale factor and recreates DPI-sensitive resources.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+void RenderSystem::OnDpiChanged (UINT dpi)
+{
+    m_dpiScale = static_cast<float> (dpi) / 96.0f;
+
+    // Recreate the FPS text format at the new DPI scale
+    if (m_dwriteFactory)
+    {
+        CreateFpsTextFormat();
+    }
 }
 
 
@@ -1353,29 +1433,35 @@ void RenderSystem::Render (const AnimationSystem & animationSystem, const Viewpo
         // Calculate character scale based on viewport height
         // Scale down proportionally for preview mode to fit the entire effect
         // Minimum scale ensures characters remain visible (12px tall minimum)
+        //
+        // DPI scaling: The base character size (32×48 in the shader) is in physical pixels.
+        // We multiply by m_dpiScale so characters maintain a consistent logical size
+        // regardless of the monitor's DPI setting.
+        // The reference viewport height (1080) is also DPI-adjusted so that the
+        // same logical viewport produces the same scale across DPI levels.
         if (m_characterScaleOverride.has_value())
         {
             // Use explicit override (e.g., UsageDialog forcing full-size characters)
+            // UsageDialog handles its own DPI scaling — do NOT multiply by m_dpiScale
             cbData->characterScale = m_characterScaleOverride.value();
         }
         else
         {
-            float viewportHeight = static_cast<float> (viewport.GetHeight());
+            float viewportHeight    = static_cast<float> (viewport.GetHeight());
+            float referenceHeight   = 1080.0f * m_dpiScale;
+            float viewportBaseScale = 1.0f;
 
-            if (viewportHeight < 1080.0f)
+            if (viewportHeight < referenceHeight)
             {
-                // Scale linearly based on viewport height (Full HD = 1.0 reference)
-                cbData->characterScale = viewportHeight / 1080.0f;
+                // Scale linearly based on viewport height (reference = 1.0)
+                viewportBaseScale = viewportHeight / referenceHeight;
 
-                // Clamp to minimum 0.5 (24px tall from 48px base)
-                if (cbData->characterScale < 0.5f)
-                    cbData->characterScale = 0.5f;
+                // Clamp to minimum 0.5 (24px tall from 48px base at 96 DPI)
+                if (viewportBaseScale < 0.5f)
+                    viewportBaseScale = 0.5f;
             }
-            else
-            {
-                // Full HD and above: use normal character size
-                cbData->characterScale = 1.0f;
-            }
+
+            cbData->characterScale = viewportBaseScale * m_dpiScale;
         }
 
         m_context->Unmap (m_constantBuffer.Get(), 0);
@@ -1785,11 +1871,11 @@ void RenderSystem::RenderOverlayCharacters (std::span<const HintCharacter> chars
 
 void RenderSystem::RenderHelpHintOverlay (const HelpHintOverlay & overlay)
 {
-    constexpr float CHAR_WIDTH   = HelpHintOverlay::CHAR_WIDTH;
-    constexpr float CHAR_HEIGHT  = HelpHintOverlay::CHAR_HEIGHT;
-    constexpr float PADDING      = HelpHintOverlay::PADDING;
-    constexpr int   MARGIN_COLS  = HelpHintOverlay::MARGIN_COLS;
-    constexpr float EDGE_PADDING = std::max (0.0f, PADDING - MARGIN_COLS * CHAR_WIDTH);
+    const float CHAR_WIDTH   = overlay.GetCharWidth();
+    const float CHAR_HEIGHT  = overlay.GetCharHeight();
+    const float PADDING      = overlay.GetPadding();
+    const int   MARGIN_COLS  = HelpHintOverlay::MARGIN_COLS;
+    const float EDGE_PADDING = std::max (0.0f, PADDING - MARGIN_COLS * CHAR_WIDTH);
 
     HRESULT                        hr           = S_OK;
     bool                           drawing      = false;
@@ -1815,7 +1901,7 @@ void RenderSystem::RenderHelpHintOverlay (const HelpHintOverlay & overlay)
     baseY = boundingRect.top  + PADDING;
 
     RenderOverlayCharacters (chars, overlay.GetAllGlyphs(), HelpHintOverlay::GLOW_LAYERS,
-        [baseX, baseY] (const HintCharacter & ch) -> D2D1_RECT_F
+        [baseX, baseY, CHAR_WIDTH, CHAR_HEIGHT] (const HintCharacter & ch) -> D2D1_RECT_F
         {
             float charX = baseX + ch.col * CHAR_WIDTH;
             float charY = baseY + ch.row * CHAR_HEIGHT;
@@ -1850,9 +1936,9 @@ Error:
 
 void RenderSystem::ComputeHotkeyOverlayLayout (HotkeyOverlay & overlay, float viewportWidth, float viewportHeight)
 {
-    constexpr float ROW_HEIGHT = HotkeyOverlay::ROW_HEIGHT;
-    constexpr float PADDING    = HotkeyOverlay::PADDING;
-    constexpr float GAP        = HotkeyOverlay::GAP;
+    const float ROW_HEIGHT = overlay.GetRowHeight();
+    const float PADDING    = overlay.GetPadding();
+    const float GAP        = overlay.GetGap();
 
     const auto & hotkeys = overlay.GetHotkeys();
 
@@ -2014,9 +2100,9 @@ static D2D1_RECT_F ComputeHotkeyCharRect (const HotkeyColumnLayout & layout, con
 
 static HotkeyColumnLayout ComputeHotkeyColumnLayout (const HotkeyOverlay & overlay)
 {
-    constexpr float PADDING     = HotkeyOverlay::PADDING;
-    constexpr float GAP         = HotkeyOverlay::GAP;
-    constexpr int   MARGIN_COLS = HotkeyOverlay::MARGIN_COLS;
+    const float PADDING     = overlay.GetPadding();
+    const float GAP         = overlay.GetGap();
+    const int   MARGIN_COLS = HotkeyOverlay::MARGIN_COLS;
 
     HotkeyColumnLayout layout;
     D2D1_RECT_F        boundingRect = overlay.GetBoundingRect();
@@ -2032,7 +2118,7 @@ static HotkeyColumnLayout ComputeHotkeyColumnLayout (const HotkeyOverlay & overl
     layout.baseY            = boundingRect.top + PADDING;
     layout.padding          = PADDING;
     layout.gap              = GAP;
-    layout.rowHeight        = HotkeyOverlay::ROW_HEIGHT;
+    layout.rowHeight        = overlay.GetRowHeight();
     layout.keyColPixelWidth = overlay.GetKeyColumnWidth();
 
     for (const auto & entry : overlay.GetHotkeys())

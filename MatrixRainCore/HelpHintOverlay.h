@@ -84,15 +84,22 @@ struct HintCharacter
 class HelpHintOverlay
 {
 public:
-    // Layout constants
-    static constexpr float CHAR_WIDTH   = 16.0f;
-    static constexpr float CHAR_HEIGHT  = 28.0f;
-    static constexpr float PADDING      = 20.0f;
-    static constexpr int   GLOW_LAYERS  = 4;
-    static constexpr int   MARGIN_COLS  = 1;
+    // Layout base constants (at 96 DPI / 100%)
+    static constexpr float BASE_CHAR_WIDTH  = 16.0f;
+    static constexpr float BASE_CHAR_HEIGHT = 28.0f;
+    static constexpr float BASE_PADDING     = 20.0f;
+    static constexpr int   GLOW_LAYERS      = 4;
+    static constexpr int   MARGIN_COLS      = 1;
 
 
     HelpHintOverlay();
+
+
+    // DPI scaling
+    void  SetDpiScale (float dpiScale);
+    float GetCharWidth()  const { return BASE_CHAR_WIDTH  * m_dpiScale; }
+    float GetCharHeight() const { return BASE_CHAR_HEIGHT * m_dpiScale; }
+    float GetPadding()    const { return BASE_PADDING     * m_dpiScale; }
 
 
     // State control
@@ -140,4 +147,7 @@ private:
 
     // Glyph set for scrambling
     std::vector<uint32_t>            m_allGlyphs;
+
+    // DPI scale factor (1.0 at 96 DPI / 100%)
+    float                            m_dpiScale = 1.0f;
 };

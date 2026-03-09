@@ -114,6 +114,7 @@ private:
     void OnSysKeyDown               (WPARAM wParam);
     void OnMouseMove                (LPARAM lParam);
     void OnSize                     (LPARAM lParam);
+    void OnDpiChanged               (WPARAM wParam, LPARAM lParam);
     void OnNcHitTest                (LRESULT & result);
     
     // Window procedure

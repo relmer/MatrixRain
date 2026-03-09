@@ -432,3 +432,20 @@ void HotkeyOverlay::SetMeasuredLayout (D2D1_RECT_F boundingRect, float keyColumn
     m_boundingRect   = boundingRect;
     m_keyColumnWidth = keyColumnWidth;
 }
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  HotkeyOverlay::SetDpiScale
+//
+//  Updates the DPI scale factor used by the scaled layout accessors.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+void HotkeyOverlay::SetDpiScale (float dpiScale)
+{
+    m_dpiScale = dpiScale;
+}

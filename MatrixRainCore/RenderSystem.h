@@ -122,6 +122,19 @@ public:
     /// <param name="scale">Fixed character scale (1.0 = full size)</param>
     void SetCharacterScaleOverride (float scale);
 
+    /// <summary>
+    /// Notify the render system of a DPI change.  Recreates DPI-sensitive
+    /// resources (text formats) and stores the new scale factor for use
+    /// by the character-scale constant buffer and overlay layout.
+    /// </summary>
+    /// <param name="dpi">New dots-per-inch value from GetDpiForWindow</param>
+    void OnDpiChanged (UINT dpi);
+
+    /// <summary>
+    /// Returns the current DPI scale factor (1.0 at 96 DPI / 100%).
+    /// </summary>
+    float GetDpiScale() const { return m_dpiScale; }
+
     // Accessors
     ID3D11Device        * GetDevice()       const { return m_device.Get();       }
     ID3D11DeviceContext * GetContext()      const { return m_context.Get();      }
@@ -186,6 +199,8 @@ private:
     HRESULT CreateBlendState();
     HRESULT CreateSamplerState();
     HRESULT CreateDirect2DResources();
+    HRESULT CreateFpsTextFormat();
+    void    UpdateDpiScale();
     HRESULT CreateBloomResources       (UINT width, UINT height);
 
     // Rendering helpers
@@ -274,9 +289,15 @@ private:
     // Texture atlas reference
     ComPtr<ID3D11ShaderResourceView> m_atlasTextureSRV;
 
+    // Window handle (for DPI queries)
+    HWND m_hwnd { nullptr };
+
     // Render target dimensions
     UINT m_renderWidth  { 0 };
     UINT m_renderHeight { 0 };
+
+    // DPI scale factor (1.0 at 96 DPI / 100%)
+    float m_dpiScale { 1.0f };
 
     // Glow effect parameters
     float m_glowIntensity { 2.5f };  // Bloom intensity multiplier (100% = 2.5)

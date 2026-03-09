@@ -481,6 +481,63 @@ namespace MatrixRainTests
                 Assert::AreEqual (static_cast<int>(OverlayPhase::Hidden), static_cast<int>(overlay.GetPhase()), L"Dismiss from Hidden should be no-op");
                 Assert::IsFalse (overlay.IsActive(), L"Should remain inactive");
             }
+
+
+
+
+            ////////////////////////////////////////////////////////////
+            //  SetDpiScale scales layout proportionally
+            ////////////////////////////////////////////////////////////
+
+            TEST_METHOD (SetDpiScale_ScalesLayoutProportionally)
+            {
+                HelpHintOverlay overlay1x;
+                HelpHintOverlay overlay2x;
+
+
+                overlay1x.UpdateLayout (1920.0f, 1080.0f);
+
+                overlay2x.SetDpiScale (2.0f);
+                overlay2x.UpdateLayout (3840.0f, 2160.0f);
+
+                D2D1_RECT_F rect1x = overlay1x.GetBoundingRect();
+                D2D1_RECT_F rect2x = overlay2x.GetBoundingRect();
+
+                float width1x  = rect1x.right  - rect1x.left;
+                float height1x = rect1x.bottom - rect1x.top;
+                float width2x  = rect2x.right  - rect2x.left;
+                float height2x = rect2x.bottom - rect2x.top;
+
+                // At 2× DPI with 2× viewport, block should be 2× larger in pixels
+                Assert::IsTrue (abs (width2x  - width1x  * 2.0f) < 1.0f, L"Width should double at 2× DPI");
+                Assert::IsTrue (abs (height2x - height1x * 2.0f) < 1.0f, L"Height should double at 2× DPI");
+
+                // Both should still be centered in their respective viewports
+                float centerX2x = (rect2x.left + rect2x.right) / 2.0f;
+                float centerY2x = (rect2x.top + rect2x.bottom) / 2.0f;
+
+                Assert::IsTrue (abs (centerX2x - 1920.0f) < 1.0f, L"Should be horizontally centered at 2× DPI");
+                Assert::IsTrue (abs (centerY2x - 1080.0f) < 1.0f, L"Should be vertically centered at 2× DPI");
+            }
+
+
+
+
+            ////////////////////////////////////////////////////////////
+            //  Default DPI scale is 1.0 (backward compatible)
+            ////////////////////////////////////////////////////////////
+
+            TEST_METHOD (DefaultDpiScale_IsOne)
+            {
+                HelpHintOverlay overlay;
+
+
+                // With default dpiScale=1.0 the scaled accessors should
+                // return the base constants unchanged.
+                Assert::AreEqual (HelpHintOverlay::BASE_CHAR_WIDTH,  overlay.GetCharWidth(),  L"Default char width should match base");
+                Assert::AreEqual (HelpHintOverlay::BASE_CHAR_HEIGHT, overlay.GetCharHeight(), L"Default char height should match base");
+                Assert::AreEqual (HelpHintOverlay::BASE_PADDING,     overlay.GetPadding(),    L"Default padding should match base");
+            }
     };
 
 
