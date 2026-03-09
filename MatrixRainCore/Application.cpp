@@ -175,6 +175,7 @@ HRESULT Application::InitializeApplicationWindow()
 
         m_helpHintOverlay->SetDpiScale (dpiScale);
         m_hotkeyOverlay->SetDpiScale (dpiScale);
+        m_animationSystem->SetDpiScale (dpiScale);
     }
 
 
@@ -851,6 +852,12 @@ void Application::OnDpiChanged (WPARAM wParam, LPARAM lParam)
         {
             m_renderSystem->ComputeHotkeyOverlayLayout (*m_hotkeyOverlay, m_viewport->GetWidth(), m_viewport->GetHeight());
         }
+    }
+
+    // Propagate new DPI scale to animation system for character spacing
+    if (m_animationSystem)
+    {
+        m_animationSystem->SetDpiScale (dpiScale);
     }
 }
 

@@ -1461,7 +1461,7 @@ void RenderSystem::Render (const AnimationSystem & animationSystem, const Viewpo
                     viewportBaseScale = 0.5f;
             }
 
-            cbData->characterScale = viewportBaseScale * m_dpiScale;
+            cbData->characterScale = viewportBaseScale * m_dpiScale * 0.75f;
         }
 
         m_context->Unmap (m_constantBuffer.Get(), 0);

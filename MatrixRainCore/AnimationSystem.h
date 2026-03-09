@@ -146,6 +146,12 @@ public:
     void SetCharacterSpacingOverride (float spacing);
 
     /// <summary>
+    /// Set the DPI scale factor so character spacing scales with display DPI.
+    /// </summary>
+    /// <param name="dpiScale">Scale factor (1.0 at 96 DPI / 100%)</param>
+    void SetDpiScale (float dpiScale);
+
+    /// <summary>
     /// Set a callback that can override the X position of newly spawned streaks.
     /// The callback receives the valid spawn range and returns an X position,
     /// or nullopt to use normal random placement.
@@ -183,6 +189,7 @@ private:
     int                            m_previousTargetCount   = 0;            // Previous frame's target count (to detect density changes)
     int                            m_animationSpeedPercent = 100;        // Current animation speed percentage (1-100)
     std::optional<float>           m_characterSpacingOverride;            // Override for character spacing (bypasses viewport scaling)
+    float                          m_dpiScale              = 1.0f;      // DPI scale factor (1.0 at 96 DPI / 100%)
     SpawnPositionCallback          m_spawnPositionCallback;               // Optional callback for overriding spawn X position
     std::vector<OverlayCharacter>  m_overlayCharacters;                   // Extra characters rendered alongside streaks
     

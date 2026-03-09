@@ -414,6 +414,32 @@ void AnimationSystem::SetCharacterSpacingOverride (float spacing)
 
 ////////////////////////////////////////////////////////////////////////////////
 //
+//  AnimationSystem::SetDpiScale
+//
+//  Updates the DPI scale factor and recalculates character spacing on all
+//  active streaks so they don't overlap at high DPI.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+void AnimationSystem::SetDpiScale (float dpiScale)
+{
+    m_dpiScale = dpiScale;
+
+    // Recalculate spacing for all existing streaks
+    float characterSpacing = CalculateCharacterSpacing();
+
+    for (auto & streak : m_streaks)
+    {
+        streak.SetCharacterSpacing (characterSpacing);
+    }
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
 //  AnimationSystem::SetSpawnPositionCallback
 //
 //  Sets or clears the callback used to override streak spawn X positions.
@@ -468,13 +494,16 @@ float AnimationSystem::CalculateCharacterSpacing() const
 
     if (!m_viewport)
     {
-        return BASE_SPACING;
+        return BASE_SPACING * m_dpiScale * 0.75f;
     }
 
     viewportHeight = static_cast<float> (m_viewport->GetHeight ());
-    if (viewportHeight < REFERENCE_HEIGHT)
+
+    float referenceHeight = REFERENCE_HEIGHT * m_dpiScale;
+
+    if (viewportHeight < referenceHeight)
     {
-        float scale = viewportHeight / REFERENCE_HEIGHT;
+        float scale = viewportHeight / referenceHeight;
 
 
 
@@ -483,10 +512,10 @@ float AnimationSystem::CalculateCharacterSpacing() const
             scale = MIN_SCALE;
         }
 
-        return BASE_SPACING * scale;
+        return BASE_SPACING * scale * m_dpiScale * 0.75f;
     }
 
-    return BASE_SPACING;
+    return BASE_SPACING * m_dpiScale * 0.75f;
 }
 
 

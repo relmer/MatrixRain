@@ -234,8 +234,8 @@ namespace MatrixRainTests
             float prevY = characters[characters.size () - 2].positionOffset.y;
             float actualSpacing = headY - prevY;
 
-            // Height 480 → scale clamped to 0.5, so spacing should be 16px
-            Assert::AreEqual (16.0f, actualSpacing, 0.5f,
+            // Height 480 → scale clamped to 0.5, then 0.75 size factor, so spacing should be 12px
+            Assert::AreEqual (12.0f, actualSpacing, 0.5f,
                 L"Character spacing should shrink with viewport height (clamped at 0.5x)");
         }
     };

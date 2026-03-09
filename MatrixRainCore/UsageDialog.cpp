@@ -693,8 +693,16 @@ HRESULT UsageDialog::CreateRenderPipeline ()
     // Without overrides the pipeline scales characters down proportionally
     // for viewports smaller than 1080px — fine for the settings preview
     // but wrong for the help dialog where we want full-impact rain.
-    m_animationSystem->SetCharacterSpacingOverride (32.0f);
-    m_renderSystem->SetCharacterScaleOverride (1.0f);
+    // Multiply by DPI scale so characters maintain consistent logical size.
+    // The 0.75 factor reduces characters to 75% of full size for a denser,
+    // more cinematic backdrop that doesn't overpower the usage text.
+    {
+        float dpiScale      = m_renderSystem->GetDpiScale();
+        float dialogScale   = 0.75f * dpiScale;
+
+        m_animationSystem->SetCharacterSpacingOverride (32.0f * dialogScale);
+        m_renderSystem->SetCharacterScaleOverride (dialogScale);
+    }
 
     // Create D2D text overlay brushes on RenderSystem's D2D context
     {
