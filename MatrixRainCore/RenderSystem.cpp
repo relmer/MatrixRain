@@ -746,6 +746,13 @@ static const char * s_kszQuadVertexShaderSource = R"(
     )";
 
 static const char * s_kszBlurHorizontalShaderSource = R"(
+        cbuffer BloomConstants : register(b0)
+        {
+            float bloomIntensity;
+            float glowSize;
+            float2 padding;
+        };
+
         Texture2D inputTexture : register(t0);
         SamplerState samplerState : register(s0);
 
@@ -757,18 +764,17 @@ static const char * s_kszBlurHorizontalShaderSource = R"(
 
         float4 main(PSInput input) : SV_TARGET
         {
-            // Get texture dimensions dynamically
             uint width, height;
             inputTexture.GetDimensions(width, height);
-            float2 texelSize = float2(1.0 / width, 1.0 / height);
+            float texelX = glowSize / width;
             
             float4 color = float4(0, 0, 0, 0);
             
-            // 13-tap Gaussian blur for wider spread (horizontal)
+            // 13-tap Gaussian blur (horizontal), spread scaled by glowSize
             float weights[13] = { 0.02, 0.04, 0.06, 0.08, 0.10, 0.12, 0.16, 0.12, 0.10, 0.08, 0.06, 0.04, 0.02 };
             for (int i = -6; i <= 6; i++)
             {
-                float2 offset = float2(i * texelSize.x, 0);
+                float2 offset = float2(i * texelX, 0);
                 color += inputTexture.Sample(samplerState, input.uv + offset) * weights[i + 6];
             }
             
@@ -777,6 +783,13 @@ static const char * s_kszBlurHorizontalShaderSource = R"(
     )";
 
 static const char * s_kszBlurVerticalShaderSource = R"(
+        cbuffer BloomConstants : register(b0)
+        {
+            float bloomIntensity;
+            float glowSize;
+            float2 padding;
+        };
+
         Texture2D inputTexture : register(t0);
         SamplerState samplerState : register(s0);
 
@@ -788,18 +801,17 @@ static const char * s_kszBlurVerticalShaderSource = R"(
 
         float4 main(PSInput input) : SV_TARGET
         {
-            // Get texture dimensions dynamically
             uint width, height;
             inputTexture.GetDimensions(width, height);
-            float2 texelSize = float2(1.0 / width, 1.0 / height);
+            float texelY = glowSize / height;
             
             float4 color = float4(0, 0, 0, 0);
             
-            // 13-tap Gaussian blur for wider spread (vertical)
+            // 13-tap Gaussian blur (vertical), spread scaled by glowSize
             float weights[13] = { 0.02, 0.04, 0.06, 0.08, 0.10, 0.12, 0.16, 0.12, 0.10, 0.08, 0.06, 0.04, 0.02 };
             for (int i = -6; i <= 6; i++)
             {
-                float2 offset = float2(0, i * texelSize.y);
+                float2 offset = float2(0, i * texelY);
                 color += inputTexture.Sample(samplerState, input.uv + offset) * weights[i + 6];
             }
             
@@ -844,7 +856,8 @@ static const char * s_kszBloomCompositeShaderSource = R"(
         cbuffer BloomConstants : register(b0)
         {
             float bloomIntensity;
-            float3 padding;
+            float glowSize;
+            float2 padding;
         };
 
         Texture2D sceneTexture : register(t0);
@@ -1172,6 +1185,23 @@ HRESULT RenderSystem::ApplyBloom()
     
     RenderFullscreenPass (m_bloomRTV.Get(), m_bloomExtractPS.Get(), m_sceneSRV.GetAddressOf(), 1);
     
+    // Update bloom constant buffer (shared by blur and composite shaders)
+    hr = m_context->Map (m_bloomConstantBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedBloomCB);
+    if (SUCCEEDED (hr))
+    {
+        float * bloomData = static_cast<float*> (mappedBloomCB.pData);
+
+        bloomData[0] = m_glowIntensity;  // Bloom intensity
+        bloomData[1] = m_glowSize;       // Blur radius multiplier
+        bloomData[2] = 0.0f;             // Padding
+        bloomData[3] = 0.0f;             // Padding
+
+        m_context->Unmap (m_bloomConstantBuffer.Get(), 0);
+    }
+
+    // Bind constant buffer for blur shaders (glowSize controls spread)
+    m_context->PSSetConstantBuffers (0, 1, m_bloomConstantBuffer.GetAddressOf());
+
     // Horizontal blur pass (bloom → temp)
     RenderFullscreenPass (m_blurTempRTV.Get(), m_blurHorizontalPS.Get(), m_bloomSRV.GetAddressOf(), 1);
     
@@ -1180,22 +1210,6 @@ HRESULT RenderSystem::ApplyBloom()
     
     // Restore full viewport
     SetViewport (m_renderWidth, m_renderHeight);
-    
-    // Update bloom constant buffer with current intensity
-    hr = m_context->Map (m_bloomConstantBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedBloomCB);
-    if (SUCCEEDED (hr))
-    {
-        float * bloomData = static_cast<float*> (mappedBloomCB.pData);
-        
-        
-        
-        bloomData[0] = m_glowIntensity;  // Bloom intensity
-        bloomData[1] = 0.0f;             // Padding
-        bloomData[2] = 0.0f;             // Padding
-        bloomData[3] = 0.0f;             // Padding
-        
-        m_context->Unmap (m_bloomConstantBuffer.Get(), 0);
-    }
     
     // Composite back to backbuffer
     m_context->OMSetRenderTargets (1, m_renderTargetView.GetAddressOf(), nullptr);

@@ -689,16 +689,38 @@ HRESULT UsageDialog::CreateRenderPipeline ()
     m_animationSystem->ClearAllStreaks();  // Remove the MIN_STREAKS streak spawned during init
     m_animationSystem->SetAnimationSpeed (std::min (100, static_cast<int> (m_settings.m_animationSpeedPercent)));
 
-    // Force full-size rain characters regardless of viewport size.
-    // Without overrides the pipeline scales characters down proportionally
-    // for viewports smaller than 1080px — fine for the settings preview
-    // but wrong for the help dialog where we want full-impact rain.
-    // Multiply by DPI scale so characters maintain consistent logical size.
-    // The 0.75 factor reduces characters to 75% of full size for a denser,
-    // more cinematic backdrop that doesn't overpower the usage text.
+    // Match the fullscreen character scale so rain appears the same size
+    // as the main window.  Use the monitor's resolution (not the dialog's
+    // window size) to compute the viewport scale factor, since that's what
+    // the fullscreen pipeline would use.
     {
-        float dpiScale      = m_renderSystem->GetDpiScale();
-        float dialogScale   = 0.75f * dpiScale;
+        float dpiScale        = m_renderSystem->GetDpiScale();
+        float referenceHeight = 1080.0f * dpiScale;
+        float screenHeight    = referenceHeight;  // Fallback: assume reference
+        float viewportScale   = 1.0f;
+
+        HMONITOR hMon = MonitorFromWindow (m_hWnd, MONITOR_DEFAULTTONEAREST);
+
+        if (hMon)
+        {
+            MONITORINFO mi = {};
+            mi.cbSize      = sizeof (mi);
+
+            if (GetMonitorInfo (hMon, &mi))
+            {
+                screenHeight = static_cast<float> (mi.rcMonitor.bottom - mi.rcMonitor.top);
+            }
+        }
+
+        if (screenHeight < referenceHeight)
+        {
+            viewportScale = screenHeight / referenceHeight;
+
+            if (viewportScale < 0.5f)
+                viewportScale = 0.5f;
+        }
+
+        float dialogScale = viewportScale * dpiScale * 0.75f;
 
         m_animationSystem->SetCharacterSpacingOverride (32.0f * dialogScale);
         m_renderSystem->SetCharacterScaleOverride (dialogScale);
