@@ -154,6 +154,7 @@ void HelpHintOverlay::InitializeCharacters ()
                 }
             }
 
+            ch.randomGlyphIndex  = (m_chars.size() * 7) % m_allGlyphs.size();
             ch.currentGlyphIndex = ch.targetGlyphIndex;
 
             m_chars.push_back (ch);

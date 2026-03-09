@@ -25,9 +25,9 @@ OverlayColor ComputeScrambleColor (CellPhase cellPhase,
 {
     OverlayColor color;
 
-    static constexpr float kPulseRampUp   = 0.8f;    // Smooth ramp to white duration
-    static constexpr float kPulseHold     = 1.5f;    // Hold at white duration
-    static constexpr float kPulseRampDown = 1.0f;    // Smooth ramp back to green duration
+    static constexpr float kPulseRampUp   = 0.33f;   // Smooth ramp to white duration
+    static constexpr float kPulseHold     = 0.75f;   // Hold at white duration
+    static constexpr float kPulseRampDown = 0.5f;    // Smooth ramp back to green duration
 
 
 
