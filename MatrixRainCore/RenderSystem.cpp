@@ -836,7 +836,6 @@ static const char * s_kszBloomExtractShaderSource = R"(
             // Smooth falloff near threshold for gradual bloom
             float bloomAmount = smoothstep(threshold, threshold + 0.25, brightness);
 
-            // Return the bright color multiplied by bloom amount
             return float4(color.rgb * bloomAmount, 1.0);
         }
     )";
@@ -863,8 +862,15 @@ static const char * s_kszBloomCompositeShaderSource = R"(
             float4 scene = sceneTexture.Sample(samplerState, input.uv);
             float4 bloom = bloomTexture.Sample(samplerState, input.uv);
             
-            // Additive blend with dynamic bloom intensity
-            return scene + bloom * bloomIntensity;
+            // Exponential soft-saturation: low bloom values pass through
+            // nearly linearly (good glow on isolated streaks) while high
+            // bloom values from dense overlapping areas hit a ceiling.
+            // This lets the user crank up bloomIntensity without dense
+            // regions becoming a solid wall of glow.
+            float3 bloomContrib = bloom.rgb * bloomIntensity;
+            float3 softBloom   = 1.0 - exp(-bloomContrib);
+
+            return float4(scene.rgb + softBloom * (1.0 - scene.rgb), 1.0);
         }
     )";
 
