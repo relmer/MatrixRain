@@ -842,11 +842,14 @@ static const char * s_kszBloomExtractShaderSource = R"(
             // Use the higher of luminance or max component as brightness metric
             float brightness = max(luminance, maxComp);
 
-            // Lower threshold to include deep blues/reds while keeping green/amber strong
-            float threshold = 0.45;
+            // Low threshold so even dim characters get a subtle glow.
+            // The wide smoothstep range (0.1 → 0.6) ensures bright streak
+            // heads bloom strongly while dim tail characters still contribute
+            // a soft halo rather than appearing flat.
+            float threshold = 0.1;
 
-            // Smooth falloff near threshold for gradual bloom
-            float bloomAmount = smoothstep(threshold, threshold + 0.25, brightness);
+            // Smooth ramp: dim chars get subtle bloom, bright chars get full
+            float bloomAmount = smoothstep(threshold, threshold + 0.5, brightness);
 
             return float4(color.rgb * bloomAmount, 1.0);
         }
@@ -1202,11 +1205,17 @@ HRESULT RenderSystem::ApplyBloom()
     // Bind constant buffer for blur shaders (glowSize controls spread)
     m_context->PSSetConstantBuffers (0, 1, m_bloomConstantBuffer.GetAddressOf());
 
-    // Horizontal blur pass (bloom → temp)
-    RenderFullscreenPass (m_blurTempRTV.Get(), m_blurHorizontalPS.Get(), m_bloomSRV.GetAddressOf(), 1);
-    
-    // Vertical blur pass (temp → bloom)
-    RenderFullscreenPass (m_bloomRTV.Get(), m_blurVerticalPS.Get(), m_blurTempSRV.GetAddressOf(), 1);
+    // Multiple blur passes: each H+V pass blurs the previous result,
+    // creating an exponentially wider and softer glow.  Three passes with
+    // a 13-tap kernel produce a very wide, cinematic bloom falloff.
+    for (int pass = 0; pass < 3; ++pass)
+    {
+        // Horizontal blur pass (bloom → temp)
+        RenderFullscreenPass (m_blurTempRTV.Get(), m_blurHorizontalPS.Get(), m_bloomSRV.GetAddressOf(), 1);
+
+        // Vertical blur pass (temp → bloom)
+        RenderFullscreenPass (m_bloomRTV.Get(), m_blurVerticalPS.Get(), m_blurTempSRV.GetAddressOf(), 1);
+    }
     
     // Restore full viewport
     SetViewport (m_renderWidth, m_renderHeight);
