@@ -64,6 +64,11 @@ public:
     void ComputeHotkeyOverlayLayout (HotkeyOverlay & overlay, float viewportWidth, float viewportHeight);
 
     /// <summary>
+    /// Compute exact bounding rect and per-character positions for help hint overlay using DWrite text metrics.
+    /// </summary>
+    void ComputeHelpHintOverlayLayout (HelpHintOverlay & overlay, float viewportWidth, float viewportHeight);
+
+    /// <summary>
     /// Present the rendered frame to the screen.
     /// </summary>
     void Present();
@@ -200,6 +205,7 @@ private:
     HRESULT CreateSamplerState();
     HRESULT CreateDirect2DResources();
     HRESULT CreateFpsTextFormat();
+    HRESULT CreateOverlayTextFormat();
     void    UpdateDpiScale();
     HRESULT CreateBloomResources       (UINT width, UINT height);
 
@@ -265,6 +271,7 @@ private:
     ComPtr<ID2D1Bitmap1>         m_d2dBitmap;
     ComPtr<IDWriteFactory>       m_dwriteFactory;
     ComPtr<IDWriteTextFormat>    m_fpsTextFormat;
+    ComPtr<IDWriteTextFormat>    m_overlayTextFormat;
     ComPtr<ID2D1SolidColorBrush> m_fpsBrush;
     ComPtr<ID2D1SolidColorBrush> m_fpsGlowBrush;
 

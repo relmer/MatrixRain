@@ -21,21 +21,57 @@ HelpHintOverlay::HelpHintOverlay()
     m_allGlyphs = CharacterConstants::GetAllCodepoints();
 
     //
-    // Build three-line hint layout:
+    // Define two-column layout:
     //   Settings      Enter
     //       Help      ?
     //       Exit      Esc
     //
-    // Right-justified left column, left-justified right column,
-    // separated by 6 spaces.
+    // Left column is right-justified, right column is left-justified,
+    // separated by a proportional gap.
     //
 
-    m_textLines =
+    m_leftTexts  = { L"Settings", L"Help", L"Exit" };
+    m_rightTexts = { L"Enter",    L"?",    L"Esc"  };
+    m_gapChars   = 6;
+
+    // Compute max column widths in characters
+    size_t maxLeftLen  = 0;
+    size_t maxRightLen = 0;
+
+    for (const auto & t : m_leftTexts)
     {
-        L"Settings      Enter",
-        L"    Help      ?",
-        L"    Exit      Esc"
-    };
+        maxLeftLen = std::max (maxLeftLen, t.size());
+    }
+
+    for (const auto & t : m_rightTexts)
+    {
+        maxRightLen = std::max (maxRightLen, t.size());
+    }
+
+    m_leftColChars = static_cast<int> (maxLeftLen);
+
+    // Build padded text lines from columns (for character grid construction
+    // and glyph registration).  Left column is right-justified with leading
+    // spaces; right column is left-justified with trailing spaces.
+    m_textLines.clear();
+
+    for (size_t i = 0; i < m_leftTexts.size(); i++)
+    {
+        std::wstring line;
+
+        // Left column: right-justify within maxLeftLen
+        line.append (maxLeftLen - m_leftTexts[i].size(), L' ');
+        line += m_leftTexts[i];
+
+        // Gap (spaces)
+        line.append (m_gapChars, L' ');
+
+        // Right column: left-justify within maxRightLen
+        line += m_rightTexts[i];
+        line.append (maxRightLen - m_rightTexts[i].size(), L' ');
+
+        m_textLines.push_back (line);
+    }
 
     // Ensure text characters (like '?') that aren't in the
     // katakana/Latin/numeral glyph set get appended so they
@@ -58,20 +94,8 @@ HelpHintOverlay::HelpHintOverlay()
         }
     }
 
-    // Ensure uniform width
-    size_t maxLen = 0;
-    for (const auto & line : m_textLines)
-    {
-        maxLen = std::max (maxLen, line.size());
-    }
-
-    for (auto & line : m_textLines)
-    {
-        line.resize (maxLen, L' ');
-    }
-
     m_rows     = static_cast<int>(m_textLines.size());
-    m_textCols = static_cast<int>(maxLen);
+    m_textCols = static_cast<int>(m_textLines[0].size());
     m_cols     = m_textCols + 2 * MARGIN_COLS;
 
     InitializeCharacters();

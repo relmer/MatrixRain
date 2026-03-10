@@ -61,6 +61,8 @@ struct HintCharacter
     float     colorR            = 0.0f;
     float     colorG            = 0.0f;
     float     colorB            = 0.0f;
+    float     xOffset           = 0.0f;
+    float     charWidth         = 0.0f;
     int       row               = 0;
     int       col               = 0;
     bool      isSpace           = false;
@@ -88,6 +90,7 @@ public:
     static constexpr float BASE_CHAR_WIDTH  = 16.0f;
     static constexpr float BASE_CHAR_HEIGHT = 28.0f;
     static constexpr float BASE_PADDING     = 20.0f;
+    static constexpr float BASE_GAP         = 40.0f;
     static constexpr int   GLOW_LAYERS      = 4;
     static constexpr int   MARGIN_COLS      = 1;
 
@@ -100,6 +103,7 @@ public:
     float GetCharWidth()  const { return BASE_CHAR_WIDTH  * m_dpiScale; }
     float GetCharHeight() const { return BASE_CHAR_HEIGHT * m_dpiScale; }
     float GetPadding()    const { return BASE_PADDING     * m_dpiScale; }
+    float GetGap()        const { return BASE_GAP         * m_dpiScale; }
 
 
     // State control
@@ -121,9 +125,17 @@ public:
     OverlayPhase                     GetPhase()         const;
     D2D1_RECT_F                      GetBoundingRect()  const { return m_boundingRect;                           }
     std::span<const HintCharacter>   GetCharacters()    const { return std::span<const HintCharacter>(m_chars);  }
+    std::span<HintCharacter>         GetMutableCharacters()    { return std::span<HintCharacter>(m_chars);        }
     std::span<const uint32_t>        GetAllGlyphs()     const { return std::span<const uint32_t>(m_allGlyphs);   }
     int                              GetRows()          const { return m_rows;                                   }
     int                              GetCols()          const { return m_cols;                                   }
+    int                              GetTextCols()      const { return m_textCols;                               }
+    int                              GetLeftColChars()  const { return m_leftColChars;                            }
+    int                              GetGapChars()      const { return m_gapChars;                                }
+    const std::vector<std::wstring> & GetTextLines()    const { return m_textLines;                              }
+    const std::vector<std::wstring> & GetLeftTexts()    const { return m_leftTexts;                              }
+    const std::vector<std::wstring> & GetRightTexts()   const { return m_rightTexts;                             }
+    void                             SetBoundingRect (D2D1_RECT_F rect) { m_boundingRect = rect;                 }
 
 
 private:
@@ -141,6 +153,10 @@ private:
 
     // Text content
     std::vector<std::wstring>        m_textLines;
+    std::vector<std::wstring>        m_leftTexts;
+    std::vector<std::wstring>        m_rightTexts;
+    int                              m_leftColChars = 0;
+    int                              m_gapChars     = 0;
 
     // Bounding rect for rendering / occlusion
     D2D1_RECT_F                      m_boundingRect = {};

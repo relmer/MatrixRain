@@ -615,6 +615,10 @@ HRESULT RenderSystem::CreateDirect2DResources()
     hr = CreateFpsTextFormat();
     CHR (hr);
 
+    // Create text format for overlays (proportional font)
+    hr = CreateOverlayTextFormat();
+    CHR (hr);
+
     // Create white brush for FPS text
     hr = m_d2dContext->CreateSolidColorBrush (D2D1::ColorF (D2D1::ColorF::White), &m_fpsBrush);
     CHRA (hr);
@@ -674,6 +678,48 @@ Error:
 
 ////////////////////////////////////////////////////////////////////////////////
 //
+//  RenderSystem::CreateOverlayTextFormat
+//
+//  Creates (or recreates) the DirectWrite text format used by overlays
+//  (HelpHintOverlay, HotkeyOverlay).  Uses Segoe UI for a proportional
+//  appearance.  Font size is scaled by m_dpiScale.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+HRESULT RenderSystem::CreateOverlayTextFormat()
+{
+    HRESULT hr       = S_OK;
+    float   fontSize = 20.0f * m_dpiScale;
+
+
+    CBRAEx (m_dwriteFactory.Get() != nullptr, E_UNEXPECTED);
+
+    m_overlayTextFormat.Reset();
+
+    hr = m_dwriteFactory->CreateTextFormat (L"Segoe UI",
+                                            nullptr,
+                                            DWRITE_FONT_WEIGHT_NORMAL,
+                                            DWRITE_FONT_STYLE_NORMAL,
+                                            DWRITE_FONT_STRETCH_NORMAL,
+                                            fontSize,
+                                            L"en-us",
+                                            &m_overlayTextFormat);
+    CHRA (hr);
+
+    m_overlayTextFormat->SetTextAlignment (DWRITE_TEXT_ALIGNMENT_LEADING);
+    m_overlayTextFormat->SetParagraphAlignment (DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
+    m_overlayTextFormat->SetWordWrapping (DWRITE_WORD_WRAPPING_NO_WRAP);
+
+Error:
+    return hr;
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
 //  RenderSystem::UpdateDpiScale
 //
 //  Queries the window's current DPI and updates m_dpiScale accordingly.
@@ -706,10 +752,11 @@ void RenderSystem::OnDpiChanged (UINT dpi)
 {
     m_dpiScale = static_cast<float> (dpi) / 96.0f;
 
-    // Recreate the FPS text format at the new DPI scale
+    // Recreate text formats at the new DPI scale
     if (m_dwriteFactory)
     {
         CreateFpsTextFormat();
+        CreateOverlayTextFormat();
     }
 }
 
@@ -1813,7 +1860,7 @@ void RenderSystem::DrawCharacterGlow (const wchar_t * glyphStr, int glyphLen, co
 
                 m_d2dContext->DrawText (glyphStr,
                                         static_cast<UINT32> (glyphLen),
-                                        m_fpsTextFormat.Get(),
+                                        m_overlayTextFormat.Get(),
                                         glowRect,
                                         m_fpsGlowBrush.Get());
             }
@@ -1875,7 +1922,7 @@ void RenderSystem::RenderOverlayCharacters (std::span<const HintCharacter> chars
 
         m_d2dContext->DrawText (glyphStr,
                                 static_cast<UINT32> (glyphLen),
-                                m_fpsTextFormat.Get(),
+                                m_overlayTextFormat.Get(),
                                 charRect,
                                 m_fpsBrush.Get());
     }
@@ -1900,22 +1947,18 @@ void RenderSystem::RenderOverlayCharacters (std::span<const HintCharacter> chars
 
 void RenderSystem::RenderHelpHintOverlay (const HelpHintOverlay & overlay)
 {
-    const float CHAR_WIDTH   = overlay.GetCharWidth();
-    const float CHAR_HEIGHT  = overlay.GetCharHeight();
-    const float PADDING      = overlay.GetPadding();
-    const int   MARGIN_COLS  = HelpHintOverlay::MARGIN_COLS;
-    const float EDGE_PADDING = std::max (0.0f, PADDING - MARGIN_COLS * CHAR_WIDTH);
+    const float CHAR_HEIGHT = overlay.GetCharHeight();
+    const float PADDING     = overlay.GetPadding();
 
     HRESULT                        hr           = S_OK;
     bool                           drawing      = false;
     std::span<const HintCharacter> chars;
     D2D1_RECT_F                    boundingRect = {};
-    float                          baseX        = 0.0f;
     float                          baseY        = 0.0f;
 
 
 
-    CBRAEx (m_d2dContext && m_fpsBrush && m_fpsTextFormat && m_fpsGlowBrush && m_dwriteFactory, E_UNEXPECTED);
+    CBRAEx (m_d2dContext && m_fpsBrush && m_overlayTextFormat && m_fpsGlowBrush && m_dwriteFactory, E_UNEXPECTED);
 
     chars = overlay.GetCharacters();
     BAIL_OUT_IF (chars.empty(), S_OK);
@@ -1926,16 +1969,14 @@ void RenderSystem::RenderHelpHintOverlay (const HelpHintOverlay & overlay)
     boundingRect = overlay.GetBoundingRect();
     DrawFeatheredBackground (boundingRect);
 
-    baseX = boundingRect.left + EDGE_PADDING;
-    baseY = boundingRect.top  + PADDING;
+    baseY = boundingRect.top + PADDING;
 
     RenderOverlayCharacters (chars, overlay.GetAllGlyphs(), HelpHintOverlay::GLOW_LAYERS,
-        [baseX, baseY, CHAR_WIDTH, CHAR_HEIGHT] (const HintCharacter & ch) -> D2D1_RECT_F
+        [baseY, CHAR_HEIGHT] (const HintCharacter & ch) -> D2D1_RECT_F
         {
-            float charX = baseX + ch.col * CHAR_WIDTH;
-            float charY = baseY + ch.row * CHAR_HEIGHT;
+            float charY = baseY + static_cast<float> (ch.row) * CHAR_HEIGHT;
 
-            return D2D1::RectF (charX, charY, charX + CHAR_WIDTH, charY + CHAR_HEIGHT);
+            return D2D1::RectF (ch.xOffset, charY, ch.xOffset + ch.charWidth, charY + CHAR_HEIGHT);
         });
 
 
@@ -1976,7 +2017,7 @@ void RenderSystem::ComputeHotkeyOverlayLayout (HotkeyOverlay & overlay, float vi
 
 
 
-    if (!m_dwriteFactory || !m_fpsTextFormat)
+    if (!m_dwriteFactory || !m_overlayTextFormat)
     {
         return;
     }
@@ -1989,7 +2030,7 @@ void RenderSystem::ComputeHotkeyOverlayLayout (HotkeyOverlay & overlay, float vi
 
             HRESULT hr = m_dwriteFactory->CreateTextLayout (entry.keyName.c_str(),
                                                             static_cast<UINT32> (entry.keyName.size()),
-                                                            m_fpsTextFormat.Get(),
+                                                            m_overlayTextFormat.Get(),
                                                             10000.0f,
                                                             ROW_HEIGHT,
                                                             &layout);
@@ -2008,7 +2049,7 @@ void RenderSystem::ComputeHotkeyOverlayLayout (HotkeyOverlay & overlay, float vi
 
             HRESULT hr = m_dwriteFactory->CreateTextLayout (entry.description.c_str(),
                                                             static_cast<UINT32> (entry.description.size()),
-                                                            m_fpsTextFormat.Get(),
+                                                            m_overlayTextFormat.Get(),
                                                             10000.0f,
                                                             ROW_HEIGHT,
                                                             &layout);
@@ -2035,6 +2076,124 @@ void RenderSystem::ComputeHotkeyOverlayLayout (HotkeyOverlay & overlay, float vi
     D2D1_RECT_F rect = D2D1::RectF (left, top, left + contentWidth, top + contentHeight);
 
     overlay.SetMeasuredLayout (rect, maxKeyWidth);
+
+    // Compute per-character proportional positions using DWrite text layout
+    {
+        float baseX          = rect.left;
+        int   keyChars       = overlay.GetKeyColChars();
+        int   gapCols        = overlay.GetGapChars();
+        int   cols           = overlay.GetCols();
+        int   textCols       = cols - 2 * HotkeyOverlay::MARGIN_COLS;
+        int   descChars      = textCols - keyChars - gapCols;
+        int   descTextStart  = keyChars + gapCols;
+        float marginColWidth = (HotkeyOverlay::MARGIN_COLS > 0) ? PADDING / static_cast<float> (HotkeyOverlay::MARGIN_COLS) : 0.0f;
+        float gapColWidth    = (gapCols > 0) ? GAP / static_cast<float> (gapCols) : 0.0f;
+
+        auto chars = overlay.GetMutableCharacters();
+
+
+        for (int row = 0; row < static_cast<int> (hotkeys.size()); row++)
+        {
+            int rowStart = row * cols;
+
+            // Left margin (spaces)
+            for (int m = 0; m < HotkeyOverlay::MARGIN_COLS; m++)
+            {
+                chars[rowStart + m].xOffset   = baseX + static_cast<float> (m) * marginColWidth;
+                chars[rowStart + m].charWidth = marginColWidth;
+            }
+
+            // Key name — proportional positions within key column
+            {
+                ComPtr<IDWriteTextLayout> keyLayout;
+
+                HRESULT hr = m_dwriteFactory->CreateTextLayout (hotkeys[row].keyName.c_str(),
+                                                                static_cast<UINT32> (hotkeys[row].keyName.size()),
+                                                                m_overlayTextFormat.Get(),
+                                                                maxKeyWidth,
+                                                                ROW_HEIGHT,
+                                                                &keyLayout);
+                if (SUCCEEDED (hr))
+                {
+                    for (int i = 0; i < keyChars; i++)
+                    {
+                        int ci = rowStart + HotkeyOverlay::MARGIN_COLS + i;
+
+                        if (i < static_cast<int> (hotkeys[row].keyName.size()))
+                        {
+                            float                   pointX    = 0.0f;
+                            float                   pointY    = 0.0f;
+                            DWRITE_HIT_TEST_METRICS htMetrics = {};
+
+                            keyLayout->HitTestTextPosition (static_cast<UINT32> (i), FALSE, &pointX, &pointY, &htMetrics);
+
+                            chars[ci].xOffset   = baseX + PADDING + htMetrics.left;
+                            chars[ci].charWidth = htMetrics.width;
+                        }
+                        else
+                        {
+                            chars[ci].xOffset   = baseX + PADDING + maxKeyWidth;
+                            chars[ci].charWidth = 0.0f;
+                        }
+                    }
+                }
+            }
+
+            // Gap (spaces)
+            for (int g = 0; g < gapCols; g++)
+            {
+                int ci = rowStart + HotkeyOverlay::MARGIN_COLS + keyChars + g;
+
+                chars[ci].xOffset   = baseX + PADDING + maxKeyWidth + static_cast<float> (g) * gapColWidth;
+                chars[ci].charWidth = gapColWidth;
+            }
+
+            // Description — proportional positions within desc column
+            {
+                ComPtr<IDWriteTextLayout> descLayout;
+
+                HRESULT hr = m_dwriteFactory->CreateTextLayout (hotkeys[row].description.c_str(),
+                                                                static_cast<UINT32> (hotkeys[row].description.size()),
+                                                                m_overlayTextFormat.Get(),
+                                                                maxDescWidth,
+                                                                ROW_HEIGHT,
+                                                                &descLayout);
+                if (SUCCEEDED (hr))
+                {
+                    for (int i = 0; i < descChars; i++)
+                    {
+                        int ci = rowStart + HotkeyOverlay::MARGIN_COLS + descTextStart + i;
+
+                        if (i < static_cast<int> (hotkeys[row].description.size()))
+                        {
+                            float                   pointX    = 0.0f;
+                            float                   pointY    = 0.0f;
+                            DWRITE_HIT_TEST_METRICS htMetrics = {};
+
+                            descLayout->HitTestTextPosition (static_cast<UINT32> (i), FALSE, &pointX, &pointY, &htMetrics);
+
+                            chars[ci].xOffset   = baseX + PADDING + maxKeyWidth + GAP + htMetrics.left;
+                            chars[ci].charWidth = htMetrics.width;
+                        }
+                        else
+                        {
+                            chars[ci].xOffset   = baseX + PADDING + maxKeyWidth + GAP + maxDescWidth;
+                            chars[ci].charWidth = 0.0f;
+                        }
+                    }
+                }
+            }
+
+            // Right margin (spaces)
+            for (int m = 0; m < HotkeyOverlay::MARGIN_COLS; m++)
+            {
+                int ci = rowStart + HotkeyOverlay::MARGIN_COLS + textCols + m;
+
+                chars[ci].xOffset   = baseX + PADDING + maxKeyWidth + GAP + maxDescWidth + static_cast<float> (m) * marginColWidth;
+                chars[ci].charWidth = marginColWidth;
+            }
+        }
+    }
 }
 
 
@@ -2043,135 +2202,216 @@ void RenderSystem::ComputeHotkeyOverlayLayout (HotkeyOverlay & overlay, float vi
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-//  HotkeyColumnLayout — Pre-computed column geometry for hotkey overlay.
+//  RenderSystem::ComputeHelpHintOverlayLayout
+//
+//  Measures each column separately via DWrite, computes a sized bounding rect,
+//  and pre-computes per-character proportional x-positions.  The left column
+//  is right-justified, the right column is left-justified.
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-struct HotkeyColumnLayout
+void RenderSystem::ComputeHelpHintOverlayLayout (HelpHintOverlay & overlay, float viewportWidth, float viewportHeight)
 {
-    float baseX             = 0.0f;
-    float baseY             = 0.0f;
-    float padding           = 0.0f;
-    float gap               = 0.0f;
-    float rowHeight         = 0.0f;
-    float keyColPixelWidth  = 0.0f;
-    float descColPixelWidth = 0.0f;
-    float keyCharWidth      = 0.0f;
-    float descCharWidth     = 0.0f;
-    float marginCharWidth   = 0.0f;
-    float gapCharWidth      = 0.0f;
-    int   keyStart          = 0;
-    int   gapStart          = 0;
-    int   descStart         = 0;
-    int   descEnd           = 0;
-};
+    const float CHAR_HEIGHT   = overlay.GetCharHeight();
+    const float PADDING       = overlay.GetPadding();
+    const float GAP           = overlay.GetGap();
+    const int   MARGIN_COLS   = HelpHintOverlay::MARGIN_COLS;
+
+    const auto & leftTexts    = overlay.GetLeftTexts();
+    const auto & rightTexts   = overlay.GetRightTexts();
+    int          rows         = overlay.GetRows();
+    int          textCols     = overlay.GetTextCols();
+    int          cols         = overlay.GetCols();
+    int          leftColChars = overlay.GetLeftColChars();
+    int          gapChars     = overlay.GetGapChars();
+    int          rightColChars = textCols - leftColChars - gapChars;
+    float        maxLeftWidth  = 0.0f;
+    float        maxRightWidth = 0.0f;
 
 
 
-
-////////////////////////////////////////////////////////////////////////////////
-//
-//  ComputeHotkeyCharRect
-//
-//  Maps a HintCharacter's grid position to a D2D pixel rect using the
-//  pre-computed column layout.
-//
-////////////////////////////////////////////////////////////////////////////////
-
-static D2D1_RECT_F ComputeHotkeyCharRect (const HotkeyColumnLayout & layout, const HintCharacter & ch)
-{
-    float charX = 0.0f;
-    float charW = 0.0f;
-    float charY = layout.baseY + static_cast<float> (ch.row) * layout.rowHeight;
-
-
-
-    if (ch.col < layout.keyStart)
+    if (!m_dwriteFactory || !m_overlayTextFormat)
     {
-        charX = layout.baseX + static_cast<float> (ch.col) * layout.marginCharWidth;
-        charW = layout.marginCharWidth;
-    }
-    else if (ch.col < layout.gapStart)
-    {
-        charX = layout.baseX + layout.padding + static_cast<float> (ch.col - layout.keyStart) * layout.keyCharWidth;
-        charW = layout.keyCharWidth;
-    }
-    else if (ch.col < layout.descStart)
-    {
-        charX = layout.baseX + layout.padding + layout.keyColPixelWidth + static_cast<float> (ch.col - layout.gapStart) * layout.gapCharWidth;
-        charW = layout.gapCharWidth;
-    }
-    else if (ch.col < layout.descEnd)
-    {
-        charX = layout.baseX + layout.padding + layout.keyColPixelWidth + layout.gap + static_cast<float> (ch.col - layout.descStart) * layout.descCharWidth;
-        charW = layout.descCharWidth;
-    }
-    else
-    {
-        charX = layout.baseX + layout.padding + layout.keyColPixelWidth + layout.gap + layout.descColPixelWidth + static_cast<float> (ch.col - layout.descEnd) * layout.marginCharWidth;
-        charW = layout.marginCharWidth;
+        return;
     }
 
-    return D2D1::RectF (charX, charY, charX + charW, charY + layout.rowHeight);
+    // Measure max left and right column pixel widths separately
+    for (const auto & text : leftTexts)
+    {
+        ComPtr<IDWriteTextLayout> layout;
+
+        HRESULT hr = m_dwriteFactory->CreateTextLayout (text.c_str(),
+                                                        static_cast<UINT32> (text.size()),
+                                                        m_overlayTextFormat.Get(),
+                                                        10000.0f,
+                                                        CHAR_HEIGHT,
+                                                        &layout);
+        if (SUCCEEDED (hr))
+        {
+            DWRITE_TEXT_METRICS metrics = {};
+
+            layout->GetMetrics (&metrics);
+            maxLeftWidth = std::max (maxLeftWidth, metrics.width);
+        }
+    }
+
+    for (const auto & text : rightTexts)
+    {
+        ComPtr<IDWriteTextLayout> layout;
+
+        HRESULT hr = m_dwriteFactory->CreateTextLayout (text.c_str(),
+                                                        static_cast<UINT32> (text.size()),
+                                                        m_overlayTextFormat.Get(),
+                                                        10000.0f,
+                                                        CHAR_HEIGHT,
+                                                        &layout);
+        if (SUCCEEDED (hr))
+        {
+            DWRITE_TEXT_METRICS metrics = {};
+
+            layout->GetMetrics (&metrics);
+            maxRightWidth = std::max (maxRightWidth, metrics.width);
+        }
+    }
+
+    maxLeftWidth  = std::ceil (maxLeftWidth);
+    maxRightWidth = std::ceil (maxRightWidth);
+
+    float contentWidth  = PADDING + maxLeftWidth + GAP + maxRightWidth + PADDING;
+    float contentHeight = static_cast<float> (rows) * CHAR_HEIGHT + PADDING * 2.0f;
+
+    float       left = (viewportWidth  - contentWidth)  / 2.0f;
+    float       top  = (viewportHeight - contentHeight) / 2.0f;
+    D2D1_RECT_F rect = D2D1::RectF (left, top, left + contentWidth, top + contentHeight);
+
+    overlay.SetBoundingRect (rect);
+
+    // Compute per-character proportional positions
+    {
+        float baseX          = rect.left;
+        float marginColWidth = (MARGIN_COLS > 0) ? PADDING / static_cast<float> (MARGIN_COLS) : 0.0f;
+        float gapColWidth    = (gapChars > 0) ? GAP / static_cast<float> (gapChars) : 0.0f;
+        auto  chars          = overlay.GetMutableCharacters();
+
+
+        for (int row = 0; row < rows; row++)
+        {
+            int rowStart = row * cols;
+
+            // Left margin (spaces)
+            for (int m = 0; m < MARGIN_COLS; m++)
+            {
+                chars[rowStart + m].xOffset   = baseX + static_cast<float> (m) * marginColWidth;
+                chars[rowStart + m].charWidth = marginColWidth;
+            }
+
+            // Left column — right-justified within maxLeftWidth
+            {
+                ComPtr<IDWriteTextLayout> leftLayout;
+                int                       leftLen = static_cast<int> (leftTexts[row].size());
+
+                HRESULT hr = m_dwriteFactory->CreateTextLayout (leftTexts[row].c_str(),
+                                                                static_cast<UINT32> (leftLen),
+                                                                m_overlayTextFormat.Get(),
+                                                                maxLeftWidth,
+                                                                CHAR_HEIGHT,
+                                                                &leftLayout);
+                if (SUCCEEDED (hr))
+                {
+                    DWRITE_TEXT_METRICS textMetrics = {};
+
+                    leftLayout->GetMetrics (&textMetrics);
+
+                    float rightJustifyOffset = maxLeftWidth - textMetrics.width;
+
+                    // Leading space characters (padding for right-justification)
+                    int leadingSpaces = leftColChars - leftLen;
+
+                    for (int s = 0; s < leadingSpaces; s++)
+                    {
+                        int ci = rowStart + MARGIN_COLS + s;
+
+                        chars[ci].xOffset   = baseX + PADDING;
+                        chars[ci].charWidth = 0.0f;
+                    }
+
+                    // Actual text characters — positioned via DWrite
+                    for (int i = 0; i < leftLen; i++)
+                    {
+                        int                     ci        = rowStart + MARGIN_COLS + leadingSpaces + i;
+                        float                   pointX    = 0.0f;
+                        float                   pointY    = 0.0f;
+                        DWRITE_HIT_TEST_METRICS htMetrics = {};
+
+                        leftLayout->HitTestTextPosition (static_cast<UINT32> (i), FALSE, &pointX, &pointY, &htMetrics);
+
+                        chars[ci].xOffset   = baseX + PADDING + rightJustifyOffset + htMetrics.left;
+                        chars[ci].charWidth = htMetrics.width;
+                    }
+                }
+            }
+
+            // Gap (spaces)
+            for (int g = 0; g < gapChars; g++)
+            {
+                int ci = rowStart + MARGIN_COLS + leftColChars + g;
+
+                chars[ci].xOffset   = baseX + PADDING + maxLeftWidth + static_cast<float> (g) * gapColWidth;
+                chars[ci].charWidth = gapColWidth;
+            }
+
+            // Right column — left-justified within maxRightWidth
+            {
+                ComPtr<IDWriteTextLayout> rightLayout;
+                int                       rightLen = static_cast<int> (rightTexts[row].size());
+
+                HRESULT hr = m_dwriteFactory->CreateTextLayout (rightTexts[row].c_str(),
+                                                                static_cast<UINT32> (rightLen),
+                                                                m_overlayTextFormat.Get(),
+                                                                maxRightWidth,
+                                                                CHAR_HEIGHT,
+                                                                &rightLayout);
+                if (SUCCEEDED (hr))
+                {
+                    int rightTextStart = leftColChars + gapChars;
+
+                    for (int i = 0; i < rightColChars; i++)
+                    {
+                        int ci = rowStart + MARGIN_COLS + rightTextStart + i;
+
+                        if (i < rightLen)
+                        {
+                            float                   pointX    = 0.0f;
+                            float                   pointY    = 0.0f;
+                            DWRITE_HIT_TEST_METRICS htMetrics = {};
+
+                            rightLayout->HitTestTextPosition (static_cast<UINT32> (i), FALSE, &pointX, &pointY, &htMetrics);
+
+                            chars[ci].xOffset   = baseX + PADDING + maxLeftWidth + GAP + htMetrics.left;
+                            chars[ci].charWidth = htMetrics.width;
+                        }
+                        else
+                        {
+                            // Trailing space padding
+                            chars[ci].xOffset   = baseX + PADDING + maxLeftWidth + GAP + maxRightWidth;
+                            chars[ci].charWidth = 0.0f;
+                        }
+                    }
+                }
+            }
+
+            // Right margin (spaces)
+            for (int m = 0; m < MARGIN_COLS; m++)
+            {
+                int ci = rowStart + MARGIN_COLS + textCols + m;
+
+                chars[ci].xOffset   = baseX + PADDING + maxLeftWidth + GAP + maxRightWidth + static_cast<float> (m) * marginColWidth;
+                chars[ci].charWidth = marginColWidth;
+            }
+        }
+    }
 }
 
-
-
-
-////////////////////////////////////////////////////////////////////////////////
-//
-//  ComputeHotkeyColumnLayout
-//
-//  Populates a HotkeyColumnLayout from the overlay's bounding rect, measured
-//  key-column width, and hotkey entry sizes.
-//
-////////////////////////////////////////////////////////////////////////////////
-
-static HotkeyColumnLayout ComputeHotkeyColumnLayout (const HotkeyOverlay & overlay)
-{
-    const float PADDING     = overlay.GetPadding();
-    const float GAP         = overlay.GetGap();
-    const int   MARGIN_COLS = HotkeyOverlay::MARGIN_COLS;
-
-    HotkeyColumnLayout layout;
-    D2D1_RECT_F        boundingRect = overlay.GetBoundingRect();
-    int                cols         = overlay.GetCols();
-    int                maxKeyChars  = 0;
-    int                maxDescChars = 0;
-    int                gapChars     = 0;
-    float              contentWidth = 0.0f;
-
-
-
-    layout.baseX            = boundingRect.left;
-    layout.baseY            = boundingRect.top + PADDING;
-    layout.padding          = PADDING;
-    layout.gap              = GAP;
-    layout.rowHeight        = overlay.GetRowHeight();
-    layout.keyColPixelWidth = overlay.GetKeyColumnWidth();
-
-    for (const auto & entry : overlay.GetHotkeys())
-    {
-        maxKeyChars  = std::max (maxKeyChars,  static_cast<int> (entry.keyName.size()));
-        maxDescChars = std::max (maxDescChars, static_cast<int> (entry.description.size()));
-    }
-
-    gapChars     = cols - 2 * MARGIN_COLS - maxKeyChars - maxDescChars;
-    contentWidth = boundingRect.right - boundingRect.left;
-
-    layout.keyCharWidth      = (maxKeyChars  > 0) ? layout.keyColPixelWidth / static_cast<float> (maxKeyChars)   : 0.0f;
-    layout.descColPixelWidth = contentWidth - PADDING - layout.keyColPixelWidth - GAP - PADDING;
-    layout.descCharWidth     = (maxDescChars > 0) ? layout.descColPixelWidth / static_cast<float> (maxDescChars) : 0.0f;
-    layout.marginCharWidth   = (MARGIN_COLS  > 0) ? PADDING / static_cast<float> (MARGIN_COLS)                   : 0.0f;
-    layout.gapCharWidth      = (gapChars     > 0) ? GAP / static_cast<float> (gapChars)                          : 0.0f;
-
-    layout.keyStart  = MARGIN_COLS;
-    layout.gapStart  = MARGIN_COLS + maxKeyChars;
-    layout.descStart = MARGIN_COLS + maxKeyChars + gapChars;
-    layout.descEnd   = MARGIN_COLS + maxKeyChars + gapChars + maxDescChars;
-
-    return layout;
-}
 
 
 
@@ -2189,42 +2429,34 @@ static HotkeyColumnLayout ComputeHotkeyColumnLayout (const HotkeyOverlay & overl
 
 void RenderSystem::RenderHotkeyOverlay (const HotkeyOverlay & overlay)
 {
-    HRESULT                        hr             = S_OK;
-    bool                           drawing        = false;
+    HRESULT                        hr           = S_OK;
+    bool                           drawing      = false;
     std::span<const HintCharacter> chars;
-    HotkeyColumnLayout             columnLayout;
-    DWRITE_TEXT_ALIGNMENT          savedTextAlign = DWRITE_TEXT_ALIGNMENT_LEADING;
-    DWRITE_PARAGRAPH_ALIGNMENT     savedParaAlign = DWRITE_PARAGRAPH_ALIGNMENT_NEAR;
+    float                          baseY        = 0.0f;
+    float                          rowHeight    = 0.0f;
 
 
 
-    CBRAEx (m_d2dContext && m_fpsBrush && m_fpsTextFormat && m_fpsGlowBrush && m_dwriteFactory, E_UNEXPECTED);
+    CBRAEx (m_d2dContext && m_fpsBrush && m_overlayTextFormat && m_fpsGlowBrush && m_dwriteFactory, E_UNEXPECTED);
 
     chars = overlay.GetCharacters();
     BAIL_OUT_IF (chars.empty(), S_OK);
 
-    columnLayout = ComputeHotkeyColumnLayout (overlay);
+    baseY     = overlay.GetBoundingRect().top + overlay.GetPadding();
+    rowHeight = overlay.GetRowHeight();
 
     m_d2dContext->BeginDraw();
     drawing = true;
 
     DrawFeatheredBackground (overlay.GetBoundingRect());
 
-    // Save and set text format
-    savedTextAlign = m_fpsTextFormat->GetTextAlignment();
-    savedParaAlign = m_fpsTextFormat->GetParagraphAlignment();
-
-    m_fpsTextFormat->SetTextAlignment (DWRITE_TEXT_ALIGNMENT_LEADING);
-    m_fpsTextFormat->SetParagraphAlignment (DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
-    m_fpsTextFormat->SetWordWrapping (DWRITE_WORD_WRAPPING_NO_WRAP);
-
     RenderOverlayCharacters (chars, overlay.GetAllGlyphs(), HotkeyOverlay::GLOW_LAYERS,
-        [&columnLayout] (const HintCharacter & ch) { return ComputeHotkeyCharRect (columnLayout, ch); });
+        [baseY, rowHeight] (const HintCharacter & ch) -> D2D1_RECT_F
+        {
+            float charY = baseY + static_cast<float> (ch.row) * rowHeight;
 
-    // Restore text format settings
-    m_fpsTextFormat->SetTextAlignment (savedTextAlign);
-    m_fpsTextFormat->SetParagraphAlignment (savedParaAlign);
-    m_fpsTextFormat->SetWordWrapping (DWRITE_WORD_WRAPPING_WRAP);
+            return D2D1::RectF (ch.xOffset, charY, ch.xOffset + ch.charWidth, charY + rowHeight);
+        });
 
 Error:
     if (drawing)

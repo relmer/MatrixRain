@@ -80,7 +80,7 @@ HRESULT Application::Initialize (HINSTANCE hInstance, int nCmdShow, const Screen
     // Show help hint overlay in Normal mode only
     if (m_appState->GetHelpHintEnabled() && m_helpHintOverlay)
     {
-        m_helpHintOverlay->UpdateLayout (static_cast<float>(m_viewport->GetWidth()), static_cast<float>(m_viewport->GetHeight()));
+        m_renderSystem->ComputeHelpHintOverlayLayout (*m_helpHintOverlay, static_cast<float>(m_viewport->GetWidth()), static_cast<float>(m_viewport->GetHeight()));
         m_helpHintOverlay->Show();
     }
 
@@ -679,7 +679,7 @@ void Application::OnKeyDown (WPARAM wParam)
         }
         else
         {
-            m_helpHintOverlay->UpdateLayout (static_cast<float>(m_viewport->GetWidth()), static_cast<float>(m_viewport->GetHeight()));
+            m_renderSystem->ComputeHelpHintOverlayLayout (*m_helpHintOverlay, static_cast<float>(m_viewport->GetWidth()), static_cast<float>(m_viewport->GetHeight()));
             m_helpHintOverlay->Show();
         }
     }
@@ -784,7 +784,7 @@ void Application::OnSize (LPARAM lParam)
 
         if (m_helpHintOverlay)
         {
-            m_helpHintOverlay->UpdateLayout (static_cast<float>(width), static_cast<float>(height));
+            m_renderSystem->ComputeHelpHintOverlayLayout (*m_helpHintOverlay, static_cast<float>(width), static_cast<float>(height));
         }
 
         if (m_hotkeyOverlay && m_hotkeyOverlay->IsActive())
@@ -838,9 +838,9 @@ void Application::OnDpiChanged (WPARAM wParam, LPARAM lParam)
     {
         m_helpHintOverlay->SetDpiScale (dpiScale);
 
-        if (m_viewport)
+        if (m_viewport && m_renderSystem)
         {
-            m_helpHintOverlay->UpdateLayout (m_viewport->GetWidth(), m_viewport->GetHeight());
+            m_renderSystem->ComputeHelpHintOverlayLayout (*m_helpHintOverlay, m_viewport->GetWidth(), m_viewport->GetHeight());
         }
     }
 

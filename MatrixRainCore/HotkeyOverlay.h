@@ -62,9 +62,12 @@ public:
     const std::vector<HotkeyEntry>          & GetHotkeys ()         const { return m_hotkeys;                                           }
     int                                       GetRows ()            const { return static_cast<int> (m_hotkeys.size());                 }
     std::span<const HintCharacter>            GetCharacters ()      const { return std::span<const HintCharacter> (m_chars);            }
+    std::span<HintCharacter>                  GetMutableCharacters ()      { return std::span<HintCharacter> (m_chars);                 }
     std::span<const uint32_t>                 GetAllGlyphs ()       const { return std::span<const uint32_t> (m_allGlyphs);             }
     int                                       GetCols ()            const { return m_cols;                                              }
     int                                       GetCharRows ()        const { return static_cast<int> (m_hotkeys.size());                 }
+    int                                       GetKeyColChars ()     const { return m_keyColChars;                                      }
+    int                                       GetGapChars ()        const { return m_gapChars;                                         }
 
 
 private:
