@@ -217,7 +217,7 @@ private:
     void    RenderHelpHintOverlay    (const HelpHintOverlay & overlay);
     void    RenderHotkeyOverlay      (const HotkeyOverlay & overlay);
     void    DrawFeatheredGlow        (const wchar_t * fpsText, UINT32 textLength, const D2D1_RECT_F & textRect);
-    void    DrawFeatheredBackground  (const D2D1_RECT_F & boundingRect);
+    void    DrawFeatheredBackground  (const D2D1_RECT_F & boundingRect, float opacityScale);
     void    DrawCharacterGlow        (const wchar_t * glyphStr, int glyphLen, const D2D1_RECT_F & charRect, int glowLayers, float opacity);
     void    RenderOverlayCharacters  (std::span<const HintCharacter> chars, std::span<const uint32_t> allGlyphs, int glowLayers, const std::function<D2D1_RECT_F (const HintCharacter &)> & computeCharRect);
     void    RenderDebugFadeTimes     (const AnimationSystem & animationSystem);

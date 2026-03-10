@@ -26,7 +26,7 @@ public:
     static constexpr float BASE_ROW_HEIGHT = 28.0f;
     static constexpr float BASE_PADDING    = 30.0f;
     static constexpr float BASE_GAP        = 16.0f;
-    static constexpr int   GLOW_LAYERS     = 4;
+    static constexpr int   GLOW_LAYERS     = 8;
     static constexpr int   MARGIN_COLS     = 2;
 
 

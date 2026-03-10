@@ -648,7 +648,7 @@ Error:
 HRESULT RenderSystem::CreateFpsTextFormat()
 {
     HRESULT hr       = S_OK;
-    float   fontSize = 20.0f * m_dpiScale;
+    float   fontSize = 12.0f * m_dpiScale;
 
 
     CBRAEx (m_dwriteFactory.Get() != nullptr, E_UNEXPECTED);
@@ -1543,22 +1543,8 @@ void RenderSystem::Render (const AnimationSystem & animationSystem, const Viewpo
         m_context->Unmap (m_constantBuffer.Get(), 0);
     }
 
-    // Update instance buffer with character data (pass occlusion rect if provided or derived from overlay)
-    const D2D1_RECT_F * pEffectiveOcclusionRect = pOcclusionRect;
-    D2D1_RECT_F         overlayOcclusionRect    = {};
-
-    if (!pEffectiveOcclusionRect && pOverlay && pOverlay->IsActive())
-    {
-        overlayOcclusionRect    = pOverlay->GetBoundingRect();
-        pEffectiveOcclusionRect = &overlayOcclusionRect;
-    }
-    else if (!pEffectiveOcclusionRect && pHotkeyOverlay && pHotkeyOverlay->IsActive())
-    {
-        overlayOcclusionRect    = pHotkeyOverlay->GetBoundingRect();
-        pEffectiveOcclusionRect = &overlayOcclusionRect;
-    }
-
-    (void) UpdateInstanceBuffer (animationSystem, colorScheme, elapsedTime, pEffectiveOcclusionRect);  // Ignore return - errors already handled within
+    // Update instance buffer with character data (pass occlusion rect if provided)
+    (void) UpdateInstanceBuffer (animationSystem, colorScheme, elapsedTime, pOcclusionRect);  // Ignore return - errors already handled within
 
     if (m_instanceData.empty())
     {
@@ -1794,17 +1780,19 @@ int RenderSystem::CodepointToUtf16 (uint32_t codepoint, wchar_t * glyphStr)
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void RenderSystem::DrawFeatheredBackground (const D2D1_RECT_F & boundingRect)
+void RenderSystem::DrawFeatheredBackground (const D2D1_RECT_F & boundingRect, float opacityScale)
 {
-    const int   featherLayers = 12;
-    const float maxExpand     = 20.0f;
+    const int   featherLayers  = 24;
+    const float maxExpand      = 60.0f;
+    const float centerOpacity  = 0.35f * opacityScale;
 
 
 
     for (int i = featherLayers; i > 0; --i)
     {
-        float expand  = maxExpand * (static_cast<float>(i) / static_cast<float>(featherLayers));
-        float opacity = 0.7f * (1.0f - (static_cast<float>(i) / static_cast<float>(featherLayers)));
+        float t       = static_cast<float>(i) / static_cast<float>(featherLayers);
+        float expand  = maxExpand * t;
+        float opacity = centerOpacity * (1.0f - t);
 
         D2D1_RECT_F expandedRect = D2D1::RectF (boundingRect.left   - expand,
                                                 boundingRect.top    - expand,
@@ -1816,7 +1804,7 @@ void RenderSystem::DrawFeatheredBackground (const D2D1_RECT_F & boundingRect)
     }
 
     // Solid dark center
-    m_fpsGlowBrush->SetColor (D2D1::ColorF (D2D1::ColorF::Black, 0.7f));
+    m_fpsGlowBrush->SetColor (D2D1::ColorF (D2D1::ColorF::Black, centerOpacity));
     m_d2dContext->FillRectangle (boundingRect, m_fpsGlowBrush.Get());
 }
 
@@ -1955,6 +1943,9 @@ void RenderSystem::RenderHelpHintOverlay (const HelpHintOverlay & overlay)
     std::span<const HintCharacter> chars;
     D2D1_RECT_F                    boundingRect = {};
     float                          baseY        = 0.0f;
+    float                          opacitySum   = 0.0f;
+    int                            visibleCount = 0;
+    float                          meanOpacity  = 0.0f;
 
 
 
@@ -1963,11 +1954,23 @@ void RenderSystem::RenderHelpHintOverlay (const HelpHintOverlay & overlay)
     chars = overlay.GetCharacters();
     BAIL_OUT_IF (chars.empty(), S_OK);
 
+    // Compute mean character opacity to drive background fade
+    for (const auto & ch : chars)
+    {
+        if (!ch.isSpace)
+        {
+            opacitySum += ch.opacity;
+            visibleCount++;
+        }
+    }
+
+    meanOpacity = (visibleCount > 0) ? (opacitySum / static_cast<float> (visibleCount)) : 0.0f;
+
     m_d2dContext->BeginDraw();
     drawing = true;
 
     boundingRect = overlay.GetBoundingRect();
-    DrawFeatheredBackground (boundingRect);
+    DrawFeatheredBackground (boundingRect, meanOpacity);
 
     baseY = boundingRect.top + PADDING;
 
@@ -2434,6 +2437,9 @@ void RenderSystem::RenderHotkeyOverlay (const HotkeyOverlay & overlay)
     std::span<const HintCharacter> chars;
     float                          baseY        = 0.0f;
     float                          rowHeight    = 0.0f;
+    float                          opacitySum   = 0.0f;
+    int                            visibleCount = 0;
+    float                          meanOpacity  = 0.0f;
 
 
 
@@ -2442,13 +2448,25 @@ void RenderSystem::RenderHotkeyOverlay (const HotkeyOverlay & overlay)
     chars = overlay.GetCharacters();
     BAIL_OUT_IF (chars.empty(), S_OK);
 
+    // Compute mean character opacity to drive background fade
+    for (const auto & ch : chars)
+    {
+        if (!ch.isSpace)
+        {
+            opacitySum += ch.opacity;
+            visibleCount++;
+        }
+    }
+
+    meanOpacity = (visibleCount > 0) ? (opacitySum / static_cast<float> (visibleCount)) : 0.0f;
+
     baseY     = overlay.GetBoundingRect().top + overlay.GetPadding();
     rowHeight = overlay.GetRowHeight();
 
     m_d2dContext->BeginDraw();
     drawing = true;
 
-    DrawFeatheredBackground (overlay.GetBoundingRect());
+    DrawFeatheredBackground (overlay.GetBoundingRect(), meanOpacity);
 
     RenderOverlayCharacters (chars, overlay.GetAllGlyphs(), HotkeyOverlay::GLOW_LAYERS,
         [baseY, rowHeight] (const HintCharacter & ch) -> D2D1_RECT_F
