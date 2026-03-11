@@ -23,6 +23,7 @@ class HotkeyOverlay
 {
 public:
     // Layout base constants (at 96 DPI / 100%)
+    static constexpr float BASE_CHAR_WIDTH = 16.0f;
     static constexpr float BASE_ROW_HEIGHT = 28.0f;
     static constexpr float BASE_PADDING    = 30.0f;
     static constexpr float BASE_GAP        = 16.0f;
@@ -34,7 +35,8 @@ public:
 
 
     // DPI scaling
-    void  SetDpiScale  (float dpiScale);
+    void  SetDpiScale   (float dpiScale);
+    float GetCharWidth() const { return BASE_CHAR_WIDTH * m_dpiScale; }
     float GetRowHeight() const { return BASE_ROW_HEIGHT * m_dpiScale; }
     float GetPadding()   const { return BASE_PADDING    * m_dpiScale; }
     float GetGap()       const { return BASE_GAP        * m_dpiScale; }

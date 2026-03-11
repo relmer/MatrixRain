@@ -59,16 +59,6 @@ public:
     void Render (const AnimationSystem & animationSystem, const Viewport & viewport, ColorScheme colorScheme = ColorScheme::Green, float fps = 0.0f, int rainPercentage = 0, int streakCount = 0, int activeHeadCount = 0, bool showDebugFadeTimes = false, float elapsedTime = 0.0f, const HelpHintOverlay * pOverlay = nullptr, const HotkeyOverlay * pHotkeyOverlay = nullptr, const D2D1_RECT_F * pOcclusionRect = nullptr);
 
     /// <summary>
-    /// Compute exact bounding rect for hotkey overlay using DWrite text metrics.
-    /// </summary>
-    void ComputeHotkeyOverlayLayout (HotkeyOverlay & overlay, float viewportWidth, float viewportHeight);
-
-    /// <summary>
-    /// Compute exact bounding rect and per-character positions for help hint overlay using DWrite text metrics.
-    /// </summary>
-    void ComputeHelpHintOverlayLayout (HelpHintOverlay & overlay, float viewportWidth, float viewportHeight);
-
-    /// <summary>
     /// Present the rendered frame to the screen.
     /// </summary>
     void Present();
@@ -180,11 +170,13 @@ public:
     {
         float projection[16];   // 4x4 projection matrix (column-major)
         float characterScale;   // Global character scale (1.0 = normal, <1.0 for preview)
-        float padding[47];      // Padding to 256 bytes for optimal GPU alignment
+        float widthScale;       // Quad width multiplier (1.0 = rain, 1.5 = overlay proportional)
+        float padding[46];      // Padding to 256 bytes for optimal GPU alignment
 
         ConstantBufferData() :
             projection     { 1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1 },
             characterScale ( 1.0f ),
+            widthScale     ( 1.0f ),
             padding        {}
         {
         }
@@ -205,7 +197,6 @@ private:
     HRESULT CreateSamplerState();
     HRESULT CreateDirect2DResources();
     HRESULT CreateFpsTextFormat();
-    HRESULT CreateOverlayTextFormat();
     void    UpdateDpiScale();
     HRESULT CreateBloomResources       (UINT width, UINT height);
 
@@ -218,8 +209,8 @@ private:
     void    RenderHotkeyOverlay      (const HotkeyOverlay & overlay);
     void    DrawFeatheredGlow        (const wchar_t * fpsText, UINT32 textLength, const D2D1_RECT_F & textRect);
     void    DrawFeatheredBackground  (const D2D1_RECT_F & boundingRect, float opacityScale);
-    void    DrawCharacterGlow        (const wchar_t * glyphStr, int glyphLen, const D2D1_RECT_F & charRect, int glowLayers, float opacity);
-    void    RenderOverlayCharacters  (std::span<const HintCharacter> chars, std::span<const uint32_t> allGlyphs, int glowLayers, const std::function<D2D1_RECT_F (const HintCharacter &)> & computeCharRect);
+    void    BuildOverlayInstances    (std::span<const HintCharacter> chars, std::span<const uint32_t> allGlyphs, int glowLayers, float charScale, float glowOffset, float baseY, float cellHeight, std::span<const float> xPositions);
+    void    RenderOverlayInstances   ();
     void    RenderDebugFadeTimes     (const AnimationSystem & animationSystem);
     HRESULT ApplyBloom();
     void    RenderFullscreenPass     (ID3D11RenderTargetView * pRenderTarget, ID3D11PixelShader * pPixelShader, ID3D11ShaderResourceView * const * ppShaderResources, UINT numResources);
@@ -271,13 +262,13 @@ private:
     ComPtr<ID2D1Bitmap1>         m_d2dBitmap;
     ComPtr<IDWriteFactory>       m_dwriteFactory;
     ComPtr<IDWriteTextFormat>    m_fpsTextFormat;
-    ComPtr<IDWriteTextFormat>    m_overlayTextFormat;
     ComPtr<ID2D1SolidColorBrush> m_fpsBrush;
     ComPtr<ID2D1SolidColorBrush> m_fpsGlowBrush;
 
     // Shader resources
     ComPtr<ID3D11VertexShader> m_vertexShader;
     ComPtr<ID3D11PixelShader>  m_pixelShader;
+    ComPtr<ID3D11PixelShader>  m_overlayPixelShader;
     ComPtr<ID3D11InputLayout>  m_inputLayout;
     ComPtr<ID3D11InputLayout>  m_fullscreenQuadInputLayout;
     ComPtr<ID3D11VertexShader> m_fullscreenQuadVS;
@@ -288,6 +279,11 @@ private:
     ComPtr<ID3D11Buffer> m_constantBuffer;
     ComPtr<ID3D11Buffer> m_bloomConstantBuffer;
     UINT                 m_instanceBufferCapacity { INITIAL_INSTANCE_CAPACITY};
+
+    // Overlay GPU rendering
+    ComPtr<ID3D11Buffer>                   m_overlayInstanceBuffer;
+    UINT                                   m_overlayInstanceBufferCapacity { 0 };
+    std::vector<CharacterInstanceData>     m_overlayInstanceData;
 
     // Render states
     ComPtr<ID3D11BlendState>   m_blendState;

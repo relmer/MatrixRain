@@ -230,8 +230,22 @@ namespace CharacterConstants
 
 
 
-    // Total: 72 + 26 + 26 + 10 = 134 unique characters
-    // With mirroring, the texture atlas will contain 134 * 2 = 268 glyphs
+    // Overlay-only symbols: characters needed by overlays but not in main rain set.
+    // These are added to the atlas without mirrored variants.
+    const uint32_t OVERLAY_SYMBOL_CODEPOINTS[] = {
+        0x002B, // +
+        0x002D, // -
+        0x002F, // /
+        0x003F  // ?
+    };
+    const size_t OVERLAY_SYMBOL_COUNT = sizeof(OVERLAY_SYMBOL_CODEPOINTS) / sizeof(OVERLAY_SYMBOL_CODEPOINTS[0]);
+
+
+
+
+
+    // Total: 72 + 26 + 26 + 10 = 134 rain characters (mirrored = 268)
+    //        + 4 overlay symbols (not mirrored) = 272 glyphs total
 
     // Helper function to get all codepoints in a single vector
     std::vector<uint32_t> GetAllCodepoints()
@@ -264,6 +278,16 @@ namespace CharacterConstants
         }
 
         return allCodepoints;
+    }
+
+
+
+
+
+    std::vector<uint32_t> GetOverlayCodepoints()
+    {
+        return std::vector<uint32_t> (std::begin (OVERLAY_SYMBOL_CODEPOINTS),
+                                      std::end   (OVERLAY_SYMBOL_CODEPOINTS));
     }
 
 

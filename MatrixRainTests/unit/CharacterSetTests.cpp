@@ -264,8 +264,8 @@ namespace MatrixRainTests
                 CharacterSet& charset = CharacterSet::GetInstance();
                 charset.Initialize();
 
-                // Should have 134 normal + 134 mirrored = 268 glyphs
-                Assert::AreEqual (static_cast<size_t>(268), charset.GetGlyphCount());
+                // Should have 134 normal + 134 mirrored + 4 overlay symbols = 272 glyphs
+                Assert::AreEqual (static_cast<size_t>(272), charset.GetGlyphCount());
             }
 
 
@@ -299,14 +299,21 @@ namespace MatrixRainTests
                 CharacterSet& charset = CharacterSet::GetInstance();
                 charset.Initialize();
 
-                // Last 134 glyphs should be mirrored
+                // Indices 134-267 should be mirrored rain glyphs
                 size_t count = charset.GetGlyphCount();
-                Assert::IsTrue (count >= 268);
+                Assert::IsTrue (count >= 272);
 
                 for (size_t i = 134; i < 268; i++)
                 {
                     const GlyphInfo& glyph = charset.GetGlyph (i);
-                    Assert::IsTrue (glyph.mirrored, L"Last 134 glyphs should be mirrored");
+                    Assert::IsTrue (glyph.mirrored, L"Indices 134-267 should be mirrored");
+                }
+
+                // Indices 268-271 are overlay symbols (non-mirrored)
+                for (size_t i = 268; i < 272; i++)
+                {
+                    const GlyphInfo& glyph = charset.GetGlyph (i);
+                    Assert::IsFalse (glyph.mirrored, L"Overlay symbols should not be mirrored");
                 }
             }
 

@@ -26,8 +26,15 @@ namespace CharacterConstants
     extern const uint32_t HALFWIDTH_KATAKANA_CODEPOINTS[];
     extern const size_t   HALFWIDTH_KATAKANA_COUNT;
 
-    // Get all codepoints in a single vector (132 total)
+    // Overlay-only symbols (not mirrored in atlas)
+    extern const uint32_t OVERLAY_SYMBOL_CODEPOINTS[];
+    extern const size_t   OVERLAY_SYMBOL_COUNT;
+
+    // Get all rain codepoints in a single vector (134 total)
     std::vector<uint32_t> GetAllCodepoints();
+
+    // Get overlay-only symbol codepoints (4 total)
+    std::vector<uint32_t> GetOverlayCodepoints();
 
     // Get codepoints suitable for console rendering (single-width only)
     std::vector<uint32_t> GetConsoleCodepoints();

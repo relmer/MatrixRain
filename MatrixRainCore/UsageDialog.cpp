@@ -670,7 +670,7 @@ HRESULT UsageDialog::CreateRenderPipeline ()
             CHR (hr);
         }
 
-        hr = charSet.CreateTextureAtlas (m_renderSystem->GetDevice());
+        hr = charSet.CreateTextureAtlas (m_renderSystem->GetDevice(), m_renderSystem->GetDpiScale());
         CHR (hr);
     }
 

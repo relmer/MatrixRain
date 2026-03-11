@@ -71,7 +71,7 @@ HRESULT Application::Initialize (HINSTANCE hInstance, int nCmdShow, const Screen
 
     m_animationSystem->Initialize (*m_viewport, *m_densityController);
 
-    hr = charSet.CreateTextureAtlas (m_renderSystem->GetDevice());
+    hr = charSet.CreateTextureAtlas (m_renderSystem->GetDevice(), m_renderSystem->GetDpiScale());
     CHR (hr);
 
 
@@ -80,7 +80,6 @@ HRESULT Application::Initialize (HINSTANCE hInstance, int nCmdShow, const Screen
     // Show help hint overlay in Normal mode only
     if (m_appState->GetHelpHintEnabled() && m_helpHintOverlay)
     {
-        m_renderSystem->ComputeHelpHintOverlayLayout (*m_helpHintOverlay, static_cast<float>(m_viewport->GetWidth()), static_cast<float>(m_viewport->GetHeight()));
         m_helpHintOverlay->Show();
     }
 
@@ -660,7 +659,6 @@ void Application::OnKeyDown (WPARAM wParam)
             }
             else
             {
-                m_renderSystem->ComputeHotkeyOverlayLayout (*m_hotkeyOverlay, static_cast<float>(m_viewport->GetWidth()), static_cast<float>(m_viewport->GetHeight()));
                 m_hotkeyOverlay->Show();
             }
         }
@@ -679,7 +677,6 @@ void Application::OnKeyDown (WPARAM wParam)
         }
         else
         {
-            m_renderSystem->ComputeHelpHintOverlayLayout (*m_helpHintOverlay, static_cast<float>(m_viewport->GetWidth()), static_cast<float>(m_viewport->GetHeight()));
             m_helpHintOverlay->Show();
         }
     }
@@ -782,15 +779,7 @@ void Application::OnSize (LPARAM lParam)
         m_renderSystem->Resize (width, height);
         m_viewport->Resize (static_cast<float> (width), static_cast<float> (height));
 
-        if (m_helpHintOverlay)
-        {
-            m_renderSystem->ComputeHelpHintOverlayLayout (*m_helpHintOverlay, static_cast<float>(width), static_cast<float>(height));
-        }
 
-        if (m_hotkeyOverlay && m_hotkeyOverlay->IsActive())
-        {
-            m_renderSystem->ComputeHotkeyOverlayLayout (*m_hotkeyOverlay, static_cast<float>(width), static_cast<float>(height));
-        }
     }
 }
 
@@ -838,20 +827,14 @@ void Application::OnDpiChanged (WPARAM wParam, LPARAM lParam)
     {
         m_helpHintOverlay->SetDpiScale (dpiScale);
 
-        if (m_viewport && m_renderSystem)
-        {
-            m_renderSystem->ComputeHelpHintOverlayLayout (*m_helpHintOverlay, m_viewport->GetWidth(), m_viewport->GetHeight());
-        }
+
     }
 
     if (m_hotkeyOverlay)
     {
         m_hotkeyOverlay->SetDpiScale (dpiScale);
 
-        if (m_hotkeyOverlay->IsActive() && m_renderSystem && m_viewport)
-        {
-            m_renderSystem->ComputeHotkeyOverlayLayout (*m_hotkeyOverlay, m_viewport->GetWidth(), m_viewport->GetHeight());
-        }
+
     }
 
     // Propagate new DPI scale to animation system for character spacing
