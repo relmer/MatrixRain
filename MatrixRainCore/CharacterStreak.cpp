@@ -57,7 +57,7 @@ void CharacterStreak::Spawn (const Vector3 & position)
     
     CharacterInstance character;
     
-    character.glyphIndex     = charSet.GetRandomGlyphIndex();
+    character.glyphIndex     = charSet.GetRandomGlyphIndex (charSet.GetGlyphCount());
     character.color          = Color4 (1.0f, 1.0f, 1.0f, 1.0f); // White (head)
     character.brightness     = 1.0f;
     character.scale          = 1.0f;
@@ -104,7 +104,7 @@ void CharacterStreak::Update (float deltaTime, float viewportHeight)
             
             CharacterInstance character;
             
-            character.glyphIndex     = charSet.GetRandomGlyphIndex();
+            character.glyphIndex     = charSet.GetRandomGlyphIndex (charSet.GetGlyphCount());
             character.color          = Color4 (1.0f, 1.0f, 1.0f, 1.0f); // White (head)
             character.brightness     = 1.0f;
             character.scale          = 1.0f;
@@ -172,7 +172,7 @@ void CharacterStreak::Update (float deltaTime, float viewportHeight)
         if (mutationDist (s_generator) < mutationChance)
         {
             // Mutate to a new random glyph (keep existing fade state)
-            character.glyphIndex = charSet.GetRandomGlyphIndex();
+            character.glyphIndex = charSet.GetRandomGlyphIndex (charSet.GetGlyphCount());
         }
     }
 }

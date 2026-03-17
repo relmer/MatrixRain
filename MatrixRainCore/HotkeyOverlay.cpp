@@ -2,6 +2,7 @@
 
 #include "HotkeyOverlay.h"
 
+#include "CharacterSet.h"
 #include "OverlayColor.h"
 
 
@@ -18,45 +19,7 @@
 
 HotkeyOverlay::HotkeyOverlay()
 {
-    m_allGlyphs = CharacterConstants::GetAllCodepoints();
-
     BuildHotkeyList();
-
-    // Ensure text characters (like '+', '-', '`', '?') that aren't in
-    // the katakana/Latin/numeral glyph set get appended so they
-    // resolve to the correct codepoint during scramble→reveal.
-    for (const auto & entry : m_hotkeys)
-    {
-        for (wchar_t wc : entry.keyName)
-        {
-            if (wc == L' ')
-            {
-                continue;
-            }
-
-            uint32_t cp = static_cast<uint32_t> (wc);
-
-            if (std::find (m_allGlyphs.begin(), m_allGlyphs.end(), cp) == m_allGlyphs.end())
-            {
-                m_allGlyphs.push_back (cp);
-            }
-        }
-
-        for (wchar_t wc : entry.description)
-        {
-            if (wc == L' ')
-            {
-                continue;
-            }
-
-            uint32_t cp = static_cast<uint32_t> (wc);
-
-            if (std::find (m_allGlyphs.begin(), m_allGlyphs.end(), cp) == m_allGlyphs.end())
-            {
-                m_allGlyphs.push_back (cp);
-            }
-        }
-    }
 
     // Compute key column width (max key name length) and total columns
     m_keyColChars = 0;
@@ -78,7 +41,7 @@ HotkeyOverlay::HotkeyOverlay()
     // Initialize the scramble-reveal effect (holdDuration = -1 → hold indefinitely)
     int cellCount = static_cast<int>(m_chars.size());
 
-    m_scramble.Initialize (cellCount, 1.2f, 1.0f, 0.065f, 1.0f, -1.0f);
+    m_scramble.Initialize (cellCount, 1.2f, 1.0f, 0.10f, 1.0f, -1.0f);
 
     for (int i = 0; i < cellCount; i++)
     {
@@ -181,30 +144,12 @@ void HotkeyOverlay::InitializeCharacters ()
         {
             HintCharacter ch;
 
-            ch.row     = row;
-            ch.col     = MARGIN_COLS + col;
-            ch.isSpace = (rowText[col] == L' ');
-            ch.phase   = CharPhase::Hidden;
-            ch.opacity = 0.0f;
-
-            // Find the target glyph index for the character
-            if (!ch.isSpace)
-            {
-                uint32_t codepoint = static_cast<uint32_t> (rowText[col]);
-
-                auto it = std::find (m_allGlyphs.begin(), m_allGlyphs.end(), codepoint);
-                if (it != m_allGlyphs.end())
-                {
-                    ch.targetGlyphIndex = static_cast<size_t> (it - m_allGlyphs.begin());
-                }
-                else
-                {
-                    ch.targetGlyphIndex = 0;
-                }
-            }
-
-            ch.randomGlyphIndex  = (m_chars.size() * 7) % m_allGlyphs.size();
-            ch.currentGlyphIndex = ch.targetGlyphIndex;
+            ch.row             = row;
+            ch.col             = MARGIN_COLS + col;
+            ch.isSpace         = (rowText[col] == L' ');
+            ch.targetCodepoint = static_cast<uint32_t> (rowText[col]);
+            ch.phase           = CharPhase::Hidden;
+            ch.opacity         = 0.0f;
 
             m_chars.push_back (ch);
         }
@@ -231,6 +176,35 @@ void HotkeyOverlay::InitializeCharacters ()
 
 ////////////////////////////////////////////////////////////////////////////////
 //
+//  HotkeyOverlay::ResolveGlyphIndices
+//
+//  Resolves targetCodepoint to CharacterSet glyph indices.
+//  Called from Show() when CharacterSet is guaranteed to be initialized.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+void HotkeyOverlay::ResolveGlyphIndices ()
+{
+    CharacterSet & charSet = CharacterSet::GetInstance();
+
+
+
+    for (auto & ch : m_chars)
+    {
+        size_t idx = charSet.FindGlyphByCodepoint (ch.targetCodepoint);
+
+        ch.targetGlyphIndex  = (idx != SIZE_MAX) ? idx : 0;
+        ch.randomGlyphIndex  = charSet.GetRandomGlyphIndex (charSet.GetRainGlyphCount());
+        ch.currentGlyphIndex = ch.targetGlyphIndex;
+    }
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
 //  HotkeyOverlay::Show
 //
 //  Starts or restarts the reveal animation.
@@ -239,6 +213,8 @@ void HotkeyOverlay::InitializeCharacters ()
 
 void HotkeyOverlay::Show ()
 {
+    ResolveGlyphIndices();
+
     // Reset all characters to Hidden so the new reveal starts clean
     for (auto & ch : m_chars)
     {
@@ -308,8 +284,9 @@ void HotkeyOverlay::Update (float deltaTime)
 {
     m_scramble.Update (deltaTime);
 
-    float postRevealTimer = m_scramble.GetPostRevealTimer();
-    int   cellCount       = m_scramble.GetCellCount();
+    CharacterSet & charSet         = CharacterSet::GetInstance();
+    float          postRevealTimer = m_scramble.GetPostRevealTimer();
+    int            cellCount       = m_scramble.GetCellCount();
 
 
 
@@ -329,7 +306,7 @@ void HotkeyOverlay::Update (float deltaTime)
 
                 if (cell.needsCycle)
                 {
-                    ch.randomGlyphIndex  = (ch.randomGlyphIndex + 7) % m_allGlyphs.size();
+                    ch.randomGlyphIndex  = charSet.GetRandomGlyphIndex (charSet.GetRainGlyphCount());
                     ch.currentGlyphIndex = ch.randomGlyphIndex;
                 }
 
@@ -359,7 +336,7 @@ void HotkeyOverlay::Update (float deltaTime)
 
                 if (cell.needsCycle)
                 {
-                    ch.randomGlyphIndex  = (ch.randomGlyphIndex + 7) % m_allGlyphs.size();
+                    ch.randomGlyphIndex  = charSet.GetRandomGlyphIndex (charSet.GetRainGlyphCount());
                     ch.currentGlyphIndex = ch.randomGlyphIndex;
                 }
                 else

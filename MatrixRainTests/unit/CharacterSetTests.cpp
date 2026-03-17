@@ -158,114 +158,13 @@ namespace MatrixRainTests
 
 
 
-            TEST_METHOD (CharacterSet_GetGlyphCount_BeforeInitialization_ReturnsZero)
-            {
-                CharacterSet& charset = CharacterSet::GetInstance();
-                // Note: This test assumes CharacterSet is not initialized yet
-                // In a real scenario, we'd need to ensure a fresh instance
-                // For now, we just verify the method exists and returns a value
-                size_t count = charset.GetGlyphCount();
-                Assert::IsTrue (count >= 0); // Can be 0 if not initialized, or 266 if initialized
-            }
-
-
-
-
-
-
-            TEST_METHOD (CharacterSet_GetTextureResource_BeforeInitialization_MayReturnNull)
-            {
-                CharacterSet& charset = CharacterSet::GetInstance();
-                void* texture = charset.GetTextureResource();
-                // Before initialization, texture may be nullptr
-                // After initialization, it should be a valid pointer
-                // We can't test both states in one test, so we just verify the method works
-                Assert::IsTrue (texture == nullptr || texture != nullptr); // Always true, but tests the API
-            }
-
-
-
-
-
-
-            TEST_METHOD (CharacterSet_HasGetRandomGlyphIndexMethod)
-            {
-                CharacterSet& charset = CharacterSet::GetInstance();
-                // This test just verifies the method exists and can be called
-                // We can't test randomness properly without initialization
-                // But we can verify it doesn't crash
-                try
-                {
-                    size_t index = charset.GetRandomGlyphIndex();
-                    // If initialized, should return valid index (0-265)
-                    // If not initialized, behavior is implementation-defined
-                    Assert::IsTrue (index >= 0); // Always true for size_t, but documents expectation
-                }
-                catch (...)
-                {
-                    // If not initialized, method might throw - that's okay for this test
-                    Assert::IsTrue (true);
-                }
-            }
-
-
-
-
-
-
-            TEST_METHOD (CharacterSet_HasGetGlyphMethod)
-            {
-                CharacterSet& charset = CharacterSet::GetInstance();
-                // Verify the method signature exists
-                // We can't test actual glyph data without initialization
-                try
-                {
-                    const GlyphInfo& glyph = charset.GetGlyph (0);
-                    // If this doesn't crash, the method works
-                    // Check that glyph has valid structure
-                    UNREFERENCED_PARAMETER(glyph);
-                    Assert::IsTrue (true);
-                }
-                catch (...)
-                {
-                    // If not initialized or index invalid, might throw - acceptable
-                    Assert::IsTrue (true);
-                }
-            }
-
-
-
-
-
-
-            TEST_METHOD (CharacterSet_HasInitializeMethod)
-            {
-                CharacterSet& charset = CharacterSet::GetInstance();
-                // Verify Initialize method exists and returns bool
-                // Note: Actual initialization may fail in test environment without D3D11
-                try
-                {
-                    bool result = charset.Initialize();
-                    // Result could be true or false depending on environment
-                    Assert::IsTrue (result == true || result == false);
-                }
-                catch (...)
-                {
-                    // DirectX initialization might fail in test environment - that's okay
-                    Assert::IsTrue (true);
-                }
-            }
-
-            // Shutdown test removed - calling Shutdown() on the singleton breaks other tests
-            // since CharacterSet is shared across all test methods
-
-            TEST_METHOD (CharacterSet_AfterInitialize_Has268Glyphs)
+            TEST_METHOD (CharacterSet_AfterInitialize_Has273Glyphs)
             {
                 CharacterSet& charset = CharacterSet::GetInstance();
                 charset.Initialize();
 
-                // Should have 134 normal + 134 mirrored + 4 overlay symbols = 272 glyphs
-                Assert::AreEqual (static_cast<size_t>(272), charset.GetGlyphCount());
+                // Should have 134 normal + 134 mirrored + 5 overlay symbols = 273 glyphs
+                Assert::AreEqual (static_cast<size_t>(273), charset.GetGlyphCount());
             }
 
 
@@ -273,19 +172,19 @@ namespace MatrixRainTests
 
 
 
-            TEST_METHOD (CharacterSet_AfterInitialize_FirstHalfNotMirrored)
+            TEST_METHOD (CharacterSet_AfterInitialize_NormalGlyphsAtEvenIndices)
             {
                 CharacterSet& charset = CharacterSet::GetInstance();
                 charset.Initialize();
 
-                // First 134 glyphs should NOT be mirrored
+                // In the paired layout, even indices (0, 2, 4, ...) should NOT be mirrored
                 size_t count = charset.GetGlyphCount();
-                Assert::IsTrue (count >= 134);
+                Assert::IsTrue (count >= 268);
 
-                for (size_t i = 0; i < 134; i++)
+                for (size_t i = 0; i < 268; i += 2)
                 {
                     const GlyphInfo& glyph = charset.GetGlyph (i);
-                    Assert::IsFalse (glyph.mirrored, L"First 134 glyphs should not be mirrored");
+                    Assert::IsFalse (glyph.mirrored, L"Even rain indices should not be mirrored");
                 }
             }
 
@@ -294,23 +193,23 @@ namespace MatrixRainTests
 
 
 
-            TEST_METHOD (CharacterSet_AfterInitialize_SecondHalfMirrored)
+            TEST_METHOD (CharacterSet_AfterInitialize_MirroredGlyphsAtOddIndices)
             {
                 CharacterSet& charset = CharacterSet::GetInstance();
                 charset.Initialize();
 
-                // Indices 134-267 should be mirrored rain glyphs
+                // In the paired layout, odd indices (1, 3, 5, ...) should be mirrored
                 size_t count = charset.GetGlyphCount();
-                Assert::IsTrue (count >= 272);
+                Assert::IsTrue (count >= 273);
 
-                for (size_t i = 134; i < 268; i++)
+                for (size_t i = 1; i < 268; i += 2)
                 {
                     const GlyphInfo& glyph = charset.GetGlyph (i);
-                    Assert::IsTrue (glyph.mirrored, L"Indices 134-267 should be mirrored");
+                    Assert::IsTrue (glyph.mirrored, L"Odd rain indices should be mirrored");
                 }
 
-                // Indices 268-271 are overlay symbols (non-mirrored)
-                for (size_t i = 268; i < 272; i++)
+                // Indices 268-272 are overlay symbols (non-mirrored)
+                for (size_t i = 268; i < 273; i++)
                 {
                     const GlyphInfo& glyph = charset.GetGlyph (i);
                     Assert::IsFalse (glyph.mirrored, L"Overlay symbols should not be mirrored");
@@ -327,8 +226,9 @@ namespace MatrixRainTests
                 CharacterSet& charset = CharacterSet::GetInstance();
                 charset.Initialize();
 
-                // All glyphs should have UV coordinates in [0, 1] range
-                size_t count = charset.GetGlyphCount();
+                // Rain-atlas glyphs (first 272) should have UV coordinates in [0, 1] range
+                // Overlay-only glyphs (index 272+) don't have rain UVs
+                size_t count = std::min (charset.GetGlyphCount(), static_cast<size_t> (272));
                 for (size_t i = 0; i < count; i++)
                 {
                     const GlyphInfo& glyph = charset.GetGlyph (i);
@@ -377,7 +277,7 @@ namespace MatrixRainTests
                 size_t count = charset.GetGlyphCount();
                 for (int i = 0; i < 100; i++)
                 {
-                    size_t index = charset.GetRandomGlyphIndex();
+                    size_t index = charset.GetRandomGlyphIndex (count);
                     Assert::IsTrue (index < count, L"Random glyph index should be within valid range");
                 }
             }
@@ -392,9 +292,9 @@ namespace MatrixRainTests
                 CharacterSet& charset = CharacterSet::GetInstance();
                 charset.Initialize();
 
-                // Verify that glyphs have proper spacing (no overlap)
-                // This is a simplified check - we just verify each glyph has reasonable size
-                size_t count = charset.GetGlyphCount();
+                // Verify that rain-atlas glyphs have proper spacing (no overlap)
+                // Overlay-only glyphs (index 272+) don't have rain UVs
+                size_t count = std::min (charset.GetGlyphCount(), static_cast<size_t> (272));
 
                 for (size_t i = 0; i < count; i++)
                 {

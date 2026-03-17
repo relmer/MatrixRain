@@ -1,6 +1,5 @@
 #pragma once
 
-#include "CharacterConstants.h"
 #include "HelpHintOverlay.h"
 #include "UsageText.h"
 
@@ -65,7 +64,6 @@ public:
     int                                       GetRows ()            const { return static_cast<int> (m_hotkeys.size());                 }
     std::span<const HintCharacter>            GetCharacters ()      const { return std::span<const HintCharacter> (m_chars);            }
     std::span<HintCharacter>                  GetMutableCharacters ()      { return std::span<HintCharacter> (m_chars);                 }
-    std::span<const uint32_t>                 GetAllGlyphs ()       const { return std::span<const uint32_t> (m_allGlyphs);             }
     int                                       GetCols ()            const { return m_cols;                                              }
     int                                       GetCharRows ()        const { return static_cast<int> (m_hotkeys.size());                 }
     int                                       GetKeyColChars ()     const { return m_keyColChars;                                      }
@@ -75,6 +73,7 @@ public:
 private:
     void BuildHotkeyList();
     void InitializeCharacters();
+    void ResolveGlyphIndices();
 
 
     // Scramble-reveal effect (handles all timing / phase transitions)
@@ -88,10 +87,7 @@ private:
     int                             m_cols          = 0;
     int                             m_textCols      = 0;
     int                             m_keyColChars   = 0;
-    int                             m_gapChars      = 2;
-
-    // Glyph set for scrambling
-    std::vector<uint32_t>           m_allGlyphs;
+    int                             m_gapChars      = 6;
 
     // Bounding rect for rendering
     D2D1_RECT_F                     m_boundingRect    = {};

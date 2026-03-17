@@ -13,6 +13,12 @@ using Microsoft::WRL::ComPtr;
 
 
 
+////////////////////////////////////////////////////////////////////////////////
+//
+//  CharacterSet::~CharacterSet
+//
+////////////////////////////////////////////////////////////////////////////////
+
 CharacterSet::~CharacterSet()
 {
     Shutdown();
@@ -22,15 +28,34 @@ CharacterSet::~CharacterSet()
 
 
 
+////////////////////////////////////////////////////////////////////////////////
+//
+//  CharacterSet::GetInstance
+//
+//  Returns the singleton instance.
+//
+////////////////////////////////////////////////////////////////////////////////
+
 CharacterSet & CharacterSet::GetInstance()
 {
-    static CharacterSet instance;
-    return instance;
+    static CharacterSet s_instance;
+
+    return s_instance;
 }
 
 
 
 
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  CharacterSet::Initialize
+//
+//  Populates the glyph table with paired normal/mirrored rain codepoints
+//  and overlay symbols.  Measures proportional advance widths for overlay
+//  text layout.
+//
+////////////////////////////////////////////////////////////////////////////////
 
 bool CharacterSet::Initialize()
 {
@@ -39,70 +64,55 @@ bool CharacterSet::Initialize()
         return true;
     }
 
-    // Get all character codepoints (134 rain + 4 overlay symbols)
+    // Get all character codepoints (134 rain + 5 overlay symbols)
     auto codepoints        = CharacterConstants::GetAllCodepoints();
     auto overlayCodepoints = CharacterConstants::GetOverlayCodepoints();
 
-    // Reserve space: 134 normal + 134 mirrored + 4 overlay = 272 total
+    // Reserve space: 134 normal + 134 mirrored + 5 overlay = 273 total
     m_glyphs.clear();
     m_glyphs.reserve (codepoints.size() * 2 + overlayCodepoints.size());
 
-    // Create glyph info for normal characters
-    for (size_t i = 0; i < codepoints.size(); i++)
-    {
-        GlyphInfo glyph;
-
-        glyph.codepoint = codepoints[i];
-        glyph.mirrored  = false;
-        glyph.uvMin     = Vector2 (0.0f, 0.0f);
-        glyph.uvMax     = Vector2 (0.0f, 0.0f);
-
-        m_glyphs.push_back (glyph);
-    }
-
-    // Create glyph info for mirrored characters
-    for (size_t i = 0; i < codepoints.size(); i++)
-    {
-        GlyphInfo glyph;
-
-        glyph.codepoint = codepoints[i];
-        glyph.mirrored  = true;
-        glyph.uvMin     = Vector2 (0.0f, 0.0f);
-        glyph.uvMax     = Vector2 (0.0f, 0.0f);
-
-        m_glyphs.push_back (glyph);
-    }
-
-    // Append overlay-only symbols (non-mirrored)
-    for (size_t i = 0; i < overlayCodepoints.size(); i++)
-    {
-        GlyphInfo glyph;
-
-        glyph.codepoint = overlayCodepoints[i];
-        glyph.mirrored  = false;
-        glyph.uvMin     = Vector2 (0.0f, 0.0f);
-        glyph.uvMax     = Vector2 (0.0f, 0.0f);
-
-        m_glyphs.push_back (glyph);
-    }
-
-    // Calculate UV coordinates for 16x17 grid (272 glyphs total)
-    CalculateUVCoordinates();
-
-    // Build codepoint-to-glyph lookup (non-mirrored only)
     m_codepointToGlyph.clear();
     m_codepointToGlyph.reserve (codepoints.size() + overlayCodepoints.size());
 
-    for (size_t i = 0; i < codepoints.size(); i++)
+    // Create glyph info for rain characters (normal + mirrored pairs)
+    for (const auto & cp : codepoints)
     {
-        m_codepointToGlyph[codepoints[i]] = i;
+        GlyphInfo glyph;
+
+        m_codepointToGlyph[cp] = m_glyphs.size();
+
+        glyph.codepoint = cp;
+        glyph.mirrored  = false;
+        glyph.uvMin     = Vector2 (0.0f, 0.0f);
+        glyph.uvMax     = Vector2 (0.0f, 0.0f);
+
+        m_glyphs.push_back (glyph);
+
+        glyph.mirrored = true;
+        m_glyphs.push_back (glyph);
     }
 
-    // Overlay symbols are at indices 268..271 (after mirrored block)
-    for (size_t i = 0; i < overlayCodepoints.size(); i++)
+    // Store rain-only glyph count (normal + mirrored, before overlay symbols)
+    m_rainGlyphCount = codepoints.size() * 2;
+
+    // Append overlay-only symbols (non-mirrored)
+    for (const auto & cp : overlayCodepoints)
     {
-        m_codepointToGlyph[overlayCodepoints[i]] = codepoints.size() * 2 + i;
+        GlyphInfo glyph;
+
+        m_codepointToGlyph[cp] = m_glyphs.size();
+
+        glyph.codepoint = cp;
+        glyph.mirrored  = false;
+        glyph.uvMin     = Vector2 (0.0f, 0.0f);
+        glyph.uvMax     = Vector2 (0.0f, 0.0f);
+
+        m_glyphs.push_back (glyph);
     }
+
+    // Calculate UV coordinates for 16x17 grid (272 rain glyphs)
+    CalculateUVCoordinates();
 
     // Measure proportional advance widths using Segoe UI (for overlay positioning)
     MeasureProportionalAdvanceWidths (codepoints, overlayCodepoints);
@@ -116,37 +126,28 @@ bool CharacterSet::Initialize()
 
 
 
-size_t CharacterSet::GetRandomGlyphIndex() const
+////////////////////////////////////////////////////////////////////////////////
+//
+//  CharacterSet::GetRandomGlyphIndex
+//
+//  Returns a random index in the range [0, count).
+//
+////////////////////////////////////////////////////////////////////////////////
+
+size_t CharacterSet::GetRandomGlyphIndex (size_t count) const
 {
-    static thread_local std::random_device rd;
-    static thread_local std::mt19937       gen (rd());
+    static thread_local std::random_device s_rd;
+    static thread_local std::mt19937       s_gen (s_rd());
 
 
 
-    if (m_glyphs.empty())
+    if (count == 0)
     {
         return 0;
     }
 
-    // Create distribution fresh each time to avoid stale size issues
-    std::uniform_int_distribution<size_t> dist (0, m_glyphs.size() - 1);
-    return dist (gen);
-}
-
-
-
-
-
-const GlyphInfo & CharacterSet::GetGlyph (size_t index) const
-{
-    static GlyphInfo defaultGlyph;
-    
-    if (m_glyphs.empty() || index >= m_glyphs.size())
-    {
-        return defaultGlyph;
-    }
-
-    return m_glyphs[index];
+    std::uniform_int_distribution<size_t> dist (0, count - 1);
+    return dist (s_gen);
 }
 
 
@@ -195,18 +196,15 @@ void CharacterSet::MeasureProportionalAdvanceWidths (const std::vector<uint32_t>
 {
     ComPtr<IDWriteFactory>    dwriteFactory;
     ComPtr<IDWriteTextFormat> textFormat;
-    HRESULT                   hr       = S_OK;
-    float                     fontSize = 100.0f;
+    HRESULT                   hr             = S_OK;
+    float                     fontSize       = 100.0f;
+
 
 
     hr = DWriteCreateFactory (DWRITE_FACTORY_TYPE_SHARED,
                               __uuidof (IDWriteFactory),
                               reinterpret_cast<IUnknown **> (dwriteFactory.GetAddressOf()));
-
-    if (FAILED (hr))
-    {
-        return;
-    }
+    CHRA (hr);
 
     hr = dwriteFactory->CreateTextFormat (L"Segoe UI",
                                           nullptr,
@@ -216,131 +214,101 @@ void CharacterSet::MeasureProportionalAdvanceWidths (const std::vector<uint32_t>
                                           fontSize,
                                           L"en-us",
                                           &textFormat);
+    CHRA (hr);
 
-    if (FAILED (hr))
-    {
-        return;
-    }
-
-    // Measure rain codepoints (normal glyphs, indices 0..N-1)
+    // Measure rain codepoints (normal + mirrored pairs, indices 0,1,2,3,...267)
     for (size_t i = 0; i < rainCodepoints.size(); i++)
     {
-        wchar_t                   text[3]  = {};
-        int                       len      = 0;
-        ComPtr<IDWriteTextLayout> layout;
-        DWRITE_TEXT_METRICS       metrics  = {};
-        uint32_t                  cp       = rainCodepoints[i];
-
-
-        // Convert codepoint to UTF-16
-        if (cp <= 0xFFFF)
-        {
-            text[0] = static_cast<wchar_t> (cp);
-            len     = 1;
-        }
-        else
-        {
-            cp -= 0x10000;
-            text[0] = static_cast<wchar_t> (0xD800 + (cp >> 10));
-            text[1] = static_cast<wchar_t> (0xDC00 + (cp & 0x3FF));
-            len     = 2;
-        }
-
-        hr = dwriteFactory->CreateTextLayout (text,
-                                              static_cast<UINT32> (len),
-                                              textFormat.Get(),
-                                              10000.0f,
-                                              10000.0f,
-                                              &layout);
-
-        if (SUCCEEDED (hr))
-        {
-            layout->GetMetrics (&metrics);
-            m_glyphs[i].advanceWidth = metrics.width / fontSize;
-        }
+        m_glyphs[i * 2].advanceWidth = MeasureCodepointAdvanceWidth (dwriteFactory.Get(), textFormat.Get(),
+                                                                     rainCodepoints[i], fontSize, false);
 
         // Mirrored glyph gets the same advance width
-        m_glyphs[rainCodepoints.size() + i].advanceWidth = m_glyphs[i].advanceWidth;
+        m_glyphs[i * 2 + 1].advanceWidth = m_glyphs[i * 2].advanceWidth;
     }
 
-    // Measure overlay symbol codepoints (indices 268..271)
+    // Measure overlay symbol codepoints (indices 268..272)
     for (size_t i = 0; i < overlayCodepoints.size(); i++)
     {
-        size_t                    glyphIdx = rainCodepoints.size() * 2 + i;
-        wchar_t                   text[2]  = { static_cast<wchar_t> (overlayCodepoints[i]), L'\0' };
-        ComPtr<IDWriteTextLayout> layout;
-        DWRITE_TEXT_METRICS       metrics  = {};
+        size_t glyphIdx = rainCodepoints.size() * 2 + i;
 
-
-        hr = dwriteFactory->CreateTextLayout (text,
-                                              1,
-                                              textFormat.Get(),
-                                              10000.0f,
-                                              10000.0f,
-                                              &layout);
-
-        if (SUCCEEDED (hr))
-        {
-            layout->GetMetrics (&metrics);
-            m_glyphs[glyphIdx].advanceWidth = metrics.width / fontSize;
-        }
+        m_glyphs[glyphIdx].advanceWidth = MeasureCodepointAdvanceWidth (dwriteFactory.Get(), textFormat.Get(),
+                                                                        overlayCodepoints[i], fontSize, true);
     }
 
     // Measure space character advance width
+    m_spaceAdvanceWidth = MeasureCodepointAdvanceWidth (dwriteFactory.Get(), textFormat.Get(),
+                                                        0x0020, fontSize, true);
+
+Error:
+    return;
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  CharacterSet::MeasureCodepointAdvanceWidth
+//
+//  Measures the advance width of a single codepoint using DirectWrite,
+//  returned as a fraction of em-height.  When includeTrailingWhitespace
+//  is true, uses widthIncludingTrailingWhitespace (needed for space).
+//
+////////////////////////////////////////////////////////////////////////////////
+
+float CharacterSet::MeasureCodepointAdvanceWidth (IDWriteFactory * pFactory,
+                                                  IDWriteTextFormat * pFormat,
+                                                  uint32_t codepoint,
+                                                  float fontSize,
+                                                  bool includeTrailingWhitespace)
+{
+    HRESULT                   hr      = S_OK;
+    float                     advance = 0.0f;
+    wchar_t                   text[3] = {};
+    int                       len     = 0;
+    ComPtr<IDWriteTextLayout> layout;
+    DWRITE_TEXT_METRICS       metrics = {};
+
+
+
+    // Convert codepoint to UTF-16
+    if (codepoint <= 0xFFFF)
     {
-        ComPtr<IDWriteTextLayout> layout;
-        DWRITE_TEXT_METRICS       metrics = {};
-
-        hr = dwriteFactory->CreateTextLayout (L" ",
-                                              1,
-                                              textFormat.Get(),
-                                              10000.0f,
-                                              10000.0f,
-                                              &layout);
-
-        if (SUCCEEDED (hr))
-        {
-            layout->GetMetrics (&metrics);
-            m_spaceAdvanceWidth = metrics.width / fontSize;
-        }
+        text[0] = static_cast<wchar_t> (codepoint);
+        len     = 1;
     }
+    else
+    {
+        uint32_t cp = codepoint - 0x10000;
+
+        text[0] = static_cast<wchar_t> (0xD800 + (cp >> 10));
+        text[1] = static_cast<wchar_t> (0xDC00 + (cp & 0x3FF));
+        len     = 2;
+    }
+
+    hr = pFactory->CreateTextLayout (text,
+                                     static_cast<UINT32> (len),
+                                     pFormat,
+                                     10000.0f,
+                                     10000.0f,
+                                     &layout);
+    CHRA (hr);
+
+    layout->GetMetrics (&metrics);
+    advance = (includeTrailingWhitespace ? metrics.widthIncludingTrailingWhitespace : metrics.width) / fontSize;
+
+
+
+Error:
+    return advance;
 }
 
 
 
 
 
-size_t CharacterSet::GetGlyphCount() const
-{
-    return m_glyphs.size();
-}
 
-
-
-
-
-ID3D11Texture2D * CharacterSet::GetTextureResource() const
-{
-    return m_textureResource.Get();
-}
-
-
-
-
-
-ID3D11ShaderResourceView * CharacterSet::GetTextureResourceView() const
-{
-    return m_textureResourceView.Get();
-}
-
-
-
-
-
-ID3D11ShaderResourceView * CharacterSet::GetOverlayTextureResourceView() const
-{
-    return m_overlayTextureResourceView.Get();
-}
 
 
 
@@ -348,22 +316,11 @@ ID3D11ShaderResourceView * CharacterSet::GetOverlayTextureResourceView() const
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-//  CharacterSet::GetOverlayUV
+//  CharacterSet::Shutdown
 //
-//  Returns the overlay-specific UV coordinates for a glyph.  These map into
-//  the DPI-aware overlay atlas (which may have different dimensions than the
-//  rain atlas).
+//  Releases all GPU resources and clears glyph data.
 //
 ////////////////////////////////////////////////////////////////////////////////
-
-const OverlayUV & CharacterSet::GetOverlayUV (size_t index) const
-{
-    return m_overlayUVs[index];
-}
-
-
-
-
 
 void CharacterSet::Shutdown()
 {
@@ -401,6 +358,15 @@ HRESULT CharacterSet::RecreateOverlayAtlas (ID3D11Device * d3dDevice, float dpiS
 
 
 
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  CharacterSet::CreateTextureAtlas
+//
+//  Creates the 2048x2048 rain glyph atlas and the DPI-aware overlay atlas.
+//  Both atlases share the same D3D11 device.
+//
+////////////////////////////////////////////////////////////////////////////////
 
 HRESULT CharacterSet::CreateTextureAtlas (ID3D11Device * d3dDevice, float dpiScale)
 {
@@ -485,7 +451,7 @@ HRESULT CharacterSet::CreateOverlayAtlas (ID3D11Device * d3dDevice, float dpiSca
     D3D11_SHADER_RESOURCE_VIEW_DESC    srvDesc     = {};
     int                                fontSize    = 0;
     int                                gridCols    = 16;
-    int                                gridRows    = 17;
+    int                                gridRows    = 18;
 
 
 
@@ -494,10 +460,18 @@ HRESULT CharacterSet::CreateOverlayAtlas (ID3D11Device * d3dDevice, float dpiSca
     // Compute atlas dimensions for target pixel size at current DPI.
     // Font size: 12pt Segoe UI = 16 DIP at 96 DPI, scaled by dpiScale.
     // Cell content proportions match rain atlas: 1.4x em width, 1.3x em height.
+    //
+    // Display dimensions are the on-screen quad size.  The atlas renders
+    // at 3x resolution for high-quality supersampled anti-aliasing and
+    // relies on the linear texture sampler to downsample.
+    static constexpr int SUPERSAMPLE = 3;
+
     fontSize                   = static_cast<int> (ceil (16.0f * dpiScale));
-    m_overlayFontSize          = static_cast<float> (fontSize);
-    m_overlayCellContentWidth  = static_cast<int> (ceil (m_overlayFontSize * 1.4f));
-    m_overlayCellContentHeight = static_cast<int> (ceil (m_overlayFontSize * 1.3f));
+    m_overlayDisplayWidth      = static_cast<int> (ceil (static_cast<float> (fontSize) * 1.4f));
+    m_overlayDisplayHeight     = static_cast<int> (ceil (static_cast<float> (fontSize) * 1.3f));
+    m_overlayFontSize          = static_cast<float> (fontSize * SUPERSAMPLE);
+    m_overlayCellContentWidth  = m_overlayDisplayWidth  * SUPERSAMPLE;
+    m_overlayCellContentHeight = m_overlayDisplayHeight * SUPERSAMPLE;
     m_overlayPadding           = std::max (2, static_cast<int> (ceil (m_overlayFontSize * 0.15f)));
     m_overlayAtlasWidth        = gridCols * (m_overlayCellContentWidth  + 2 * m_overlayPadding);
     m_overlayAtlasHeight       = gridRows * (m_overlayCellContentHeight + 2 * m_overlayPadding);
@@ -546,56 +520,62 @@ Error:
 
 
 
-HRESULT CharacterSet::RenderGlyphsToAtlas (ID3D11Device * d3dDevice)
+////////////////////////////////////////////////////////////////////////////////
+//
+//  CharacterSet::CreateD2DRenderContext
+//
+//  Creates a Direct2D device context, DirectWrite factory, and white brush
+//  for rendering glyphs into the given texture atlas.  Shared setup used by
+//  both RenderGlyphsToAtlas and RenderOverlayGlyphsToAtlas.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+HRESULT CharacterSet::CreateD2DRenderContext (ID3D11Device          * d3dDevice,
+                                              ID3D11Texture2D       * texture,
+                                              ID2D1DeviceContext   ** ppContext,
+                                              IDWriteFactory       ** ppDWriteFactory,
+                                              ID2D1SolidColorBrush ** ppBrush)
 {
-    HRESULT                              hr              = S_OK;
-    ID3D11Device                       * device          = d3dDevice;
-    ID3D11Texture2D                    * texture         = m_textureResource.Get();
-    ComPtr<IDXGIDevice>                  dxgiDevice;
-    ComPtr<ID2D1Factory1>                d2dFactory;
-    ComPtr<ID2D1Device>                  d2dDevice;
-    ComPtr<ID2D1DeviceContext>           d2dContext;
-    ComPtr<IDXGISurface>                 dxgiSurface;
-    ComPtr<ID2D1Bitmap1>                 d2dBitmap;
-    ComPtr<IDWriteFactory>               dwriteFactory;
-    ComPtr<IDWriteTextFormat>            textFormat;
-    ComPtr<ID2D1SolidColorBrush>         brush;
-    D2D1_FACTORY_OPTIONS                 options         = {};
-    D2D1_BITMAP_PROPERTIES1              bitmapProps     = {};
-    constexpr size_t                     GRID_COLS       = 16;
-    constexpr size_t                     CELL_WIDTH      = 128;
-    constexpr size_t                     CELL_HEIGHT     = 120;
+    HRESULT                    hr            = S_OK;
+    ComPtr<IDXGIDevice>        dxgiDevice;
+    ComPtr<ID2D1Factory1>      d2dFactory;
+    ComPtr<ID2D1Device>        d2dDevice;
+    ComPtr<ID2D1DeviceContext> d2dContext;
+    ComPtr<IDXGISurface>       dxgiSurface;
+    ComPtr<ID2D1Bitmap1>       d2dBitmap;
+    ComPtr<IDWriteFactory>     dwriteFactory;
+    D2D1_FACTORY_OPTIONS       options       = {};
+    D2D1_BITMAP_PROPERTIES1    bitmapProps   = {};
 
 
 
-    CBRAEx (m_textureResource.Get() != nullptr, E_UNEXPECTED);
-    CBRAEx (d3dDevice != nullptr,               E_INVALIDARG);
-    
+    CBRAEx (d3dDevice != nullptr, E_INVALIDARG);
+    CBRAEx (texture   != nullptr, E_INVALIDARG);
+    CBRAEx (ppContext != nullptr, E_INVALIDARG);
+
     // Get DXGI device for D2D
-    hr = device->QueryInterface (__uuidof (IDXGIDevice), &dxgiDevice);
+    hr = d3dDevice->QueryInterface (__uuidof (IDXGIDevice), &dxgiDevice);
     CHRA (hr);
-    
+
     // Create D2D factory
 #ifdef _DEBUG
     options.debugLevel = D2D1_DEBUG_LEVEL_INFORMATION;
 #endif
-    hr = D2D1CreateFactory (D2D1_FACTORY_TYPE_SINGLE_THREADED, __uuidof (ID2D1Factory1), &options, 
+    hr = D2D1CreateFactory (D2D1_FACTORY_TYPE_SINGLE_THREADED, __uuidof (ID2D1Factory1), &options,
                             reinterpret_cast<void **> (d2dFactory.GetAddressOf()));
     CHRA (hr);
-    
-    // Create D2D device
+
+    // Create D2D device and context
     hr = d2dFactory->CreateDevice (dxgiDevice.Get(), &d2dDevice);
     CHRA (hr);
-    
-    // Create D2D device context
+
     hr = d2dDevice->CreateDeviceContext (D2D1_DEVICE_CONTEXT_OPTIONS_NONE, &d2dContext);
     CHRA (hr);
-    
-    // Get DXGI surface from the D3D11 texture
+
+    // Get DXGI surface and create D2D bitmap render target
     hr = texture->QueryInterface (__uuidof (IDXGISurface), &dxgiSurface);
     CHRA (hr);
 
-    // Create D2D bitmap from DXGI surface
     bitmapProps = D2D1::BitmapProperties1 (
         D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW,
         D2D1::PixelFormat (DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED)
@@ -604,47 +584,87 @@ HRESULT CharacterSet::RenderGlyphsToAtlas (ID3D11Device * d3dDevice)
     hr = d2dContext->CreateBitmapFromDxgiSurface (dxgiSurface.Get(), &bitmapProps, &d2dBitmap);
     CHRA (hr);
 
-    // Set the bitmap as the render target
     d2dContext->SetTarget (d2dBitmap.Get());
 
     // Create DirectWrite factory
-    hr = DWriteCreateFactory (DWRITE_FACTORY_TYPE_SHARED, __uuidof (IDWriteFactory), 
-                                reinterpret_cast<IUnknown **> (dwriteFactory.GetAddressOf()));
+    hr = DWriteCreateFactory (DWRITE_FACTORY_TYPE_SHARED, __uuidof (IDWriteFactory),
+                              reinterpret_cast<IUnknown **> (dwriteFactory.GetAddressOf()));
     CHRA (hr);
+
+    // Create white brush (color will be applied by pixel shader)
+    hr = d2dContext->CreateSolidColorBrush (D2D1::ColorF (1.0f, 1.0f, 1.0f, 1.0f), ppBrush);
+    CHRA (hr);
+
+    // Transfer ownership to caller
+    *ppContext       = d2dContext.Detach();
+    *ppDWriteFactory = dwriteFactory.Detach();
+
+Error:
+    return hr;
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  CharacterSet::RenderGlyphsToAtlas
+//
+//  Renders all rain glyphs (normal and mirrored) into the 2048x2048 texture
+//  atlas using Direct2D/DirectWrite.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+HRESULT CharacterSet::RenderGlyphsToAtlas (ID3D11Device * d3dDevice)
+{
+    HRESULT                      hr             = S_OK;
+    ComPtr<ID2D1DeviceContext>   d2dContext;
+    ComPtr<IDWriteFactory>       dwriteFactory;
+    ComPtr<IDWriteTextFormat>    textFormat;
+    ComPtr<ID2D1SolidColorBrush> brush;
+    constexpr size_t             GRID_COLS      = 16;
+    constexpr size_t             CELL_WIDTH     = 128;
+    constexpr size_t             CELL_HEIGHT    = 120;
+    size_t                       rainGlyphCount = std::min (m_glyphs.size(), GRID_COLS * static_cast<size_t> (17));
+
+
+
+    CBRAEx (m_textureResource.Get() != nullptr, E_UNEXPECTED);
+
+    hr = CreateD2DRenderContext (d3dDevice, m_textureResource.Get(),
+                                &d2dContext, &dwriteFactory, &brush);
+    CHR (hr);
 
     // Create text format (Consolas, 80pt, centered)
     hr = dwriteFactory->CreateTextFormat (L"Consolas",
-                                            nullptr,
-                                            DWRITE_FONT_WEIGHT_NORMAL,
-                                            DWRITE_FONT_STYLE_NORMAL,
-                                            DWRITE_FONT_STRETCH_NORMAL,
-                                            80.0f,
-                                            L"en-us",
-                                            &textFormat);
+                                          nullptr,
+                                          DWRITE_FONT_WEIGHT_NORMAL,
+                                          DWRITE_FONT_STYLE_NORMAL,
+                                          DWRITE_FONT_STRETCH_NORMAL,
+                                          80.0f,
+                                          L"en-us",
+                                          &textFormat);
     CHRA (hr);
 
     textFormat->SetTextAlignment      (DWRITE_TEXT_ALIGNMENT_CENTER);
     textFormat->SetParagraphAlignment (DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
 
-    // Create brush (white - color will be applied by pixel shader)
-    hr = d2dContext->CreateSolidColorBrush (D2D1::ColorF (1.0f, 1.0f, 1.0f, 1.0f), &brush);
-    CHRA (hr);
-
     // Begin drawing
     d2dContext->BeginDraw();
-    d2dContext->Clear (D2D1::ColorF (0.0f, 0.0f, 0.0f, 0.0f)); // Transparent black
+    d2dContext->Clear (D2D1::ColorF (0.0f, 0.0f, 0.0f, 0.0f));
 
-    // Render all glyphs
-    for (size_t i = 0; i < m_glyphs.size(); i++)
+    // Render all glyphs (rain atlas only holds 272 glyphs — overlay-only symbols are excluded)
+    for (size_t i = 0; i < rainGlyphCount; i++)
     {
         size_t col = i % GRID_COLS;
         size_t row = i / GRID_COLS;
-        
+
         float x = static_cast<float> (col * CELL_WIDTH);
         float y = static_cast<float> (row * CELL_HEIGHT);
-        
+
         D2D1_RECT_F rect = D2D1::RectF (x, y, x + CELL_WIDTH, y + CELL_HEIGHT);
-        
+
         // For mirrored glyphs, apply horizontal mirroring
         if (m_glyphs[i].mirrored)
         {
@@ -665,7 +685,7 @@ HRESULT CharacterSet::RenderGlyphsToAtlas (ID3D11Device * d3dDevice)
 
     hr = d2dContext->EndDraw();
     CHRA (hr);
-    
+
 Error:
     return hr;
 }
@@ -688,73 +708,26 @@ Error:
 
 HRESULT CharacterSet::RenderOverlayGlyphsToAtlas (ID3D11Device * d3dDevice)
 {
-    HRESULT                              hr              = S_OK;
-    ID3D11Device                       * device          = d3dDevice;
-    ID3D11Texture2D                    * texture         = m_overlayTextureResource.Get();
-    ComPtr<IDXGIDevice>                  dxgiDevice;
-    ComPtr<ID2D1Factory1>                d2dFactory;
-    ComPtr<ID2D1Device>                  d2dDevice;
-    ComPtr<ID2D1DeviceContext>           d2dContext;
-    ComPtr<IDXGISurface>                 dxgiSurface;
-    ComPtr<ID2D1Bitmap1>                 d2dBitmap;
-    ComPtr<IDWriteFactory>               dwriteFactory;
-    ComPtr<IDWriteTextFormat>            textFormat;
-    ComPtr<ID2D1SolidColorBrush>         brush;
-    D2D1_FACTORY_OPTIONS                 options         = {};
-    D2D1_BITMAP_PROPERTIES1              bitmapProps     = {};
-    size_t                               GRID_COLS       = 16;
-    int                                  cellWidth       = m_overlayCellContentWidth  + 2 * m_overlayPadding;
-    int                                  cellHeight      = m_overlayCellContentHeight + 2 * m_overlayPadding;
+    HRESULT                      hr            = S_OK;
+    ComPtr<ID2D1DeviceContext>   d2dContext;
+    ComPtr<IDWriteFactory>       dwriteFactory;
+    ComPtr<IDWriteTextFormat>    textFormat;
+    ComPtr<ID2D1SolidColorBrush> brush;
+    constexpr size_t             GRID_COLS     = 16;
+    int                          cellWidth     = m_overlayCellContentWidth  + 2 * m_overlayPadding;
+    int                          cellHeight    = m_overlayCellContentHeight + 2 * m_overlayPadding;
 
 
 
     CBRAEx (m_overlayTextureResource.Get() != nullptr, E_UNEXPECTED);
-    CBRAEx (d3dDevice != nullptr,                      E_INVALIDARG);
 
-    // Get DXGI device for D2D
-    hr = device->QueryInterface (__uuidof (IDXGIDevice), &dxgiDevice);
-    CHRA (hr);
-
-    // Create D2D factory
-#ifdef _DEBUG
-    options.debugLevel = D2D1_DEBUG_LEVEL_INFORMATION;
-#endif
-    hr = D2D1CreateFactory (D2D1_FACTORY_TYPE_SINGLE_THREADED, __uuidof (ID2D1Factory1), &options,
-                            reinterpret_cast<void **> (d2dFactory.GetAddressOf()));
-    CHRA (hr);
-
-    // Create D2D device
-    hr = d2dFactory->CreateDevice (dxgiDevice.Get(), &d2dDevice);
-    CHRA (hr);
-
-    // Create D2D device context
-    hr = d2dDevice->CreateDeviceContext (D2D1_DEVICE_CONTEXT_OPTIONS_NONE, &d2dContext);
-    CHRA (hr);
-
-    // Get DXGI surface from the D3D11 texture
-    hr = texture->QueryInterface (__uuidof (IDXGISurface), &dxgiSurface);
-    CHRA (hr);
-
-    // Create D2D bitmap from DXGI surface
-    bitmapProps = D2D1::BitmapProperties1 (
-        D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW,
-        D2D1::PixelFormat (DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED)
-    );
-
-    hr = d2dContext->CreateBitmapFromDxgiSurface (dxgiSurface.Get(), &bitmapProps, &d2dBitmap);
-    CHRA (hr);
-
-    // Set the bitmap as the render target
-    d2dContext->SetTarget (d2dBitmap.Get());
+    hr = CreateD2DRenderContext (d3dDevice, m_overlayTextureResource.Get(),
+                                &d2dContext, &dwriteFactory, &brush);
+    CHR (hr);
 
     // Grayscale anti-aliasing for best quality on transparent background
     // (ClearType requires an opaque background and cannot be used with atlas textures)
     d2dContext->SetTextAntialiasMode (D2D1_TEXT_ANTIALIAS_MODE_GRAYSCALE);
-
-    // Create DirectWrite factory
-    hr = DWriteCreateFactory (DWRITE_FACTORY_TYPE_SHARED, __uuidof (IDWriteFactory),
-                              reinterpret_cast<IUnknown **> (dwriteFactory.GetAddressOf()));
-    CHRA (hr);
 
     // Create text format (Segoe UI, left-aligned at target pixel size)
     // Font size matches the atlas cell content so glyphs are rendered at the
@@ -772,13 +745,9 @@ HRESULT CharacterSet::RenderOverlayGlyphsToAtlas (ID3D11Device * d3dDevice)
     textFormat->SetTextAlignment      (DWRITE_TEXT_ALIGNMENT_LEADING);
     textFormat->SetParagraphAlignment (DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
 
-    // Create brush (white - color will be applied by pixel shader)
-    hr = d2dContext->CreateSolidColorBrush (D2D1::ColorF (1.0f, 1.0f, 1.0f, 1.0f), &brush);
-    CHRA (hr);
-
     // Begin drawing
     d2dContext->BeginDraw();
-    d2dContext->Clear (D2D1::ColorF (0.0f, 0.0f, 0.0f, 0.0f)); // Transparent black
+    d2dContext->Clear (D2D1::ColorF (0.0f, 0.0f, 0.0f, 0.0f));
 
     // Render all glyphs with Segoe UI
     for (size_t i = 0; i < m_glyphs.size(); i++)
@@ -788,10 +757,10 @@ HRESULT CharacterSet::RenderOverlayGlyphsToAtlas (ID3D11Device * d3dDevice)
 
         // Use the padded rect that matches the UV coordinate boundaries.
         // This ensures left-aligned glyphs start exactly at uvMin.x.
-        float x = static_cast<float> (col * cellWidth + m_overlayPadding);
-        float y = static_cast<float> (row * cellHeight);
+        float x = static_cast<float> (col * cellWidth  + m_overlayPadding);
+        float y = static_cast<float> (row * cellHeight + m_overlayPadding);
 
-        D2D1_RECT_F rect = D2D1::RectF (x, y, x + static_cast<float> (m_overlayCellContentWidth), y + static_cast<float> (cellHeight));
+        D2D1_RECT_F rect = D2D1::RectF (x, y, x + static_cast<float> (m_overlayCellContentWidth), y + static_cast<float> (m_overlayCellContentHeight));
 
         // For mirrored glyphs, apply horizontal mirroring around the padded rect center
         if (m_glyphs[i].mirrored)
@@ -825,22 +794,32 @@ Error:
 
 
 
+////////////////////////////////////////////////////////////////////////////////
+//
+//  CharacterSet::CalculateUVCoordinates
+//
+//  Computes UV coordinates for each rain glyph within the 2048x2048 atlas
+//  based on the 16-column grid layout with padding.
+//
+////////////////////////////////////////////////////////////////////////////////
+
 void CharacterSet::CalculateUVCoordinates()
 {
     // Layout: 2048x2048 texture atlas
     // Grid arrangement: 16 columns × 17 rows = 272 cells (272 used)
     // Each glyph cell: 128x120 pixels (with 8 pixel padding per cell)
-    
     constexpr size_t ATLAS_SIZE    = 2048;
     constexpr size_t GRID_COLS     = 16;
     constexpr size_t GRID_ROWS     = 17;
     constexpr size_t CELL_WIDTH    = ATLAS_SIZE / GRID_COLS;   // 128 pixels
     constexpr size_t CELL_HEIGHT   = ATLAS_SIZE / GRID_ROWS;  // 120 pixels
     constexpr size_t GLYPH_PADDING = 8;  // Padding to prevent texture bleeding
-    
+
+    size_t rainGlyphCount = std::min (m_glyphs.size(), GRID_COLS * GRID_ROWS);
 
 
-    for (size_t i = 0; i < m_glyphs.size(); i++)
+
+    for (size_t i = 0; i < rainGlyphCount; i++)
     {
         size_t col = i % GRID_COLS;
         size_t row = i / GRID_COLS;
@@ -875,9 +854,10 @@ void CharacterSet::CalculateUVCoordinates()
 
 void CharacterSet::CalculateOverlayUVCoordinates()
 {
+    size_t GRID_COLS  = 16;
+    
     int    cellWidth  = m_overlayCellContentWidth  + 2 * m_overlayPadding;
     int    cellHeight = m_overlayCellContentHeight + 2 * m_overlayPadding;
-    size_t GRID_COLS  = 16;
 
 
 

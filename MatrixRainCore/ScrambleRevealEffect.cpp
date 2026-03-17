@@ -226,6 +226,9 @@ void ScrambleRevealEffect::Update (float deltaTime)
                     continue;
                 }
 
+                // Reset one-frame pulse; phase logic below may re-set it
+                cell.needsCycle = false;
+
                 switch (cell.phase)
                 {
                     case CellPhase::Cycling:
@@ -318,6 +321,9 @@ void ScrambleRevealEffect::Update (float deltaTime)
                 {
                     continue;
                 }
+
+                // Reset one-frame pulse; phase logic below may re-set it
+                cell.needsCycle = false;
 
                 switch (cell.phase)
                 {

@@ -141,15 +141,17 @@ public:
     /// Instance data for rendering a single character glyph.
     /// Packed tightly for GPU upload.
     /// </summary>
-    struct CharacterInstanceData
+    #pragma warning(push)
+    #pragma warning(disable: 4324)  // structure was padded due to alignment specifier
+    struct alignas(16) CharacterInstanceData
     {
         float position[3];      // World position (x, y, z)
         float uvMin[2];         // Top-left UV coordinate
         float uvMax[2];         // Bottom-right UV coordinate
         float color[4];         // RGBA color
         float brightness;       // Brightness multiplier (0-1)
-        float scale;            // Scale multiplier
-        float padding[2];       // Padding to align to 16 bytes
+        float scaleX;           // Horizontal scale multiplier
+        float scaleY;           // Vertical scale multiplier
 
         CharacterInstanceData() :
             position   { 0.0f, 0.0f, 0.0f },
@@ -157,11 +159,12 @@ public:
             uvMax      { 1.0f, 1.0f },
             color      { 0.0f, 1.0f, 0.0f, 1.0f },
             brightness ( 1.0f ),
-            scale      ( 1.0f ),
-            padding    { 0.0f, 0.0f }
+            scaleX     ( 1.0f ),
+            scaleY     ( 1.0f )
         {
         }
     };
+    #pragma warning(pop)
 
     /// <summary>
     /// Constant buffer data passed to shaders each frame.
@@ -170,13 +173,15 @@ public:
     {
         float projection[16];   // 4x4 projection matrix (column-major)
         float characterScale;   // Global character scale (1.0 = normal, <1.0 for preview)
-        float widthScale;       // Quad width multiplier (1.0 = rain, 1.5 = overlay proportional)
-        float padding[46];      // Padding to 256 bytes for optimal GPU alignment
+        float charWidth;        // Base quad width in pixels (24.0 for rain, cell width for overlay)
+        float charHeight;       // Base quad height in pixels (36.0 for rain, cell height for overlay)
+        float padding[45];      // Padding to 256 bytes for optimal GPU alignment
 
         ConstantBufferData() :
             projection     { 1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1 },
             characterScale ( 1.0f ),
-            widthScale     ( 1.0f ),
+            charWidth      ( 24.0f ),
+            charHeight     ( 36.0f ),
             padding        {}
         {
         }
@@ -205,20 +210,21 @@ private:
     HRESULT UpdateInstanceBuffer     (const AnimationSystem & animationSystem, ColorScheme colorScheme, float elapsedTime, const D2D1_RECT_F * pOcclusionRect = nullptr);
     void    ClearRenderTarget();
     void    RenderFPSCounter         (float fps, int rainPercentage, int streakCount, int activeHeadCount);
-    void    RenderHelpHintOverlay    (const HelpHintOverlay & overlay);
-    void    RenderHotkeyOverlay      (const HotkeyOverlay & overlay);
     void    DrawFeatheredGlow        (const wchar_t * fpsText, UINT32 textLength, const D2D1_RECT_F & textRect);
     void    DrawFeatheredBackground  (const D2D1_RECT_F & boundingRect, float opacityScale);
-    void    BuildOverlayInstances    (std::span<const HintCharacter> chars, std::span<const uint32_t> allGlyphs, int glowLayers, float charScale, float glowOffset, float baseY, float cellHeight, std::span<const float> xPositions);
+    void    BuildOverlayInstances    (std::span<const HintCharacter> chars, int glowLayers, float charScale, float glowOffset, float baseY, float cellHeight, std::span<const float> xPositions, float advanceScale);
     void    RenderOverlayInstances   ();
+    void    RenderTwoColumnOverlay   (std::span<const HintCharacter> chars, int marginCols, int keyColChars, int gapChars, int numRows, float cellHeight, float padding, int glowLayers);
     void    RenderDebugFadeTimes     (const AnimationSystem & animationSystem);
     HRESULT ApplyBloom();
     void    RenderFullscreenPass     (ID3D11RenderTargetView * pRenderTarget, ID3D11PixelShader * pPixelShader, ID3D11ShaderResourceView * const * ppShaderResources, UINT numResources);
     void    SetRenderPipelineState   (ID3D11InputLayout * pInputLayout, D3D11_PRIMITIVE_TOPOLOGY topology, ID3D11Buffer * pVertexBuffer, UINT stride, ID3D11VertexShader * pVertexShader, ID3D11Buffer * pConstantBuffer, ID3D11PixelShader * pPixelShader);
     void    SetViewport              (UINT width, UINT height);
     
-    static int  CodepointToUtf16           (uint32_t codepoint, wchar_t * glyphStr);
-    static void BuildCharacterInstanceData (const CharacterInstance & character, const Vector3 & streakPos, const Color4 & schemeColor, CharacterInstanceData & data);
+    static int  CodepointToUtf16                    (uint32_t codepoint, wchar_t * glyphStr);
+    static void BuildCharacterInstanceData          (const CharacterInstance & character, const Vector3 & streakPos, const Color4 & schemeColor, CharacterInstanceData & data);
+    void        ComputeOverlayLayout                (std::span<const HintCharacter> chars, int marginCols, int keyColChars, int gapChars, int numRows, float cellHeight, float padding, std::vector<float> & xPositions, D2D1_RECT_F & bounds, float & baseY, float & advanceScale);
+    void        CalculateColumnAlignedTextPositions (std::span<const HintCharacter> chars, int marginCols, int keyColChars, int descColStart, float maxKeyWidth, const std::vector<float> & keyColWidths, float gapWidth, float advScaled, std::vector<float> & positions);
 
     // Resource cleanup helpers
     void ReleaseBloomResources();
@@ -287,7 +293,9 @@ private:
 
     // Render states
     ComPtr<ID3D11BlendState>   m_blendState;
+    ComPtr<ID3D11BlendState>   m_premultipliedBlendState;
     ComPtr<ID3D11SamplerState> m_samplerState;
+    ComPtr<ID3D11SamplerState> m_pointSamplerState;
 
     // Texture atlas reference
     ComPtr<ID3D11ShaderResourceView> m_atlasTextureSRV;

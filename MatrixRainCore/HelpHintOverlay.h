@@ -1,6 +1,5 @@
 #pragma once
 
-#include "CharacterConstants.h"
 #include "ScrambleRevealEffect.h"
 
 
@@ -55,6 +54,7 @@ struct HintCharacter
     size_t    targetGlyphIndex  = 0;
     size_t    currentGlyphIndex = 0;
     size_t    randomGlyphIndex  = 0;
+    uint32_t  targetCodepoint   = 0x0020;
     CharPhase phase             = CharPhase::Hidden;
     float     opacity           = 0.0f;
     float     glowIntensity     = 0.0f;
@@ -125,8 +125,7 @@ public:
     OverlayPhase                     GetPhase()         const;
     D2D1_RECT_F                      GetBoundingRect()  const { return m_boundingRect;                           }
     std::span<const HintCharacter>   GetCharacters()    const { return std::span<const HintCharacter>(m_chars);  }
-    std::span<HintCharacter>         GetMutableCharacters()    { return std::span<HintCharacter>(m_chars);        }
-    std::span<const uint32_t>        GetAllGlyphs()     const { return std::span<const uint32_t>(m_allGlyphs);   }
+    std::span<HintCharacter>         GetMutableCharacters()   { return std::span<HintCharacter>(m_chars);        }
     int                              GetRows()          const { return m_rows;                                   }
     int                              GetCols()          const { return m_cols;                                   }
     int                              GetTextCols()      const { return m_textCols;                               }
@@ -140,6 +139,7 @@ public:
 
 private:
     void InitializeCharacters();
+    void ResolveGlyphIndices();
 
 
     // Scramble-reveal effect (handles all timing / phase transitions)
@@ -160,9 +160,6 @@ private:
 
     // Bounding rect for rendering / occlusion
     D2D1_RECT_F                      m_boundingRect = {};
-
-    // Glyph set for scrambling
-    std::vector<uint32_t>            m_allGlyphs;
 
     // DPI scale factor (1.0 at 96 DPI / 100%)
     float                            m_dpiScale = 1.0f;

@@ -2,6 +2,7 @@
 
 #include "HelpHintOverlay.h"
 
+#include "CharacterSet.h"
 #include "OverlayColor.h"
 
 
@@ -18,7 +19,6 @@
 
 HelpHintOverlay::HelpHintOverlay()
 {
-    m_allGlyphs = CharacterConstants::GetAllCodepoints();
 
     //
     // Define two-column layout:
@@ -73,27 +73,6 @@ HelpHintOverlay::HelpHintOverlay()
         m_textLines.push_back (line);
     }
 
-    // Ensure text characters (like '?') that aren't in the
-    // katakana/Latin/numeral glyph set get appended so they
-    // resolve to the correct codepoint during scramble→reveal.
-    for (const auto & line : m_textLines)
-    {
-        for (wchar_t wc : line)
-        {
-            if (wc == L' ')
-            {
-                continue;
-            }
-
-            uint32_t cp = static_cast<uint32_t> (wc);
-
-            if (std::find (m_allGlyphs.begin(), m_allGlyphs.end(), cp) == m_allGlyphs.end())
-            {
-                m_allGlyphs.push_back (cp);
-            }
-        }
-    }
-
     m_rows     = static_cast<int>(m_textLines.size());
     m_textCols = static_cast<int>(m_textLines[0].size());
     m_cols     = m_textCols + 2 * MARGIN_COLS;
@@ -103,7 +82,7 @@ HelpHintOverlay::HelpHintOverlay()
     // Initialize the scramble-reveal effect
     int cellCount = static_cast<int>(m_chars.size());
 
-    m_scramble.Initialize (cellCount, 1.2f, 1.0f, 0.065f, 1.0f, 3.0f);
+    m_scramble.Initialize (cellCount, 1.2f, 1.0f, 0.10f, 1.0f, 3.0f);
 
     for (int i = 0; i < cellCount; i++)
     {
@@ -155,31 +134,12 @@ void HelpHintOverlay::InitializeCharacters ()
         {
             HintCharacter ch;
 
-            ch.row     = row;
-            ch.col     = MARGIN_COLS + col;
-            ch.isSpace = (m_textLines[row][col] == L' ');
-            ch.phase   = CharPhase::Hidden;
-            ch.opacity = 0.0f;
-
-            // Find the target glyph index for the character
-            if (!ch.isSpace)
-            {
-                uint32_t codepoint = static_cast<uint32_t>(m_textLines[row][col]);
-
-                auto it = std::find (m_allGlyphs.begin(), m_allGlyphs.end(), codepoint);
-                if (it != m_allGlyphs.end())
-                {
-                    ch.targetGlyphIndex = static_cast<size_t>(it - m_allGlyphs.begin());
-                }
-                else
-                {
-                    // Character not in glyph set — use index 0 as fallback
-                    ch.targetGlyphIndex = 0;
-                }
-            }
-
-            ch.randomGlyphIndex  = (m_chars.size() * 7) % m_allGlyphs.size();
-            ch.currentGlyphIndex = ch.targetGlyphIndex;
+            ch.row             = row;
+            ch.col             = MARGIN_COLS + col;
+            ch.isSpace         = (m_textLines[row][col] == L' ');
+            ch.targetCodepoint = static_cast<uint32_t> (m_textLines[row][col]);
+            ch.phase           = CharPhase::Hidden;
+            ch.opacity         = 0.0f;
 
             m_chars.push_back (ch);
         }
@@ -206,6 +166,35 @@ void HelpHintOverlay::InitializeCharacters ()
 
 ////////////////////////////////////////////////////////////////////////////////
 //
+//  HelpHintOverlay::ResolveGlyphIndices
+//
+//  Resolves targetCodepoint to CharacterSet glyph indices.
+//  Called from Show() when CharacterSet is guaranteed to be initialized.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+void HelpHintOverlay::ResolveGlyphIndices ()
+{
+    CharacterSet & charSet = CharacterSet::GetInstance();
+
+
+
+    for (auto & ch : m_chars)
+    {
+        size_t idx = charSet.FindGlyphByCodepoint (ch.targetCodepoint);
+
+        ch.targetGlyphIndex  = (idx != SIZE_MAX) ? idx : 0;
+        ch.randomGlyphIndex  = charSet.GetRandomGlyphIndex (charSet.GetRainGlyphCount());
+        ch.currentGlyphIndex = ch.targetGlyphIndex;
+    }
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
 //  HelpHintOverlay::Show
 //
 //  Starts or restarts the reveal animation.
@@ -214,6 +203,8 @@ void HelpHintOverlay::InitializeCharacters ()
 
 void HelpHintOverlay::Show ()
 {
+    ResolveGlyphIndices();
+
     // Reset all characters to Hidden so the new reveal starts clean
     for (auto & ch : m_chars)
     {
@@ -283,8 +274,9 @@ void HelpHintOverlay::Update (float deltaTime)
 {
     m_scramble.Update (deltaTime);
 
-    float postRevealTimer = m_scramble.GetPostRevealTimer();
-    int   cellCount       = m_scramble.GetCellCount();
+    CharacterSet & charSet         = CharacterSet::GetInstance();
+    float          postRevealTimer = m_scramble.GetPostRevealTimer();
+    int            cellCount       = m_scramble.GetCellCount();
 
 
 
@@ -304,7 +296,7 @@ void HelpHintOverlay::Update (float deltaTime)
 
                 if (cell.needsCycle)
                 {
-                    ch.randomGlyphIndex  = (ch.randomGlyphIndex + 7) % m_allGlyphs.size();
+                    ch.randomGlyphIndex  = charSet.GetRandomGlyphIndex (charSet.GetRainGlyphCount());
                     ch.currentGlyphIndex = ch.randomGlyphIndex;
                 }
 
@@ -334,7 +326,7 @@ void HelpHintOverlay::Update (float deltaTime)
 
                 if (cell.needsCycle)
                 {
-                    ch.randomGlyphIndex  = (ch.randomGlyphIndex + 7) % m_allGlyphs.size();
+                    ch.randomGlyphIndex  = charSet.GetRandomGlyphIndex (charSet.GetRainGlyphCount());
                     ch.currentGlyphIndex = ch.randomGlyphIndex;
                 }
                 else
