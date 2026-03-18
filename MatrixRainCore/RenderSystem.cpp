@@ -1803,48 +1803,6 @@ int RenderSystem::CodepointToUtf16 (uint32_t codepoint, wchar_t * glyphStr)
 
 
 
-////////////////////////////////////////////////////////////////////////////////
-//
-//  RenderSystem::DrawFeatheredBackground
-//
-//  Draws a feathered dark background with expanding layers of decreasing
-//  opacity, plus a solid dark center.
-//
-////////////////////////////////////////////////////////////////////////////////
-
-void RenderSystem::DrawFeatheredBackground (const D2D1_RECT_F & boundingRect, float opacityScale)
-{
-    const int   featherLayers  = 24;
-    const float maxExpand      = 60.0f;
-    const float centerOpacity  = 0.35f * opacityScale;
-
-
-
-    for (int i = featherLayers; i > 0; --i)
-    {
-        float t       = static_cast<float>(i) / static_cast<float>(featherLayers);
-        float expand  = maxExpand * t;
-        float opacity = centerOpacity * (1.0f - t);
-
-        D2D1_RECT_F expandedRect = D2D1::RectF (boundingRect.left   - expand,
-                                                boundingRect.top    - expand,
-                                                boundingRect.right  + expand,
-                                                boundingRect.bottom + expand);
-
-        m_fpsGlowBrush->SetColor (D2D1::ColorF (D2D1::ColorF::Black, opacity));
-        m_d2dContext->FillRectangle (expandedRect, m_fpsGlowBrush.Get());
-    }
-
-    // Solid dark center
-    m_fpsGlowBrush->SetColor (D2D1::ColorF (D2D1::ColorF::Black, centerOpacity));
-    m_d2dContext->FillRectangle (boundingRect, m_fpsGlowBrush.Get());
-}
-
-
-
-
-
-
 // Overlay rendering constants
 static constexpr float OVERLAY_FONT_DIP       = 16.0f;   // Overlay font design size in DIP (matches CharacterSet)
 static constexpr float OVERLAY_CELL_DIP       = 28.0f;   // Base cell height in DIP (matches BASE_CHAR_HEIGHT / BASE_ROW_HEIGHT)
@@ -1853,6 +1811,99 @@ static constexpr float OVERLAY_CHAR_SCALE     = 1.0f;    // 1:1 pixel mapping (n
 static constexpr float OVERLAY_GLOW_OFFSET    = 1.0f;    // Shadow offset in pixels per layer
 static constexpr float OVERLAY_MIN_OPACITY    = 0.01f;   // Below this opacity, skip rendering
 static constexpr float OVERLAY_MAX_GLOW_ALPHA = 0.9f;    // Peak glow opacity at innermost layer
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  RenderSystem::DrawFeatheredBackground
+//
+//  Draws per-row rounded-rect halos with expanding layers of decreasing
+//  opacity, creating a soft glow behind each line of overlay text.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+void RenderSystem::DrawFeatheredBackground (std::span<const HintCharacter> chars,
+                                            std::span<const float>         xPositions,
+                                            float                          advanceScale,
+                                            float                          baseY,
+                                            float                          cellHeight,
+                                            int                            numRows,
+                                            float                          padding,
+                                            float                          opacityScale)
+{
+    CharacterSet     & charSet        = CharacterSet::GetInstance();
+    const int          featherLayers  = 18;
+    const float        maxExpand      = 35.0f;
+    const float        cornerRadius   = cellHeight * 0.5f;
+    const float        centerOpacity  = 0.25f * opacityScale;
+    const float        hPad           = padding * 0.4f;
+    const float        vPad           = cellHeight * 0.1f;
+
+
+
+    // Compute per-row bounding rects from actual character positions
+    for (int row = 0; row < numRows; ++row)
+    {
+        float rowLeft  =  1e9f;
+        float rowRight = -1e9f;
+        bool  hasChars = false;
+
+
+        for (size_t i = 0; i < chars.size(); ++i)
+        {
+            if (chars[i].row == row && !chars[i].isSpace && chars[i].opacity > OVERLAY_MIN_OPACITY)
+            {
+                float charRight = xPositions[i] + charSet.GetGlyph (chars[i].targetGlyphIndex).advanceWidth * advanceScale;
+
+                rowLeft  = std::min (rowLeft, xPositions[i]);
+                rowRight = std::max (rowRight, charRight);
+                hasChars = true;
+            }
+        }
+
+        if (!hasChars)
+        {
+            continue;
+        }
+
+        float rowTop    = baseY + static_cast<float> (row) * cellHeight - vPad;
+        float rowBottom = rowTop + cellHeight + 2.0f * vPad;
+
+        D2D1_RECT_F rowRect = D2D1::RectF (rowLeft  - hPad,
+                                           rowTop,
+                                           rowRight + hPad,
+                                           rowBottom);
+
+        // Feathered expanding layers
+        for (int i = featherLayers; i > 0; --i)
+        {
+            float t       = static_cast<float> (i) / static_cast<float> (featherLayers);
+            float expand  = maxExpand * t;
+            float opacity = centerOpacity * (1.0f - t);
+
+            D2D1_ROUNDED_RECT expandedRRect = D2D1::RoundedRect (
+                D2D1::RectF (rowRect.left   - expand,
+                             rowRect.top    - expand,
+                             rowRect.right  + expand,
+                             rowRect.bottom + expand),
+                cornerRadius + expand,
+                cornerRadius + expand);
+
+            m_fpsGlowBrush->SetColor (D2D1::ColorF (D2D1::ColorF::Black, opacity));
+            m_d2dContext->FillRoundedRectangle (expandedRRect, m_fpsGlowBrush.Get());
+        }
+
+        // Solid dark center
+        D2D1_ROUNDED_RECT centerRRect = D2D1::RoundedRect (rowRect, cornerRadius, cornerRadius);
+
+        m_fpsGlowBrush->SetColor (D2D1::ColorF (D2D1::ColorF::Black, centerOpacity));
+        m_d2dContext->FillRoundedRectangle (centerRRect, m_fpsGlowBrush.Get());
+    }
+}
+
 
 
 
@@ -2356,10 +2407,11 @@ void RenderSystem::RenderTwoColumnOverlay (
                           numRows, cellHeight, padding,
                           xPositions, bounds, baseY, advanceScale);
 
-    // D2D: feathered background
+    // D2D: per-row feathered background halos
     m_d2dContext->BeginDraw();
     drawing = true;
-    DrawFeatheredBackground (bounds, meanOpacity);
+    DrawFeatheredBackground (chars, std::span<const float> (xPositions), advanceScale,
+                             baseY, cellHeight, numRows, padding, meanOpacity);
     m_d2dContext->EndDraw();
     drawing = false;
 

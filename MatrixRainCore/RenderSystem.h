@@ -211,7 +211,7 @@ private:
     void    ClearRenderTarget();
     void    RenderFPSCounter         (float fps, int rainPercentage, int streakCount, int activeHeadCount);
     void    DrawFeatheredGlow        (const wchar_t * fpsText, UINT32 textLength, const D2D1_RECT_F & textRect);
-    void    DrawFeatheredBackground  (const D2D1_RECT_F & boundingRect, float opacityScale);
+    void    DrawFeatheredBackground  (std::span<const HintCharacter> chars, std::span<const float> xPositions, float advanceScale, float baseY, float cellHeight, int numRows, float padding, float opacityScale);
     void    BuildOverlayInstances    (std::span<const HintCharacter> chars, int glowLayers, float charScale, float glowOffset, float baseY, float cellHeight, std::span<const float> xPositions, float advanceScale);
     void    RenderOverlayInstances   ();
     void    RenderTwoColumnOverlay   (std::span<const HintCharacter> chars, int marginCols, int keyColChars, int gapChars, int numRows, float cellHeight, float padding, int glowLayers);

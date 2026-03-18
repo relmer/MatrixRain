@@ -108,7 +108,7 @@ void ScrambleRevealEffect::StartReveal ()
         else
         {
             cell.phase      = CellPhase::Cycling;
-            cell.opacity    = 1.0f;
+            cell.opacity    = 0.0f;
             cell.lockTime   = lockDist (m_rng);
             cell.cycleTimer = 0.0f;
             cell.flashTimer = 0.0f;
@@ -233,6 +233,16 @@ void ScrambleRevealEffect::Update (float deltaTime)
                 {
                     case CellPhase::Cycling:
                     {
+                        // Fade opacity toward full over half the reveal duration
+                        float fadeDuration = m_revealDuration * 0.5f;
+
+                        cell.opacity += deltaTime / fadeDuration;
+
+                        if (cell.opacity >= 1.0f)
+                        {
+                            cell.opacity = 1.0f;
+                        }
+
                         // Advance cycle timer; flag consumer when interval elapses
                         cell.cycleTimer += deltaTime;
 
@@ -245,6 +255,8 @@ void ScrambleRevealEffect::Update (float deltaTime)
                         // Check if it's time to lock onto target
                         if (m_revealTimer >= cell.lockTime)
                         {
+                            cell.opacity = 1.0f;  // Snap to full on lock
+
                             // Per-cell flash duration: cap so all cells finish by revealDuration
                             float cellFlash = std::min (m_flashDuration,
                                                         std::max (0.0f, m_revealDuration - cell.lockTime));
