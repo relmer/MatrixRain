@@ -41,7 +41,7 @@ HotkeyOverlay::HotkeyOverlay()
     // Initialize the scramble-reveal effect (holdDuration = -1 → hold indefinitely)
     int cellCount = static_cast<int>(m_chars.size());
 
-    m_scramble.Initialize (cellCount, 1.2f, 1.0f, 0.10f, 1.0f, -1.0f);
+    m_scramble.SetCellCount (cellCount);
 
     for (int i = 0; i < cellCount; i++)
     {

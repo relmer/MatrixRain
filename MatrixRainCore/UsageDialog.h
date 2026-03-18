@@ -141,7 +141,7 @@ private:
     AnimationPhase                 m_animationPhase  = AnimationPhase::Revealing;
     float                          m_phaseTimer      = 0.0f;
     float                          m_elapsedTime     = 0.0f;
-    ScrambleRevealEffect           m_scramble;
+    ScrambleRevealEffect           m_scramble { kRevealDuration, 0.0f, kCycleInterval, kFlashDuration, -1.0f };
 
     std::vector<CharPosition>      m_characterPositions;
     std::vector<float>             m_revealedFlags;

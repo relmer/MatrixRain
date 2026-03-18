@@ -33,7 +33,7 @@ UsageDialog::UsageDialog (const UsageText & usageText, ISettingsProvider & setti
     // cell is a non-space character that will cycle random glyphs.
     int cellCount = static_cast<int>(m_characterPositions.size());
 
-    m_scramble.Initialize (cellCount, kRevealDuration, 0.0f, kCycleInterval, kFlashDuration, -1.0f);
+    m_scramble.SetCellCount (cellCount);
     m_scramble.StartReveal();
 }
 
@@ -224,7 +224,7 @@ HRESULT UsageDialog::Show ()
     {
         int cellCount = static_cast<int>(m_characterPositions.size());
 
-        m_scramble.Initialize (cellCount, kRevealDuration, 0.0f, kCycleInterval, kFlashDuration, -1.0f);
+        m_scramble.SetCellCount (cellCount);
         m_scramble.StartReveal();
     }
 

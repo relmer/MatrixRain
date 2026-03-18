@@ -12,37 +12,31 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-ScrambleRevealEffect::ScrambleRevealEffect() = default;
-
-
-
-
-
-////////////////////////////////////////////////////////////////////////////////
-//
-//  ScrambleRevealEffect::Initialize
-//
-//  Configures the effect for a given number of cells with timing
-//  parameters.  holdDuration < 0 means hold indefinitely.
-//
-////////////////////////////////////////////////////////////////////////////////
-
-void ScrambleRevealEffect::Initialize (int   cellCount,
-                                       float revealDuration,
-                                       float dismissDuration,
-                                       float cycleInterval,
-                                       float flashDuration,
-                                       float holdDuration)
+ScrambleRevealEffect::ScrambleRevealEffect (float revealDuration,
+                                            float dismissDuration,
+                                            float cycleInterval,
+                                            float flashDuration,
+                                            float holdDuration) :
+    m_revealDuration  (revealDuration),
+    m_dismissDuration (dismissDuration),
+    m_cycleInterval   (cycleInterval),
+    m_flashDuration   (flashDuration),
+    m_holdDuration    (holdDuration)
 {
-    m_cellCount        = cellCount;
-    m_revealDuration   = revealDuration;
-    m_dismissDuration  = dismissDuration;
-    m_cycleInterval    = cycleInterval;
-    m_flashDuration    = flashDuration;
-    m_holdDuration     = holdDuration;
+}
 
 
 
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  ScrambleRevealEffect::SetCellCount
+//
+////////////////////////////////////////////////////////////////////////////////
+
+void ScrambleRevealEffect::SetCellCount (int cellCount)
+{
     Reset();
 
     m_cells.resize (cellCount);
@@ -62,7 +56,7 @@ void ScrambleRevealEffect::Initialize (int   cellCount,
 
 void ScrambleRevealEffect::MarkSpace (int index)
 {
-    if (index >= 0 && index < m_cellCount)
+    if (index >= 0 && index < static_cast<int> (m_cells.size()))
     {
         m_cells[index].isSpace = true;
     }
@@ -94,10 +88,8 @@ void ScrambleRevealEffect::StartReveal ()
 
 
 
-    for (int i = 0; i < m_cellCount; i++)
+    for (auto & cell : m_cells)
     {
-        auto & cell = m_cells[i];
-
         if (cell.isSpace)
         {
             cell.phase      = CellPhase::Hidden;
@@ -144,10 +136,8 @@ void ScrambleRevealEffect::StartDismiss ()
 
 
 
-    for (int i = 0; i < m_cellCount; i++)
+    for (auto & cell : m_cells)
     {
-        auto & cell = m_cells[i];
-
         if (cell.isSpace)
         {
             continue;
@@ -205,9 +195,256 @@ void ScrambleRevealEffect::Reset ()
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-//  ScrambleRevealEffect::Update
+//  ScrambleRevealEffect::AdvanceCycleTimer
 //
-//  Advances the animation clock and per-cell state machines.
+////////////////////////////////////////////////////////////////////////////////
+
+void ScrambleRevealEffect::AdvanceCycleTimer (CellState & cell, float deltaTime)
+{
+    cell.cycleTimer += deltaTime;
+
+    if (cell.cycleTimer >= m_cycleInterval)
+    {
+        cell.cycleTimer -= m_cycleInterval;
+        cell.needsCycle  = true;
+    }
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  ScrambleRevealEffect::FadeOpacity
+//
+////////////////////////////////////////////////////////////////////////////////
+
+void ScrambleRevealEffect::FadeOpacity (CellState & cell, float deltaTime, float fadeDuration, float target)
+{
+    if (target > cell.opacity)
+    {
+        cell.opacity += deltaTime / fadeDuration;
+
+        if (cell.opacity >= target)
+        {
+            cell.opacity = target;
+        }
+    }
+    else
+    {
+        cell.opacity -= deltaTime / fadeDuration;
+
+        if (cell.opacity <= target)
+        {
+            cell.opacity = target;
+        }
+    }
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  ScrambleRevealEffect::UpdateRevealingCell
+//
+////////////////////////////////////////////////////////////////////////////////
+
+void ScrambleRevealEffect::UpdateRevealingCell (CellState & cell, float deltaTime, float fadeDuration)
+{
+    FadeOpacity (cell, deltaTime, fadeDuration, 1.0f);
+    AdvanceCycleTimer (cell, deltaTime);
+
+    if (m_revealTimer >= cell.lockTime)
+    {
+        cell.opacity = 1.0f;
+
+        float cellFlash = std::min (m_flashDuration,
+                                    std::max (0.0f, m_revealDuration - cell.lockTime));
+        float overshoot = m_revealTimer - cell.lockTime;
+
+        cell.flashDuration = cellFlash;
+        cell.needsCycle    = false;
+
+        if (overshoot >= cellFlash)
+        {
+            cell.phase      = CellPhase::Settled;
+            cell.flashTimer = 0.0f;
+        }
+        else
+        {
+            cell.phase      = CellPhase::LockFlash;
+            cell.flashTimer = cellFlash - overshoot;
+        }
+    }
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  ScrambleRevealEffect::UpdateLockFlash
+//
+////////////////////////////////////////////////////////////////////////////////
+
+void ScrambleRevealEffect::UpdateLockFlash (CellState & cell, float deltaTime)
+{
+    cell.flashTimer -= deltaTime;
+
+    if (cell.flashTimer <= 0.0f)
+    {
+        cell.flashTimer = 0.0f;
+        cell.phase      = CellPhase::Settled;
+    }
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  ScrambleRevealEffect::UpdateRevealing
+//
+////////////////////////////////////////////////////////////////////////////////
+
+void ScrambleRevealEffect::UpdateRevealing (float deltaTime)
+{
+    float fadeDuration = m_revealDuration * 0.5f;
+
+
+    m_revealTimer += deltaTime;
+
+    for (auto & cell : m_cells)
+    {
+        if (cell.isSpace)
+        {
+            continue;
+        }
+
+        cell.needsCycle = false;
+
+        switch (cell.phase)
+        {
+            case CellPhase::Cycling:   UpdateRevealingCell (cell, deltaTime, fadeDuration); break;
+            case CellPhase::LockFlash: UpdateLockFlash (cell, deltaTime);                   break;
+            default:                                                                        break;
+        }
+    }
+
+    if (IsRevealComplete())
+    {
+        m_phase         = ScramblePhase::Holding;
+        m_holdStartTime = m_revealTimer;
+    }
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  ScrambleRevealEffect::UpdateHolding
+//
+////////////////////////////////////////////////////////////////////////////////
+
+void ScrambleRevealEffect::UpdateHolding (float deltaTime)
+{
+    m_revealTimer     += deltaTime;
+    m_postRevealTimer += deltaTime;
+
+    if (m_holdDuration >= 0.0f && (m_revealTimer - m_holdStartTime) >= m_holdDuration)
+    {
+        StartDismiss();
+    }
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  ScrambleRevealEffect::UpdateDismissing
+//
+////////////////////////////////////////////////////////////////////////////////
+
+void ScrambleRevealEffect::UpdateDismissing (float deltaTime)
+{
+    float fadeDuration = m_dismissDuration * 0.5f;
+
+
+    m_dismissTimer += deltaTime;
+
+    for (auto & cell : m_cells)
+    {
+        if (cell.isSpace)
+        {
+            continue;
+        }
+
+        cell.needsCycle = false;
+
+        switch (cell.phase)
+        {
+            case CellPhase::Settled:
+            {
+                if (m_dismissTimer >= cell.lockTime)
+                {
+                    cell.phase      = CellPhase::Dismissing;
+                    cell.cycleTimer = 0.0f;
+                    cell.needsCycle = true;
+
+                    float overshoot = m_dismissTimer - cell.lockTime;
+
+                    cell.opacity -= overshoot / fadeDuration;
+
+                    if (cell.opacity <= 0.0f)
+                    {
+                        cell.opacity = 0.0f;
+                        cell.phase   = CellPhase::Hidden;
+                    }
+                }
+
+                break;
+            }
+
+            case CellPhase::Dismissing:
+            {
+                AdvanceCycleTimer (cell, deltaTime);
+                FadeOpacity (cell, deltaTime, fadeDuration, 0.0f);
+
+                if (cell.opacity <= 0.0f)
+                {
+                    cell.phase = CellPhase::Hidden;
+                }
+
+                break;
+            }
+
+            default:
+                break;
+        }
+    }
+
+    if (IsDismissComplete())
+    {
+        m_phase = ScramblePhase::Done;
+    }
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  ScrambleRevealEffect::Update
 //
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -215,197 +452,10 @@ void ScrambleRevealEffect::Update (float deltaTime)
 {
     switch (m_phase)
     {
-        case ScramblePhase::Revealing:
-        {
-            m_revealTimer += deltaTime;
-
-            for (auto & cell : m_cells)
-            {
-                if (cell.isSpace)
-                {
-                    continue;
-                }
-
-                // Reset one-frame pulse; phase logic below may re-set it
-                cell.needsCycle = false;
-
-                switch (cell.phase)
-                {
-                    case CellPhase::Cycling:
-                    {
-                        // Fade opacity toward full over half the reveal duration
-                        float fadeDuration = m_revealDuration * 0.5f;
-
-                        cell.opacity += deltaTime / fadeDuration;
-
-                        if (cell.opacity >= 1.0f)
-                        {
-                            cell.opacity = 1.0f;
-                        }
-
-                        // Advance cycle timer; flag consumer when interval elapses
-                        cell.cycleTimer += deltaTime;
-
-                        if (cell.cycleTimer >= m_cycleInterval)
-                        {
-                            cell.cycleTimer -= m_cycleInterval;
-                            cell.needsCycle  = true;
-                        }
-
-                        // Check if it's time to lock onto target
-                        if (m_revealTimer >= cell.lockTime)
-                        {
-                            cell.opacity = 1.0f;  // Snap to full on lock
-
-                            // Per-cell flash duration: cap so all cells finish by revealDuration
-                            float cellFlash = std::min (m_flashDuration,
-                                                        std::max (0.0f, m_revealDuration - cell.lockTime));
-                            float overshoot = m_revealTimer - cell.lockTime;
-
-                            cell.flashDuration = cellFlash;
-
-                            if (overshoot >= cellFlash)
-                            {
-                                // Flash has already completed — go straight to Settled
-                                cell.phase      = CellPhase::Settled;
-                                cell.flashTimer = 0.0f;
-                            }
-                            else
-                            {
-                                cell.phase      = CellPhase::LockFlash;
-                                cell.flashTimer = cellFlash - overshoot;
-                            }
-
-                            cell.needsCycle = false;
-                        }
-
-                        break;
-                    }
-
-                    case CellPhase::LockFlash:
-                    {
-                        cell.flashTimer -= deltaTime;
-
-                        if (cell.flashTimer <= 0.0f)
-                        {
-                            cell.flashTimer = 0.0f;
-                            cell.phase      = CellPhase::Settled;
-                        }
-
-                        break;
-                    }
-
-                    default:
-                        break;
-                }
-            }
-
-            // Check if all non-space cells have settled
-            if (IsRevealComplete())
-            {
-                m_phase         = ScramblePhase::Holding;
-                m_holdStartTime = m_revealTimer;
-            }
-
-            break;
-        }
-
-        case ScramblePhase::Holding:
-        {
-            m_revealTimer     += deltaTime;
-            m_postRevealTimer += deltaTime;
-
-            if (m_holdDuration >= 0.0f && (m_revealTimer - m_holdStartTime) >= m_holdDuration)
-            {
-                StartDismiss();
-            }
-
-            break;
-        }
-
-        case ScramblePhase::Dismissing:
-        {
-            m_dismissTimer += deltaTime;
-
-            for (auto & cell : m_cells)
-            {
-                if (cell.isSpace)
-                {
-                    continue;
-                }
-
-                // Reset one-frame pulse; phase logic below may re-set it
-                cell.needsCycle = false;
-
-                switch (cell.phase)
-                {
-                    case CellPhase::Settled:
-                    {
-                        // Wait for unlock time, then start cycling again
-                        if (m_dismissTimer >= cell.lockTime)
-                        {
-                            cell.phase      = CellPhase::Dismissing;
-                            cell.cycleTimer = 0.0f;
-                            cell.needsCycle = true;
-
-                            // Account for time already elapsed past unlock point
-                            float overshoot    = m_dismissTimer - cell.lockTime;
-                            float fadeDuration = m_dismissDuration * 0.5f;
-
-                            cell.opacity -= overshoot / fadeDuration;
-
-                            if (cell.opacity <= 0.0f)
-                            {
-                                cell.opacity = 0.0f;
-                                cell.phase   = CellPhase::Hidden;
-                            }
-                        }
-
-                        break;
-                    }
-
-                    case CellPhase::Dismissing:
-                    {
-                        // Cycle glyphs while fading out
-                        cell.cycleTimer += deltaTime;
-
-                        if (cell.cycleTimer >= m_cycleInterval)
-                        {
-                            cell.cycleTimer -= m_cycleInterval;
-                            cell.needsCycle  = true;
-                        }
-
-                        // Fade opacity toward zero
-                        float fadeDuration = m_dismissDuration * 0.5f;
-
-                        cell.opacity -= deltaTime / fadeDuration;
-
-                        if (cell.opacity <= 0.0f)
-                        {
-                            cell.opacity = 0.0f;
-                            cell.phase   = CellPhase::Hidden;
-                        }
-
-                        break;
-                    }
-
-                    default:
-                        break;
-                }
-            }
-
-            if (IsDismissComplete())
-            {
-                m_phase = ScramblePhase::Done;
-            }
-
-            break;
-        }
-
-        case ScramblePhase::Idle:
-        case ScramblePhase::Done:
-        default:
-            break;
+        case ScramblePhase::Revealing:  UpdateRevealing  (deltaTime); break;
+        case ScramblePhase::Holding:    UpdateHolding    (deltaTime); break;
+        case ScramblePhase::Dismissing: UpdateDismissing (deltaTime); break;
+        default:                                                      break;
     }
 }
 
@@ -438,7 +488,7 @@ bool ScrambleRevealEffect::IsActive () const
 
 bool ScrambleRevealEffect::IsRevealComplete () const
 {
-    if (m_cellCount == 0)
+    if (m_cells.empty())
     {
         return false;
     }
@@ -480,7 +530,7 @@ bool ScrambleRevealEffect::IsDismissComplete () const
         return true;
     }
 
-    if (m_phase != ScramblePhase::Dismissing || m_cellCount == 0)
+    if (m_phase != ScramblePhase::Dismissing || m_cells.empty())
     {
         return false;
     }

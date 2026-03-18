@@ -265,9 +265,12 @@ namespace MatrixRainTests
 
                 UsageDialog dialog (usage, m_settingsProvider);
 
-                // After one update, all cells should be cycling at full
-                // opacity (scramble-reveal starts all cells immediately).
-                dialog.Update (1.0f / 60.0f);
+                // Run enough frames to complete the reveal animation
+                // (characters fade in over revealDuration, then lock)
+                for (int i = 0; i < 200; i++)
+                {
+                    dialog.Update (1.0f / 60.0f);
+                }
 
                 const auto & flags = dialog.GetRevealedFlags();
 

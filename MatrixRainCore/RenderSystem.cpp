@@ -1838,7 +1838,8 @@ void RenderSystem::DrawFeatheredBackground (std::span<const HintCharacter> chars
     const int          featherLayers  = 18;
     const float        maxExpand      = 35.0f;
     const float        cornerRadius   = cellHeight * 0.5f;
-    const float        centerOpacity  = 0.25f * opacityScale;
+    const float        haloMaxDark    = 0.50f;                          // Peak darkness when fully visible (the knob)
+    const float        maxOpacity     = haloMaxDark * opacityScale;     // Scaled by animation fade
     const float        hPad           = padding * 0.4f;
     const float        vPad           = cellHeight * 0.1f;
 
@@ -1877,14 +1878,18 @@ void RenderSystem::DrawFeatheredBackground (std::span<const HintCharacter> chars
                                            rowRight + hPad,
                                            rowBottom);
 
-        // Feathered expanding layers
-        for (int i = featherLayers; i > 0; --i)
-        {
-            float t       = static_cast<float> (i) / static_cast<float> (featherLayers);
-            float expand  = maxExpand * t;
-            float opacity = centerOpacity * (1.0f - t);
+        // Feathered expanding layers — drawn inside-out with uniform per-layer
+        // opacity so that the center (covered by all layers) accumulates to
+        // exactly maxOpacity via alpha compositing: 1-(1-a)^N = maxOpacity.
+        float layerCount   = static_cast<float> (featherLayers + 1);
+        float layerOpacity = 1.0f - powf (1.0f - maxOpacity, 1.0f / layerCount);
 
-            D2D1_ROUNDED_RECT expandedRRect = D2D1::RoundedRect (
+        for (int i = featherLayers; i >= 0; --i)
+        {
+            float t      = static_cast<float> (i) / static_cast<float> (featherLayers);
+            float expand = maxExpand * t;
+
+            D2D1_ROUNDED_RECT rRect = D2D1::RoundedRect (
                 D2D1::RectF (rowRect.left   - expand,
                              rowRect.top    - expand,
                              rowRect.right  + expand,
@@ -1892,15 +1897,9 @@ void RenderSystem::DrawFeatheredBackground (std::span<const HintCharacter> chars
                 cornerRadius + expand,
                 cornerRadius + expand);
 
-            m_fpsGlowBrush->SetColor (D2D1::ColorF (D2D1::ColorF::Black, opacity));
-            m_d2dContext->FillRoundedRectangle (expandedRRect, m_fpsGlowBrush.Get());
+            m_fpsGlowBrush->SetColor (D2D1::ColorF (D2D1::ColorF::Black, layerOpacity));
+            m_d2dContext->FillRoundedRectangle (rRect, m_fpsGlowBrush.Get());
         }
-
-        // Solid dark center
-        D2D1_ROUNDED_RECT centerRRect = D2D1::RoundedRect (rowRect, cornerRadius, cornerRadius);
-
-        m_fpsGlowBrush->SetColor (D2D1::ColorF (D2D1::ColorF::Black, centerOpacity));
-        m_d2dContext->FillRoundedRectangle (centerRRect, m_fpsGlowBrush.Get());
     }
 }
 

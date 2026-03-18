@@ -81,18 +81,15 @@ struct CellState
 class ScrambleRevealEffect
 {
 public:
-    ScrambleRevealEffect();
+    ScrambleRevealEffect (float revealDuration,
+                          float dismissDuration,
+                          float cycleInterval,
+                          float flashDuration,
+                          float holdDuration);
 
 
-    // Configuration
-    void Initialize (int   cellCount,
-                     float revealDuration  = 1.5f,
-                     float dismissDuration = 1.0f,
-                     float cycleInterval   = 0.045f,
-                     float flashDuration   = 0.15f,
-                     float holdDuration    = -1.0f);
-
-    void MarkSpace (int index);
+    void SetCellCount (int cellCount);
+    void MarkSpace    (int index);
 
 
     // Phase transitions
@@ -110,29 +107,36 @@ public:
     bool          IsActive()            const;
     bool          IsRevealComplete()    const;
     bool          IsDismissComplete()   const;
-    float         GetPostRevealTimer()  const { return m_postRevealTimer; }
-    float         GetRevealTimer()      const { return m_revealTimer;     }
+    float         GetPostRevealTimer()  const { return m_postRevealTimer;  }
+    float         GetRevealTimer()      const { return m_revealTimer;      }
 
 
     // Per-cell queries
-    const CellState & GetCell (int index) const { return m_cells[index]; }
-    int               GetCellCount()      const { return m_cellCount;    }
+    const CellState & GetCell (int index) const { return m_cells[index];                    }
+    int               GetCellCount()      const { return static_cast<int> (m_cells.size()); }
 
 
 private:
+    void UpdateRevealing    (float deltaTime);
+    void UpdateHolding      (float deltaTime);
+    void UpdateDismissing   (float deltaTime);
+    void UpdateRevealingCell (CellState & cell, float deltaTime, float fadeDuration);
+    void UpdateLockFlash     (CellState & cell, float deltaTime);
+    void AdvanceCycleTimer   (CellState & cell, float deltaTime);
+    void FadeOpacity         (CellState & cell, float deltaTime, float fadeDuration, float target);
+
     ScramblePhase          m_phase            = ScramblePhase::Idle;
     float                  m_revealTimer      = 0.0f;
     float                  m_dismissTimer     = 0.0f;
     float                  m_postRevealTimer  = 0.0f;
     float                  m_holdStartTime    = 0.0f;
-    int                    m_cellCount        = 0;
 
-    // Configuration
-    float                  m_revealDuration   = 1.5f;
-    float                  m_dismissDuration  = 1.0f;
-    float                  m_cycleInterval    = 0.045f;
-    float                  m_flashDuration    = 0.15f;
-    float                  m_holdDuration     = -1.0f;
+    // Configuration (immutable after construction)
+    const float            m_revealDuration;
+    const float            m_dismissDuration;
+    const float            m_cycleInterval;
+    const float            m_flashDuration;
+    const float            m_holdDuration;
 
     // Per-cell state
     std::vector<CellState> m_cells;
