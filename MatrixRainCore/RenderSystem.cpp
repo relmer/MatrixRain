@@ -2173,28 +2173,28 @@ Error:
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-//  ComputeMeanCharOpacity
+//  ComputeMaxCharOpacity
 //
-//  Returns the average opacity of visible (non-space) characters.
+//  Returns the maximum opacity of any visible (non-space) character.
+//  Used for halo intensity so the background stays visible as long as
+//  any text is still on screen.
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-static float ComputeMeanCharOpacity (std::span<const HintCharacter> chars)
+static float ComputeMaxCharOpacity (std::span<const HintCharacter> chars)
 {
-    float opacitySum   = 0.0f;
-    int   visibleCount = 0;
+    float maxOpacity = 0.0f;
 
 
     for (const auto & ch : chars)
     {
-        if (!ch.isSpace)
+        if (!ch.isSpace && ch.opacity > maxOpacity)
         {
-            opacitySum += ch.opacity;
-            visibleCount++;
+            maxOpacity = ch.opacity;
         }
     }
 
-    return (visibleCount > 0) ? (opacitySum / static_cast<float> (visibleCount)) : 0.0f;
+    return maxOpacity;
 }
 
 
@@ -2400,7 +2400,7 @@ void RenderSystem::RenderTwoColumnOverlay (
     CBRAEx (m_d2dContext && m_fpsBrush && m_fpsGlowBrush, E_UNEXPECTED);
     BAIL_OUT_IF (chars.empty(), S_OK);
 
-    meanOpacity = ComputeMeanCharOpacity (chars);
+    meanOpacity = ComputeMaxCharOpacity (chars);
 
     ComputeOverlayLayout (chars, marginCols, keyColChars, gapChars,
                           numRows, cellHeight, padding,

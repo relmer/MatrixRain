@@ -77,7 +77,7 @@ private:
 
 
     // Scramble-reveal effect (handles all timing / phase transitions)
-    ScrambleRevealEffect            m_scramble { 1.2f, 1.0f, 0.10f, 1.0f, -1.0f };
+    ScrambleRevealEffect            m_scramble { 1.2f, 1.0f, 0.10f, 1.0f, 2.7f };
 
     // Content
     std::vector<HotkeyEntry>        m_hotkeys;

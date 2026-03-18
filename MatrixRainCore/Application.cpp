@@ -743,7 +743,8 @@ void Application::OnKeyDown (WPARAM wParam)
                 isQuestionKey = true;
                 isRecognized  = true;
 
-                if (m_hotkeyOverlay->IsActive())
+                if (m_hotkeyOverlay->GetPhase() == OverlayPhase::Holding ||
+                    m_hotkeyOverlay->GetPhase() == OverlayPhase::Revealing)
                 {
                     m_hotkeyOverlay->Dismiss();
                 }
@@ -764,10 +765,10 @@ void Application::OnKeyDown (WPARAM wParam)
     }
 
     //
-    // Help hint overlay: dismiss on recognized key, show on unrecognized
+    // Overlay dismiss: any non-modifier key dismisses active overlays
     //
 
-    // Don't show help hint for standalone modifier keys (e.g. Shift before Shift+/)
+    // Don't dismiss on standalone modifier keys (e.g. Shift before Shift+/)
     if (wParam == VK_SHIFT   || wParam == VK_LSHIFT   || wParam == VK_RSHIFT   ||
         wParam == VK_CONTROL || wParam == VK_LCONTROL || wParam == VK_RCONTROL ||
         wParam == VK_MENU    || wParam == VK_LMENU    || wParam == VK_RMENU)
@@ -775,20 +776,12 @@ void Application::OnKeyDown (WPARAM wParam)
         return;
     }
 
-    if (m_helpHintOverlay)
+    if (m_helpHintOverlay && m_helpHintOverlay->IsActive())
     {
-        if (isRecognized)
-        {
-            m_helpHintOverlay->Dismiss();
-        }
-        else
-        {
-            m_helpHintOverlay->Show();
-        }
+        m_helpHintOverlay->Dismiss();
     }
 
-    // Dismiss hotkey overlay on any recognized key other than ? toggle
-    if (m_hotkeyOverlay && m_hotkeyOverlay->IsActive() && isRecognized && !isQuestionKey)
+    if (m_hotkeyOverlay && m_hotkeyOverlay->IsActive() && !isQuestionKey)
     {
         m_hotkeyOverlay->Dismiss();
     }

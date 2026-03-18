@@ -313,7 +313,7 @@ namespace MatrixRainTests
 
 
 
-            TEST_METHOD (Update_Holding_NoPhaseChange)
+            TEST_METHOD (Update_Holding_AutoDismissesAfterTimeout)
             {
                 HotkeyOverlay overlay;
 
@@ -326,13 +326,13 @@ namespace MatrixRainTests
                 Assert::IsTrue (overlay.GetPhase() == OverlayPhase::Holding,
                                 L"Should be in Holding");
 
-                // Update further — should stay in Holding (no auto-dismiss)
+                // Update past the hold duration — should auto-dismiss
                 overlay.Update (5.0f);
 
 
 
-                Assert::IsTrue (overlay.GetPhase() == OverlayPhase::Holding,
-                                L"Hotkey overlay should remain in Holding until user dismisses");
+                Assert::IsTrue (overlay.GetPhase() == OverlayPhase::Dissolving,
+                                L"Hotkey overlay should auto-dismiss after hold timeout");
             }
 
 
