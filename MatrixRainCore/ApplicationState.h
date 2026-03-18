@@ -123,7 +123,6 @@ public:
     bool                      GetShowDebugFadeTimes()  const { return m_showDebugFadeTimes;  }
     float                     GetElapsedTime()         const { return m_elapsedTime;         }
     bool                      GetShowStatistics()      const { return m_showStatistics;      }
-    bool                      GetHelpHintEnabled()     const { return m_helpHintEnabled;     }
     const ScreenSaverSettings GetSettings()            const { return m_settings;            }
 
     void    SetDisplayMode        (DisplayMode mode)   { m_displayMode = mode;                 }
@@ -139,7 +138,6 @@ private:
     ColorScheme                    m_colorScheme                  = ColorScheme::Green;      // Current color scheme
     bool                           m_showDebugFadeTimes           = false;                   // Show debug fade time overlay
     bool                           m_showStatistics               = false;                   // Show FPS and density statistics
-    bool                           m_helpHintEnabled              = false;                   // Show help hint overlay on startup
     float                          m_elapsedTime                  = 0.0f;     // Elapsed time for color cycling animation
     ScreenSaverSettings            m_settings;                                        // User-configurable settings
     const ScreenSaverModeContext * m_pScreenSaverContext          = nullptr;           // Screensaver mode context (nullptr = normal mode)

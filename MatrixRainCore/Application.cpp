@@ -74,9 +74,14 @@ HRESULT Application::Initialize (HINSTANCE hInstance, int nCmdShow, const Screen
     m_renderSystem      = std::make_unique<RenderSystem>();
     m_inputSystem       = std::make_unique<InputSystem>();
     m_fpsCounter        = std::make_unique<FPSCounter>();
-    m_helpHintOverlay   = std::make_unique<HelpHintOverlay>();
-    m_hotkeyOverlay     = std::make_unique<HotkeyOverlay>();
     m_timer             = std::make_unique<Timer>();
+
+    // Overlays are only used in Normal mode
+    if (!pScreenSaverContext || pScreenSaverContext->m_mode == ScreenSaverMode::Normal)
+    {
+        m_helpHintOverlay = std::make_unique<HelpHintOverlay>();
+        m_hotkeyOverlay   = std::make_unique<HotkeyOverlay>();
+    }
 
 
     InitializeApplicationState (pScreenSaverContext);
@@ -96,8 +101,8 @@ HRESULT Application::Initialize (HINSTANCE hInstance, int nCmdShow, const Screen
 
     m_isRunning = true;
 
-    // Show help hint overlay in Normal mode only
-    if (m_appState->GetHelpHintEnabled() && m_helpHintOverlay)
+    // Show help hint overlay on startup (null in screensaver mode)
+    if (m_helpHintOverlay)
     {
         m_helpHintOverlay->Show();
     }
@@ -203,8 +208,9 @@ HRESULT Application::InitializeApplicationWindow()
     {
         float dpiScale = m_renderSystem->GetDpiScale();
 
-        m_helpHintOverlay->SetDpiScale (dpiScale);
-        m_hotkeyOverlay->SetDpiScale (dpiScale);
+        if (m_helpHintOverlay) m_helpHintOverlay->SetDpiScale (dpiScale);
+        if (m_hotkeyOverlay)   m_hotkeyOverlay->SetDpiScale (dpiScale);
+
         m_animationSystem->SetDpiScale (dpiScale);
     }
 
@@ -685,7 +691,8 @@ LRESULT Application::HandleMessage (UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 void Application::OnKeyDown (WPARAM wParam)
 {
-    bool isRecognized = false;
+    bool isRecognized  = false;
+    bool isQuestionKey = false;
 
 
 
@@ -731,21 +738,19 @@ void Application::OnKeyDown (WPARAM wParam)
 
         case VK_OEM_2:
             // ? key (Shift + /) — toggle hotkey overlay
-            if (GetAsyncKeyState (VK_SHIFT) & 0x8000)
+            if (m_hotkeyOverlay && (GetKeyState (VK_SHIFT) & 0x8000))
             {
-                if (m_hotkeyOverlay)
+                isQuestionKey = true;
+                isRecognized  = true;
+
+                if (m_hotkeyOverlay->IsActive())
                 {
-                    if (m_hotkeyOverlay->GetPhase() == OverlayPhase::Holding ||
-                        m_hotkeyOverlay->GetPhase() == OverlayPhase::Revealing)
-                    {
-                        m_hotkeyOverlay->Dismiss();
-                    }
-                    else
-                    {
-                        m_hotkeyOverlay->Show();
-                    }
+                    m_hotkeyOverlay->Dismiss();
                 }
-                isRecognized = true;
+                else
+                {
+                    m_hotkeyOverlay->Show();
+                }
             }
             break;
 
@@ -762,7 +767,15 @@ void Application::OnKeyDown (WPARAM wParam)
     // Help hint overlay: dismiss on recognized key, show on unrecognized
     //
 
-    if (m_helpHintOverlay && m_appState && m_appState->GetHelpHintEnabled())
+    // Don't show help hint for standalone modifier keys (e.g. Shift before Shift+/)
+    if (wParam == VK_SHIFT   || wParam == VK_LSHIFT   || wParam == VK_RSHIFT   ||
+        wParam == VK_CONTROL || wParam == VK_LCONTROL || wParam == VK_RCONTROL ||
+        wParam == VK_MENU    || wParam == VK_LMENU    || wParam == VK_RMENU)
+    {
+        return;
+    }
+
+    if (m_helpHintOverlay)
     {
         if (isRecognized)
         {
@@ -775,8 +788,7 @@ void Application::OnKeyDown (WPARAM wParam)
     }
 
     // Dismiss hotkey overlay on any recognized key other than ? toggle
-    if (m_hotkeyOverlay && m_hotkeyOverlay->IsActive() && isRecognized &&
-        !(wParam == VK_OEM_2 && (GetAsyncKeyState (VK_SHIFT) & 0x8000)))
+    if (m_hotkeyOverlay && m_hotkeyOverlay->IsActive() && isRecognized && !isQuestionKey)
     {
         m_hotkeyOverlay->Dismiss();
     }
@@ -815,7 +827,7 @@ void Application::OnSysKeyDown (WPARAM wParam)
         }
 
         // Immediately hide help hint on Alt+Enter (no fade — viewport is changing)
-        if (m_helpHintOverlay && m_appState && m_appState->GetHelpHintEnabled())
+        if (m_helpHintOverlay && m_helpHintOverlay->IsActive())
         {
             m_helpHintOverlay->Hide();
         }

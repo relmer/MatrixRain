@@ -56,18 +56,18 @@ public:
 
 
     // Queries
-    bool                                      IsActive ()           const { return m_scramble.IsActive();                               }
-    OverlayPhase                              GetPhase ()           const;
-    D2D1_RECT_F                               GetBoundingRect ()    const { return m_boundingRect;                                      }
-    float                                     GetKeyColumnWidth ()  const { return m_keyColumnWidth;                                    }
-    const std::vector<HotkeyEntry>          & GetHotkeys ()         const { return m_hotkeys;                                           }
-    int                                       GetRows ()            const { return static_cast<int> (m_hotkeys.size());                 }
-    std::span<const HintCharacter>            GetCharacters ()      const { return std::span<const HintCharacter> (m_chars);            }
-    std::span<HintCharacter>                  GetMutableCharacters ()      { return std::span<HintCharacter> (m_chars);                 }
-    int                                       GetCols ()            const { return m_cols;                                              }
-    int                                       GetCharRows ()        const { return static_cast<int> (m_hotkeys.size());                 }
-    int                                       GetKeyColChars ()     const { return m_keyColChars;                                      }
-    int                                       GetGapChars ()        const { return m_gapChars;                                         }
+    bool                             IsActive()            const { return m_scramble.IsActive();                    }
+    OverlayPhase                     GetPhase()            const;
+    D2D1_RECT_F                      GetBoundingRect()     const { return m_boundingRect;                           }
+    float                            GetKeyColumnWidth()   const { return m_keyColumnWidth;                         }
+    const std::vector<HotkeyEntry> & GetHotkeys()          const { return m_hotkeys;                                }
+    int                              GetRows()             const { return static_cast<int> (m_hotkeys.size());      }
+    std::span<const HintCharacter>   GetCharacters()       const { return std::span<const HintCharacter> (m_chars); }
+    std::span<HintCharacter>         GetMutableCharacters()      { return std::span<HintCharacter> (m_chars);       }
+    int                              GetCols()             const { return m_cols;                                   }
+    int                              GetCharRows()         const { return static_cast<int> (m_hotkeys.size());      }
+    int                              GetKeyColChars()      const { return m_keyColChars;                            }
+    int                              GetGapChars()         const { return m_gapChars;                               }
 
 
 private:
