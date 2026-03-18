@@ -39,9 +39,10 @@ namespace MatrixRainTests
             Assert::AreEqual (256, densityController.GetTargetStreakCount (), L"Initial should be 256 streaks at 80%");
 
             // Process VK_ADD
-            inputSystem.ProcessKeyDown (VK_ADD);
+            bool handled = inputSystem.ProcessKeyDown (VK_ADD);
 
             // Verify percentage increased (85% of 320 = 272 streaks)
+            Assert::IsTrue (handled, L"VK_ADD should be recognized");
             Assert::AreEqual (85, densityController.GetPercentage (), L"VK_ADD should increase to 85%");
             Assert::AreEqual (272, densityController.GetTargetStreakCount (), L"Should be 272 streaks at 85%");
         }
@@ -73,9 +74,10 @@ namespace MatrixRainTests
             Assert::AreEqual (256, densityController.GetTargetStreakCount (), L"Initial should be 256 streaks at 80%");
 
             // Process VK_SUBTRACT
-            inputSystem.ProcessKeyDown (VK_SUBTRACT);
+            bool handled = inputSystem.ProcessKeyDown (VK_SUBTRACT);
 
             // Verify percentage decreased (75% of 320 = 240 streaks)
+            Assert::IsTrue (handled, L"VK_SUBTRACT should be recognized");
             Assert::AreEqual (75, densityController.GetPercentage (), L"VK_SUBTRACT should decrease to 75%");
             Assert::AreEqual (240, densityController.GetTargetStreakCount (), L"Should be 240 streaks at 75%");
         }
@@ -103,9 +105,10 @@ namespace MatrixRainTests
             inputSystem.Initialize (densityController, appState);
 
             // Process VK_OEM_PLUS
-            inputSystem.ProcessKeyDown (VK_OEM_PLUS);
+            bool handled = inputSystem.ProcessKeyDown (VK_OEM_PLUS);
 
             // Verify percentage increased
+            Assert::IsTrue (handled, L"VK_OEM_PLUS should be recognized");
             Assert::AreEqual (85, densityController.GetPercentage (), L"VK_OEM_PLUS should increase to 85%");
         }
 
@@ -132,30 +135,11 @@ namespace MatrixRainTests
             inputSystem.Initialize (densityController, appState);
 
             // Process VK_OEM_MINUS
-            inputSystem.ProcessKeyDown (VK_OEM_MINUS);
+            bool handled = inputSystem.ProcessKeyDown (VK_OEM_MINUS);
 
             // Verify percentage decreased
+            Assert::IsTrue (handled, L"VK_OEM_MINUS should be recognized");
             Assert::AreEqual (75, densityController.GetPercentage (), L"VK_OEM_MINUS should decrease to 75%");
-        }
-
-
-
-
-
-        // T121: Test InputSystem Alt+Enter key combination detection
-        TEST_METHOD (TestAltEnterKeyDetection)
-        {
-            // Given: InputSystem is initialized
-            // When: IsAltEnterPressed is called with VK_RETURN and Alt modifier state
-            // Then: Should return true when Alt is pressed, false otherwise
-
-            InputSystem inputSystem;
-
-            // Note: IsAltEnterPressed will check GetAsyncKeyState for VK_MENU (Alt key)
-            // For unit testing, we verify the method exists and basic logic
-            // Full integration test will validate actual Alt+Enter behavior
-
-            Assert::IsTrue (true, L"Alt+Enter detection interface exists");
         }
 
 
@@ -165,10 +149,9 @@ namespace MatrixRainTests
         // T177: Test InputSystem keyboard event processing for VK_C (color cycle)
         TEST_METHOD (TestInputSystemProcessesVK_C)
         {
-            // Given: InputSystem is initialized
-            // When: ProcessKeyDown(VK_C) is called (C key for color cycling)
-            // Then: Should be processed without errors
-            // Note: Actual color cycling logic is tested in ApplicationState
+            // Given: InputSystem is initialized with ApplicationState
+            // When: ProcessKeyDown('C') is called
+            // Then: Should return true (recognized) and cycle the color scheme
 
             Viewport viewport;
             viewport.Resize (1920.0f, 1080.0f);
@@ -181,10 +164,50 @@ namespace MatrixRainTests
             InputSystem inputSystem;
             inputSystem.Initialize (densityController, appState);
 
-            // Process VK_C - should not throw or crash
-            inputSystem.ProcessKeyDown ('C');
+            // Default color scheme is Green; cycling goes to Blue
+            Assert::AreEqual (static_cast<int> (ColorScheme::Green), static_cast<int> (appState.GetColorScheme()), L"Initial scheme should be Green");
 
-            Assert::IsTrue (true, L"VK_C key processing should complete without error");
+            bool handled = inputSystem.ProcessKeyDown ('C');
+
+            Assert::IsTrue (handled, L"'C' key should be recognized");
+            Assert::AreEqual (static_cast<int> (ColorScheme::Blue), static_cast<int> (appState.GetColorScheme()), L"Color scheme should cycle to Blue");
+        }
+
+
+
+
+
+        // Test InputSystem keyboard event processing for 'S' (statistics toggle)
+        TEST_METHOD (TestInputSystemProcessesVK_S)
+        {
+            // Given: InputSystem is initialized with ApplicationState
+            // When: ProcessKeyDown('S') is called
+            // Then: Should return true (recognized) and toggle statistics display
+
+            Viewport viewport;
+            viewport.Resize (1920.0f, 1080.0f);
+
+            DensityController densityController (viewport, 24.0f);
+            InMemorySettingsProvider settingsProvider;
+            ApplicationState appState (settingsProvider);
+            appState.Initialize (nullptr);
+
+            InputSystem inputSystem;
+            inputSystem.Initialize (densityController, appState);
+
+            // Statistics should be off initially
+            Assert::IsFalse (appState.GetShowStatistics(), L"Initial statistics should be off");
+
+            bool handled = inputSystem.ProcessKeyDown ('S');
+
+            Assert::IsTrue (handled, L"'S' key should be recognized");
+            Assert::IsTrue (appState.GetShowStatistics(), L"Statistics should be toggled on");
+
+            // Toggle again - should turn off
+            handled = inputSystem.ProcessKeyDown ('S');
+
+            Assert::IsTrue (handled, L"'S' key should be recognized on second press");
+            Assert::IsFalse (appState.GetShowStatistics(), L"Statistics should be toggled back off");
         }
     };
 }  // namespace MatrixRainTests

@@ -6,6 +6,12 @@
 
 
 
+////////////////////////////////////////////////////////////////////////////////
+//
+//  InputSystem::Initialize
+//
+////////////////////////////////////////////////////////////////////////////////
+
 void InputSystem::Initialize (DensityController & densityController, ApplicationState & appState)
 {
     m_densityController = &densityController;
@@ -16,8 +22,19 @@ void InputSystem::Initialize (DensityController & densityController, Application
 
 
 
-void InputSystem::ProcessKeyDown (int virtualKey)
+////////////////////////////////////////////////////////////////////////////////
+//
+//  InputSystem::ProcessKeyDown
+//
+//  Returns true if the key was recognized and handled.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+bool InputSystem::ProcessKeyDown (int virtualKey)
 {
+    bool handled = false;
+
+
     // Any keyboard input in screensaver mode triggers exit
     if (!m_exitState.m_keyboardTriggered)
     {
@@ -26,14 +43,32 @@ void InputSystem::ProcessKeyDown (int virtualKey)
 
     switch (virtualKey)
     {
+        case 'C':
+            if (m_appState)
+            {
+                m_appState->CycleColorScheme();
+                handled = true;
+            }
+            break;
+
+        case 'S':
+            if (m_appState)
+            {
+                m_appState->ToggleStatistics();
+                handled = true;
+            }
+            break;
+
         case VK_ADD:                // Numpad +
         case VK_OEM_PLUS:           // Main keyboard = (shift for +)
             OnDensityIncrease();
+            handled = true;
             break;
 
         case VK_SUBTRACT:           // Numpad -
         case VK_OEM_MINUS:          // Main keyboard -
             OnDensityDecrease();
+            handled = true;
             break;
 
 #ifdef _DEBUG
@@ -41,6 +76,7 @@ void InputSystem::ProcessKeyDown (int virtualKey)
             if (m_appState)
             {
                 m_appState->ToggleDebugFadeTimes();
+                handled = true;
             }
             break;
 #endif
@@ -48,11 +84,19 @@ void InputSystem::ProcessKeyDown (int virtualKey)
         default:
             break;
     }
+
+    return handled;
 }
 
 
 
 
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  InputSystem::OnDensityIncrease
+//
+////////////////////////////////////////////////////////////////////////////////
 
 void InputSystem::OnDensityIncrease()
 {
@@ -72,6 +116,12 @@ void InputSystem::OnDensityIncrease()
 
 
 
+////////////////////////////////////////////////////////////////////////////////
+//
+//  InputSystem::OnDensityDecrease
+//
+////////////////////////////////////////////////////////////////////////////////
+
 void InputSystem::OnDensityDecrease()
 {
     if (m_densityController)
@@ -84,23 +134,6 @@ void InputSystem::OnDensityDecrease()
             m_appState->OnDensityChanged (m_densityController->GetPercentage());
         }
     }
-}
-
-
-    
-
-
-bool InputSystem::IsAltEnterPressed (int virtualKey) const
-{
-    // Check if Enter key is pressed
-    if (virtualKey != VK_RETURN)
-    {
-        return false;
-    }
-
-    // Check if Alt key is currently held down
-    // GetAsyncKeyState returns high-order bit set if key is down
-    return (GetAsyncKeyState (VK_MENU) & 0x8000) != 0;
 }
 
 

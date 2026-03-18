@@ -41,13 +41,8 @@ public:
     void                SetConfigDialog       (HWND hConfigDialog) { m_hConfigDialog = hConfigDialog; }
     ScreenSaverMode     GetScreenSaverMode()  const                { return m_pScreenSaverContext ? m_pScreenSaverContext->m_mode : ScreenSaverMode::Normal; }
     
-    // Callback for opening config dialog from Enter key (set by main.cpp)
     void                SetOpenConfigDialogCallback (std::function<void()> callback) { m_openConfigDialogCallback = callback; }
-    
-    // Callback for showing usage dialog from ? key (set by main.cpp)
     void                SetShowUsageDialogCallback (std::function<void()> callback)  { m_showUsageDialogCallback = callback; }
-    
-    // Apply display mode change and resize window
     void                ApplyDisplayModeChange()                   { ResizeWindowForCurrentMode();    }
 
     // Window dimensions
@@ -76,16 +71,11 @@ private:
     bool      m_isPaused                { false   };
     bool      m_inDisplayModeTransition { false   };
     
-    // Live overlay configuration dialog (modeless)
     HWND      m_hConfigDialog           { nullptr };
     
-    // Callback for opening config dialog from Enter key
     std::function<void()> m_openConfigDialogCallback;
-    
-    // Callback for showing usage dialog from ? key
     std::function<void()> m_showUsageDialogCallback;
     
-    // Screensaver mode
     const ScreenSaverModeContext * m_pScreenSaverContext { nullptr };
     
     // Render thread
@@ -106,7 +96,6 @@ private:
     void    ResizeWindowForCurrentMode();
     bool    ShouldExitScreenSaverOnKey    (WPARAM wParam);
     
-    // Render thread
     void    RenderThreadProc();
     
     // Message handlers

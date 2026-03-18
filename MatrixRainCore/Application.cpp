@@ -18,15 +18,28 @@
 
 
 
-// Constructor must be defined in .cpp (not just declared in header) because Application
-// contains unique_ptr members to forward-declared types (Pimpl idiom). The unique_ptr
-// destructor requires complete type definitions, which are only available here in the .cpp
-// where all headers are included. Using = default still gets compiler-generated behavior.
+////////////////////////////////////////////////////////////////////////////////
+//
+//  Application::Application
+//
+//  Constructor must be defined in .cpp (not just declared in header) because
+//  Application contains unique_ptr members to forward-declared types (Pimpl
+//  idiom).  The unique_ptr destructor requires complete type definitions, which
+//  are only available here in the .cpp where all headers are included.
+//
+////////////////////////////////////////////////////////////////////////////////
+
 Application::Application() = default;
 
 
 
 
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  Application::~Application
+//
+////////////////////////////////////////////////////////////////////////////////
 
 Application::~Application()
 {
@@ -36,6 +49,12 @@ Application::~Application()
 
 
 
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  Application::Initialize
+//
+////////////////////////////////////////////////////////////////////////////////
 
 HRESULT Application::Initialize (HINSTANCE hInstance, int nCmdShow, const ScreenSaverModeContext * pScreenSaverContext)
 {
@@ -93,6 +112,12 @@ Error:
 
 
 
+////////////////////////////////////////////////////////////////////////////////
+//
+//  Application::InitializeApplicationState
+//
+////////////////////////////////////////////////////////////////////////////////
+
 void Application::InitializeApplicationState (const ScreenSaverModeContext * pScreenSaverContext)
 {
     m_pScreenSaverContext = pScreenSaverContext;
@@ -133,6 +158,12 @@ void Application::InitializeApplicationState (const ScreenSaverModeContext * pSc
 
 
 
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  Application::InitializeApplicationWindow
+//
+////////////////////////////////////////////////////////////////////////////////
 
 HRESULT Application::InitializeApplicationWindow()
 {
@@ -186,6 +217,12 @@ Error:
 
 
 
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  Application::CreateApplicationWindow
+//
+////////////////////////////////////////////////////////////////////////////////
 
 HRESULT Application::CreateApplicationWindow (POINT & position, SIZE & size)
 {
@@ -263,6 +300,12 @@ Error:
 
 
 
+////////////////////////////////////////////////////////////////////////////////
+//
+//  Application::Run
+//
+////////////////////////////////////////////////////////////////////////////////
+
 int Application::Run()
 {
     MSG msg = {};
@@ -304,6 +347,12 @@ int Application::Run()
 
 
 
+////////////////////////////////////////////////////////////////////////////////
+//
+//  Application::Update
+//
+////////////////////////////////////////////////////////////////////////////////
+
 void Application::Update (float deltaTime)
 {
     if (m_appState)
@@ -330,6 +379,12 @@ void Application::Update (float deltaTime)
 
 
 
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  Application::GetWindowSizeForCurrentMode
+//
+////////////////////////////////////////////////////////////////////////////////
 
 void Application::GetWindowSizeForCurrentMode (POINT & position, SIZE & size)
 {
@@ -367,6 +422,12 @@ Error:
 
 
 
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  Application::ResizeWindowForCurrentMode
+//
+////////////////////////////////////////////////////////////////////////////////
 
 void Application::ResizeWindowForCurrentMode()
 {
@@ -426,6 +487,12 @@ Error:
 
 
 
+////////////////////////////////////////////////////////////////////////////////
+//
+//  Application::Render
+//
+////////////////////////////////////////////////////////////////////////////////
+
 void Application::Render()
 {
     if (m_renderSystem && m_animationSystem && m_viewport && m_appState)
@@ -452,6 +519,12 @@ void Application::Render()
 
 
 
+////////////////////////////////////////////////////////////////////////////////
+//
+//  Application::ShouldExitScreenSaverOnKey
+//
+////////////////////////////////////////////////////////////////////////////////
+
 bool Application::ShouldExitScreenSaverOnKey (WPARAM wParam)
 {
     HRESULT hr         = S_OK;
@@ -476,6 +549,12 @@ Error:
 
 
 
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  Application::Shutdown
+//
+////////////////////////////////////////////////////////////////////////////////
 
 void Application::Shutdown()
 {
@@ -509,6 +588,12 @@ void Application::Shutdown()
 
 
 
+////////////////////////////////////////////////////////////////////////////////
+//
+//  Application::WindowProc
+//
+////////////////////////////////////////////////////////////////////////////////
+
 LRESULT CALLBACK Application::WindowProc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
     Application * pApp = nullptr;
@@ -541,6 +626,12 @@ LRESULT CALLBACK Application::WindowProc (HWND hwnd, UINT uMsg, WPARAM wParam, L
 
 
 
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  Application::HandleMessage
+//
+////////////////////////////////////////////////////////////////////////////////
 
 LRESULT Application::HandleMessage (UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
@@ -586,83 +677,85 @@ LRESULT Application::HandleMessage (UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 
 
+////////////////////////////////////////////////////////////////////////////////
+//
+//  Application::OnKeyDown
+//
+////////////////////////////////////////////////////////////////////////////////
+
 void Application::OnKeyDown (WPARAM wParam)
 {
+    bool isRecognized = false;
+
+
+
     // If live overlay dialog is active, don't process exit keys
     if (m_hConfigDialog && (wParam == VK_ESCAPE || ShouldExitScreenSaverOnKey (wParam)))
     {
         return;
     }
 
+    // ShouldExitScreenSaverOnKey matches any key in screensaver mode, so it
+    // can't be a switch case — check it first before the per-key dispatch.
+    if (ShouldExitScreenSaverOnKey (wParam))
+    {
+        PostQuitMessage (0);
+        return;
+    }
+    
     //
     // Determine if this key is a recognized hotkey
     //
 
-    bool isRecognized = false;
+    switch (wParam)
+    {
+        case VK_ESCAPE:
+            // ESC key pressed - exit application
+            PostQuitMessage (0);
+            return;
 
-    if (wParam == VK_ESCAPE || ShouldExitScreenSaverOnKey (wParam))
-    {
-        // ESC key pressed - exit application
-        PostQuitMessage (0);
-        isRecognized = true;
-    }
-    else if (wParam == VK_SPACE)
-    {
-        // Spacebar pressed - toggle pause
-        m_isPaused = !m_isPaused;
-        isRecognized = true;
-    }
-    else if (wParam == 'C' && m_appState)
-    {
-        // C key pressed - cycle color scheme
-        m_appState->CycleColorScheme();
-        isRecognized = true;
-    }
-    else if (wParam == 'S' && m_appState)
-    {
-        // S key pressed - toggle statistics display
-        m_appState->ToggleStatistics();
-        isRecognized = true;
-    }
-    else if (wParam == VK_ADD || wParam == VK_OEM_PLUS ||
-             wParam == VK_SUBTRACT || wParam == VK_OEM_MINUS
-#ifdef _DEBUG
-             || wParam == VK_OEM_3
-#endif
-             )
-    {
-        // Density +/- (and backtick for debug fade timers in debug builds) — process via InputSystem
-        if (m_inputSystem)
-        {
-            m_inputSystem->ProcessKeyDown (static_cast<int> (wParam));
-        }
-        isRecognized = true;
-    }
-    else if (wParam == VK_RETURN)
-    {
-        // Enter key — open config dialog as live overlay (guard against opening twice)
-        if (!m_hConfigDialog && m_openConfigDialogCallback)
-        {
-            m_openConfigDialogCallback();
-        }
-        isRecognized = true;
-    }
-    else if (wParam == VK_OEM_2 && (GetAsyncKeyState (VK_SHIFT) & 0x8000))
-    {
-        // ? key (Shift + /) — toggle hotkey overlay
-        if (m_hotkeyOverlay)
-        {
-            if (m_hotkeyOverlay->GetPhase() == OverlayPhase::Holding ||
-                m_hotkeyOverlay->GetPhase() == OverlayPhase::Revealing)
+        case VK_SPACE:
+            // Spacebar pressed - toggle pause
+            m_isPaused = !m_isPaused;
+            isRecognized = true;
+            break;
+
+        case VK_RETURN:
+            // Enter key — open config dialog as live overlay (guard against opening twice)
+            if (!m_hConfigDialog && m_openConfigDialogCallback)
             {
-                m_hotkeyOverlay->Dismiss();
+                m_openConfigDialogCallback();
             }
-            else
+            isRecognized = true;
+            break;
+
+        case VK_OEM_2:
+            // ? key (Shift + /) — toggle hotkey overlay
+            if (GetAsyncKeyState (VK_SHIFT) & 0x8000)
             {
-                m_hotkeyOverlay->Show();
+                if (m_hotkeyOverlay)
+                {
+                    if (m_hotkeyOverlay->GetPhase() == OverlayPhase::Holding ||
+                        m_hotkeyOverlay->GetPhase() == OverlayPhase::Revealing)
+                    {
+                        m_hotkeyOverlay->Dismiss();
+                    }
+                    else
+                    {
+                        m_hotkeyOverlay->Show();
+                    }
+                }
+                isRecognized = true;
             }
-        }
-        isRecognized = true;
+            break;
+
+        default:
+            // All other keys — delegate to InputSystem
+            if (m_inputSystem)
+            {
+                isRecognized = m_inputSystem->ProcessKeyDown (static_cast<int> (wParam));
+            }
+            break;
     }
 
     //
@@ -693,6 +786,12 @@ void Application::OnKeyDown (WPARAM wParam)
 
 
 
+////////////////////////////////////////////////////////////////////////////////
+//
+//  Application::OnSysKeyDown
+//
+////////////////////////////////////////////////////////////////////////////////
+
 void Application::OnSysKeyDown (WPARAM wParam)
 {
     // In screensaver mode with exit-on-input, suppress all hotkeys including Alt+Enter
@@ -703,7 +802,8 @@ void Application::OnSysKeyDown (WPARAM wParam)
     }
     
     // Handle Alt+key combinations (Alt causes SYSKEYDOWN instead of KEYDOWN)
-    if (m_inputSystem && m_inputSystem->IsAltEnterPressed (static_cast<int> (wParam)))
+    // WM_SYSKEYDOWN is only sent when Alt is held, so VK_RETURN here is Alt+Enter.
+    if (wParam == VK_RETURN)
     {
         // Alt+Enter pressed - toggle display mode
         if (m_appState && m_renderSystem && m_viewport && m_animationSystem)
@@ -731,6 +831,12 @@ void Application::OnSysKeyDown (WPARAM wParam)
 
 
 
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  Application::OnMouseMove
+//
+////////////////////////////////////////////////////////////////////////////////
 
 void Application::OnMouseMove (LPARAM lParam)
 {
@@ -762,6 +868,12 @@ Error:
 
 
 
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  Application::OnSize
+//
+////////////////////////////////////////////////////////////////////////////////
 
 void Application::OnSize (LPARAM lParam)
 {
@@ -847,6 +959,12 @@ void Application::OnDpiChanged (WPARAM wParam, LPARAM lParam)
 
 
 
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  Application::OnNcHitTest
+//
+////////////////////////////////////////////////////////////////////////////////
 
 void Application::OnNcHitTest (LRESULT & result)
 {
