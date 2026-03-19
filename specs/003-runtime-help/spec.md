@@ -37,14 +37,14 @@
 - **Margin columns**: Invisible columns added on each side (`MARGIN_COLS=1` for HelpHintOverlay, `MARGIN_COLS=2` for HotkeyOverlay) so the reveal enters/exits the visible area smoothly rather than starting/ending abruptly at the first/last text character.
 - **Random glyph assignment**: Each character is assigned one random glyph index on first reveal (deterministic from position). Characters in the cycling phase display this fixed random glyph.
 - **CharPhase**: Maps from `CellPhase` — Hidden, Cycling, LockFlash, Settled, Dismissing. The scramble-reveal timing oracle manages all per-cell state.
-- **Color sequence**: Driven by `ComputeScrambleColor` based on `CellPhase`:
-  - Cycling: dark green (0, 0.33, 0)
-  - LockFlash: yellow decaying to mid green over flash duration
-  - Settled pre-pulse: mid green (0, 0.6, 0)
-  - Pulse ramp up (0.8s): mid green → white (quadratic ease-in)
-  - Pulse hold (1.5s): white (1, 1, 1)
-  - Pulse ramp down (1.0s): white → grey (0.75, 0.75, 0.75) (quadratic ease-out)
-  - Dismissing: dark green (0, 0.33, 0)
+- **Color sequence**: Driven by `ComputeScrambleColor` based on `CellPhase` and the active rain color scheme (including color cycling mode):
+  - Cycling: 50% scheme color intensity
+  - LockFlash: white decaying to full scheme color over flash duration
+  - Settled pre-pulse: full scheme color
+  - Pulse ramp up (0.33s): scheme color → white (quadratic ease-in)
+  - Pulse hold (0.75s): white (1, 1, 1)
+  - Pulse ramp down (0.5s): white → grey (0.75, 0.75, 0.75) (quadratic ease-out)
+  - Dismissing: 50% scheme color intensity
 - **Known visual tuning areas (in progress)**:
   - Reveal speed and per-cell timing distribution
   - Flash duration (yellow lock flash)
@@ -165,11 +165,13 @@ A user presses `?` during normal mode to see a hotkey reference rendered directl
 
 1. **Given** MatrixRain is running in normal mode, **When** the user presses `?` (Shift+/ or the `?` key), **Then** a hotkey reference overlay appears directly on the main window showing all supported runtime hotkeys with descriptions. No separate dialog window is created.
 
-2. **Given** the hotkey overlay is visible, **When** the user presses any key (recognized or unrecognized), **Then** the overlay begins its dissolve phase and the animation continues.
+2. **Given** the hotkey overlay is visible, **When** the user presses any non-modifier key (recognized or unrecognized), **Then** the overlay begins its dissolve phase and the animation continues.
 
-3. **Given** the hotkey overlay is visible, **When** the user presses `?` again, **Then** nothing happens (the overlay does not restart or duplicate).
+3. **Given** the hotkey overlay is dissolving, **When** the user presses `?` again, **Then** the overlay restarts with a fresh reveal animation.
 
-4. **Given** the help hint is visible when `?` is pressed, **When** the hotkey overlay appears, **Then** the help hint begins its dissolve phase (rain-cycling and fading with staggered timing).
+4. **Given** the hotkey overlay is visible in Holding or Revealing phase, **When** the user presses `?` again, **Then** the overlay begins its dissolve phase.
+
+5. **Given** no overlay is active, **When** the user presses `?`, **Then** the hotkey overlay appears. The hotkey overlay auto-dismisses after 5.4 seconds at full visibility.
 
 ---
 
@@ -196,16 +198,16 @@ A user presses `?` during normal mode to see a hotkey reference rendered directl
 - **FR-002**: Application MUST accept `/?` and `-?` as command-line arguments to display formatted help text listing all supported switches and their descriptions, then exit without launching the animation. The help output MUST present all switches using the same prefix style (`/` or `-`) that the user used to invoke help. The help text MUST be displayed in a custom usage dialog where scramble-reveal animation reveals the text (see FR-015).
 - **FR-003**: When launched in Normal mode (no screensaver arguments), the application MUST display a three-line help hint centered on screen showing key bindings in two columns: labels right-justified in the left column, key names left-justified in the right column.
 - **FR-004**: The help hint MUST use a scramble-reveal effect. Characters appear as cycling random glyphs that lock into their target glyphs with per-cell staggered timing (`ScrambleRevealEffect`). Each character locks with a yellow flash, and a white pulse marks all cells settling. Invisible margin columns extend the reveal past the visible text edges for smooth entry/exit.
-- **FR-005**: The help hint MUST dismiss automatically after the reveal animation completes, with a brief hold at full visibility before dismissal begins. Characters transition back to cycling random glyphs and fade out with per-cell staggered timing. The overlay becomes hidden when all characters have fully faded.
+- **FR-005**: The help hint MUST dismiss automatically after the reveal animation completes, with a 2.7 second hold at full visibility before dismissal begins. Characters transition back to cycling random glyphs and fade out with per-cell staggered timing. The overlay becomes hidden when all characters have fully faded.
 - **FR-006**: When the user presses any key that is not mapped to a recognized hotkey, the application MUST re-display the help hint with the full matrix reveal animation.
-- **FR-007**: The help hint MUST NOT appear when MatrixRain is launched with any screensaver argument (`/s`, `/p`, `/c`, `/c:<HWND>`, `/a`).
+- **FR-007**: The help hint MUST NOT appear when MatrixRain is launched with any screensaver argument (`/s`, `/p`, `/c`, `/c:<HWND>`, `/a`). Overlay objects (`HelpHintOverlay`, `HotkeyOverlay`) are not created in screensaver modes — null pointers gate all overlay code paths.
 - **FR-008**: Pressing Enter in Normal mode MUST open the configuration dialog as a live modeless overlay, with the same behavior as launching with `/c`.
 - **FR-009**: Pressing `?` (Shift+/) in Normal mode MUST display a hotkey reference overlay rendered directly on the main window, listing all runtime hotkeys with brief descriptions. This is an in-app overlay — NOT a separate dialog window.
 - **FR-010**: Only one help hint instance may be active at a time. Triggering the hint while it is in the reveal or hold phase MUST restart the animation from the beginning. Triggering while in the dismiss phase MUST restart a fresh reveal.
-- **FR-011**: The help hint bounding area MUST have a feathered border (soft gradient at edges) that blends smoothly into the surrounding rain, similar to the glow effect used by the performance counter overlay.
+- **FR-011**: The help hint bounding area MUST have per-row rounded-rect halos with feathered edges that blend smoothly into the surrounding rain. The halo opacity is driven by the maximum character opacity across all non-space characters, with a tunable peak darkness (`haloMaxDark`). Each row gets an independent halo sized to its text content. Alpha compositing across feather layers is computed so the accumulated center opacity matches `haloMaxDark` exactly.
 - **FR-012**: Rain streaks MUST pass behind the help hint's bounding area while the message is visible. Streaks entering the message area are occluded and not rendered within it. When the message fully dissolves, occluded streak characters become visible again.
 - **FR-013**: The help hint MUST remain centered after window resize or display mode transitions.
-- **FR-014**: Recognized hotkeys MUST continue to function normally regardless of whether the help hint is visible. If the help hint is currently in the reveal or hold phase when a recognized hotkey is pressed, the hint MUST immediately transition to the dissolve phase (rain-cycling and fading with staggered timing). If the hint is already dissolving, the hotkey does not restart or accelerate the dissolve.
+- **FR-014**: Recognized hotkeys MUST continue to function normally regardless of whether the help hint is visible. Any non-modifier keypress (excluding Shift, Ctrl, Alt, and Win keys) MUST dismiss both the help hint and hotkey overlays. Standalone modifier keys MUST be ignored entirely — they do not dismiss overlays or trigger the help hint. The help hint and hotkey overlay are mutually exclusive — only one may be active at a time.
 - **FR-015**: When `/?` or `-?` is invoked, the usage text MUST be displayed in a custom graphical dialog (`UsageDialog`) — a standalone window with its own rendering context, black background, proportional font (Segoe UI), and scramble-reveal animation:
   - **Content**: Command-line switches only (Options and Screensaver Options sections). No hotkeys.
   - **Animation**: Uses `ScrambleRevealEffect` — the same per-cell timing oracle as the overlays. Pre-compute (x, y) for every non-space character. Characters cycle through random glyphs and independently lock into their targets at random times within the reveal duration. Each lock is marked by a yellow flash; a white pulse washes across all text once everything has settled. Background matrix rain fills the entire window.

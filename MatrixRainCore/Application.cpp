@@ -772,10 +772,11 @@ void Application::OnKeyDown (WPARAM wParam)
     }
 
     //
-    // Overlay dismiss: any non-modifier key dismisses active overlays
+    // Overlay management: dismiss active overlays on any non-modifier key,
+    // or show the help hint if no overlay is active and the key is unrecognized.
     //
 
-    // Don't dismiss on standalone modifier keys (e.g. Shift before Shift+/)
+    // Ignore standalone modifier keys entirely
     if (wParam == VK_SHIFT   || wParam == VK_LSHIFT   || wParam == VK_RSHIFT   ||
         wParam == VK_CONTROL || wParam == VK_LCONTROL || wParam == VK_RCONTROL ||
         wParam == VK_MENU    || wParam == VK_LMENU    || wParam == VK_RMENU    ||
@@ -787,6 +788,11 @@ void Application::OnKeyDown (WPARAM wParam)
     if (m_helpHintOverlay && m_helpHintOverlay->IsActive())
     {
         m_helpHintOverlay->Dismiss();
+    }
+    else if (m_helpHintOverlay && !isRecognized)
+    {
+        // Unrecognized key with no overlay active — show the help hint
+        m_helpHintOverlay->Show();
     }
 
     if (m_hotkeyOverlay && m_hotkeyOverlay->IsActive() && !isQuestionKey)

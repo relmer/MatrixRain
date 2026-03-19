@@ -326,8 +326,8 @@ namespace MatrixRainTests
                 Assert::IsTrue (overlay.GetPhase() == OverlayPhase::Holding,
                                 L"Should be in Holding");
 
-                // Update past the hold duration — should auto-dismiss
-                overlay.Update (5.0f);
+                // Update past the hold duration (5.4s) — should auto-dismiss
+                overlay.Update (6.0f);
 
 
 
@@ -370,6 +370,32 @@ namespace MatrixRainTests
                 Assert::IsTrue (overlay.GetPhase() == OverlayPhase::Hidden,
                                 L"Should complete full animation loop back to Hidden");
                 Assert::IsFalse (overlay.IsActive(), L"Should not be active after full loop");
+            }
+
+
+
+
+
+            ////////////////////////////////////////////////////////////
+            //  Show during dissolve restarts reveal
+            ////////////////////////////////////////////////////////////
+
+            TEST_METHOD (Show_WhileDissolving_RestartsReveal)
+            {
+                HotkeyOverlay overlay;
+
+
+                overlay.Show();
+                overlay.Update (5.0f);   // → Holding
+                overlay.Dismiss();       // → Dissolving
+
+                Assert::IsTrue (overlay.GetPhase() == OverlayPhase::Dissolving,
+                                L"Should be dissolving after Dismiss");
+
+                overlay.Show();
+
+                Assert::IsTrue (overlay.GetPhase() == OverlayPhase::Revealing,
+                                L"Show during dissolve should restart reveal");
             }
     };
 
