@@ -1838,7 +1838,7 @@ void RenderSystem::DrawFeatheredBackground (std::span<const HintCharacter> chars
     const int          featherLayers  = 18;
     const float        maxExpand      = 35.0f;
     const float        cornerRadius   = cellHeight * 0.5f;
-    const float        haloMaxDark    = 0.50f;                          // Peak darkness when fully visible (the knob)
+    const float        haloMaxDark    = 0.70f;                          // Peak darkness when fully visible (the knob)
     const float        maxOpacity     = haloMaxDark * opacityScale;     // Scaled by animation fade
     const float        hPad           = padding * 0.4f;
     const float        vPad           = cellHeight * 0.1f;
