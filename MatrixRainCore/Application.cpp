@@ -785,14 +785,18 @@ void Application::OnKeyDown (WPARAM wParam)
         return;
     }
 
-    if (m_helpHintOverlay && m_helpHintOverlay->IsActive())
+    if (m_helpHintOverlay)
     {
-        m_helpHintOverlay->Dismiss();
-    }
-    else if (m_helpHintOverlay && !isRecognized)
-    {
-        // Unrecognized key with no overlay active — show the help hint
-        m_helpHintOverlay->Show();
+        if (m_helpHintOverlay->GetPhase() == OverlayPhase::Holding ||
+            m_helpHintOverlay->GetPhase() == OverlayPhase::Revealing)
+        {
+            m_helpHintOverlay->Dismiss();
+        }
+        else if (!isRecognized)
+        {
+            // Unrecognized key with overlay hidden or dissolving — (re)show
+            m_helpHintOverlay->Show();
+        }
     }
 
     if (m_hotkeyOverlay && m_hotkeyOverlay->IsActive() && !isQuestionKey)

@@ -547,15 +547,15 @@ static BOOL OnCancel (HWND hDlg)
 
     CBRAEx (pController != nullptr, E_UNEXPECTED);
 
-    pController->CancelChanges();
-    
-    // For modeless dialogs, use DestroyWindow instead of EndDialog
+    // For modeless dialogs, revert live preview changes back to snapshot
     if (pController->IsLiveMode())
     {
+        pController->CancelLiveMode();
         DestroyWindow (hDlg);
     }
     else
     {
+        pController->CancelChanges();
         EndDialog (hDlg, IDCANCEL);
     }
     
