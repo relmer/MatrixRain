@@ -3,6 +3,7 @@
 #include "Application.h"
 #include "AnimationSystem.h"
 #include "ApplicationState.h"
+#include "ColorScheme.h"
 #include "HelpHintOverlay.h"
 #include "HotkeyOverlay.h"
 #include "RenderSystem.h"
@@ -371,14 +372,20 @@ void Application::Update (float deltaTime)
         m_animationSystem->Update (deltaTime);
     }
 
-    if (m_helpHintOverlay && m_helpHintOverlay->IsActive())
+    if ((m_helpHintOverlay && m_helpHintOverlay->IsActive()) ||
+        (m_hotkeyOverlay  && m_hotkeyOverlay->IsActive()))
     {
-        m_helpHintOverlay->Update (deltaTime);
-    }
+        Color4 scheme = GetColorRGB (m_appState->GetColorScheme(), m_appState->GetElapsedTime());
 
-    if (m_hotkeyOverlay && m_hotkeyOverlay->IsActive())
-    {
-        m_hotkeyOverlay->Update (deltaTime);
+        if (m_helpHintOverlay && m_helpHintOverlay->IsActive())
+        {
+            m_helpHintOverlay->Update (deltaTime, scheme.r, scheme.g, scheme.b);
+        }
+
+        if (m_hotkeyOverlay && m_hotkeyOverlay->IsActive())
+        {
+            m_hotkeyOverlay->Update (deltaTime, scheme.r, scheme.g, scheme.b);
+        }
     }
 }
 
@@ -771,7 +778,8 @@ void Application::OnKeyDown (WPARAM wParam)
     // Don't dismiss on standalone modifier keys (e.g. Shift before Shift+/)
     if (wParam == VK_SHIFT   || wParam == VK_LSHIFT   || wParam == VK_RSHIFT   ||
         wParam == VK_CONTROL || wParam == VK_LCONTROL || wParam == VK_RCONTROL ||
-        wParam == VK_MENU    || wParam == VK_LMENU    || wParam == VK_RMENU)
+        wParam == VK_MENU    || wParam == VK_LMENU    || wParam == VK_RMENU    ||
+        wParam == VK_LWIN    || wParam == VK_RWIN)
     {
         return;
     }

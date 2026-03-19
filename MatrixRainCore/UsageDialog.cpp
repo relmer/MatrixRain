@@ -885,7 +885,7 @@ void UsageDialog::RenderTextOverlay ()
         D2D1_RECT_F charRect = D2D1::RectF (drawX, drawY, drawX + kCharWidth, drawY + kCharHeight);
 
         // Scramble-reveal color model
-        OverlayColor color = ComputeScrambleColor (cell.phase, cell.flashTimer, cell.flashDuration, postRevealTimer);
+        OverlayColor color = ComputeScrambleColor (cell.phase, cell.flashTimer, cell.flashDuration, postRevealTimer, 0.0f, 1.0f, 0.0f);
 
         // Select character: cycling/dismissing → random katakana, settled → actual
         wchar_t displayChar = pos.character;

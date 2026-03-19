@@ -270,7 +270,7 @@ void HelpHintOverlay::Hide ()
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void HelpHintOverlay::Update (float deltaTime)
+void HelpHintOverlay::Update (float deltaTime, float schemeR, float schemeG, float schemeB)
 {
     m_scramble.Update (deltaTime);
 
@@ -348,7 +348,7 @@ void HelpHintOverlay::Update (float deltaTime)
         }
 
         // Pre-compute color for rendering
-        OverlayColor color = ComputeScrambleColor (cell.phase, cell.flashTimer, cell.flashDuration, postRevealTimer);
+        OverlayColor color = ComputeScrambleColor (cell.phase, cell.flashTimer, cell.flashDuration, postRevealTimer, schemeR, schemeG, schemeB);
 
         ch.colorR = color.r;
         ch.colorG = color.g;

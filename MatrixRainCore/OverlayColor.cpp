@@ -21,7 +21,10 @@
 OverlayColor ComputeScrambleColor (CellPhase cellPhase,
                                  float     flashTimer,
                                  float     flashDuration,
-                                 float     postRevealTimer)
+                                 float     postRevealTimer,
+                                 float     schemeR,
+                                 float     schemeG,
+                                 float     schemeB)
 {
     OverlayColor color;
 
@@ -35,31 +38,36 @@ OverlayColor ComputeScrambleColor (CellPhase cellPhase,
     {
         case CellPhase::Cycling:
         {
-            color.g = 0.33f;
+            // Medium intensity of scheme color
+            color.r = schemeR * 0.5f;
+            color.g = schemeG * 0.5f;
+            color.b = schemeB * 0.5f;
             break;
         }
 
         case CellPhase::LockFlash:
         {
-            // Yellow decaying to mid green over flashDuration
+            // Bright flash decaying to medium scheme color over flashDuration
             float t = (flashDuration > 0.0f)
                     ? std::clamp (flashTimer / flashDuration, 0.0f, 1.0f)
                     : 0.0f;
 
-            // t=1 at flash start (yellow), t=0 at end (mid green)
-            color.r = 0.8f * t;
-            color.g = 0.6f + 0.4f * t;
-            color.b = 0.3f * t;
+            // t=1 at flash start (bright white-ish), t=0 at end (full scheme color)
+            color.r = schemeR + (1.0f - schemeR) * t;
+            color.g = schemeG + (1.0f - schemeG) * t;
+            color.b = schemeB + (1.0f - schemeB) * t;
             break;
         }
 
         case CellPhase::Settled:
         {
-            // Pre-pulse: mid green.  Pulse: ramp to white, hold, ramp down to grey.
+            // Pre-pulse: scheme color.  Pulse: ramp to white, hold, ramp down.
             if (postRevealTimer <= 0.0f)
             {
-                // All locked but pulse hasn't started — mid green
-                color.g = 0.6f;
+                // All locked but pulse hasn't started — full scheme color
+                color.r = schemeR;
+                color.g = schemeG;
+                color.b = schemeB;
             }
             else
             {
@@ -67,24 +75,21 @@ OverlayColor ComputeScrambleColor (CellPhase cellPhase,
 
                 if (elapsed < kPulseRampUp)
                 {
-                    // Smooth ramp from mid green (0, 0.6, 0) to white (1, 1, 1)
                     float t = elapsed / kPulseRampUp;
                     float s = t * t;
 
-                    color.r = s;
-                    color.g = 0.6f + 0.4f * s;
-                    color.b = s;
+                    color.r = schemeR + (1.0f - schemeR) * s;
+                    color.g = schemeG + (1.0f - schemeG) * s;
+                    color.b = schemeB + (1.0f - schemeB) * s;
                 }
                 else if (elapsed < kPulseRampUp + kPulseHold)
                 {
-                    // Hold at white
                     color.r = 1.0f;
                     color.g = 1.0f;
                     color.b = 1.0f;
                 }
                 else
                 {
-                    // Smooth ramp from white (1, 1, 1) to grey (0.75, 0.75, 0.75)
                     float t = std::clamp ((elapsed - kPulseRampUp - kPulseHold) / kPulseRampDown, 0.0f, 1.0f);
                     float s = (1.0f - t) * (1.0f - t);
 
@@ -99,7 +104,9 @@ OverlayColor ComputeScrambleColor (CellPhase cellPhase,
 
         case CellPhase::Dismissing:
         {
-            color.g = 0.33f;
+            color.r = schemeR * 0.5f;
+            color.g = schemeG * 0.5f;
+            color.b = schemeB * 0.5f;
             break;
         }
 

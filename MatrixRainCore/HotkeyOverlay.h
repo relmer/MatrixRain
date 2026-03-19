@@ -48,7 +48,7 @@ public:
 
 
     // Update (called once per render frame)
-    void Update (float deltaTime);
+    void Update (float deltaTime, float schemeR = 0.0f, float schemeG = 1.0f, float schemeB = 0.0f);
 
 
     // Layout
@@ -77,7 +77,7 @@ private:
 
 
     // Scramble-reveal effect (handles all timing / phase transitions)
-    ScrambleRevealEffect            m_scramble { 1.2f, 1.0f, 0.10f, 1.0f, 2.7f };
+    ScrambleRevealEffect            m_scramble { 1.2f, 1.0f, 0.10f, 1.0f, 5.4f };
 
     // Content
     std::vector<HotkeyEntry>        m_hotkeys;

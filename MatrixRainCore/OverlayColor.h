@@ -41,4 +41,7 @@ struct OverlayColor
 OverlayColor ComputeScrambleColor (CellPhase cellPhase,
                                  float     flashTimer,
                                  float     flashDuration,
-                                 float     postRevealTimer);
+                                 float     postRevealTimer,
+                                 float     schemeR,
+                                 float     schemeG,
+                                 float     schemeB);

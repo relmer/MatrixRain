@@ -113,7 +113,7 @@ public:
 
 
     // Update (called once per render frame)
-    void Update (float deltaTime);
+    void Update (float deltaTime, float schemeR = 0.0f, float schemeG = 1.0f, float schemeB = 0.0f);
 
 
     // Layout
