@@ -23,6 +23,7 @@ using Microsoft::WRL::ComPtr;
 // Forward declarations
 class CharacterStreak;
 class HotkeyOverlay;
+class UsageOverlay;
 
 /// <summary>
 /// Manages DirectX 11 rendering pipeline for Matrix Rain effect.
@@ -56,6 +57,7 @@ public:
         float                   elapsedTime        = 0.0f;
         const HelpHintOverlay * pOverlay           = nullptr;
         const HotkeyOverlay   * pHotkeyOverlay     = nullptr;
+        const UsageOverlay    * pUsageOverlay      = nullptr;
     };
 
     /// <summary>

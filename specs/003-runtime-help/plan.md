@@ -61,14 +61,15 @@ specs/003-runtime-help/
 ```text
 MatrixRainCore/                    # Static library — all new feature code here
 ├── HelpHintOverlay.h/cpp          # NEW: Overlay state machine + per-character animation (3-line hint)
-├── UsageDialog.h/cpp             # NEW: Custom usage dialog with D3D/D2D rendering and scramble-reveal (/? only)
+├── UsageOverlay.h/cpp             # NEW: Usage text overlay for /? mode (GPU-rendered, replaces UsageDialog)
+├── UsageDialog.h/cpp              # DEPRECATED: Old D2D usage dialog (to be removed after unified Overlay refactor)
 ├── HotkeyOverlay.h/cpp            # NEW: In-app hotkey reference overlay (? key, rendered on main window)
 ├── ScrambleRevealEffect.h/cpp     # NEW: Shared per-cell scramble-reveal timing oracle (reveal/hold/dismiss)
 ├── UsageText.h/cpp                # NEW: Command-line switch text content + formatting
-├── CommandLineHelp.h/cpp          # NEW: /? orchestration — creates UsageDialog, exits process
+├── CommandLineHelp.h/cpp          # NEW: /? orchestration (legacy — /? now routes through Application)
 ├── UnicodeSymbols.h               # NEW: Named constants for Unicode characters (em dash, etc.)
 ├── ScreenSaverModeParser.h/cpp    # MODIFIED: Add /? parsing, prefix detection
-├── Application.h/cpp              # MODIFIED: Enter/? keys, overlay show/dismiss
+├── Application.h/cpp              # MODIFIED: Enter/? keys, overlay show/dismiss, HelpRequested mode
 ├── InputSystem.h/cpp              # MODIFIED: Unrecognized key → help hint trigger
 ├── RenderSystem.h/cpp             # MODIFIED: Render overlay to scene texture, SDF halo shader, RenderParams struct
 ├── AnimationSystem.h/cpp          # MODIFIED: Overlay character support

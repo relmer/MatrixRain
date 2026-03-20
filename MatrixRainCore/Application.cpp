@@ -14,6 +14,7 @@
 #include "InputSystem.h"
 #include "FPSCounter.h"
 #include "ScreenSaverModeContext.h"
+#include "UsageOverlay.h"
 
 
 
@@ -84,6 +85,12 @@ HRESULT Application::Initialize (HINSTANCE hInstance, int nCmdShow, const Screen
         m_hotkeyOverlay   = std::make_unique<HotkeyOverlay>();
     }
 
+    // Usage overlay for /? mode
+    if (pScreenSaverContext && pScreenSaverContext->m_mode == ScreenSaverMode::HelpRequested)
+    {
+        m_usageOverlay = std::make_unique<UsageOverlay> (pScreenSaverContext->m_switchPrefix);
+    }
+
 
     InitializeApplicationState (pScreenSaverContext);
     
@@ -106,6 +113,15 @@ HRESULT Application::Initialize (HINSTANCE hInstance, int nCmdShow, const Screen
     if (m_helpHintOverlay)
     {
         m_helpHintOverlay->Show();
+    }
+
+    // Start usage overlay in /? mode (no rain until reveal completes)
+    if (m_usageOverlay)
+    {
+        m_usageOverlay->SetDpiScale (m_renderSystem->GetDpiScale());
+        m_usageOverlay->Show();
+        m_densityController->SetPercentage (0);
+        m_animationSystem->ClearAllStreaks();
     }
 
 
@@ -267,11 +283,29 @@ HRESULT Application::CreateApplicationWindow (POINT & position, SIZE & size)
         // Class already registered - continue
     }
 
-    // For preview mode, create as child window; otherwise create fullscreen borderless
+    // For preview mode, create as child window; for help mode, create with title bar;
+    // otherwise create fullscreen borderless
     if ((m_pScreenSaverContext && m_pScreenSaverContext->m_mode == ScreenSaverMode::ScreenSaverPreview))
     {
         dwStyle    = WS_CHILD | WS_VISIBLE;
         hwndParent = m_pScreenSaverContext->m_previewParentHwnd;
+    }
+    else if (m_pScreenSaverContext && m_pScreenSaverContext->m_mode == ScreenSaverMode::HelpRequested)
+    {
+        dwStyle = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_VISIBLE;
+
+        // Adjust for window chrome so client area matches requested size
+        RECT adjustedRect = { 0, 0, size.cx, size.cy };
+
+        AdjustWindowRectExForDpi (&adjustedRect, dwStyle, FALSE, 0, GetDpiForSystem());
+
+        int chromeW = (adjustedRect.right  - adjustedRect.left) - size.cx;
+        int chromeH = (adjustedRect.bottom - adjustedRect.top)  - size.cy;
+
+        size.cx += chromeW;
+        size.cy += chromeH;
+        position.x -= chromeW / 2;
+        position.y -= chromeH / 2;
     }
     
     m_hwnd = CreateWindowExW (0,
@@ -373,7 +407,8 @@ void Application::Update (float deltaTime)
     }
 
     if ((m_helpHintOverlay && m_helpHintOverlay->IsActive()) ||
-        (m_hotkeyOverlay  && m_hotkeyOverlay->IsActive()))
+        (m_hotkeyOverlay  && m_hotkeyOverlay->IsActive())  ||
+        (m_usageOverlay   && m_usageOverlay->IsActive()))
     {
         Color4 scheme = GetColorRGB (m_appState->GetColorScheme(), m_appState->GetElapsedTime());
 
@@ -385,6 +420,19 @@ void Application::Update (float deltaTime)
         if (m_hotkeyOverlay && m_hotkeyOverlay->IsActive())
         {
             m_hotkeyOverlay->Update (deltaTime, scheme.r, scheme.g, scheme.b);
+        }
+
+        if (m_usageOverlay && m_usageOverlay->IsActive())
+        {
+            bool wasRevealing = !m_usageOverlay->IsRevealComplete();
+
+            m_usageOverlay->Update (deltaTime, scheme.r, scheme.g, scheme.b);
+
+            // Start background rain once reveal completes
+            if (wasRevealing && m_usageOverlay->IsRevealComplete() && m_densityController)
+            {
+                m_densityController->SetPercentage (8);
+            }
         }
     }
 }
@@ -409,7 +457,17 @@ void Application::GetWindowSizeForCurrentMode (POINT & position, SIZE & size)
 
     CBRAEx (m_appState != nullptr, E_UNEXPECTED);
 
-    if (m_appState->GetDisplayMode() == DisplayMode::Fullscreen)
+    if (GetScreenSaverMode() == ScreenSaverMode::HelpRequested)
+    {
+        // /? mode: 60% x 50% of screen, centered
+        int windowWidth  = screenWidth  * 60 / 100;
+        int windowHeight = screenHeight * 50 / 100;
+
+        position.x = (screenWidth  - windowWidth)  / 2;
+        position.y = (screenHeight - windowHeight) / 2;
+        size       = { windowWidth, windowHeight };
+    }
+    else if (m_appState->GetDisplayMode() == DisplayMode::Fullscreen)
     {
         // Fullscreen mode
         position = { 0, 0 };
@@ -522,6 +580,7 @@ void Application::Render()
         // Pass overlay pointers to render system for rendering
         const HelpHintOverlay * pOverlay       = (m_helpHintOverlay && m_helpHintOverlay->IsActive()) ? m_helpHintOverlay.get() : nullptr;
         const HotkeyOverlay   * pHotkeyOverlay = (m_hotkeyOverlay && m_hotkeyOverlay->IsActive())     ? m_hotkeyOverlay.get()  : nullptr;
+        const UsageOverlay    * pUsageOverlay  = (m_usageOverlay && m_usageOverlay->IsActive())        ? m_usageOverlay.get()   : nullptr;
 
         RenderSystem::RenderParams renderParams =
         {
@@ -533,7 +592,8 @@ void Application::Render()
             .showDebugFadeTimes = showDebugFadeTimes,
             .elapsedTime        = elapsedTime,
             .pOverlay           = pOverlay,
-            .pHotkeyOverlay     = pHotkeyOverlay
+            .pHotkeyOverlay     = pHotkeyOverlay,
+            .pUsageOverlay      = pUsageOverlay
         };
 
         m_renderSystem->Render (*m_animationSystem, *m_viewport, renderParams);
@@ -715,6 +775,18 @@ void Application::OnKeyDown (WPARAM wParam)
     bool isQuestionKey = false;
 
 
+    // In /? help mode, only Enter and Escape exit the application
+    if (GetScreenSaverMode() == ScreenSaverMode::HelpRequested)
+    {
+        if (wParam == VK_RETURN || wParam == VK_ESCAPE)
+        {
+            PostQuitMessage (0);
+        }
+
+        return;
+    }
+
+
 
     // If live overlay dialog is active, don't process exit keys
     if (m_hConfigDialog && (wParam == VK_ESCAPE || ShouldExitScreenSaverOnKey (wParam)))
@@ -830,6 +902,12 @@ void Application::OnKeyDown (WPARAM wParam)
 
 void Application::OnSysKeyDown (WPARAM wParam)
 {
+    // In /? help mode, suppress all system keys
+    if (GetScreenSaverMode() == ScreenSaverMode::HelpRequested)
+    {
+        return;
+    }
+
     // In screensaver mode with exit-on-input, suppress all hotkeys including Alt+Enter
     if (ShouldExitScreenSaverOnKey (wParam))
     {

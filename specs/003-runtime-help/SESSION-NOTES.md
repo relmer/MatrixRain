@@ -66,36 +66,47 @@ The original spec described per-character random resolve/dissolve (each char has
 - `ScreenSaverSettings::DEFAULT_DENSITY_PERCENT = 50`
 - `DensityController::DEFAULT_PERCENTAGE = 50`
 
-## Open Work: UsageDialog GPU Migration
+## Open Work: UsageDialog GPU Migration (IN PROGRESS)
 
-**Decision**: Replace UsageDialog's separate window + duplicate rendering stack with a special mode of the main Application window.
+**Status**: Initial implementation done — builds and tests pass, but needs visual testing and refinement.
 
-**Approach**:
-- `/? ` becomes a mode flag on Application (new ScreenSaverMode or similar)
-- Window sizes to 2x text bounding box (capped at 80% work area) instead of fullscreen
-- New `UsageOverlay` class (modeled on `HotkeyOverlay`) builds HintCharacter arrays from UsageText content
-- Rendered via existing GPU instancing + SDF halo + bloom pipeline
-- Rain density held at 0% until overlay reveal completes, then background rain starts
-- Only Enter/Esc dismiss (exits app) — no other hotkeys
-- Help hint overlay not shown in this mode
+**What's done**:
+- `UsageOverlay` class created (builds HintCharacter arrays from UsageText formatted lines)
+- Application handles `HelpRequested` mode: 60%×50% window, title bar, Enter/Esc exit only
+- `main.cpp` routes `/? ` through Application instead of UsageDialog
+- Overlay atlas expanded with punctuation (281 glyphs)
+- `BuildOverlayInstances` race condition fixed (atlas lookups after bounds check)
+- CharacterSet glyph count tests updated (273 → 281)
 
-**What gets deleted**:
-- `UsageDialog` class entirely (UsageDialog.h, UsageDialog.cpp)
-- `CharPosition` struct
-- `DrawCharacterGlow` D2D per-character glow rendering
-- `RenderTextOverlay` D2D text rendering
-- Duplicate RenderSystem/AnimationSystem/CharacterSet initialization
-- D2D text brushes (m_textBrush, m_glowBrush, m_tracerBrush)
+**What still needs doing**:
+- Add `<` and `>` to overlay atlas for `<HWND>` in usage text
+- Visual testing and tuning of /? mode
+- Delete old UsageDialog class once /? mode is verified working
+- Unified Overlay class refactor (see below)
 
-**What gets created**:
-- `UsageOverlay` class (like HotkeyOverlay but with UsageText content)
-- Application mode handling for /?
+**Known issues**:
+- Window sizing is a rough 60%×50% instead of content-aware 2x text bounding box
+- `RenderTwoColumnOverlay` treats all content as single-column (keyCol=0, gap=0)
 
-**Atlas expansion** (DONE — committed):
-- Added: . ( ) [ ] : © — to overlay codepoints
-- Total glyphs: 281 (was 273)
+## Planned: Unified Overlay Class Refactor
 
-**Key insight**: HotkeyOverlay already renders proportional Segoe UI text via GPU instancing. The overlay atlas has all needed glyphs. UsageOverlay is structurally identical — just different text content.
+**Goal**: Consolidate HelpHintOverlay, HotkeyOverlay, UsageOverlay into a single `Overlay` class.
+
+**Design**:
+- Takes `vector<OverlayEntry>` where `OverlayEntry { wstring left; wstring right; }`
+- Single-column rows: text in `left`, `right` empty
+- Two-column rows: key in `left`, description in `right`  
+- Configurable timing: revealDuration, dismissDuration, cycleInterval, flashDuration, holdDuration
+- Configurable layout: marginCols, gapChars, padding
+- Shared Update logic (CellPhase→CharPhase mapping, glyph cycling, color computation)
+- Shared Show/Dismiss/Hide/ResolveGlyphIndices
+- Per-overlay specifics become just constructor configuration
+- Eliminates three overlay classes, the duplicated Update switch statements, and the per-overlay rendering code in RenderSystem
+
+**Benefits**:
+- Single code path = no divergence bugs (like the SIZE_MAX race condition)
+- New overlays are just new sets of OverlayEntry + timing config
+- RenderSystem needs only one overlay rendering code path
 
 ## Config Dialog Cancel Bug (FIXED)
 - `OnCancel()` called `CancelLiveMode()` before `DestroyWindow()`, clearing isLiveMode flag

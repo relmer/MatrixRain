@@ -8,6 +8,7 @@
 #include "HelpHintOverlay.h"
 #include "HotkeyOverlay.h"
 #include "OverlayColor.h"
+#include "UsageOverlay.h"
 
 using Microsoft::WRL::ComPtr;
 
@@ -1676,6 +1677,17 @@ void RenderSystem::Render (const AnimationSystem & animationSystem, const Viewpo
                                     params.pHotkeyOverlay->GetPadding());
         }
 
+        if (params.pUsageOverlay && params.pUsageOverlay->IsActive())
+        {
+            RenderTwoColumnOverlay (params.pUsageOverlay->GetCharacters(),
+                                    UsageOverlay::MARGIN_COLS,
+                                    params.pUsageOverlay->GetKeyColChars(),
+                                    params.pUsageOverlay->GetGapChars(),
+                                    params.pUsageOverlay->GetCharRows(),
+                                    params.pUsageOverlay->GetCharHeight(),
+                                    params.pUsageOverlay->GetPadding());
+        }
+
         // Apply bloom (extracts bright pixels including overlay text, composites to backbuffer)
         (void)ApplyBloom();
     }
@@ -2039,9 +2051,7 @@ void RenderSystem::BuildOverlayInstances (std::span<const HintCharacter> chars,
 
     for (size_t i = 0; i < chars.size(); i++)
     {
-        const HintCharacter & ch        = chars[i];
-        const OverlayUV     & overlayUV = charSet.GetOverlayUV (ch.currentGlyphIndex);
-        const GlyphInfo     & glyph     = charSet.GetGlyph (ch.currentGlyphIndex);
+        const HintCharacter & ch = chars[i];
 
 
 
@@ -2049,6 +2059,15 @@ void RenderSystem::BuildOverlayInstances (std::span<const HintCharacter> chars,
         {
             continue;
         }
+
+        // Skip characters with unresolved glyph indices (spaces, margin columns)
+        if (ch.currentGlyphIndex >= charSet.GetGlyphCount())
+        {
+            continue;
+        }
+
+        const OverlayUV & overlayUV = charSet.GetOverlayUV (ch.currentGlyphIndex);
+        const GlyphInfo & glyph     = charSet.GetGlyph (ch.currentGlyphIndex);
 
         // Compute width ratio: how much of the atlas cell this character
         // actually occupies.  Shrink the quad and crop the UV so the

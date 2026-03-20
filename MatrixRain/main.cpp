@@ -39,12 +39,8 @@ int APIENTRY wWinMain(_In_     HINSTANCE hInstance,
     hr = ParseCommandLine (lpCmdLine, context);
     CHR (hr);
 
-    // Handle help request before window creation
-    if (context.m_mode == ScreenSaverMode::HelpRequested)
-    {
-        hr = CommandLineHelp::DisplayCommandLineHelp (context.m_switchPrefix);
-        goto Error;
-    }
+    // Handle help request — runs through Application in HelpRequested mode
+    // (no longer uses UsageDialog — overlay renders via GPU pipeline)
 
     // Handle configuration mode with HWND (modal Control Panel dialog)
     if (context.m_mode == ScreenSaverMode::SettingsDialog && context.m_previewParentHwnd != nullptr)

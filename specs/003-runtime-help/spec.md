@@ -78,6 +78,21 @@
 - Config dialog cancel bug fixed: `OnCancel()` now clears `m_hConfigDialog` before `DestroyWindow()` so Enter and Escape resume working.
 - `CharacterInstanceData` and `ConstantBufferData` moved from public to private in `RenderSystem`.
 
+### Session 2026-03-20 — UsageDialog GPU Migration & Unified Overlay Design
+
+- **UsageDialog eliminated**: `/? ` now runs through Application in `HelpRequested` mode with a smaller windowed view, instead of a separate `UsageDialog` class with its own duplicate RenderSystem/AnimationSystem/D2D rendering stack.
+- **UsageOverlay created**: New overlay class (modeled on HotkeyOverlay) builds `HintCharacter` arrays from `UsageText` formatted lines. Rendered via the same GPU instancing + SDF halo + bloom pipeline as all overlays.
+- **Overlay atlas expanded**: Added `. ( ) [ ] : © —` to overlay codepoints (281 glyphs total, was 273). Still need `<` `>` for `<HWND>`.
+- **Application HelpRequested mode**: Window sized to 60%×50% of screen with title bar and close button. Rain held at 0% until reveal completes, then starts at 8%. Only Enter/Esc exit. Alt+Enter disabled. Help hint overlay not created.
+- **BuildOverlayInstances race fix**: Atlas lookups (`GetOverlayUV`, `GetGlyph`) moved after bounds check on `currentGlyphIndex` to prevent out-of-bounds access when render thread reads stale data during Update().
+- **Unified Overlay design (planned)**: All three overlays (HelpHint, Hotkey, Usage) will be consolidated into a single `Overlay` class parameterized by:
+  - `vector<OverlayEntry>` where each entry has `left` (key/header) and `right` (description) strings
+  - Single-column rows: text in `left`, `right` empty
+  - Two-column rows: key in `left`, description in `right`
+  - Configurable timing (`revealDuration`, `dismissDuration`, `cycleInterval`, `flashDuration`, `holdDuration`)
+  - Configurable layout (`marginCols`, `gapChars`, `padding`)
+  - Shared Update/Show/Dismiss/ResolveGlyphIndices — eliminates duplicated CellPhase→CharPhase mapping code
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Runtime Help Hint on Startup (Priority: P2)
