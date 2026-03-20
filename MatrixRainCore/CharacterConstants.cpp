@@ -234,10 +234,18 @@ namespace CharacterConstants
     // These are added to the atlas without mirrored variants.
     const uint32_t OVERLAY_SYMBOL_CODEPOINTS[] = {
         0x0020, // space
+        0x0028, // (
+        0x0029, // )
         0x002B, // +
         0x002D, // -
+        0x002E, // .
         0x002F, // /
-        0x003F  // ?
+        0x003A, // :
+        0x003F, // ?
+        0x005B, // [
+        0x005D, // ]
+        0x00A9, // © copyright
+        0x2014  // — em dash
     };
     const size_t OVERLAY_SYMBOL_COUNT = sizeof(OVERLAY_SYMBOL_CODEPOINTS) / sizeof(OVERLAY_SYMBOL_CODEPOINTS[0]);
 
@@ -246,7 +254,7 @@ namespace CharacterConstants
 
 
     // Total: 72 + 26 + 26 + 10 = 134 rain characters (mirrored = 268)
-    //        + 5 overlay symbols (not mirrored) = 273 glyphs total
+    //        + 13 overlay symbols (not mirrored) = 281 glyphs total
 
     // Helper function to get all codepoints in a single vector
     std::vector<uint32_t> GetAllCodepoints()
