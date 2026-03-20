@@ -39,9 +39,9 @@ OverlayColor ComputeScrambleColor (CellPhase cellPhase,
         case CellPhase::Cycling:
         {
             // Medium intensity of scheme color
-            color.r = schemeR * 0.5f;
-            color.g = schemeG * 0.5f;
-            color.b = schemeB * 0.5f;
+            color.r = schemeR * 0.7f;
+            color.g = schemeG * 0.7f;
+            color.b = schemeB * 0.7f;
             break;
         }
 
@@ -104,9 +104,9 @@ OverlayColor ComputeScrambleColor (CellPhase cellPhase,
 
         case CellPhase::Dismissing:
         {
-            color.r = schemeR * 0.5f;
-            color.g = schemeG * 0.5f;
-            color.b = schemeB * 0.5f;
+            color.r = schemeR * 0.7f;
+            color.g = schemeG * 0.7f;
+            color.b = schemeB * 0.7f;
             break;
         }
 

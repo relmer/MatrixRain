@@ -519,11 +519,24 @@ void Application::Render()
         bool        showDebugFadeTimes = m_appState->GetShowDebugFadeTimes();
         float       elapsedTime        = m_appState->GetElapsedTime();
         
-        // Pass overlay pointers to render system for rendering + occlusion
+        // Pass overlay pointers to render system for rendering
         const HelpHintOverlay * pOverlay       = (m_helpHintOverlay && m_helpHintOverlay->IsActive()) ? m_helpHintOverlay.get() : nullptr;
         const HotkeyOverlay   * pHotkeyOverlay = (m_hotkeyOverlay && m_hotkeyOverlay->IsActive())     ? m_hotkeyOverlay.get()  : nullptr;
-        
-        m_renderSystem->Render (*m_animationSystem, *m_viewport, scheme, fps, rainPercentage, streakCount, activeHeadCount, showDebugFadeTimes, elapsedTime, pOverlay, pHotkeyOverlay);
+
+        RenderSystem::RenderParams renderParams =
+        {
+            .colorScheme        = scheme,
+            .fps                = fps,
+            .rainPercentage     = rainPercentage,
+            .streakCount        = streakCount,
+            .activeHeadCount    = activeHeadCount,
+            .showDebugFadeTimes = showDebugFadeTimes,
+            .elapsedTime        = elapsedTime,
+            .pOverlay           = pOverlay,
+            .pHotkeyOverlay     = pHotkeyOverlay
+        };
+
+        m_renderSystem->Render (*m_animationSystem, *m_viewport, renderParams);
         m_renderSystem->Present();
     }
 }

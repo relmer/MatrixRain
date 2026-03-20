@@ -84,7 +84,8 @@ void ScrambleRevealEffect::StartReveal ()
     m_postRevealTimer  = 0.0f;
     m_holdStartTime    = 0.0f;
 
-    std::uniform_real_distribution<float> lockDist (0.0f, m_revealDuration);
+    std::uniform_real_distribution<float> lockDist  (0.0f, m_revealDuration);
+    std::uniform_real_distribution<float> cycleDist (0.0f, m_cycleInterval);
 
 
 
@@ -102,7 +103,7 @@ void ScrambleRevealEffect::StartReveal ()
             cell.phase      = CellPhase::Cycling;
             cell.opacity    = 0.0f;
             cell.lockTime   = lockDist (m_rng);
-            cell.cycleTimer = 0.0f;
+            cell.cycleTimer = cycleDist (m_rng);  // Stagger so cells don't all cycle on the same frame
             cell.flashTimer = 0.0f;
             cell.needsCycle = true;      // Consumer should pick initial random glyph
         }
@@ -397,7 +398,7 @@ void ScrambleRevealEffect::UpdateDismissing (float deltaTime)
                 if (m_dismissTimer >= cell.lockTime)
                 {
                     cell.phase      = CellPhase::Dismissing;
-                    cell.cycleTimer = 0.0f;
+                    cell.cycleTimer = std::uniform_real_distribution<float> (0.0f, m_cycleInterval) (m_rng);
                     cell.needsCycle = true;
 
                     float overshoot = m_dismissTimer - cell.lockTime;

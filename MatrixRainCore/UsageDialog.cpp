@@ -796,16 +796,14 @@ void UsageDialog::RenderFrame ()
         return;
     }
 
-    // Render GPU rain with bloom (no occlusion — D2D glow halos keep text readable)
-    m_renderSystem->Render (*m_animationSystem,
-                            *m_viewport,
-                            m_colorScheme,
-                            0.0f,     // fps (hidden)
-                            0,        // rainPercentage
-                            0,        // streakCount
-                            0,        // activeHeadCount
-                            false,    // showDebugFadeTimes
-                            m_elapsedTime);
+    // Render GPU rain with bloom
+    RenderSystem::RenderParams renderParams =
+    {
+        .colorScheme = m_colorScheme,
+        .elapsedTime = m_elapsedTime
+    };
+
+    m_renderSystem->Render (*m_animationSystem, *m_viewport, renderParams);
 
     // D2D text overlay on top of rain
     RenderTextOverlay();

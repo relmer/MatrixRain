@@ -22,7 +22,6 @@ using Microsoft::WRL::ComPtr;
 
 // Forward declarations
 class CharacterStreak;
-class HelpHintOverlay;
 class HotkeyOverlay;
 
 /// <summary>
@@ -44,19 +43,25 @@ public:
     HRESULT Initialize (HWND hwnd, UINT width, UINT height);
 
     /// <summary>
+    /// Parameters for rendering a single frame.
+    /// </summary>
+    struct RenderParams
+    {
+        ColorScheme             colorScheme        = ColorScheme::Green;
+        float                   fps                = 0.0f;
+        int                     rainPercentage     = 0;
+        int                     streakCount        = 0;
+        int                     activeHeadCount    = 0;
+        bool                    showDebugFadeTimes = false;
+        float                   elapsedTime        = 0.0f;
+        const HelpHintOverlay * pOverlay           = nullptr;
+        const HotkeyOverlay   * pHotkeyOverlay     = nullptr;
+    };
+
+    /// <summary>
     /// Render all character streaks from the animation system.
     /// </summary>
-    /// <param name="animationSystem">Source of streak data to render</param>
-    /// <param name="viewport">Viewport for projection matrix</param>
-    /// <param name="colorScheme">Current color scheme for rendering</param>
-    /// <param name="fps">Current FPS for display (0 to hide)</param>
-    /// <param name="rainPercentage">Current rain density percentage (0-100)</param>
-    /// <param name="streakCount">Current number of active streaks</param>
-    /// <param name="activeHeadCount">Current number of active streak heads on screen</param>
-    /// <param name="showDebugFadeTimes">True to show debug fade time overlay</param>
-    /// <param name="elapsedTime">Elapsed time in seconds for color cycling</param>
-    /// <param name="pOcclusionRect">Optional rect in pixel coordinates where rain should not render</param>
-    void Render (const AnimationSystem & animationSystem, const Viewport & viewport, ColorScheme colorScheme = ColorScheme::Green, float fps = 0.0f, int rainPercentage = 0, int streakCount = 0, int activeHeadCount = 0, bool showDebugFadeTimes = false, float elapsedTime = 0.0f, const HelpHintOverlay * pOverlay = nullptr, const HotkeyOverlay * pHotkeyOverlay = nullptr, const D2D1_RECT_F * pOcclusionRect = nullptr);
+    void Render (const AnimationSystem & animationSystem, const Viewport & viewport, const RenderParams & params);
 
     /// <summary>
     /// Present the rendered frame to the screen.
@@ -131,12 +136,12 @@ public:
     float GetDpiScale() const { return m_dpiScale; }
 
     // Accessors
-    ID3D11Device        * GetDevice()       const { return m_device.Get();       }
-    ID3D11DeviceContext * GetContext()      const { return m_context.Get();      }
-    ID2D1DeviceContext  * GetD2DContext()   const { return m_d2dContext.Get();   }
+    ID3D11Device        * GetDevice()        const { return m_device.Get();        }
+    ID3D11DeviceContext * GetContext()       const { return m_context.Get();       }
+    ID2D1DeviceContext  * GetD2DContext()    const { return m_d2dContext.Get();    }
     IDWriteFactory      * GetDWriteFactory() const { return m_dwriteFactory.Get(); }
 
-    // Internal data structures (public for static helper function access)
+private:
     /// <summary>
     /// Instance data for rendering a single character glyph.
     /// Packed tightly for GPU upload.
@@ -186,8 +191,6 @@ public:
         {
         }
     };
-
-private:
     // Initialization helpers
     HRESULT CreateDevice();
     HRESULT CreateSwapChain            (HWND hwnd, UINT width, UINT height);
@@ -207,14 +210,15 @@ private:
 
     // Rendering helpers
     void    SortStreaksByDepth       (std::vector<const CharacterStreak *> & streaks);
-    HRESULT UpdateInstanceBuffer     (const AnimationSystem & animationSystem, ColorScheme colorScheme, float elapsedTime, const D2D1_RECT_F * pOcclusionRect = nullptr);
+    HRESULT UpdateInstanceBuffer     (const AnimationSystem & animationSystem, ColorScheme colorScheme, float elapsedTime);
     void    ClearRenderTarget();
     void    RenderFPSCounter         (float fps, int rainPercentage, int streakCount, int activeHeadCount);
     void    DrawFeatheredGlow        (const wchar_t * fpsText, UINT32 textLength, const D2D1_RECT_F & textRect);
     void    DrawFeatheredBackground  (std::span<const HintCharacter> chars, std::span<const float> xPositions, float advanceScale, float baseY, float cellHeight, int numRows, float padding, float opacityScale);
-    void    BuildOverlayInstances    (std::span<const HintCharacter> chars, int glowLayers, float charScale, float glowOffset, float baseY, float cellHeight, std::span<const float> xPositions, float advanceScale);
+    void    ComputeRowRects          (std::span<const HintCharacter> chars, std::span<const float> xPositions, float advanceScale, float baseY, float cellHeight, int numRows, float hPad, float vPad);
+    void    BuildOverlayInstances    (std::span<const HintCharacter> chars, float charScale, float baseY, float cellHeight, std::span<const float> xPositions, float advanceScale);
     void    RenderOverlayInstances   ();
-    void    RenderTwoColumnOverlay   (std::span<const HintCharacter> chars, int marginCols, int keyColChars, int gapChars, int numRows, float cellHeight, float padding, int glowLayers);
+    void    RenderTwoColumnOverlay   (std::span<const HintCharacter> chars, int marginCols, int keyColChars, int gapChars, int numRows, float cellHeight, float padding);
     void    RenderDebugFadeTimes     (const AnimationSystem & animationSystem);
     HRESULT ApplyBloom();
     void    RenderFullscreenPass     (ID3D11RenderTargetView * pRenderTarget, ID3D11PixelShader * pPixelShader, ID3D11ShaderResourceView * const * ppShaderResources, UINT numResources);
@@ -237,7 +241,7 @@ private:
 
     // Shader compilation helpers
     struct ShaderCompileEntry;
-    HRESULT CompileShadersFromTable (const ShaderCompileEntry * pTable, size_t cEntries);
+    HRESULT CompileShadersFromTable       (std::span<const ShaderCompileEntry> entries);
 
     // DirectX resources
     ComPtr<ID3D11Device>           m_device;
@@ -259,7 +263,10 @@ private:
     ComPtr<ID3D11PixelShader>         m_blurHorizontalPS;
     ComPtr<ID3D11PixelShader>         m_blurVerticalPS;
     ComPtr<ID3D11PixelShader>         m_compositePS;
+    ComPtr<ID3D11PixelShader>         m_haloPS;
     ComPtr<ID3D11Buffer>              m_fullscreenQuadVB;
+    ComPtr<ID3D11Buffer>              m_haloConstantBuffer;
+    ComPtr<ID3D11Buffer>              m_bloomConstantBuffer;
 
     // Direct2D/DirectWrite resources for FPS display
     ComPtr<ID2D1Factory1>        m_d2dFactory;
@@ -283,19 +290,19 @@ private:
     ComPtr<ID3D11Buffer> m_dummyVertexBuffer;
     ComPtr<ID3D11Buffer> m_instanceBuffer;
     ComPtr<ID3D11Buffer> m_constantBuffer;
-    ComPtr<ID3D11Buffer> m_bloomConstantBuffer;
-    UINT                 m_instanceBufferCapacity { INITIAL_INSTANCE_CAPACITY};
+    UINT                 m_instanceBufferCapacity { INITIAL_INSTANCE_CAPACITY };
 
     // Overlay GPU rendering
     ComPtr<ID3D11Buffer>                   m_overlayInstanceBuffer;
     UINT                                   m_overlayInstanceBufferCapacity { 0 };
     std::vector<CharacterInstanceData>     m_overlayInstanceData;
+    std::vector<D2D1_RECT_F>               m_haloRowRects;
+    const HintCharacter                  * m_haloRowRectsKey { nullptr };  // Cache key: chars data pointer
 
     // Render states
     ComPtr<ID3D11BlendState>   m_blendState;
     ComPtr<ID3D11BlendState>   m_premultipliedBlendState;
     ComPtr<ID3D11SamplerState> m_samplerState;
-    ComPtr<ID3D11SamplerState> m_pointSamplerState;
 
     // Texture atlas reference
     ComPtr<ID3D11ShaderResourceView> m_atlasTextureSRV;

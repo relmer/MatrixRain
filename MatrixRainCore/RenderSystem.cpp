@@ -349,12 +349,13 @@ static const D3D11_INPUT_ELEMENT_DESC s_krgInputLayout[] = {
 
 struct RenderSystem::ShaderCompileEntry
 {
-    const char *   pszSource;
-    const char *   pszName;
-    const char *   pszEntryPoint;
-    const char *   pszTarget;
-    LPCWSTR        pszErrorMsg;
-    ID3DBlob   **  ppBlob;
+    const char *                 pszSource;
+    const char *                 pszName;
+    const char *                 pszEntryPoint;
+    const char *                 pszTarget;
+    LPCWSTR                      pszErrorMsg;
+    ID3DBlob                  ** ppBlob;
+    ComPtr<ID3D11PixelShader>  * ppPixelShader;   // If non-null, create pixel shader from blob
 };
 
 
@@ -366,39 +367,49 @@ struct RenderSystem::ShaderCompileEntry
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-HRESULT RenderSystem::CompileShadersFromTable (const ShaderCompileEntry* pTable, size_t cEntries)
+HRESULT RenderSystem::CompileShadersFromTable (std::span<const ShaderCompileEntry> entries)
 {
     HRESULT          hr        = S_OK;
     ComPtr<ID3DBlob> errorBlob;
 
 
-    for (size_t i = 0; i < cEntries; ++i)
+    for (const auto & entry : entries)
     {
-        const ShaderCompileEntry& entry = pTable[i];
 
         errorBlob.Reset();
 
         hr = D3DCompile (entry.pszSource,
-                            strlen (entry.pszSource),
-                            entry.pszName,
-                            nullptr,
-                            nullptr,
-                            entry.pszEntryPoint,
-                            entry.pszTarget,
-                            D3DCOMPILE_ENABLE_STRICTNESS,
-                            0,
-                            entry.ppBlob,
-                            &errorBlob);
+                         strlen (entry.pszSource),
+                         entry.pszName,
+                         nullptr,
+                         nullptr,
+                         entry.pszEntryPoint,
+                         entry.pszTarget,
+                         D3DCOMPILE_ENABLE_STRICTNESS,
+                         0,
+                         entry.ppBlob,
+                         &errorBlob);
         if (FAILED (hr) && errorBlob)
         {
-            OutputDebugStringA ((char*)errorBlob->GetBufferPointer());
+            OutputDebugStringA ((char *) errorBlob->GetBufferPointer());
         }
         CHRLA (hr, entry.pszErrorMsg);
+
+        // Create pixel shader if target pointer is provided
+        if (entry.ppPixelShader)
+        {
+            hr = m_device->CreatePixelShader ((*entry.ppBlob)->GetBufferPointer(),
+                                              (*entry.ppBlob)->GetBufferSize(),
+                                              nullptr,
+                                              entry.ppPixelShader->GetAddressOf());
+            CHRA (hr);
+        }
     }
 
 Error:
     return hr;
 }
+
 
 
 
@@ -410,35 +421,22 @@ HRESULT RenderSystem::CompileCharacterShaders()
     ComPtr<ID3DBlob>    psBlob;
     ComPtr<ID3DBlob>    overlayPsBlob;
     ShaderCompileEntry  shaderTable[] = {
-        { s_kszVertexShaderSource,        "VS",        "main", "vs_5_0",  L"D3DCompile failed for vertex shader",         vsBlob.GetAddressOf()        },
-        { s_kszPixelShaderSource,         "PS",        "main", "ps_5_0",  L"D3DCompile failed for pixel shader",          psBlob.GetAddressOf()        },
-        { s_kszOverlayPixelShaderSource,  "OverlayPS", "main", "ps_5_0",  L"D3DCompile failed for overlay pixel shader",  overlayPsBlob.GetAddressOf() }
+        { s_kszVertexShaderSource,        "VS",        "main", "vs_5_0",  L"D3DCompile failed for vertex shader",         vsBlob.GetAddressOf(),        nullptr                },
+        { s_kszPixelShaderSource,         "PS",        "main", "ps_5_0",  L"D3DCompile failed for pixel shader",          psBlob.GetAddressOf(),        &m_pixelShader         },
+        { s_kszOverlayPixelShaderSource,  "OverlayPS", "main", "ps_5_0",  L"D3DCompile failed for overlay pixel shader",  overlayPsBlob.GetAddressOf(), &m_overlayPixelShader  }
     };
     
 
 
-    // Compile shaders from table
-    hr = CompileShadersFromTable (shaderTable, _countof (shaderTable));
-    CHR (hr);        // Create vertex shader
+    // Compile shaders and create pixel shaders from table
+    hr = CompileShadersFromTable (shaderTable);
+    CHR (hr);
 
+    // Create vertex shader
     hr = m_device->CreateVertexShader (vsBlob->GetBufferPointer(),
                                         vsBlob->GetBufferSize(),
                                         nullptr,
                                         &m_vertexShader);
-    CHRA (hr);
-
-    // Create pixel shader
-    hr = m_device->CreatePixelShader (psBlob->GetBufferPointer(),
-                                        psBlob->GetBufferSize(),
-                                        nullptr,
-                                        &m_pixelShader);
-    CHRA (hr);
-
-    // Create overlay pixel shader (no additive glow)
-    hr = m_device->CreatePixelShader (overlayPsBlob->GetBufferPointer(),
-                                        overlayPsBlob->GetBufferSize(),
-                                        nullptr,
-                                        &m_overlayPixelShader);
     CHRA (hr);
 
     // Create input layout using vertex shader blob
@@ -460,9 +458,9 @@ Error:
 
 HRESULT RenderSystem::CreateDummyVertexBuffer()
 {
-    HRESULT                hr       = S_OK;
-    D3D11_BUFFER_DESC      vbDesc   = {};
-    D3D11_SUBRESOURCE_DATA vbData   = {};
+    HRESULT                hr           = S_OK;
+    D3D11_BUFFER_DESC      vbDesc       = {};
+    D3D11_SUBRESOURCE_DATA vbData       = {};
     float                  dummyData[6] = { 0.0f, 1.0f, 2.0f, 3.0f, 4.0f, 5.0f };  // 6 dummy vertices (4-byte aligned)
 
 
@@ -610,12 +608,6 @@ HRESULT RenderSystem::CreateSamplerState()
     hr = m_device->CreateSamplerState (&samplerDesc, &m_samplerState);
     CHRA (hr);
 
-    // Point sampler for overlay text (1:1 texel-to-pixel, no interpolation)
-    samplerDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_POINT;
-
-    hr = m_device->CreateSamplerState (&samplerDesc, &m_pointSamplerState);
-    CHRA (hr);
-
 Error:
     return hr;
 }
@@ -759,6 +751,9 @@ void RenderSystem::UpdateDpiScale()
 void RenderSystem::OnDpiChanged (UINT dpi)
 {
     m_dpiScale = static_cast<float> (dpi) / 96.0f;
+
+    // Invalidate cached overlay rects (layout depends on DPI scale)
+    m_haloRowRectsKey = nullptr;
 
     // Recreate text formats at the new DPI scale
     if (m_dwriteFactory)
@@ -950,6 +945,56 @@ static const char * s_kszBloomCompositeShaderSource = R"(
         }
     )";
 
+static constexpr int MAX_HALO_ROWS = 16;  // Must match rowRects[] size in halo shader
+
+static const char * s_kszHaloShaderSource = R"(
+        cbuffer HaloConstants : register(b0)
+        {
+            float4 rowRects[16];    // (left, top, right, bottom) per row — must match MAX_HALO_ROWS
+            float  cornerRadius;
+            float  maxExpand;
+            float  maxOpacity;
+            int    numRows;
+        };
+
+        struct PSInput
+        {
+            float4 position : SV_POSITION;
+            float2 uv : TEXCOORD;
+        };
+
+        // Signed distance to a rounded rectangle (negative = inside)
+        float sdRoundedRect(float2 p, float2 center, float2 halfSize, float radius)
+        {
+            float2 d = abs(p - center) - halfSize + float2(radius, radius);
+            return length(max(d, 0.0)) + min(max(d.x, d.y), 0.0) - radius;
+        }
+
+        float4 main(PSInput input) : SV_TARGET
+        {
+            float2 pixelPos = input.position.xy;
+
+            // Find minimum distance to any row's rounded rect
+            float minDist = 1e9;
+
+            for (int i = 0; i < numRows; i++)
+            {
+                float4 r = rowRects[i];
+                float2 center   = float2((r.x + r.z) * 0.5, (r.y + r.w) * 0.5);
+                float2 halfSize = float2((r.z - r.x) * 0.5, (r.w - r.y) * 0.5);
+
+                float d = sdRoundedRect(pixelPos, center, halfSize, cornerRadius);
+                minDist = min(minDist, d);
+            }
+
+            // Map distance to opacity: inside = maxOpacity, feather over maxExpand
+            float t = saturate(minDist / maxExpand);
+            float opacity = maxOpacity * (1.0 - t * t);  // Quadratic falloff
+
+            return float4(0, 0, 0, opacity);
+        }
+    )";
+
 static const D3D11_INPUT_ELEMENT_DESC s_krgQuadInputLayout[] = {
     { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0,  D3D11_INPUT_PER_VERTEX_DATA, 0 },
     { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,    0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0 }
@@ -979,6 +1024,7 @@ HRESULT RenderSystem::CompileBloomShaders()
     ComPtr<ID3DBlob>       blurHPSBlob;
     ComPtr<ID3DBlob>       blurVPSBlob;
     ComPtr<ID3DBlob>       compositePSBlob;
+    ComPtr<ID3DBlob>       haloPSBlob;
     QuadVertex             quadVertices[]     = {
         { {-1, -1, 0}, {0, 1} },
         { {-1,  1, 0}, {0, 0} },
@@ -990,35 +1036,24 @@ HRESULT RenderSystem::CompileBloomShaders()
     D3D11_BUFFER_DESC      vbDesc             = { };
     D3D11_SUBRESOURCE_DATA vbData             = { };
     ShaderCompileEntry     bloomShaderTable[] = {
-        { s_kszQuadVertexShaderSource,         "QuadVS",    "main", "vs_5_0", L"D3DCompile failed for quad vertex shader",     quadVSBlob.GetAddressOf() },
-        { s_kszBloomExtractShaderSource,       "Extract",   "main", "ps_5_0", L"D3DCompile failed for bloom extract shader",   extractPSBlob.GetAddressOf() },
-        { s_kszBlurHorizontalShaderSource,     "BlurH",     "main", "ps_5_0", L"D3DCompile failed for horizontal blur shader", blurHPSBlob.GetAddressOf() },
-        { s_kszBlurVerticalShaderSource,       "BlurV",     "main", "ps_5_0", L"D3DCompile failed for vertical blur shader",   blurVPSBlob.GetAddressOf() },
-        { s_kszBloomCompositeShaderSource,     "Composite", "main", "ps_5_0", L"D3DCompile failed for composite shader",       compositePSBlob.GetAddressOf() }
+        { s_kszQuadVertexShaderSource,         "QuadVS",    "main", "vs_5_0", L"D3DCompile failed for quad vertex shader",     quadVSBlob.GetAddressOf(),      nullptr              },
+        { s_kszBloomExtractShaderSource,       "Extract",   "main", "ps_5_0", L"D3DCompile failed for bloom extract shader",   extractPSBlob.GetAddressOf(),   &m_bloomExtractPS    },
+        { s_kszBlurHorizontalShaderSource,     "BlurH",     "main", "ps_5_0", L"D3DCompile failed for horizontal blur shader", blurHPSBlob.GetAddressOf(),     &m_blurHorizontalPS  },
+        { s_kszBlurVerticalShaderSource,       "BlurV",     "main", "ps_5_0", L"D3DCompile failed for vertical blur shader",   blurVPSBlob.GetAddressOf(),     &m_blurVerticalPS    },
+        { s_kszBloomCompositeShaderSource,     "Composite", "main", "ps_5_0", L"D3DCompile failed for composite shader",       compositePSBlob.GetAddressOf(), &m_compositePS       },
+        { s_kszHaloShaderSource,               "Halo",      "main", "ps_5_0", L"D3DCompile failed for halo shader",            haloPSBlob.GetAddressOf(),      &m_haloPS            }
     };
 
 
-    // Compile shaders from table
-    hr = CompileShadersFromTable (bloomShaderTable, _countof (bloomShaderTable));
+    // Compile shaders and create pixel shaders from table
+    hr = CompileShadersFromTable (bloomShaderTable);
     CHR (hr);
     
     hr = m_device->CreateVertexShader (quadVSBlob->GetBufferPointer(), quadVSBlob->GetBufferSize(), nullptr, &m_fullscreenQuadVS);
     CHRA (hr);
     
-    hr = m_device->CreatePixelShader (extractPSBlob->GetBufferPointer(), extractPSBlob->GetBufferSize(), nullptr, &m_bloomExtractPS);
-    CHRA (hr);
-    
-    hr = m_device->CreatePixelShader (blurHPSBlob->GetBufferPointer(), blurHPSBlob->GetBufferSize(), nullptr, &m_blurHorizontalPS);
-    CHRA (hr);
-    
-    hr = m_device->CreatePixelShader (blurVPSBlob->GetBufferPointer(), blurVPSBlob->GetBufferSize(), nullptr, &m_blurVerticalPS);
-    CHRA (hr);
-    
-    hr = m_device->CreatePixelShader (compositePSBlob->GetBufferPointer(), compositePSBlob->GetBufferSize(), nullptr, &m_compositePS);
-    CHRA (hr);
-    
     hr = m_device->CreateInputLayout (s_krgQuadInputLayout, _countof (s_krgQuadInputLayout), 
-                                        quadVSBlob->GetBufferPointer(), quadVSBlob->GetBufferSize(), &m_fullscreenQuadInputLayout);
+                                      quadVSBlob->GetBufferPointer(), quadVSBlob->GetBufferSize(), &m_fullscreenQuadInputLayout);
     CHRA (hr);
 
     // Create fullscreen quad vertex buffer
@@ -1030,6 +1065,20 @@ HRESULT RenderSystem::CompileBloomShaders()
 
     hr = m_device->CreateBuffer (&vbDesc, &vbData, &m_fullscreenQuadVB);
     CHRA (hr);
+
+    // Create halo constant buffer (MAX_HALO_ROWS row rects + 1 control float4)
+    {
+        D3D11_BUFFER_DESC haloCBDesc = {};
+        constexpr UINT    haloCBSize = (MAX_HALO_ROWS + 1) * 16;  // 16 bytes per float4, rounded to 16-byte alignment
+
+        haloCBDesc.ByteWidth      = haloCBSize;
+        haloCBDesc.Usage          = D3D11_USAGE_DYNAMIC;
+        haloCBDesc.BindFlags      = D3D11_BIND_CONSTANT_BUFFER;
+        haloCBDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+
+        hr = m_device->CreateBuffer (&haloCBDesc, nullptr, &m_haloConstantBuffer);
+        CHRA (hr);
+    }
 
 Error:
     return hr;
@@ -1250,17 +1299,18 @@ HRESULT RenderSystem::ApplyBloom()
     
     // Update bloom constant buffer (shared by blur and composite shaders)
     hr = m_context->Map (m_bloomConstantBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedBloomCB);
-    if (SUCCEEDED (hr))
+    CHRA (hr);
+
     {
-        float * bloomData = static_cast<float*> (mappedBloomCB.pData);
+        float * bloomData = static_cast<float *> (mappedBloomCB.pData);
 
         bloomData[0] = m_glowIntensity;  // Bloom intensity
         bloomData[1] = m_glowSize;       // Blur radius multiplier
         bloomData[2] = 0.0f;             // Padding
         bloomData[3] = 0.0f;             // Padding
-
-        m_context->Unmap (m_bloomConstantBuffer.Get(), 0);
     }
+
+    m_context->Unmap (m_bloomConstantBuffer.Get(), 0);
 
     // Bind constant buffer for blur shaders (glowSize controls spread)
     m_context->PSSetConstantBuffers (0, 1, m_bloomConstantBuffer.GetAddressOf());
@@ -1401,7 +1451,7 @@ void RenderSystem::BuildCharacterInstanceData (const CharacterInstance & charact
 
 
 
-HRESULT RenderSystem::UpdateInstanceBuffer (const AnimationSystem& animationSystem, ColorScheme colorScheme, float elapsedTime, const D2D1_RECT_F * pOcclusionRect)
+HRESULT RenderSystem::UpdateInstanceBuffer (const AnimationSystem& animationSystem, ColorScheme colorScheme, float elapsedTime)
 {
     HRESULT                  hr             = S_OK;
     Color4                   schemeColor    = GetColorRGB (colorScheme, elapsedTime);
@@ -1434,19 +1484,6 @@ HRESULT RenderSystem::UpdateInstanceBuffer (const AnimationSystem& animationSyst
             CharacterInstanceData data;
 
 
-
-            // Skip characters occluded by the help hint overlay
-            if (pOcclusionRect)
-            {
-                float charX = streakPos.x + character.positionOffset.x;
-                float charY = character.positionOffset.y;
-
-                if (charX >= pOcclusionRect->left && charX <= pOcclusionRect->right &&
-                    charY >= pOcclusionRect->top  && charY <= pOcclusionRect->bottom)
-                {
-                    continue;
-                }
-            }
 
             BuildCharacterInstanceData (character, streakPos, schemeColor, data);
             m_instanceData.push_back (data);
@@ -1498,7 +1535,7 @@ Error:
 
 
 
-void RenderSystem::Render (const AnimationSystem & animationSystem, const Viewport & viewport, ColorScheme colorScheme, float fps, int rainPercentage, int streakCount, int activeHeadCount, bool showDebugFadeTimes, float elapsedTime, const HelpHintOverlay * pOverlay, const HotkeyOverlay * pHotkeyOverlay, const D2D1_RECT_F * pOcclusionRect)
+void RenderSystem::Render (const AnimationSystem & animationSystem, const Viewport & viewport, const RenderParams & params)
 {
     if (!m_device || !m_context || !m_renderTargetView)
     {
@@ -1561,23 +1598,13 @@ void RenderSystem::Render (const AnimationSystem & animationSystem, const Viewpo
         m_context->Unmap (m_constantBuffer.Get(), 0);
     }
 
-    // Update instance buffer with character data (pass occlusion rect if provided)
-    (void) UpdateInstanceBuffer (animationSystem, colorScheme, elapsedTime, pOcclusionRect);  // Ignore return - errors already handled within
+    // Update instance buffer with character data
+    (void) UpdateInstanceBuffer (animationSystem, params.colorScheme, params.elapsedTime);
 
     if (m_instanceData.empty())
     {
         return;
     }
-
-    // Set viewport for rendering
-    D3D11_VIEWPORT vp = {};
-    vp.TopLeftX = 0.0f;
-    vp.TopLeftY = 0.0f;
-    vp.Width    = static_cast<FLOAT> (viewport.GetWidth());
-    vp.Height   = static_cast<FLOAT> (viewport.GetHeight());
-    vp.MinDepth = 0.0f;
-    vp.MaxDepth = 1.0f;
-    m_context->RSSetViewports (1, &vp);
 
     // Set render state
     m_context->IASetInputLayout (m_inputLayout.Get());
@@ -1625,9 +1652,32 @@ void RenderSystem::Render (const AnimationSystem & animationSystem, const Viewpo
         
         m_context->OMSetRenderTargets (1, m_sceneRTV.GetAddressOf(), nullptr);
         m_context->DrawInstanced (6, static_cast<UINT> (m_instanceData.size()), 0, 0);
-        
-        // Now apply bloom (which will composite to backbuffer)
-        (void)ApplyBloom();  // Ignore return - errors already handled within
+
+        // Render overlays to scene texture (before bloom so they get glow for free)
+        if (params.pOverlay && params.pOverlay->IsActive())
+        {
+            RenderTwoColumnOverlay (params.pOverlay->GetCharacters(),
+                                    HelpHintOverlay::MARGIN_COLS,
+                                    params.pOverlay->GetLeftColChars(),
+                                    params.pOverlay->GetGapChars(),
+                                    params.pOverlay->GetRows(),
+                                    params.pOverlay->GetCharHeight(),
+                                    params.pOverlay->GetPadding());
+        }
+
+        if (params.pHotkeyOverlay && params.pHotkeyOverlay->IsActive())
+        {
+            RenderTwoColumnOverlay (params.pHotkeyOverlay->GetCharacters(),
+                                    HotkeyOverlay::MARGIN_COLS,
+                                    params.pHotkeyOverlay->GetKeyColChars(),
+                                    params.pHotkeyOverlay->GetGapChars(),
+                                    params.pHotkeyOverlay->GetCharRows(),
+                                    params.pHotkeyOverlay->GetRowHeight(),
+                                    params.pHotkeyOverlay->GetPadding());
+        }
+
+        // Apply bloom (extracts bright pixels including overlay text, composites to backbuffer)
+        (void)ApplyBloom();
     }
     else
     {
@@ -1636,40 +1686,14 @@ void RenderSystem::Render (const AnimationSystem & animationSystem, const Viewpo
         m_context->DrawInstanced (6, static_cast<UINT> (m_instanceData.size()), 0, 0);
     }
 
-    // Render help hint overlay if active (after bloom, before FPS counter)
-    if (pOverlay && pOverlay->IsActive())
-    {
-        RenderTwoColumnOverlay (pOverlay->GetCharacters(),
-                                HelpHintOverlay::MARGIN_COLS,
-                                pOverlay->GetLeftColChars(),
-                                pOverlay->GetGapChars(),
-                                pOverlay->GetRows(),
-                                pOverlay->GetCharHeight(),
-                                pOverlay->GetPadding(),
-                                HelpHintOverlay::GLOW_LAYERS);
-    }
-
-    // Render hotkey overlay if active (after help hint, before FPS counter)
-    if (pHotkeyOverlay && pHotkeyOverlay->IsActive())
-    {
-        RenderTwoColumnOverlay (pHotkeyOverlay->GetCharacters(),
-                                HotkeyOverlay::MARGIN_COLS,
-                                pHotkeyOverlay->GetKeyColChars(),
-                                pHotkeyOverlay->GetGapChars(),
-                                pHotkeyOverlay->GetCharRows(),
-                                pHotkeyOverlay->GetRowHeight(),
-                                pHotkeyOverlay->GetPadding(),
-                                HotkeyOverlay::GLOW_LAYERS);
-    }
-
     // Render FPS counter overlay if fps > 0
-    if (fps > 0.0f)
+    if (params.fps > 0.0f)
     {
-        RenderFPSCounter (fps, rainPercentage, streakCount, activeHeadCount);
+        RenderFPSCounter (params.fps, params.rainPercentage, params.streakCount, params.activeHeadCount);
     }
 
     // Debug: Render fade times when enabled and only one streak is visible
-    if (showDebugFadeTimes)
+    if (params.showDebugFadeTimes)
     {
         RenderDebugFadeTimes (animationSystem);
     }
@@ -1808,9 +1832,70 @@ static constexpr float OVERLAY_FONT_DIP       = 16.0f;   // Overlay font design 
 static constexpr float OVERLAY_CELL_DIP       = 28.0f;   // Base cell height in DIP (matches BASE_CHAR_HEIGHT / BASE_ROW_HEIGHT)
 static constexpr float OVERLAY_ADV_SCALE      = OVERLAY_FONT_DIP / OVERLAY_CELL_DIP;  // Font-to-cell advance ratio
 static constexpr float OVERLAY_CHAR_SCALE     = 1.0f;    // 1:1 pixel mapping (no scale)
-static constexpr float OVERLAY_GLOW_OFFSET    = 1.0f;    // Shadow offset in pixels per layer
 static constexpr float OVERLAY_MIN_OPACITY    = 0.01f;   // Below this opacity, skip rendering
-static constexpr float OVERLAY_MAX_GLOW_ALPHA = 0.9f;    // Peak glow opacity at innermost layer
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  RenderSystem::ComputeRowRects
+//
+//  Builds per-row bounding rects from character positions for halo rendering.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+void RenderSystem::ComputeRowRects (std::span<const HintCharacter> chars,
+                                    std::span<const float>         xPositions,
+                                    float                          advanceScale,
+                                    float                          baseY,
+                                    float                          cellHeight,
+                                    int                            numRows,
+                                    float                          hPad,
+                                    float                          vPad)
+{
+    CharacterSet & charSet = CharacterSet::GetInstance();
+
+
+    // Skip recomputation if the same overlay data produced the cached rects
+    if (chars.data() == m_haloRowRectsKey && !m_haloRowRects.empty())
+    {
+        return;
+    }
+
+    m_haloRowRects.clear();
+    m_haloRowRectsKey = chars.data();
+
+    for (int row = 0; row < numRows; ++row)
+    {
+        float rowLeft  =  1e9f;
+        float rowRight = -1e9f;
+        bool  hasChars = false;
+
+        for (size_t i = 0; i < chars.size(); ++i)
+        {
+            if (chars[i].row == row && !chars[i].isSpace)
+            {
+                float charRight = xPositions[i] + charSet.GetGlyph (chars[i].targetGlyphIndex).advanceWidth * advanceScale;
+
+                rowLeft  = std::min (rowLeft, xPositions[i]);
+                rowRight = std::max (rowRight, charRight);
+                hasChars = true;
+            }
+        }
+
+        if (hasChars)
+        {
+            float rowTop    = baseY + static_cast<float> (row) * cellHeight - vPad;
+            float rowBottom = rowTop + cellHeight + 2.0f * vPad;
+
+            D2D1_RECT_F rect = D2D1::RectF (rowLeft - hPad, rowTop, rowRight + hPad, rowBottom);
+
+            m_haloRowRects.push_back (rect);
+        }
+    }
+}
 
 
 
@@ -1820,8 +1905,9 @@ static constexpr float OVERLAY_MAX_GLOW_ALPHA = 0.9f;    // Peak glow opacity at
 //
 //  RenderSystem::DrawFeatheredBackground
 //
-//  Draws per-row rounded-rect halos with expanding layers of decreasing
-//  opacity, creating a soft glow behind each line of overlay text.
+//  Renders per-row rounded-rect halos via a D3D11 fullscreen pixel shader.
+//  Single draw call — the shader computes signed distance to the nearest
+//  rounded rect per pixel with a smooth quadratic falloff.
 //
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -1834,73 +1920,89 @@ void RenderSystem::DrawFeatheredBackground (std::span<const HintCharacter> chars
                                             float                          padding,
                                             float                          opacityScale)
 {
-    CharacterSet     & charSet        = CharacterSet::GetInstance();
-    const int          featherLayers  = 18;
-    const float        maxExpand      = 35.0f;
-    const float        cornerRadius   = cellHeight * 0.5f;
-    const float        haloMaxDark    = 0.70f;                          // Peak darkness when fully visible (the knob)
-    const float        maxOpacity     = haloMaxDark * opacityScale;     // Scaled by animation fade
-    const float        hPad           = padding * 0.4f;
-    const float        vPad           = cellHeight * 0.1f;
+    HRESULT                  hr          = S_OK;
+    const float              haloMaxDark = 0.85f;
+    const float              maxOpacity  = haloMaxDark * opacityScale;
+    const float              hPad        = padding * 0.4f;
+    const float              vPad        = cellHeight * 0.1f;
+    const float              cornerRad   = cellHeight * 0.5f;
+    const float              maxExpand   = 35.0f;
+    D3D11_MAPPED_SUBRESOURCE mapped      = {};
 
 
 
-    // Compute per-row bounding rects from actual character positions
-    for (int row = 0; row < numRows; ++row)
+    BAIL_OUT_IF (!m_haloPS || !m_haloConstantBuffer, S_OK);
+    BAIL_OUT_IF (maxOpacity <= 0.01f, S_OK);
+
+    ComputeRowRects (chars, xPositions, advanceScale, baseY, cellHeight, numRows, hPad, vPad);
+    BAIL_OUT_IF (m_haloRowRects.empty(), S_OK);
+
+    // Upload row rects and control params to constant buffer
+    hr = m_context->Map (m_haloConstantBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
+    CHRA (hr);
+
     {
-        float rowLeft  =  1e9f;
-        float rowRight = -1e9f;
-        bool  hasChars = false;
+        float * cb       = static_cast<float *> (mapped.pData);
+        int     rowCount = std::min (static_cast<int> (m_haloRowRects.size()), MAX_HALO_ROWS);
 
+        memset (cb, 0, (MAX_HALO_ROWS + 1) * 16);
 
-        for (size_t i = 0; i < chars.size(); ++i)
+        for (int i = 0; i < rowCount; i++)
         {
-            if (chars[i].row == row && !chars[i].isSpace && chars[i].opacity > OVERLAY_MIN_OPACITY)
-            {
-                float charRight = xPositions[i] + charSet.GetGlyph (chars[i].targetGlyphIndex).advanceWidth * advanceScale;
-
-                rowLeft  = std::min (rowLeft, xPositions[i]);
-                rowRight = std::max (rowRight, charRight);
-                hasChars = true;
-            }
+            cb[i * 4 + 0] = m_haloRowRects[i].left;
+            cb[i * 4 + 1] = m_haloRowRects[i].top;
+            cb[i * 4 + 2] = m_haloRowRects[i].right;
+            cb[i * 4 + 3] = m_haloRowRects[i].bottom;
         }
 
-        if (!hasChars)
-        {
-            continue;
-        }
-
-        float rowTop    = baseY + static_cast<float> (row) * cellHeight - vPad;
-        float rowBottom = rowTop + cellHeight + 2.0f * vPad;
-
-        D2D1_RECT_F rowRect = D2D1::RectF (rowLeft  - hPad,
-                                           rowTop,
-                                           rowRight + hPad,
-                                           rowBottom);
-
-        // Feathered expanding layers — drawn inside-out with uniform per-layer
-        // opacity so that the center (covered by all layers) accumulates to
-        // exactly maxOpacity via alpha compositing: 1-(1-a)^N = maxOpacity.
-        float layerCount   = static_cast<float> (featherLayers + 1);
-        float layerOpacity = 1.0f - powf (1.0f - maxOpacity, 1.0f / layerCount);
-
-        for (int i = featherLayers; i >= 0; --i)
-        {
-            float t      = static_cast<float> (i) / static_cast<float> (featherLayers);
-            float expand = maxExpand * t;
-
-            D2D1_ROUNDED_RECT rRect = D2D1::RoundedRect (
-                D2D1::RectF (rowRect.left   - expand,
-                             rowRect.top    - expand,
-                             rowRect.right  + expand,
-                             rowRect.bottom + expand),
-                cornerRadius + expand,
-                cornerRadius + expand);
-
-            m_fpsGlowBrush->SetColor (D2D1::ColorF (D2D1::ColorF::Black, layerOpacity));
-            m_d2dContext->FillRoundedRectangle (rRect, m_fpsGlowBrush.Get());
-        }
+        // Control params at offset MAX_HALO_ROWS * 4 floats
+        cb[MAX_HALO_ROWS * 4 + 0] = cornerRad;
+        cb[MAX_HALO_ROWS * 4 + 1] = maxExpand;
+        cb[MAX_HALO_ROWS * 4 + 2] = maxOpacity;
+        memcpy (&cb[MAX_HALO_ROWS * 4 + 3], &rowCount, sizeof (int));
     }
+
+    m_context->Unmap (m_haloConstantBuffer.Get(), 0);
+
+    // Set up fullscreen pass
+    SetRenderPipelineState (m_fullscreenQuadInputLayout.Get(),
+                            D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST,
+                            m_fullscreenQuadVB.Get(),
+                            sizeof (float) * 5,
+                            m_fullscreenQuadVS.Get(),
+                            nullptr,
+                            nullptr);
+
+    {
+        float blendFactor[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
+
+        m_context->OMSetBlendState (m_blendState.Get(), blendFactor, 0xffffffff);
+    }
+
+    {
+        D3D11_VIEWPORT vp = {};
+
+        vp.Width    = static_cast<float> (m_renderWidth);
+        vp.Height   = static_cast<float> (m_renderHeight);
+        vp.MinDepth = 0.0f;
+        vp.MaxDepth = 1.0f;
+
+        m_context->RSSetViewports (1, &vp);
+    }
+
+    m_context->OMSetRenderTargets (1, m_sceneRTV.GetAddressOf(), nullptr);
+    m_context->PSSetConstantBuffers (0, 1, m_haloConstantBuffer.GetAddressOf());
+    m_context->PSSetShader (m_haloPS.Get(), nullptr, 0);
+    m_context->Draw (6, 0);
+
+    {
+        ID3D11Buffer * nullCB = nullptr;
+
+        m_context->PSSetConstantBuffers (0, 1, &nullCB);
+    }
+
+Error:
+    return;
 }
 
 
@@ -1912,17 +2014,13 @@ void RenderSystem::DrawFeatheredBackground (std::span<const HintCharacter> chars
 //
 //  RenderSystem::BuildOverlayInstances
 //
-//  Builds GPU instance data for overlay characters.  For each visible
-//  character, creates N shadow instances (dark glow) plus one foreground
-//  instance.  Character x-positions are provided via a pre-computed
-//  array of proportional offsets (one per character in the span).
+//  Builds GPU instance data for overlay characters.  One foreground
+//  instance per visible character — bloom provides the glow.
 //
 ////////////////////////////////////////////////////////////////////////////////
 
 void RenderSystem::BuildOverlayInstances (std::span<const HintCharacter> chars,
-                                          int                            glowLayers,
                                           float                          charScale,
-                                          float                          glowOffset,
                                           float                          baseY,
                                           float                          cellHeight,
                                           std::span<const float>         xPositions,
@@ -1931,9 +2029,6 @@ void RenderSystem::BuildOverlayInstances (std::span<const HintCharacter> chars,
     CharacterSet           & charSet    = CharacterSet::GetInstance();
     float                    posX       = 0.0f;
     float                    posY       = 0.0f;
-    float                    offset     = 0.0f;
-    float                    baseAlpha  = 0.0f;
-    float                    alpha      = 0.0f;
     float                    widthRatio = 1.0f;
     float                    uvWidth    = 0.0f;
     CharacterInstanceData    inst;
@@ -1970,50 +2065,7 @@ void RenderSystem::BuildOverlayInstances (std::span<const HintCharacter> chars,
         posX = xPositions[i];
         posY = roundf (baseY + static_cast<float> (ch.row) * cellHeight);
 
-        // Shadow/glow instances (outermost layer first for correct blending)
-        for (int layer = glowLayers; layer > 0; --layer)
-        {
-            offset    = static_cast<float> (layer) * glowOffset;
-            baseAlpha = OVERLAY_MAX_GLOW_ALPHA - (static_cast<float> (layer) / static_cast<float> (glowLayers));
-
-            if (baseAlpha <= 0.0f)
-            {
-                continue;
-            }
-
-            alpha = baseAlpha * ch.opacity;
-
-            for (int dy = -1; dy <= 1; ++dy)
-            {
-                for (int dx = -1; dx <= 1; ++dx)
-                {
-                    if (dx == 0 && dy == 0)
-                    {
-                        continue;
-                    }
-
-                    inst             = {};
-                    inst.position[0] = posX + offset * static_cast<float> (dx);
-                    inst.position[1] = posY + offset * static_cast<float> (dy);
-                    inst.position[2] = 0.0f;
-                    inst.uvMin[0]    = uvMinX;
-                    inst.uvMin[1]    = overlayUV.uvMin.y;
-                    inst.uvMax[0]    = uvMaxX;
-                    inst.uvMax[1]    = overlayUV.uvMax.y;
-                    inst.color[0]    = 0.0f;
-                    inst.color[1]    = 0.0f;
-                    inst.color[2]    = 0.0f;
-                    inst.color[3]    = 1.0f;
-                    inst.brightness  = alpha;
-                    inst.scaleX      = widthRatio;
-                    inst.scaleY      = charScale;
-
-                    m_overlayInstanceData.push_back (inst);
-                }
-            }
-        }
-
-        // Foreground instance
+        // Foreground instance only — bloom provides the glow
         inst             = {};
         inst.position[0] = posX;
         inst.position[1] = posY;
@@ -2116,8 +2168,8 @@ void RenderSystem::RenderOverlayInstances ()
 
     m_context->Unmap (m_constantBuffer.Get(), 0);
 
-    // Set render target to backbuffer
-    m_context->OMSetRenderTargets (1, m_renderTargetView.GetAddressOf(), nullptr);
+    // Set render target to scene texture (before bloom)
+    m_context->OMSetRenderTargets (1, m_sceneRTV.GetAddressOf(), nullptr);
 
     // Set viewport
     {
@@ -2372,8 +2424,9 @@ void RenderSystem::ComputeOverlayLayout (
 //  RenderSystem::RenderTwoColumnOverlay
 //
 //  Shared rendering logic for two-column overlay layouts (help hint and
-//  hotkey overlays).  Computes layout positioning, draws a D2D feathered
-//  background, and renders characters via GPU instancing.
+//  hotkey overlays).  Computes layout positioning, draws a D3D halo
+//  background, and renders characters via GPU instancing to the scene
+//  texture before bloom.
 //
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -2384,47 +2437,38 @@ void RenderSystem::RenderTwoColumnOverlay (
     int                            gapChars,
     int                            numRows,
     float                          cellHeight,
-    float                          padding,
-    int                            glowLayers)
+    float                          padding)
 {
-    HRESULT            hr           = S_OK;
-    bool               drawing      = false;
-    float              meanOpacity  = 0.0f;
+    HRESULT            hr              = S_OK;
+    float              maxCharOpacity = 0.0f;
     std::vector<float> xPositions;
-    D2D1_RECT_F        bounds       = {};
-    float              baseY        = 0.0f;
-    float              advanceScale = 0.0f;
+    D2D1_RECT_F        bounds         = {};
+    float              baseY          = 0.0f;
+    float              advanceScale   = 0.0f;
 
 
 
-    CBRAEx (m_d2dContext && m_fpsBrush && m_fpsGlowBrush, E_UNEXPECTED);
+    CBRAEx (m_sceneRTV && m_haloPS, E_UNEXPECTED);
     BAIL_OUT_IF (chars.empty(), S_OK);
 
-    meanOpacity = ComputeMaxCharOpacity (chars);
+    maxCharOpacity = ComputeMaxCharOpacity (chars);
 
     ComputeOverlayLayout (chars, marginCols, keyColChars, gapChars,
                           numRows, cellHeight, padding,
                           xPositions, bounds, baseY, advanceScale);
 
-    // D2D: per-row feathered background halos
-    m_d2dContext->BeginDraw();
-    drawing = true;
+    // D3D: per-row feathered background halos (single fullscreen shader pass)
     DrawFeatheredBackground (chars, std::span<const float> (xPositions), advanceScale,
-                             baseY, cellHeight, numRows, padding, meanOpacity);
-    m_d2dContext->EndDraw();
-    drawing = false;
+                             baseY, cellHeight, numRows, padding, maxCharOpacity);
 
     // GPU: overlay characters
-    BuildOverlayInstances (chars, glowLayers,
-                           OVERLAY_CHAR_SCALE, OVERLAY_GLOW_OFFSET, baseY, cellHeight,
+    BuildOverlayInstances (chars,
+                           OVERLAY_CHAR_SCALE, baseY, cellHeight,
                            std::span<const float> (xPositions), advanceScale);
     RenderOverlayInstances();
 
 Error:
-    if (drawing)
-    {
-        m_d2dContext->EndDraw();
-    }
+    return;
 }
 
 
@@ -2525,13 +2569,11 @@ void RenderSystem::RenderDebugFadeTimes (const AnimationSystem& animationSystem)
             );
 
             // Draw text in white
-            m_d2dContext->DrawText (
-                fadeText,
-                static_cast<UINT32> (wcslen (fadeText)),
-                m_fpsTextFormat.Get(),
-                textRect,
-            m_fpsBrush.Get()
-        );
+            m_d2dContext->DrawText (fadeText,
+                                    static_cast<UINT32> (wcslen (fadeText)),
+                                    m_fpsTextFormat.Get(),
+                                    textRect,
+                                    m_fpsBrush.Get());
         }
     }
 
@@ -2556,6 +2598,9 @@ void RenderSystem::Resize (UINT width, UINT height)
 
     m_renderWidth  = width;
     m_renderHeight = height;
+
+    // Invalidate cached overlay rects (they use absolute pixel coordinates)
+    m_haloRowRectsKey = nullptr;
 
     if (!m_swapChain)
     {
@@ -2682,9 +2727,10 @@ void RenderSystem::ReleaseDirectXResources()
     m_blurHorizontalPS.Reset();
     m_blurVerticalPS.Reset();
     m_compositePS.Reset();
+    m_haloPS.Reset();
+    m_haloConstantBuffer.Reset();
     m_bloomConstantBuffer.Reset();
     m_atlasTextureSRV.Reset();
-    m_pointSamplerState.Reset();
     m_samplerState.Reset();
     m_premultipliedBlendState.Reset();
     m_blendState.Reset();

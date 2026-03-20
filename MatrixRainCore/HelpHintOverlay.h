@@ -143,7 +143,7 @@ private:
 
 
     // Scramble-reveal effect (handles all timing / phase transitions)
-    ScrambleRevealEffect                 m_scramble { 2.5f, 1.0f, 0.10f, 1.0f, 2.7f };
+    ScrambleRevealEffect                 m_scramble { 2.5f, 1.0f, 0.25f, 1.0f, 2.7f };
 
     // Character grid
     std::vector<HintCharacter>       m_chars;
