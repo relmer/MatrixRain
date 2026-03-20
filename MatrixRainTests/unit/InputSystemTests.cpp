@@ -19,14 +19,14 @@ namespace MatrixRainTests
         TEST_METHOD (TestInputSystemProcessesVK_ADD)
         {
             // T097: Test InputSystem keyboard event processing for VK_ADD
-            // Given: InputSystem is initialized with DensityController at 80%
+            // Given: InputSystem is initialized with DensityController at 50%
             // When: ProcessKeyDown(VK_ADD) is called
-            // Then: DensityController percentage should increase by 5% to 85%
+            // Then: DensityController percentage should increase by 5% to 55%
 
             Viewport viewport;
-            viewport.Resize (1920.0f, 1080.0f); // Max = 320 streaks
+            viewport.Resize (1920.0f, 1080.0f); // Max = 192 streaks
 
-            DensityController densityController (viewport, 24.0f); // 80%
+            DensityController densityController (viewport, 24.0f); // 50%
             InMemorySettingsProvider settingsProvider;
             ApplicationState appState (settingsProvider);
             appState.Initialize (nullptr);
@@ -34,17 +34,17 @@ namespace MatrixRainTests
             InputSystem inputSystem;
             inputSystem.Initialize (densityController, appState);
 
-            // Verify initial state (80% of 320 = 256 streaks)
-            Assert::AreEqual (80, densityController.GetPercentage (), L"Initial percentage should be 80");
-            Assert::AreEqual (256, densityController.GetTargetStreakCount (), L"Initial should be 256 streaks at 80%");
+            // Verify initial state (50% of 192 = 96 streaks)
+            Assert::AreEqual (50, densityController.GetPercentage (), L"Initial percentage should be 50");
+            Assert::AreEqual (96, densityController.GetTargetStreakCount (), L"Initial should be 96 streaks at 50%");
 
             // Process VK_ADD
             bool handled = inputSystem.ProcessKeyDown (VK_ADD);
 
-            // Verify percentage increased (85% of 320 = 272 streaks)
+            // Verify percentage increased (55% of 192 = 105 streaks)
             Assert::IsTrue (handled, L"VK_ADD should be recognized");
-            Assert::AreEqual (85, densityController.GetPercentage (), L"VK_ADD should increase to 85%");
-            Assert::AreEqual (272, densityController.GetTargetStreakCount (), L"Should be 272 streaks at 85%");
+            Assert::AreEqual (55, densityController.GetPercentage (), L"VK_ADD should increase to 55%");
+            Assert::AreEqual (105, densityController.GetTargetStreakCount (), L"Should be 105 streaks at 55%");
         }
 
 
@@ -54,14 +54,14 @@ namespace MatrixRainTests
         TEST_METHOD (TestInputSystemProcessesVK_SUBTRACT)
         {
             // T098: Test InputSystem keyboard event processing for VK_SUBTRACT
-            // Given: InputSystem is initialized with DensityController at 80%
+            // Given: InputSystem is initialized with DensityController at 50%
             // When: ProcessKeyDown(VK_SUBTRACT) is called
-            // Then: DensityController percentage should decrease by 5% to 75%
+            // Then: DensityController percentage should decrease by 5% to 45%
 
             Viewport viewport;
-            viewport.Resize (1920.0f, 1080.0f); // Max = 320 streaks
+            viewport.Resize (1920.0f, 1080.0f); // Max = 192 streaks
 
-            DensityController densityController (viewport, 24.0f); // 80%
+            DensityController densityController (viewport, 24.0f); // 50%
             InMemorySettingsProvider settingsProvider;
             ApplicationState appState (settingsProvider);
             appState.Initialize (nullptr);
@@ -69,17 +69,17 @@ namespace MatrixRainTests
             InputSystem inputSystem;
             inputSystem.Initialize (densityController, appState);
 
-            // Verify initial state (80% of 320 = 256 streaks)
-            Assert::AreEqual (80, densityController.GetPercentage (), L"Initial percentage should be 80");
-            Assert::AreEqual (256, densityController.GetTargetStreakCount (), L"Initial should be 256 streaks at 80%");
+            // Verify initial state (50% of 192 = 96 streaks)
+            Assert::AreEqual (50, densityController.GetPercentage (), L"Initial percentage should be 50");
+            Assert::AreEqual (96, densityController.GetTargetStreakCount (), L"Initial should be 96 streaks at 50%");
 
             // Process VK_SUBTRACT
             bool handled = inputSystem.ProcessKeyDown (VK_SUBTRACT);
 
-            // Verify percentage decreased (75% of 320 = 240 streaks)
+            // Verify percentage decreased (45% of 192 = 86 streaks)
             Assert::IsTrue (handled, L"VK_SUBTRACT should be recognized");
-            Assert::AreEqual (75, densityController.GetPercentage (), L"VK_SUBTRACT should decrease to 75%");
-            Assert::AreEqual (240, densityController.GetTargetStreakCount (), L"Should be 240 streaks at 75%");
+            Assert::AreEqual (45, densityController.GetPercentage (), L"VK_SUBTRACT should decrease to 45%");
+            Assert::AreEqual (86, densityController.GetTargetStreakCount (), L"Should be 86 streaks at 45%");
         }
 
 
@@ -89,9 +89,9 @@ namespace MatrixRainTests
         TEST_METHOD (TestInputSystemProcessesVK_OEM_PLUS)
         {
             // T099: Test InputSystem keyboard event processing for VK_OEM_PLUS
-            // Given: InputSystem is initialized with DensityController at 80%
+            // Given: InputSystem is initialized with DensityController at 50%
             // When: ProcessKeyDown(VK_OEM_PLUS) is called (regular '=' key, shift for '+')
-            // Then: DensityController percentage should increase by 5% to 85%
+            // Then: DensityController percentage should increase by 5% to 55%
 
             Viewport viewport;
             viewport.Resize (1920.0f, 1080.0f);
@@ -109,7 +109,7 @@ namespace MatrixRainTests
 
             // Verify percentage increased
             Assert::IsTrue (handled, L"VK_OEM_PLUS should be recognized");
-            Assert::AreEqual (85, densityController.GetPercentage (), L"VK_OEM_PLUS should increase to 85%");
+            Assert::AreEqual (55, densityController.GetPercentage (), L"VK_OEM_PLUS should increase to 55%");
         }
 
 
@@ -119,9 +119,9 @@ namespace MatrixRainTests
         TEST_METHOD (TestInputSystemProcessesVK_OEM_MINUS)
         {
             // T100: Test InputSystem keyboard event processing for VK_OEM_MINUS
-            // Given: InputSystem is initialized with DensityController at 80%
+            // Given: InputSystem is initialized with DensityController at 50%
             // When: ProcessKeyDown(VK_OEM_MINUS) is called
-            // Then: DensityController percentage should decrease by 5% to 75%
+            // Then: DensityController percentage should decrease by 5% to 45%
 
             Viewport viewport;
             viewport.Resize (1920.0f, 1080.0f);
@@ -139,7 +139,7 @@ namespace MatrixRainTests
 
             // Verify percentage decreased
             Assert::IsTrue (handled, L"VK_OEM_MINUS should be recognized");
-            Assert::AreEqual (75, densityController.GetPercentage (), L"VK_OEM_MINUS should decrease to 75%");
+            Assert::AreEqual (45, densityController.GetPercentage (), L"VK_OEM_MINUS should decrease to 45%");
         }
 
 

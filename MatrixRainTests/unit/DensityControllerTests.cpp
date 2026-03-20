@@ -15,18 +15,18 @@ namespace MatrixRainTests
 
 		TEST_METHOD (TestDensityControllerInitializationWithDefaultPercentage)
 		{
-			// Test DensityController initialization with 80% default
-			// For a 1920px viewport: max = 1920 / 24 * 4 = 320 streaks
-			// At 80%: target = 320 * 0.80 = 256 streaks
+			// Test DensityController initialization with 50% default
+			// For a 1920px viewport: max = 1920 / 24 * 2.4 = 192 streaks
+			// At 50%: target = 192 * 0.50 = 96 streaks
 
 			Viewport viewport;
 			viewport.Resize (1920.0f, 1080.0f);
 
 			DensityController controller(viewport, 24.0f);
 
-			Assert::AreEqual (80, controller.GetPercentage(), L"Default percentage should be 80");
-			Assert::AreEqual (320, controller.GetMaxPossibleStreaks(), L"Max possible streaks for 1920px should be 320");
-			Assert::AreEqual (256, controller.GetTargetStreakCount(), L"Target streak count at 80% should be 256");
+			Assert::AreEqual (50, controller.GetPercentage(), L"Default percentage should be 50");
+			Assert::AreEqual (192, controller.GetMaxPossibleStreaks(), L"Max possible streaks for 1920px should be 192");
+			Assert::AreEqual (96, controller.GetTargetStreakCount(), L"Target streak count at 50% should be 96");
 		}
 
 
@@ -36,28 +36,28 @@ namespace MatrixRainTests
 		TEST_METHOD (TestDensityControllerIncreasesToMax100Percent)
 		{
 			// Test DensityController percentage increase to max 100%
-			// Step size is 5%, so 80% → 85% → 90% → 95% → 100%
+			// Step size is 5%, so 50% → 55% → ... → 100%
 
 			Viewport viewport;
 			viewport.Resize (1920.0f, 1080.0f);
 
 			DensityController controller(viewport, 24.0f);
 
-			// Increase from 80% to 100% (4 steps of 5%)
-			controller.IncreaseLevel(); // 85%
-			controller.IncreaseLevel(); // 90%
-			controller.IncreaseLevel(); // 95%
-			controller.IncreaseLevel(); // 100%
+			// Increase from 50% to 100% (10 steps of 5%)
+			for (int i = 0; i < 10; ++i)
+			{
+				controller.IncreaseLevel();
+			}
 
 			Assert::AreEqual (100, controller.GetPercentage(), L"Percentage should be at max 100");
-			Assert::AreEqual (320, controller.GetTargetStreakCount(), L"Target at 100% should equal max possible (320)");
+			Assert::AreEqual (192, controller.GetTargetStreakCount(), L"Target at 100% should equal max possible (192)");
 
 			// Try to increase beyond max
 			controller.IncreaseLevel();
 			controller.IncreaseLevel();
 
 			Assert::AreEqual (100, controller.GetPercentage(), L"Percentage should remain at max 100");
-			Assert::AreEqual (320, controller.GetTargetStreakCount(), L"Target should remain at max (320)");
+			Assert::AreEqual (192, controller.GetTargetStreakCount(), L"Target should remain at max (192)");
 		}
 
 
@@ -74,8 +74,8 @@ namespace MatrixRainTests
 
     		DensityController controller(viewport, 24.0f);
 
-    		// Decrease from 80% to 0% (16 steps of 5%)
-    		for (int i = 0; i < 16; ++i)
+    	// Decrease from 50% to 0% (10 steps of 5%)
+    	for (int i = 0; i < 10; ++i)
     		{
 				controller.DecreaseLevel();
     		}
@@ -105,7 +105,7 @@ namespace MatrixRainTests
 
     		DensityController controller(viewport, 24.0f);
 
-    		int target = controller.GetTargetStreakCount(); // 256 for 80% at 1920px
+int target = controller.GetTargetStreakCount(); // 96 for 50% at 1920px
 
     		// Below target: should spawn
     		Assert::IsTrue (controller.ShouldSpawnStreak (0), L"Should spawn when count is 0");
@@ -139,7 +139,7 @@ namespace MatrixRainTests
 			}
 
 			Assert::AreEqual (100, controller.GetPercentage(), L"Percentage should be clamped at max 100");
-			Assert::AreEqual (320, controller.GetTargetStreakCount(), L"Target count should match 100% of max");
+Assert::AreEqual (192, controller.GetTargetStreakCount(), L"Target count should match 100% of max");
 
     		// Test min bound enforcement
     		for (int i = 0; i < 30; ++i) // Try to go way beyond min
@@ -164,24 +164,24 @@ namespace MatrixRainTests
 			smallViewport.Resize (640.0f, 480.0f);
 			DensityController smallController(smallViewport, 24.0f);
 
-			// Max = 640 / 24 * 4 = 106 streaks (truncated from 106.667)
-			Assert::AreEqual (106, smallController.GetMaxPossibleStreaks(), L"Max for 640px should be 106");
+			// Max = 640 / 24 * 2.4 = 64 streaks
+			Assert::AreEqual (64, smallController.GetMaxPossibleStreaks(), L"Max for 640px should be 64");
 
 			// Medium viewport: 1920px
 			Viewport mediumViewport;
 			mediumViewport.Resize (1920.0f, 1080.0f);
 			DensityController mediumController(mediumViewport, 24.0f);
 
-			// Max = 1920 / 24 * 4 = 320 streaks
-			Assert::AreEqual (320, mediumController.GetMaxPossibleStreaks(), L"Max for 1920px should be 320");
+			// Max = 1920 / 24 * 2.4 = 192 streaks
+			Assert::AreEqual (192, mediumController.GetMaxPossibleStreaks(), L"Max for 1920px should be 192");
 
 			// Large viewport: 3840px (4K)
 			Viewport largeViewport;
 			largeViewport.Resize (3840.0f, 2160.0f);
 			DensityController largeController(largeViewport, 24.0f);
 
-			// Max = 3840 / 24 * 4 = 640 streaks
-			Assert::AreEqual (640, largeController.GetMaxPossibleStreaks(), L"Max for 3840px should be 640");
+			// Max = 3840 / 24 * 2.4 = 384 streaks
+			Assert::AreEqual (384, largeController.GetMaxPossibleStreaks(), L"Max for 3840px should be 384");
 		}
     };
 }  // namespace MatrixRainTests
