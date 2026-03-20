@@ -38,18 +38,45 @@
 - **Random glyph assignment**: Each character is assigned one random glyph index on first reveal (deterministic from position). Characters in the cycling phase display this fixed random glyph.
 - **CharPhase**: Maps from `CellPhase` — Hidden, Cycling, LockFlash, Settled, Dismissing. The scramble-reveal timing oracle manages all per-cell state.
 - **Color sequence**: Driven by `ComputeScrambleColor` based on `CellPhase` and the active rain color scheme (including color cycling mode):
-  - Cycling: 50% scheme color intensity
+  - Cycling: 70% scheme color intensity
   - LockFlash: white decaying to full scheme color over flash duration
   - Settled pre-pulse: full scheme color
   - Pulse ramp up (0.33s): scheme color → white (quadratic ease-in)
   - Pulse hold (0.75s): white (1, 1, 1)
   - Pulse ramp down (0.5s): white → grey (0.75, 0.75, 0.75) (quadratic ease-out)
-  - Dismissing: 50% scheme color intensity
+  - Dismissing: 70% scheme color intensity
 - **Known visual tuning areas (in progress)**:
   - Reveal speed and per-cell timing distribution
   - Flash duration (yellow lock flash)
   - Dismiss timing relative to fade-out opacity
-  - Cycle interval (how fast random glyphs change during cycling phase)
+
+### Session 2026-03-07 through 2026-03-18 — Rendering & Input Overhaul
+
+- **DPI awareness**: Added per-monitor DPI awareness (`WM_DPICHANGED`). Overlay atlas recreated at current DPI scale for 1:1 texel-to-pixel mapping. Character scale in constant buffer adjusted by `m_dpiScale`. Reference viewport height (1080) is DPI-adjusted.
+- **Bloom/glow system**: Added multi-pass Gaussian blur (3 passes of 13-tap horizontal + vertical). Bloom extract shader uses `smoothstep(0.1, 0.6, brightness)` with max-component metric. Composite shader uses exponential soft-saturation `1 - exp(-bloom * intensity)` to prevent dense areas from clipping. Glow size slider wired to blur shader `glowSize` uniform.
+- **Proportional font rendering**: Overlay text switched from monospace grid to proportional positioning. Two-column layout with right-aligned key column and left-aligned description column. Per-character x-positions computed via `advanceWidth` from DirectWrite glyph metrics. `CalculateColumnAlignedTextPositions` handles margin, key, gap, and description columns.
+- **Overlay background**: Opaque overlay background replaced with feathered semi-transparent per-row halos (D2D `FillRoundedRectangle` with layered opacity, later replaced by D3D11 SDF shader in session 2026-03-19).
+- **Input system refactoring**: `Application::OnKeyDown` converted from if/else chain to switch statement. Key processing delegation to `InputSystem::ProcessKeyDown` for C, S, Space, +/- keys. `IsAltEnterPressed` removed; `OnSysKeyDown` checks `wParam == VK_RETURN` directly. Modifier key filter (Shift, Ctrl, Alt, Win) prevents spurious help hint display.
+- **Overlay mutual exclusivity**: Help hint and hotkey overlays are mutually exclusive — showing one dismisses the other. Auto-dismiss timers: help hint 2.7s hold, hotkey overlay 5.4s hold.
+- **Overlay behavior**: Pressing `?` during dissolve restarts the overlay via `Show()`. Any non-modifier key dismisses the active overlay. Overlays are not created in screensaver modes (pointers left null).
+- **UsageDialog GPU pipeline**: Custom D2D rain in UsageDialog replaced with full `RenderSystem`/`AnimationSystem` GPU render pipeline. Dialog has its own D3D11 device, swap chain, and bloom post-processing.
+- **ScrambleRevealEffect refactoring**: Constructor-based initialization with const config members (`revealDuration`, `dismissDuration`, `cycleInterval`, `flashDuration`, `holdDuration`). `SetCellCount` separate from construction. `Update` factored into `UpdateRevealing`, `UpdateHolding`, `UpdateDismissing`. `AdvanceCycleTimer` and `FadeOpacity` helper methods extracted.
+
+### Session 2026-03-19 — Rendering Pipeline & Density Overhaul
+
+- Overlay rendering moved to scene texture before bloom — bloom post-processing provides the glow effect for free, eliminating N per-character glow layer instances.
+- D2D feathered rounded-rect background replaced with a D3D11 fullscreen SDF pixel shader (signed distance field to per-row rounded rects with quadratic falloff). Single draw call, zero FPS impact.
+- Halo row rects cached per overlay (invalidated on resize / DPI change).
+- `Render()` 12-parameter signature replaced with `RenderParams` struct using C++20 designated initializers.
+- Dead `pOcclusionRect` parameter removed from `Render()` and `UpdateInstanceBuffer()` — rain occlusion was never used.
+- Dead `m_pointSamplerState` removed (linear sampler produces identical results at 1:1 texel-to-pixel).
+- Scramble cycle timers staggered per-cell with random initial offset in `[0, cycleInterval)` to prevent synchronized glyph changes.
+- Cycle interval tuned from 0.10s to 0.25s for overlays.
+- Cycling/dismissing character brightness increased from 50% to 70% scheme color.
+- Default rain density reduced from 80% to 50%; streak multiplier from 4.0x to 2.4x (new 50% = old 30%).
+- `ScreenSaverSettings::DEFAULT_DENSITY_PERCENT` aligned to 50 (config dialog Reset button).
+- Config dialog cancel bug fixed: `OnCancel()` now clears `m_hConfigDialog` before `DestroyWindow()` so Enter and Escape resume working.
+- `CharacterInstanceData` and `ConstantBufferData` moved from public to private in `RenderSystem`.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -59,7 +86,7 @@ A user launches MatrixRain in normal mode (no screensaver arguments) and sees a 
 
 **Why this priority**: Provides visual discoverability for first-time users. Deferred behind CLI help (US3) because the overlay involves more unknowns (D2D rendering, per-character animation, rain occlusion) while the CLI path is self-contained and lower-risk.
 
-**Independent Test**: Launch `MatrixRain.exe` with no arguments and observe that a centered help hint appears with the matrix reveal effect, displays three key bindings in two left-aligned columns, holds briefly, then dissolves with staggered per-character rain cycling and fade-out. Rain streaks should visibly pass behind the message area.
+**Independent Test**: Launch `MatrixRain.exe` with no arguments and observe that a centered help hint appears with the matrix reveal effect, displays three key bindings in two left-aligned columns, holds briefly, then dissolves with staggered per-character rain cycling and fade-out. Per-row halo backgrounds should darken behind each text line for readability.
 
 **Acceptance Scenarios**:
 
@@ -75,9 +102,9 @@ A user launches MatrixRain in normal mode (no screensaver arguments) and sees a 
 
 3. **Given** the help hint is fully revealed and the hold time has elapsed, **When** the dismiss phase begins, **Then** characters transition back to cycling random glyphs and fade out with per-cell staggered timing. Each row has staggered timing so the message dissolves organically rather than disappearing all at once. Characters that have been dismissed fully fade to transparent.
 
-4. **Given** the help hint is visible on screen, **When** rain streaks fall through the area occupied by the message, **Then** the streaks pass behind the message's bounding area and are not visible within it. The message area has a feathered border (soft gradient at the edges) that blends smoothly with the surrounding rain, similar to the glow effect used by the performance counter overlay.
+4. **Given** the help hint is visible on screen, **When** rain streaks fall through the area occupied by the message, **Then** the per-row rounded-rect halos (rendered via D3D11 SDF pixel shader) darken the background behind each text line, maintaining readability. The halo opacity scales with character opacity so it fades in and out with the text. Rain streaks continue to render normally — they are not occluded.
 
-5. **Given** the help hint has fully dissolved, **When** all characters have faded to transparent, **Then** rain streaks in the formerly occluded area become visible again and the animation continues unobstructed.
+5. **Given** the help hint has fully dissolved, **When** all characters have faded to transparent, **Then** the halo background also fades to fully transparent and the animation area appears unobstructed.
 
 6. **Given** MatrixRain is launched with any screensaver argument (`/s`, `/p`, `/c`, `/c:<HWND>`, `/a`), **When** the application starts, **Then** no help hint is displayed.
 
@@ -179,7 +206,7 @@ A user presses `?` during normal mode to see a hotkey reference rendered directl
 
 - If the console is not attached (double-click launch), `/?` help text must still be visible to the user — the usage dialog works identically regardless of launch context.
 - The matrix reveal effect must work correctly regardless of screen resolution or DPI scaling.
-- Rain streaks must pass behind the message area during all phases (reveal, hold, dissolve). The occlusion region disappears only after the last character has fully dissolved.
+- Rain continues to render normally behind overlay text during all phases. Per-row rounded-rect halos provide a darkened background for readability — they are driven by the D3D11 SDF halo shader and fade in/out with character opacity.
 - During the dissolve phase, partially-dissolved characters (still cycling through rain glyphs but fading) must remain legible against the feathered background until their opacity drops below a visible threshold.
 - Rapidly pressing unrecognized keys should not stack multiple help hint instances — only one hint is active at a time, resetting on each trigger.
 - The help hint bounding area must have a feathered border that blends seamlessly with the surrounding rain — no hard rectangular edges.
@@ -204,8 +231,8 @@ A user presses `?` during normal mode to see a hotkey reference rendered directl
 - **FR-008**: Pressing Enter in Normal mode MUST open the configuration dialog as a live modeless overlay, with the same behavior as launching with `/c`.
 - **FR-009**: Pressing `?` (Shift+/) in Normal mode MUST display a hotkey reference overlay rendered directly on the main window, listing all runtime hotkeys with brief descriptions. This is an in-app overlay — NOT a separate dialog window.
 - **FR-010**: Only one help hint instance may be active at a time. Triggering the hint while it is in the reveal or hold phase MUST restart the animation from the beginning. Triggering while in the dismiss phase MUST restart a fresh reveal.
-- **FR-011**: The help hint bounding area MUST have per-row rounded-rect halos with feathered edges that blend smoothly into the surrounding rain. The halo opacity is driven by the maximum character opacity across all non-space characters, with a tunable peak darkness (`haloMaxDark`). Each row gets an independent halo sized to its text content. Alpha compositing across feather layers is computed so the accumulated center opacity matches `haloMaxDark` exactly.
-- **FR-012**: Rain streaks MUST pass behind the help hint's bounding area while the message is visible. Streaks entering the message area are occluded and not rendered within it. When the message fully dissolves, occluded streak characters become visible again.
+- **FR-011**: The help hint bounding area MUST have per-row rounded-rect halos rendered via a D3D11 fullscreen SDF pixel shader (signed distance to rounded rects with quadratic falloff). Single draw call per overlay. Halo opacity is driven by the maximum character opacity across all non-space characters, with a tunable peak darkness (`haloMaxDark = 0.85`). Each row gets an independent halo sized to its text content. Halo row rects are cached per overlay and invalidated on resize or DPI change.
+- **FR-012**: Overlays render to the scene texture before bloom post-processing. Rain streaks render first, then halo backgrounds, then overlay text — all to the same scene texture. Bloom then extracts and composites, providing a natural glow on the overlay text for free. Rain is NOT occluded — it renders under the halo darkening.
 - **FR-013**: The help hint MUST remain centered after window resize or display mode transitions.
 - **FR-014**: Recognized hotkeys MUST continue to function normally regardless of whether the help hint is visible. Any non-modifier keypress (excluding Shift, Ctrl, Alt, and Win keys) MUST dismiss both the help hint and hotkey overlays. Standalone modifier keys MUST be ignored entirely — they do not dismiss overlays or trigger the help hint. The help hint and hotkey overlay are mutually exclusive — only one may be active at a time.
 - **FR-015**: When `/?` or `-?` is invoked, the usage text MUST be displayed in a custom graphical dialog (`UsageDialog`) — a standalone window with its own rendering context, black background, proportional font (Segoe UI), and scramble-reveal animation:
@@ -218,7 +245,7 @@ A user presses `?` during normal mode to see a hotkey reference rendered directl
 
 ### Key Entities
 
-- **HelpHintOverlay**: The on-screen three-line help message with scramble-reveal animation. Uses `ScrambleRevealEffect` as a per-cell timing oracle for staggered character reveals. Per-character state includes target glyph index, current glyph index (random during cycling, target otherwise), a single assigned random glyph index, phase (Hidden/Cycling/LockFlash/Settled/Dismissing), opacity, and color (driven by `ComputeScrambleColor`). Invisible margin columns (`MARGIN_COLS=1`) extend the reveal past text edges. Bounding area with feathered border for rain streak occlusion. Overall lifecycle: Hidden → Revealing → Holding → Dismissing → Hidden.
+- **HelpHintOverlay**: The on-screen three-line help message with scramble-reveal animation. Uses `ScrambleRevealEffect` as a per-cell timing oracle for staggered character reveals. Per-character state includes target glyph index, current glyph index (random during cycling, target otherwise), a single assigned random glyph index, phase (Hidden/Cycling/LockFlash/Settled/Dismissing), opacity, and color (driven by `ComputeScrambleColor`). Invisible margin columns (`MARGIN_COLS=1`) extend the reveal past text edges. Per-row SDF halo backgrounds provide readability. Overall lifecycle: Hidden \u2192 Revealing \u2192 Holding \u2192 Dismissing \u2192 Hidden.
 - **UsageDialog**: A custom graphical window used to display command-line switches (no hotkeys) with scramble-reveal animation and background matrix rain. Has its own rendering context, black background, proportional font (Segoe UI). Pre-computes per-character (x, y) positions via DirectWrite. Uses `ScrambleRevealEffect` for the same per-cell animation as the overlays. Background rain fills the entire window. Provides feathered dark glow on resolved text for readability. Used by `/?` invocation only — the `?` key uses an in-app overlay instead.
 - **UsageText**: The shared module that builds formatted help text content — switch names, arguments, and descriptions grouped into Options and Screensaver Options sections. Provides text formatting and a plain text view. Used by `UsageDialog` for its content. Does NOT contain hotkeys (those are managed by the in-app hotkey overlay).
 - **CommandLineHelp**: The orchestration module for `/?`/`-?` handling — detects the switch prefix, creates a `UsageDialog`, and exits the process after the dialog is dismissed.
@@ -240,7 +267,7 @@ A user presses `?` during normal mode to see a hotkey reference rendered directl
 
 - **SC-001** *(design goal — not automatable)*: 100% of first-time users can identify at least two available controls (Settings, Help, or Exit) within 10 seconds of launching MatrixRain in normal mode, without consulting external documentation.
 - **SC-002**: Running `MatrixRain.exe /?` displays the usage dialog, reveals all usage text through the scramble-reveal effect within 5 seconds, and the dialog is visually correct with all characters properly placed and no visual artifacts. Dismissing the dialog exits the application cleanly.
-- **SC-003**: The help hint matrix reveal effect completes, holds, and dissolves fully within 10 seconds of application startup, without dropped frames or visual glitches across tested resolutions (4K desktop, Surface Laptop 6 13", Surface Pro ARM). Rain streaks pass behind the message area without visual artifacts during all phases.
+- **SC-003**: The help hint matrix reveal effect completes, holds, and dissolves fully within 10 seconds of application startup, without dropped frames or visual glitches across tested resolutions (4K desktop, Surface Laptop 6 13", Surface Pro ARM). SDF halo backgrounds and bloom glow render without visual artifacts during all phases.
 - **SC-004**: Pressing an unrecognized key triggers the help hint re-display within one rendered frame, with the animation restarting or reversing cleanly depending on the current phase.
 - **SC-005**: All existing hotkeys (Space, C, S, +, -, `, Escape, Alt+Enter) continue to function identically to the previous release, with zero regressions.
 - **SC-006**: The help hint is not displayed in any screensaver mode across all tested invocation methods (`/s`, `/p <HWND>`, `/c`, `/c:<HWND>`, `/a`).

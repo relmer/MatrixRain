@@ -5,7 +5,7 @@
 
 ## What This Feature Adds
 
-1. **Runtime help hint overlay** — A three-line help message appears on-screen when MatrixRain starts in Normal mode, showing key bindings (Settings/Enter, Help/?, Exit/Esc). Uses a scramble-reveal effect (characters appear as random cycling glyphs that lock into their target glyphs with per-cell staggered timing). Dismiss reverses the animation. Rain streaks pass behind the message area.
+1. **Runtime help hint overlay** — A three-line help message appears on-screen when MatrixRain starts in Normal mode, showing key bindings (Settings/Enter, Help/?, Exit/Esc). Uses a scramble-reveal effect (characters appear as random cycling glyphs that lock into their target glyphs with per-cell staggered timing). Dismiss reverses the animation. Per-row rounded-rect halos (D3D11 SDF shader) darken the background for readability.
 
 2. **Re-show on unrecognized key** — Pressing any unmapped key re-triggers the help hint animation.
 
@@ -20,7 +20,7 @@
 ## Key Architecture Decisions
 
 - **All new code in MatrixRainCore.lib** — follows Library-First Architecture (Constitution VI)
-- **All rendering is GPU-based** — D2D/DirectWrite for the in-app overlay, hotkey overlay, and usage dialog. No console output, no ANSI escape codes, no `AttachConsole`.
+- **All rendering is GPU-based** — D3D11 instancing for overlay characters (rendered to scene texture before bloom for free glow), D3D11 SDF pixel shader for halo backgrounds, D2D/DirectWrite for FPS counter and text measurement. No console output, no ANSI escape codes, no `AttachConsole`.
 - **ScrambleRevealEffect** — shared per-cell scramble-reveal timing oracle, used by HelpHintOverlay, HotkeyOverlay, and UsageDialog
 - **Flat parallel arrays** for per-character overlay state — cache-friendly, TDD-friendly
 - **`UsageDialog`** is a custom window with its own D3D11/D2D rendering context — independent of the main app's render pipeline. Used by `/?` only. Uses proportional font (Segoe UI), scramble-reveal animation via ScrambleRevealEffect.
@@ -54,8 +54,8 @@
 | `ScreenSaverModeParser.cpp` | Add `?` switch parsing, detect prefix style |
 | `Application.cpp` | Add Enter/? key handling in `OnKeyDown`, show/dismiss overlay |
 | `InputSystem.cpp/h` | Route unrecognized keys to trigger help hint |
-| `RenderSystem.cpp/h` | Render `HelpHintOverlay` and `HotkeyOverlay` (D2D), rain occlusion |
-| `AnimationSystem.cpp/h` | Occlusion rect for rain streaks passing behind overlay |
+| `RenderSystem.cpp/h` | Render overlays to scene texture before bloom, SDF halo shader, `RenderParams` struct |
+| `AnimationSystem.cpp/h` | Overlay character support |
 | `ApplicationState.h` | Add help hint enabled flag |
 | `main.cpp` | Call `CommandLineHelp` before window creation for `/?` |
 
@@ -87,6 +87,6 @@ Priority: CLI help (US3) is P1 MVP; overlay (US1/US2) is P2.
 3. `UsageDialog` — custom graphical window with D3D/D2D rendering + scramble-reveal animation (ScrambleRevealEffect + ComputeScrambleColor + background matrix rain)
 4. `CommandLineHelp` — orchestration for `/?` using `UsageDialog`
 5. `HelpHintOverlay` — overlay state machine (pure logic, no rendering)
-6. Render integration — D2D rendering of overlay, rain occlusion, feathered border
+6. Render integration — overlay rendering to scene texture before bloom, SDF halo backgrounds
 7. Input integration — Enter/? keys, unrecognized key → show, hotkey → dismiss
 8. `HotkeyOverlay` — in-app overlay for `?` key (rendered directly on main window, NOT dialog)

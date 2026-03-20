@@ -5,7 +5,7 @@
 
 ## Summary
 
-Add runtime help overlay with matrix rain reveal/dissolve effects (GPU-rendered via D2D/DirectWrite) and command-line help (`/?`/`-?`) via a custom usage dialog window with its own D3D/D2D rendering context. Adds Enter key → config dialog, ? key → in-app hotkey overlay (rendered directly on the main window), unrecognized key → re-show hint. All rendering is GPU-based — no console output, no ANSI escape codes, no `AttachConsole`.
+Add runtime help overlay with matrix rain reveal/dissolve effects (GPU-rendered via D3D11 instancing with D2D atlas) and command-line help (`/?`/`-?`) via a custom usage dialog window with its own D3D/D2D rendering context. Adds Enter key → config dialog, ? key → in-app hotkey overlay (rendered to scene texture before bloom for free glow), unrecognized key → re-show hint. Overlay background halos rendered via D3D11 SDF pixel shader (signed distance to per-row rounded rects). All rendering is GPU-based — no console output, no ANSI escape codes.
 
 ## Technical Context
 
@@ -16,7 +16,7 @@ Add runtime help overlay with matrix rain reveal/dissolve effects (GPU-rendered 
 **Target Platform**: Windows 11 x64
 **Project Type**: Single solution — 3 projects (MatrixRainCore.lib, MatrixRain.exe, MatrixRainTests.dll)
 **Performance Goals**: 60 FPS render loop unaffected by overlay; usage dialog renders at 60 FPS independently
-**Constraints**: Overlay rendering on render thread under `m_renderMutex`; CLI help (`/?`) runs before main window creation; usage dialog has its own D3D/D2D rendering context
+**Constraints**: Overlays render to scene texture before bloom (single-threaded render loop); CLI help (`/?`) runs before main window creation; usage dialog has its own D3D/D2D rendering context
 **Scale/Scope**: ~15 FRs, 5 user stories; touches input handling, render system, command-line parser; all new code in MatrixRainCore.lib
 
 ## Constitution Check
@@ -27,7 +27,7 @@ Add runtime help overlay with matrix rain reveal/dissolve effects (GPU-rendered 
 | # | Principle | Status | Notes |
 |---|-----------|--------|-------|
 | I | Test-Driven Development | PASS | All new classes (`HelpHintOverlay`, `UsageDialog`, `UsageText`) in MatrixRainCore.lib — testable via TDD. Overlay and dialog animation state is pure logic (timers, phase transitions, per-cell state) — fully unit-testable without D2D. |
-| II | Performance-First Architecture | PASS | Overlay rendered as part of existing D2D pass after bloom composite — no extra draw calls beyond text rendering. Per-character state is flat arrays (cache-friendly). Usage dialog has its own lightweight D3D/D2D context. `?` key overlay rendered inline in the main render loop. |
+| II | Performance-First Architecture | PASS | Overlay rendered to scene texture before bloom — bloom provides glow for free (zero additional draw calls for glow layers). Per-row halo backgrounds rendered via a single fullscreen SDF shader pass. Halo row rects cached per overlay. Per-character state is flat arrays (cache-friendly). Usage dialog has its own lightweight D3D/D2D context. `?` key overlay rendered inline in the main render loop. |
 | III | C++23 and Windows Native Platform | PASS | Uses C++23, targets Windows 11 x64, Win32 API, D3D11/D2D1 for all rendering. No console output or ANSI escape codes. |
 | IV | Modular Architecture | PASS | New modules: `HelpHintOverlay` (overlay state machine + per-char animation), `UsageDialog` (usage dialog with scramble-reveal renderer), `UsageText` (shared text/layout). Clear boundaries, one responsibility each. No circular deps. |
 | V | Type Safety and Modern C++ | PASS | `enum class` for overlay phases, `std::optional` for stagger offsets, `std::span` for character grid views, `constexpr` for timing constants. |
@@ -70,8 +70,8 @@ MatrixRainCore/                    # Static library — all new feature code her
 ├── ScreenSaverModeParser.h/cpp    # MODIFIED: Add /? parsing, prefix detection
 ├── Application.h/cpp              # MODIFIED: Enter/? keys, overlay show/dismiss
 ├── InputSystem.h/cpp              # MODIFIED: Unrecognized key → help hint trigger
-├── RenderSystem.h/cpp             # MODIFIED: Render overlay, rain occlusion
-├── AnimationSystem.h/cpp          # MODIFIED: Occlusion rect for rain streaks
+├── RenderSystem.h/cpp             # MODIFIED: Render overlay to scene texture, SDF halo shader, RenderParams struct
+├── AnimationSystem.h/cpp          # MODIFIED: Overlay character support
 ├── ApplicationState.h             # MODIFIED: Help hint enabled flag
 └── ...existing files...
 

@@ -29,7 +29,7 @@ Idle → Revealing → Holding → Dismissing → Done
  └──────────────────────────────────────────┘  (re-trigger: Show() restarts)
 ```
 
-**Layout constants**: `CHAR_WIDTH=16`, `CHAR_HEIGHT=28`, `PADDING=20`, `GLOW_LAYERS=4`, `MARGIN_COLS=1`
+**Layout constants**: `CHAR_WIDTH=16`, `CHAR_HEIGHT=28`, `PADDING=20`, `MARGIN_COLS=1`
 
 ### 2. HintCharacter
 
@@ -42,7 +42,7 @@ Per-character animation state for overlay hints (used by both HelpHintOverlay an
 | `randomGlyphIndex` | `size_t` | Fixed random glyph assigned once on first reveal (deterministic from position) |
 | `phase` | `CharPhase` | Per-character phase (Hidden, Cycling, LockFlash, Settled, Dismissing) |
 | `opacity` | `float` | Current opacity (0.0–1.0, driven by ScrambleRevealEffect) |
-| `glowIntensity` | `float` | Legacy field — color is now computed by `ComputeScrambleColor` based on `CellPhase` |
+| `glowIntensity` | `float` | Unused (legacy) — color is computed by `ComputeScrambleColor` based on `CellPhase` |
 | `colorR` | `float` | Red component (0.0–1.0, computed by `ComputeScrambleColor`) |
 | `colorG` | `float` | Green component (0.0–1.0, computed by `ComputeScrambleColor`) |
 | `colorB` | `float` | Blue component (0.0–1.0, computed by `ComputeScrambleColor`) |
@@ -156,7 +156,7 @@ Shared per-cell scramble-reveal timing oracle. Manages reveal, hold, and dismiss
 | `m_cellCount` | `int` | Number of cells |
 | `m_revealDuration` | `float` | Duration over which cells randomly lock (default 1.5) |
 | `m_dismissDuration` | `float` | Duration over which cells randomly unlock and fade (default 1.0) |
-| `m_cycleInterval` | `float` | Time between random glyph changes during cycling (default 0.045) |
+| `m_cycleInterval` | `float` | Time between random glyph changes during cycling (default 0.25) |
 | `m_flashDuration` | `float` | Duration of lock flash per cell (default 0.15) |
 | `m_holdDuration` | `float` | Hold time before auto-dismiss (-1.0 = hold indefinitely) |
 | `m_cells` | `vector<CellState>` | Per-cell animation state |
@@ -170,7 +170,7 @@ Shared per-cell scramble-reveal timing oracle. Manages reveal, hold, and dismiss
 | `lockTime` | `float` | Time at which cell locks (reveal) or unlocks (dismiss) |
 | `flashTimer` | `float` | Countdown from lock flash to settled |
 | `flashDuration` | `float` | Per-cell flash duration (capped so all cells finish by revealDuration) |
-| `cycleTimer` | `float` | Accumulator for glyph cycling interval |
+| `cycleTimer` | `float` | Accumulator for glyph cycling interval (initialized to random offset in `[0, cycleInterval)` to stagger per-cell cycling) |
 | `opacity` | `float` | 0 = invisible, 1 = fully visible |
 | `needsCycle` | `bool` | True when consumer should pick a new random glyph |
 | `isSpace` | `bool` | Spaces don't cycle or flash |

@@ -70,7 +70,7 @@ GetPhase () → OverlayPhase
 GetBoundingRect () → D2D1_RECT_F
 ```
 - Returns the screen-space bounding rectangle of the overlay
-- Used by rain occlusion logic (FR-012) and feathered border rendering (FR-011)
+- Used by overlay layout and halo rendering (FR-011)
 
 ```
 GetCharacters () → span<const HintCharacter>
@@ -108,19 +108,18 @@ UpdateLayout (viewportWidth: float, viewportHeight: float) → void
 | `CHAR_WIDTH` | 16.0f | Character cell width in pixels |
 | `CHAR_HEIGHT` | 28.0f | Character cell height in pixels |
 | `PADDING` | 20.0f | Padding around the text area |
-| `GLOW_LAYERS` | 4 | Number of glow layers for the feathered border |
 
 ## ScrambleRevealEffect Initialization
 
 ```
-m_scramble.Initialize (cellCount, 1.5f, 1.0f, 0.045f, 0.15f, 3.0f)
+ScrambleRevealEffect m_scramble { 2.5f, 1.0f, 0.25f, 1.0f, 2.7f }
 ```
-- `cellCount` = total non-space characters in the hint text
-- 1.5s reveal duration, 1.0s dismiss duration
-- 0.045s cycle interval, 0.15s flash duration, 3.0s hold duration
+- In-class member initializer (no separate Initialize call)
+- 2.5s reveal duration, 1.0s dismiss duration
+- 0.25s cycle interval, 1.0s flash duration, 2.7s hold duration
 
 ## Thread Safety
 
-- `Update()` and all queries called from render thread under `m_renderMutex`
+- `Update()` and all queries called from render thread (single-threaded render loop)
 - `Show()` and `Dismiss()` called from main thread (input handling)
-- Shared state protected by the existing `m_renderMutex` in Application
+- No mutex needed — overlay state is accessed only from the render path via `Render()` parameters
