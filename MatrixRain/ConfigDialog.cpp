@@ -550,7 +550,16 @@ static BOOL OnCancel (HWND hDlg)
     // For modeless dialogs, revert live preview changes back to snapshot
     if (pController->IsLiveMode())
     {
+        Application * pApp = GetApplicationFromDialog (hDlg);
+
         pController->CancelLiveMode();
+
+        // Clear the dialog handle before destroying so input handling resumes
+        if (pApp)
+        {
+            pApp->SetConfigDialog (nullptr);
+        }
+
         DestroyWindow (hDlg);
     }
     else
