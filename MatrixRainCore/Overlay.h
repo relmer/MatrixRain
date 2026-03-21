@@ -70,6 +70,7 @@ struct HintCharacter
     int       row               = 0;
     int       col               = 0;
     bool      isSpace           = false;
+    bool      isSingleColumnRow = false;
 };
 
 

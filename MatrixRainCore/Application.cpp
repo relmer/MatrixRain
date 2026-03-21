@@ -14,6 +14,8 @@
 #include "InputSystem.h"
 #include "FPSCounter.h"
 #include "ScreenSaverModeContext.h"
+#include "UnicodeSymbols.h"
+#include "Version.h"
 
 
 
@@ -107,21 +109,27 @@ HRESULT Application::Initialize (HINSTANCE hInstance, int nCmdShow, const Screen
         );
     }
 
-    // Usage overlay for /? mode
+    // Usage overlay for /? mode — two-column layout for switches, single-column for headers
     if (pScreenSaverContext && pScreenSaverContext->m_mode == ScreenSaverMode::HelpRequested)
     {
-        UsageText usage (pScreenSaverContext->m_switchPrefix);
-        std::vector<OverlayEntry> entries;
+        wchar_t prefix = pScreenSaverContext->m_switchPrefix;
 
-        for (const auto & line : usage.GetFormattedLines())
+        std::vector<OverlayEntry> entries =
         {
-            entries.push_back ({ line, L"" });
-        }
+            { std::format (L"MatrixRain v{} {} ({})", VERSION_WSTRING, VERSION_ARCH_WSTRING, std::wstring (VERSION_BUILD_TIMESTAMP)), L"" },
+            { std::format (L"Copyright {} 2024-{} by Robert Elmer", UnicodeSymbols::Copyright, VERSION_YEAR_WSTRING), L"" },
+            { L"", L"" },
+            { std::format (L"Usage: MatrixRain.exe [{}option]", prefix), L"" },
+            { L"", L"" },
+            { L"Options:", L"" },
+            { std::format (L"  {}c", prefix),  L"Show settings dialog" },
+            { std::format (L"  {}?", prefix),  L"Display this help message" },
+        };
 
         m_usageOverlay = std::make_unique<Overlay> (
             std::move (entries),
             OverlayTimingConfig { .revealDuration = 1.8f, .dismissDuration = 0.0f, .cycleInterval = 0.065f, .flashDuration = 1.0f, .holdDuration = -1.0f },
-            OverlayLayoutConfig { .marginCols = 2, .gapChars = 0, .baseCharWidth = 16.0f, .baseRowHeight = 28.0f, .basePadding = 30.0f }
+            OverlayLayoutConfig { .marginCols = 2, .gapChars = 6, .baseCharWidth = 16.0f, .baseRowHeight = 28.0f, .basePadding = 30.0f }
         );
     }
 
@@ -152,10 +160,20 @@ HRESULT Application::Initialize (HINSTANCE hInstance, int nCmdShow, const Screen
     // Start usage overlay in /? mode (no rain until reveal completes)
     if (m_usageOverlay)
     {
-        m_usageOverlay->SetDpiScale (m_renderSystem->GetDpiScale());
+        float dpiScale = m_renderSystem->GetDpiScale();
+
+        m_usageOverlay->SetDpiScale (dpiScale);
         m_usageOverlay->Show();
         m_densityController->SetPercentage (0);
         m_animationSystem->ClearAllStreaks();
+
+        // Full-size rain characters (same physical size as fullscreen)
+        m_renderSystem->SetCharacterScaleOverride (dpiScale);
+        m_animationSystem->SetCharacterSpacingOverride (24.0f * dpiScale);
+
+        // Force windowed mode (enables click-to-drag) and suppress stats
+        m_appState->SetDisplayMode (DisplayMode::Windowed);
+        m_appState->SetShowStatistics (false);
     }
 
 
@@ -317,29 +335,11 @@ HRESULT Application::CreateApplicationWindow (POINT & position, SIZE & size)
         // Class already registered - continue
     }
 
-    // For preview mode, create as child window; for help mode, create with title bar;
-    // otherwise create fullscreen borderless
+    // For preview mode, create as child window; otherwise create borderless popup
     if ((m_pScreenSaverContext && m_pScreenSaverContext->m_mode == ScreenSaverMode::ScreenSaverPreview))
     {
         dwStyle    = WS_CHILD | WS_VISIBLE;
         hwndParent = m_pScreenSaverContext->m_previewParentHwnd;
-    }
-    else if (m_pScreenSaverContext && m_pScreenSaverContext->m_mode == ScreenSaverMode::HelpRequested)
-    {
-        dwStyle = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_VISIBLE;
-
-        // Adjust for window chrome so client area matches requested size
-        RECT adjustedRect = { 0, 0, size.cx, size.cy };
-
-        AdjustWindowRectExForDpi (&adjustedRect, dwStyle, FALSE, 0, GetDpiForSystem());
-
-        int chromeW = (adjustedRect.right  - adjustedRect.left) - size.cx;
-        int chromeH = (adjustedRect.bottom - adjustedRect.top)  - size.cy;
-
-        size.cx += chromeW;
-        size.cy += chromeH;
-        position.x -= chromeW / 2;
-        position.y -= chromeH / 2;
     }
     
     m_hwnd = CreateWindowExW (0,

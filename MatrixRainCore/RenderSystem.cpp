@@ -2302,23 +2302,23 @@ void RenderSystem::CalculateColumnAlignedTextPositions (
 
 
 
-        // Reset position at column boundaries
+        // Reset position at column boundaries (skip for single-column rows)
         if (ch.col <= marginCols)
         {
             charPos      = 0.0f;
             foundKeyText = false;
         }
-        else if (ch.col == gapColStart)
+        else if (!ch.isSingleColumnRow && ch.col == gapColStart)
         {
             charPos = maxKeyWidth;
         }
-        else if (ch.col == descColStart)
+        else if (!ch.isSingleColumnRow && ch.col == descColStart)
         {
             charPos = maxKeyWidth + gapWidth;
         }
 
-        // Right-align within key column: jump position on first visible char
-        if (ch.col >= marginCols && ch.col < gapColStart && !ch.isSpace && !foundKeyText)
+        // Right-align within key column (skip for single-column rows)
+        if (!ch.isSingleColumnRow && ch.col >= marginCols && ch.col < gapColStart && !ch.isSpace && !foundKeyText)
         {
             charPos      = maxKeyWidth - keyColWidths[ch.row];
             foundKeyText = true;
@@ -2378,7 +2378,7 @@ void RenderSystem::ComputeOverlayLayout (
 
     for (const auto & ch : chars)
     {
-        if (ch.col >= marginCols && ch.col < marginCols + keyColChars && !ch.isSpace)
+        if (ch.col >= marginCols && ch.col < marginCols + keyColChars && !ch.isSpace && !ch.isSingleColumnRow)
         {
             keyColWidths[ch.row] += charSet.GetGlyph (ch.targetGlyphIndex).advanceWidth * advScaled;
         }

@@ -134,7 +134,7 @@ void Overlay::InitializeCharacters ()
         }
         else
         {
-            // Single-column row: text starts at key column position, fills full width
+            // Single-column row: text fills full width from column 0
             std::wstring text = entry.left;
             text.resize (m_textCols, L' ');
             rowText += text;
@@ -155,16 +155,19 @@ void Overlay::InitializeCharacters ()
         }
 
         // Text columns
+        bool singleCol = entry.right.empty() && m_keyColChars > 0;
+
         for (int col = 0; col < m_textCols; col++)
         {
             HintCharacter ch;
 
-            ch.row             = row;
-            ch.col             = m_layout.marginCols + col;
-            ch.isSpace         = (rowText[col] == L' ');
-            ch.targetCodepoint = static_cast<uint32_t> (rowText[col]);
-            ch.phase           = CharPhase::Hidden;
-            ch.opacity         = 0.0f;
+            ch.row                = row;
+            ch.col                = m_layout.marginCols + col;
+            ch.isSpace            = (rowText[col] == L' ');
+            ch.targetCodepoint    = static_cast<uint32_t> (rowText[col]);
+            ch.phase              = CharPhase::Hidden;
+            ch.opacity            = 0.0f;
+            ch.isSingleColumnRow  = singleCol;
 
             m_chars.push_back (ch);
         }
