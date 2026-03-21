@@ -3,7 +3,10 @@
 #include "Application.h"
 #include "AnimationSystem.h"
 #include "ApplicationState.h"
+#include "ColorScheme.h"
+#include "Overlay.h"
 #include "RenderSystem.h"
+#include "UsageText.h"
 #include "Viewport.h"
 #include "Timer.h"
 #include "CharacterSet.h"
@@ -11,20 +14,96 @@
 #include "InputSystem.h"
 #include "FPSCounter.h"
 #include "ScreenSaverModeContext.h"
+#include "UnicodeSymbols.h"
+#include "Version.h"
+
+
+
+
+//
+//  Overlay timing and layout constants
+//
+
+static constexpr OverlayTimingConfig HELP_HINT_TIMING
+{
+    .revealDuration  = 1.5f,
+    .dismissDuration = 1.0f,
+    .cycleInterval   = 0.25f,
+    .flashDuration   = 1.0f,
+    .holdDuration    = 2.7f
+};
+
+static constexpr OverlayLayoutConfig HELP_HINT_LAYOUT
+{
+    .marginCols    = 1,
+    .gapChars      = 6,
+    .baseCharWidth = 16.0f,
+    .baseRowHeight = 28.0f,
+    .basePadding   = 20.0f
+};
+
+static constexpr OverlayTimingConfig HOTKEY_TIMING
+{
+    .revealDuration  = 1.5f,
+    .dismissDuration = 1.0f,
+    .cycleInterval   = 0.25f,
+    .flashDuration   = 1.0f,
+    .holdDuration    = 5.4f
+};
+
+static constexpr OverlayLayoutConfig HOTKEY_LAYOUT
+{
+    .marginCols    = 2,
+    .gapChars      = 6,
+    .baseCharWidth = 16.0f,
+    .baseRowHeight = 28.0f,
+    .basePadding   = 30.0f
+};
+
+static constexpr OverlayTimingConfig USAGE_TIMING
+{
+    .revealDuration  = 1.8f,
+    .dismissDuration = 0.0f,
+    .cycleInterval   = 0.065f,
+    .flashDuration   = 1.0f,
+    .holdDuration    = -1.0f
+};
+
+static constexpr OverlayLayoutConfig USAGE_LAYOUT
+{
+    .marginCols    = 2,
+    .gapChars      = 6,
+    .baseCharWidth = 16.0f,
+    .baseRowHeight = 28.0f,
+    .basePadding   = 30.0f
+};
 
 
 
 
 
-// Constructor must be defined in .cpp (not just declared in header) because Application
-// contains unique_ptr members to forward-declared types (Pimpl idiom). The unique_ptr
-// destructor requires complete type definitions, which are only available here in the .cpp
-// where all headers are included. Using = default still gets compiler-generated behavior.
+////////////////////////////////////////////////////////////////////////////////
+//
+//  Application::Application
+//
+//  Constructor must be defined in .cpp (not just declared in header) because
+//  Application contains unique_ptr members to forward-declared types (Pimpl
+//  idiom).  The unique_ptr destructor requires complete type definitions, which
+//  are only available here in the .cpp where all headers are included.
+//
+////////////////////////////////////////////////////////////////////////////////
+
 Application::Application() = default;
 
 
 
 
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  Application::~Application
+//
+////////////////////////////////////////////////////////////////////////////////
 
 Application::~Application()
 {
@@ -34,6 +113,12 @@ Application::~Application()
 
 
 
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  Application::Initialize
+//
+////////////////////////////////////////////////////////////////////////////////
 
 HRESULT Application::Initialize (HINSTANCE hInstance, int nCmdShow, const ScreenSaverModeContext * pScreenSaverContext)
 {
@@ -46,14 +131,64 @@ HRESULT Application::Initialize (HINSTANCE hInstance, int nCmdShow, const Screen
 
 
     m_hInstance         = hInstance;
-    m_appState          = std::make_unique<ApplicationState>();
+    m_appState          = std::make_unique<ApplicationState> (m_settingsProvider);
     m_viewport          = std::make_unique<Viewport>();
-    m_densityController = std::make_unique<DensityController> (*m_viewport, 32.0f);  // Character width matches horizontal spacing
+    m_densityController = std::make_unique<DensityController> (*m_viewport, 24.0f);  // Character width matches horizontal spacing
     m_animationSystem   = std::make_unique<AnimationSystem>();
     m_renderSystem      = std::make_unique<RenderSystem>();
     m_inputSystem       = std::make_unique<InputSystem>();
     m_fpsCounter        = std::make_unique<FPSCounter>();
     m_timer             = std::make_unique<Timer>();
+
+    // Overlays are only used in Normal mode
+    if (!pScreenSaverContext || pScreenSaverContext->m_mode == ScreenSaverMode::Normal)
+    {
+        m_helpOverlay = std::make_unique<Overlay> (HELP_HINT_TIMING, HELP_HINT_LAYOUT);
+
+        hr = m_helpOverlay->Initialize (
+            {
+                { L"Settings", L"Enter" },
+                { L"Help",     L"?" },
+                { L"Exit",     L"Esc" }
+            });
+        CHR (hr);
+
+        m_hotkeyOverlay = std::make_unique<Overlay> (HOTKEY_TIMING, HOTKEY_LAYOUT);
+
+        hr = m_hotkeyOverlay->Initialize (
+            {
+                { L"Space",       L"Pause / Resume" },
+                { L"Enter",       L"Settings dialog" },
+                { L"C",           L"Cycle color scheme" },
+                { L"S",           L"Toggle statistics" },
+                { L"?",           L"Help reference" },
+                { L"+",           L"Increase rain density" },
+                { L"-",           L"Decrease rain density" },
+                { L"Alt+Enter",   L"Toggle fullscreen" },
+                { L"Esc",         L"Exit" }
+            });
+        CHR (hr);
+    }
+
+    // Usage overlay for /? mode — entries built from UsageText (single source of truth)
+    if (pScreenSaverContext && pScreenSaverContext->m_mode == ScreenSaverMode::HelpRequested)
+    {
+        UsageText usageText (pScreenSaverContext->m_switchPrefix);
+
+        auto overlayPairs = usageText.GetOverlayEntries();
+
+        std::vector<OverlayEntry> entries;
+        entries.reserve (overlayPairs.size());
+        for (auto & [left, right] : overlayPairs)
+        {
+            entries.push_back ({ std::move (left), std::move (right) });
+        }
+
+        m_usageOverlay = std::make_unique<Overlay> (USAGE_TIMING, USAGE_LAYOUT);
+
+        hr = m_usageOverlay->Initialize (std::move (entries));
+        CHR (hr);
+    }
 
 
     InitializeApplicationState (pScreenSaverContext);
@@ -67,11 +202,35 @@ HRESULT Application::Initialize (HINSTANCE hInstance, int nCmdShow, const Screen
 
     m_animationSystem->Initialize (*m_viewport, *m_densityController);
 
-    hr = charSet.CreateTextureAtlas (m_renderSystem->GetDevice());
+    hr = charSet.CreateTextureAtlas (m_renderSystem->GetDevice(), m_renderSystem->GetDpiScale());
     CHR (hr);
 
 
     m_isRunning = true;
+
+    // Show help hint overlay on startup (null in screensaver mode)
+    if (m_helpOverlay)
+    {
+        m_helpOverlay->Show();
+    }
+
+    // Start usage overlay in /? mode with background rain
+    if (m_usageOverlay)
+    {
+        float dpiScale = m_renderSystem->GetDpiScale();
+
+        m_usageOverlay->SetDpiScale (dpiScale);
+        m_usageOverlay->Show();
+        m_densityController->SetPercentage (8);
+
+        // Full-size rain characters (same physical size as fullscreen)
+        m_renderSystem->SetCharacterScaleOverride (dpiScale);
+        m_animationSystem->SetCharacterSpacingOverride (24.0f * dpiScale);
+
+        // Force windowed mode (enables click-to-drag) and suppress stats
+        m_appState->SetDisplayMode (DisplayMode::Windowed);
+        m_appState->SetShowStatistics (false);
+    }
 
 
     
@@ -82,6 +241,12 @@ Error:
 
 
 
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  Application::InitializeApplicationState
+//
+////////////////////////////////////////////////////////////////////////////////
 
 void Application::InitializeApplicationState (const ScreenSaverModeContext * pScreenSaverContext)
 {
@@ -124,6 +289,12 @@ void Application::InitializeApplicationState (const ScreenSaverModeContext * pSc
 
 
 
+////////////////////////////////////////////////////////////////////////////////
+//
+//  Application::InitializeApplicationWindow
+//
+////////////////////////////////////////////////////////////////////////////////
+
 HRESULT Application::InitializeApplicationWindow()
 {
     HRESULT hr       = S_OK;
@@ -157,6 +328,17 @@ HRESULT Application::InitializeApplicationWindow()
     hr = m_renderSystem->Initialize (m_hwnd, size.cx, size.cy);
     CHR (hr);
 
+    // Propagate the initial DPI scale to overlay classes so layout
+    // computations use the correct scaling from the very first frame.
+    {
+        float dpiScale = m_renderSystem->GetDpiScale();
+
+        if (m_helpOverlay) m_helpOverlay->SetDpiScale (dpiScale);
+        if (m_hotkeyOverlay)   m_hotkeyOverlay->SetDpiScale (dpiScale);
+
+        m_animationSystem->SetDpiScale (dpiScale);
+    }
+
 
 
 Error:
@@ -166,6 +348,12 @@ Error:
 
 
 
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  Application::CreateApplicationWindow
+//
+////////////////////////////////////////////////////////////////////////////////
 
 HRESULT Application::CreateApplicationWindow (POINT & position, SIZE & size)
 {
@@ -203,7 +391,7 @@ HRESULT Application::CreateApplicationWindow (POINT & position, SIZE & size)
         // Class already registered - continue
     }
 
-    // For preview mode, create as child window; otherwise create fullscreen borderless
+    // For preview mode, create as child window; otherwise create borderless popup
     if ((m_pScreenSaverContext && m_pScreenSaverContext->m_mode == ScreenSaverMode::ScreenSaverPreview))
     {
         dwStyle    = WS_CHILD | WS_VISIBLE;
@@ -242,6 +430,12 @@ Error:
 
 
 
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  Application::Run
+//
+////////////////////////////////////////////////////////////////////////////////
 
 int Application::Run()
 {
@@ -284,6 +478,12 @@ int Application::Run()
 
 
 
+////////////////////////////////////////////////////////////////////////////////
+//
+//  Application::Update
+//
+////////////////////////////////////////////////////////////////////////////////
+
 void Application::Update (float deltaTime)
 {
     if (m_appState)
@@ -295,11 +495,39 @@ void Application::Update (float deltaTime)
     {
         m_animationSystem->Update (deltaTime);
     }
+
+    if ((m_helpOverlay && m_helpOverlay->IsActive()) ||
+        (m_hotkeyOverlay  && m_hotkeyOverlay->IsActive())  ||
+        (m_usageOverlay   && m_usageOverlay->IsActive()))
+    {
+        Color4 scheme = GetColorRGB (m_appState->GetColorScheme(), m_appState->GetElapsedTime());
+
+        if (m_helpOverlay && m_helpOverlay->IsActive())
+        {
+            m_helpOverlay->Update (deltaTime, scheme.r, scheme.g, scheme.b);
+        }
+
+        if (m_hotkeyOverlay && m_hotkeyOverlay->IsActive())
+        {
+            m_hotkeyOverlay->Update (deltaTime, scheme.r, scheme.g, scheme.b);
+        }
+
+        if (m_usageOverlay && m_usageOverlay->IsActive())
+        {
+            m_usageOverlay->Update (deltaTime, scheme.r, scheme.g, scheme.b);
+        }
+    }
 }
 
 
 
 
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  Application::GetWindowSizeForCurrentMode
+//
+////////////////////////////////////////////////////////////////////////////////
 
 void Application::GetWindowSizeForCurrentMode (POINT & position, SIZE & size)
 {
@@ -311,7 +539,17 @@ void Application::GetWindowSizeForCurrentMode (POINT & position, SIZE & size)
 
     CBRAEx (m_appState != nullptr, E_UNEXPECTED);
 
-    if (m_appState->GetDisplayMode() == DisplayMode::Fullscreen)
+    if (GetScreenSaverMode() == ScreenSaverMode::HelpRequested)
+    {
+        // /? mode: 60% x 50% of screen, centered
+        int windowWidth  = screenWidth  * 60 / 100;
+        int windowHeight = screenHeight * 50 / 100;
+
+        position.x = (screenWidth  - windowWidth)  / 2;
+        position.y = (screenHeight - windowHeight) / 2;
+        size       = { windowWidth, windowHeight };
+    }
+    else if (m_appState->GetDisplayMode() == DisplayMode::Fullscreen)
     {
         // Fullscreen mode
         position = { 0, 0 };
@@ -337,6 +575,12 @@ Error:
 
 
 
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  Application::ResizeWindowForCurrentMode
+//
+////////////////////////////////////////////////////////////////////////////////
 
 void Application::ResizeWindowForCurrentMode()
 {
@@ -396,6 +640,12 @@ Error:
 
 
 
+////////////////////////////////////////////////////////////////////////////////
+//
+//  Application::Render
+//
+////////////////////////////////////////////////////////////////////////////////
+
 void Application::Render()
 {
     if (m_renderSystem && m_animationSystem && m_viewport && m_appState)
@@ -409,7 +659,26 @@ void Application::Render()
         bool        showDebugFadeTimes = m_appState->GetShowDebugFadeTimes();
         float       elapsedTime        = m_appState->GetElapsedTime();
         
-        m_renderSystem->Render (*m_animationSystem, *m_viewport, scheme, fps, rainPercentage, streakCount, activeHeadCount, showDebugFadeTimes, elapsedTime);
+        // Pass overlay pointers to render system for rendering
+        const Overlay * pHelpOverlay    = (m_helpOverlay && m_helpOverlay->IsActive())       ? m_helpOverlay.get()    : nullptr;
+        const Overlay * pHotkeyOverlay  = (m_hotkeyOverlay && m_hotkeyOverlay->IsActive())   ? m_hotkeyOverlay.get()  : nullptr;
+        const Overlay * pUsageOverlay   = (m_usageOverlay && m_usageOverlay->IsActive())     ? m_usageOverlay.get()   : nullptr;
+
+        RenderSystem::RenderParams renderParams =
+        {
+            .colorScheme        = scheme,
+            .fps                = fps,
+            .rainPercentage     = rainPercentage,
+            .streakCount        = streakCount,
+            .activeHeadCount    = activeHeadCount,
+            .showDebugFadeTimes = showDebugFadeTimes,
+            .elapsedTime        = elapsedTime,
+            .pHelpOverlay       = pHelpOverlay,
+            .pHotkeyOverlay     = pHotkeyOverlay,
+            .pUsageOverlay      = pUsageOverlay
+        };
+
+        m_renderSystem->Render (*m_animationSystem, *m_viewport, renderParams);
         m_renderSystem->Present();
     }
 }
@@ -417,6 +686,12 @@ void Application::Render()
 
 
 
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  Application::ShouldExitScreenSaverOnKey
+//
+////////////////////////////////////////////////////////////////////////////////
 
 bool Application::ShouldExitScreenSaverOnKey (WPARAM wParam)
 {
@@ -442,6 +717,12 @@ Error:
 
 
 
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  Application::Shutdown
+//
+////////////////////////////////////////////////////////////////////////////////
 
 void Application::Shutdown()
 {
@@ -474,6 +755,12 @@ void Application::Shutdown()
 
 
 
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  Application::WindowProc
+//
+////////////////////////////////////////////////////////////////////////////////
 
 LRESULT CALLBACK Application::WindowProc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
@@ -508,6 +795,12 @@ LRESULT CALLBACK Application::WindowProc (HWND hwnd, UINT uMsg, WPARAM wParam, L
 
 
 
+////////////////////////////////////////////////////////////////////////////////
+//
+//  Application::HandleMessage
+//
+////////////////////////////////////////////////////////////////////////////////
+
 LRESULT Application::HandleMessage (UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
     switch (uMsg)
@@ -526,6 +819,10 @@ LRESULT Application::HandleMessage (UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         case WM_SIZE:
             OnSize (lParam);
+            return 0;
+
+        case WM_DPICHANGED:
+            OnDpiChanged (wParam, lParam);
             return 0;
 
         case WM_NCHITTEST:
@@ -548,38 +845,136 @@ LRESULT Application::HandleMessage (UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 
 
+////////////////////////////////////////////////////////////////////////////////
+//
+//  Application::OnKeyDown
+//
+////////////////////////////////////////////////////////////////////////////////
+
 void Application::OnKeyDown (WPARAM wParam)
 {
+    bool isRecognized     = false;
+    bool isQuestionKey    = false;
+    bool shouldExitSaver  = ShouldExitScreenSaverOnKey (wParam);
+
+
+    // In /? help mode, only Enter and Escape exit the application
+    if (GetScreenSaverMode() == ScreenSaverMode::HelpRequested)
+    {
+        if (wParam == VK_RETURN || wParam == VK_ESCAPE)
+        {
+            PostQuitMessage (0);
+        }
+
+        return;
+    }
+
+
+
     // If live overlay dialog is active, don't process exit keys
-    if (m_hConfigDialog && (wParam == VK_ESCAPE || ShouldExitScreenSaverOnKey (wParam)))
+    if (m_hConfigDialog && (wParam == VK_ESCAPE || shouldExitSaver))
     {
         return;
     }
 
-    if (wParam == VK_ESCAPE || ShouldExitScreenSaverOnKey (wParam))
+    // ShouldExitScreenSaverOnKey matches any key in screensaver mode, so it
+    // can't be a switch case — check it first before the per-key dispatch.
+    if (shouldExitSaver)
     {
-        // ESC key pressed - exit application
         PostQuitMessage (0);
+        return;
     }
-    else if (wParam == VK_SPACE)
+    
+    //
+    // Determine if this key is a recognized hotkey
+    //
+
+    switch (wParam)
     {
-        // Spacebar pressed - toggle pause
-        m_isPaused = !m_isPaused;
+        case VK_ESCAPE:
+            // ESC key pressed - exit application
+            PostQuitMessage (0);
+            return;
+
+        case VK_SPACE:
+            // Spacebar pressed - toggle pause
+            m_isPaused = !m_isPaused;
+            isRecognized = true;
+            break;
+
+        case VK_RETURN:
+            // Enter key — open config dialog as live overlay (guard against opening twice)
+            if (!m_hConfigDialog && m_openConfigDialogCallback)
+            {
+                m_openConfigDialogCallback();
+            }
+            isRecognized = true;
+            break;
+
+        case VK_OEM_2:
+            // ? key (Shift + /) — toggle hotkey overlay
+            if (m_hotkeyOverlay && (GetKeyState (VK_SHIFT) & 0x8000))
+            {
+                isQuestionKey = true;
+                isRecognized  = true;
+
+                std::lock_guard<std::mutex> lock (m_renderMutex);
+
+                if (m_hotkeyOverlay->GetPhase() == OverlayPhase::Holding ||
+                    m_hotkeyOverlay->GetPhase() == OverlayPhase::Revealing)
+                {
+                    m_hotkeyOverlay->Dismiss();
+                }
+                else
+                {
+                    m_hotkeyOverlay->Show();
+                }
+            }
+            break;
+
+        default:
+            // All other keys — delegate to InputSystem
+            if (m_inputSystem)
+            {
+                isRecognized = m_inputSystem->ProcessKeyDown (static_cast<int> (wParam));
+            }
+            break;
     }
-    else if (wParam == 'C' && m_appState)
+
+    //
+    // Overlay management: dismiss active overlays on any non-modifier key,
+    // or show the help hint if no overlay is active and the key is unrecognized.
+    //
+
+    // Ignore standalone modifier keys entirely
+    if (wParam == VK_SHIFT   || wParam == VK_LSHIFT   || wParam == VK_RSHIFT   ||
+        wParam == VK_CONTROL || wParam == VK_LCONTROL || wParam == VK_RCONTROL ||
+        wParam == VK_MENU    || wParam == VK_LMENU    || wParam == VK_RMENU    ||
+        wParam == VK_LWIN    || wParam == VK_RWIN)
     {
-        // C key pressed - cycle color scheme
-        m_appState->CycleColorScheme();
+        return;
     }
-    else if (wParam == 'S' && m_appState)
+
+    if (m_helpOverlay)
     {
-        // S key pressed - toggle statistics display
-        m_appState->ToggleStatistics();
+        std::lock_guard<std::mutex> lock (m_renderMutex);
+
+        if (m_helpOverlay->GetPhase() == OverlayPhase::Holding ||
+            m_helpOverlay->GetPhase() == OverlayPhase::Revealing)
+        {
+            m_helpOverlay->Dismiss();
+        }
+        else if (!isRecognized)
+        {
+            // Unrecognized key with overlay hidden or dissolving — (re)show
+            m_helpOverlay->Show();
+        }
     }
-    else if (m_inputSystem)
+
+    if (m_hotkeyOverlay && m_hotkeyOverlay->IsActive() && !isQuestionKey)
     {
-        // Process density control keys (+/- on both numpad and main keyboard)
-        m_inputSystem->ProcessKeyDown (static_cast<int> (wParam));
+        std::lock_guard<std::mutex> lock (m_renderMutex);
+        m_hotkeyOverlay->Dismiss();
     }
 }
 
@@ -587,8 +982,20 @@ void Application::OnKeyDown (WPARAM wParam)
 
 
 
+////////////////////////////////////////////////////////////////////////////////
+//
+//  Application::OnSysKeyDown
+//
+////////////////////////////////////////////////////////////////////////////////
+
 void Application::OnSysKeyDown (WPARAM wParam)
 {
+    // In /? help mode, suppress all system keys
+    if (GetScreenSaverMode() == ScreenSaverMode::HelpRequested)
+    {
+        return;
+    }
+
     // In screensaver mode with exit-on-input, suppress all hotkeys including Alt+Enter
     if (ShouldExitScreenSaverOnKey (wParam))
     {
@@ -597,7 +1004,8 @@ void Application::OnSysKeyDown (WPARAM wParam)
     }
     
     // Handle Alt+key combinations (Alt causes SYSKEYDOWN instead of KEYDOWN)
-    if (m_inputSystem && m_inputSystem->IsAltEnterPressed (static_cast<int> (wParam)))
+    // WM_SYSKEYDOWN is only sent when Alt is held, so VK_RETURN here is Alt+Enter.
+    if (wParam == VK_RETURN)
     {
         // Alt+Enter pressed - toggle display mode
         if (m_appState && m_renderSystem && m_viewport && m_animationSystem)
@@ -607,12 +1015,33 @@ void Application::OnSysKeyDown (WPARAM wParam)
             ResizeWindowForCurrentMode();
             m_inDisplayModeTransition = false;
         }
+
+        // Immediately hide overlays on Alt+Enter (no fade — viewport is changing)
+        {
+            std::lock_guard<std::mutex> lock (m_renderMutex);
+
+            if (m_helpOverlay && m_helpOverlay->IsActive())
+            {
+                m_helpOverlay->Hide();
+            }
+
+            if (m_hotkeyOverlay && m_hotkeyOverlay->IsActive())
+            {
+                m_hotkeyOverlay->Hide();
+            }
+        }
     }
 }
 
 
 
 
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  Application::OnMouseMove
+//
+////////////////////////////////////////////////////////////////////////////////
 
 void Application::OnMouseMove (LPARAM lParam)
 {
@@ -645,6 +1074,12 @@ Error:
 
 
 
+////////////////////////////////////////////////////////////////////////////////
+//
+//  Application::OnSize
+//
+////////////////////////////////////////////////////////////////////////////////
+
 void Application::OnSize (LPARAM lParam)
 {
     // Skip redundant resize if we're in the middle of a display mode transition
@@ -660,12 +1095,81 @@ void Application::OnSize (LPARAM lParam)
     {
         m_renderSystem->Resize (width, height);
         m_viewport->Resize (static_cast<float> (width), static_cast<float> (height));
+
+
     }
 }
 
 
 
 
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  Application::OnDpiChanged
+//
+//  Handles WM_DPICHANGED — triggered when the window moves to a monitor
+//  with a different DPI.  Resizes the window per the Windows-suggested rect
+//  and propagates the new DPI to the render system and overlays.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+void Application::OnDpiChanged (WPARAM wParam, LPARAM lParam)
+{
+    UINT              newDpi   = HIWORD (wParam);
+    float             dpiScale = static_cast<float> (newDpi) / 96.0f;
+    const RECT      * pRect   = reinterpret_cast<const RECT *> (lParam);
+
+
+    // Resize window to the rect Windows suggests for the new DPI
+    if (pRect)
+    {
+        SetWindowPos (m_hwnd,
+                      nullptr,
+                      pRect->left,
+                      pRect->top,
+                      pRect->right  - pRect->left,
+                      pRect->bottom - pRect->top,
+                      SWP_NOZORDER | SWP_NOACTIVATE);
+    }
+
+    // Propagate new DPI scale to the render system
+    if (m_renderSystem)
+    {
+        m_renderSystem->OnDpiChanged (newDpi);
+    }
+
+    // Propagate new DPI scale to overlays
+    if (m_helpOverlay)
+    {
+        m_helpOverlay->SetDpiScale (dpiScale);
+
+
+    }
+
+    if (m_hotkeyOverlay)
+    {
+        m_hotkeyOverlay->SetDpiScale (dpiScale);
+
+
+    }
+
+    // Propagate new DPI scale to animation system for character spacing
+    if (m_animationSystem)
+    {
+        m_animationSystem->SetDpiScale (dpiScale);
+    }
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  Application::OnNcHitTest
+//
+////////////////////////////////////////////////////////////////////////////////
 
 void Application::OnNcHitTest (LRESULT & result)
 {

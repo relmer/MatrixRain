@@ -2,6 +2,7 @@
 
 #include "..\..\MatrixRainCore\Application.h"
 #include "..\..\MatrixRainCore\ApplicationState.h"
+#include "..\..\MatrixRainCore\InMemorySettingsProvider.h"
 #include "..\..\MatrixRainCore\InputSystem.h"
 #include "..\..\MatrixRainCore\DensityController.h"
 #include "..\..\MatrixRainCore\Viewport.h"
@@ -30,7 +31,8 @@ namespace MatrixRainTests
             // 
             // This is tested in manual/automated UI tests due to window requirements
 
-            ApplicationState appState;
+            InMemorySettingsProvider settingsProvider;
+            ApplicationState appState (settingsProvider);
             appState.Initialize (nullptr);
 
             // Verify initial state
@@ -57,9 +59,10 @@ namespace MatrixRainTests
         TEST_METHOD (InputSystem_KeyboardInput_TriggersExitState)
         {
             // Verify that any keyboard input sets the exit flag
-            ApplicationState  appState;
+            InMemorySettingsProvider settingsProvider;
+            ApplicationState  appState (settingsProvider);
             Viewport          viewport;
-            DensityController densityController (viewport, 32.0f);
+            DensityController densityController (viewport, 24.0f);
             InputSystem       inputSystem;
 
 
@@ -82,9 +85,10 @@ namespace MatrixRainTests
         TEST_METHOD (InputSystem_MouseMovementBelowThreshold_DoesNotTriggerExit)
         {
             // Verify that small mouse movements don't trigger exit
-            ApplicationState  appState;
+            InMemorySettingsProvider settingsProvider;
+            ApplicationState  appState (settingsProvider);
             Viewport          viewport;
-            DensityController densityController (viewport, 32.0f);
+            DensityController densityController (viewport, 24.0f);
             InputSystem       inputSystem;
 
 
@@ -113,9 +117,10 @@ namespace MatrixRainTests
         TEST_METHOD (InputSystem_MouseMovementExceedsThreshold_TriggersExit)
         {
             // Verify that significant mouse movement triggers exit
-            ApplicationState  appState;
+            InMemorySettingsProvider settingsProvider;
+            ApplicationState  appState (settingsProvider);
             Viewport          viewport;
-            DensityController densityController (viewport, 32.0f);
+            DensityController densityController (viewport, 24.0f);
             InputSystem       inputSystem;
 
 
@@ -144,9 +149,10 @@ namespace MatrixRainTests
         TEST_METHOD (InputSystem_ResetExitState_ClearsFlags)
         {
             // Verify that exit state can be reset for reuse
-            ApplicationState  appState;
+            InMemorySettingsProvider settingsProvider;
+            ApplicationState  appState (settingsProvider);
             Viewport          viewport;
-            DensityController densityController (viewport, 32.0f);
+            DensityController densityController (viewport, 24.0f);
             InputSystem       inputSystem;
 
 

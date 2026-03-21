@@ -59,7 +59,7 @@ private:
     
     static constexpr int MIN_PERCENTAGE     = 0;
     static constexpr int MAX_PERCENTAGE     = 100;
-    static constexpr int DEFAULT_PERCENTAGE = 80; // Start at 80% density
+    static constexpr int DEFAULT_PERCENTAGE = 50; // Start at 50% density
     static constexpr int PERCENTAGE_STEP    = 5;  // Change by 5% per +/- press
     static constexpr int MIN_STREAKS        = 1;  // Always show at least one streak
 };

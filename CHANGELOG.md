@@ -4,6 +4,34 @@ All notable changes to MatrixRain are documented in this file.
 
 ## [Unreleased]
 
+## [1.1.1819] - 2026-03-21
+
+### Added
+- Added usage dialog (`/?` or `-?`) showing command-line options
+- Help hint overlay on startup showing Settings/Help/Exit keys with auto-dismiss
+- Hotkey reference overlay toggled via `?` key listing all keyboard shortcuts
+
+### Changed
+- Default rain density reduced for better visual balance
+
+### Fixed
+- Config dialog cancel not restoring keyboard input
+- Overlay character cycling and initial glyph display
+
+## [1.1.1307] - 2026-03-09
+
+### Added
+- Per-monitor DPI awareness for consistent character sizing across displays
+- Multi-pass Gaussian blur for smoother, wider bloom glow
+- Glow size slider now controls blur kernel radius in real time
+
+### Changed
+- Bloom compositing uses exponential soft-saturation to prevent clipping
+- Lowered bloom extraction threshold for a more visible glow at normal brightness
+
+### Fixed
+- Character size and spacing now scale correctly on high-DPI displays
+
 ## [1.0.1001] - 2026-02-23
 
 ### Added

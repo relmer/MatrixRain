@@ -2,6 +2,7 @@
 
 #include "ColorScheme.h"
 #include "ConfigDialogSnapshot.h"
+#include "ISettingsProvider.h"
 #include "ScreenSaverSettings.h"
 
 
@@ -22,9 +23,11 @@ class ApplicationState;
 class ConfigDialogController
 {
 public:
+    explicit ConfigDialogController (ISettingsProvider & settingsProvider);
+
     /// <summary>
-    /// Initialize controller and load current settings from registry.
-    /// Falls back to defaults if registry key doesn't exist.
+    /// Load current settings from provider.
+    /// Falls back to defaults if no saved settings exist.
     /// </summary>
     /// <returns>S_OK on success, error HRESULT otherwise</returns>
     HRESULT Initialize();
@@ -126,8 +129,9 @@ public:
     bool IsLiveMode() const { return m_snapshot.isLiveMode; }
 
 private:
+    ISettingsProvider   & m_settingsProvider;            // Settings provider (not owned)
     ScreenSaverSettings  m_settings;                    // Current settings (may include pending changes)
-    ScreenSaverSettings  m_originalSettings;            // Original settings loaded from registry
+    ScreenSaverSettings  m_originalSettings;            // Original settings loaded from provider
     ConfigDialogSnapshot m_snapshot;                    // Snapshot for live mode Cancel rollback
 };
 

@@ -77,11 +77,10 @@ Represents the rendering camera and screen dimensions.
 Manages streak spawn rate and active streak count.
 
 **Properties**:
-- `level: int32_t` - Current density level (range: 1-10, default 5)
-- `minStreaks: uint32_t` - Minimum active streaks for current level (level × 10)
-- `maxStreaks: uint32_t` - Maximum active streaks for current level (level × 50)
-- `spawnInterval: float` - Seconds between spawn checks (0.1s)
-- `timeSinceLastSpawn: float` - Accumulator for spawn timing
+- `percentage: int` - Current density percentage (range: 0-100, default 50)
+- `maxStreaks: int` - Maximum active streaks = `(viewportWidth / charWidth) * 2.4`
+- `targetStreakCount: int` - `max(1, maxStreaks * percentage / 100)`
+- `MIN_STREAKS: int` - Always at least 1 streak even at 0%
 
 **Invariants**:
 - `level` in range [1, 10]

@@ -27,7 +27,7 @@ namespace MatrixRainTests
             // Create animation system with viewport
             Viewport viewport;
             viewport.Resize (800, 600);
-            DensityController densityController (viewport, 32.0f);
+            DensityController densityController (viewport, 24.0f);
             AnimationSystem animationSystem;
             animationSystem.Initialize (viewport, densityController);
 
@@ -64,7 +64,7 @@ namespace MatrixRainTests
             // Create animation system with viewport
             Viewport viewport;
             viewport.Resize (800, 600);
-            DensityController densityController (viewport, 32.0f);
+            DensityController densityController (viewport, 24.0f);
             AnimationSystem animationSystem;
             animationSystem.Initialize (viewport, densityController);
 
@@ -99,7 +99,7 @@ namespace MatrixRainTests
             // Create animation system with viewport
             Viewport viewport;
             viewport.Resize (800, 600);
-            DensityController densityController (viewport, 32.0f);
+            DensityController densityController (viewport, 24.0f);
             AnimationSystem animationSystem;
             animationSystem.Initialize (viewport, densityController);
 
@@ -140,7 +140,7 @@ namespace MatrixRainTests
             // Create animation system with viewport
             Viewport viewport;
             viewport.Resize (800, 600);
-            DensityController densityController (viewport, 32.0f);
+            DensityController densityController (viewport, 24.0f);
             AnimationSystem animationSystem;
             animationSystem.Initialize (viewport, densityController);
 

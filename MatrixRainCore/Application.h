@@ -1,5 +1,8 @@
 #pragma once
 
+#include "RegistrySettingsProvider.h"
+#include "ScreenSaverModeContext.h"
+
 
 
 
@@ -12,7 +15,7 @@ class DensityController;
 class InputSystem;
 class ApplicationState;
 class FPSCounter;
-struct ScreenSaverModeContext;
+class Overlay;
 
 
 
@@ -30,12 +33,16 @@ public:
     void    Shutdown();
 
     // Accessors for live overlay configuration dialog
-    HWND               GetMainWindowHwnd()   const                { return m_hwnd;                   }
-    ApplicationState * GetApplicationState() const                { return m_appState.get();         }
-    void               SetConfigDialog       (HWND hConfigDialog) { m_hConfigDialog = hConfigDialog; }
+    HWND                GetMainWindowHwnd()   const                { return m_hwnd;                   }
+    HINSTANCE           GetInstance()         const                { return m_hInstance;              }
+    ApplicationState  * GetApplicationState() const                { return m_appState.get();         }
+    ISettingsProvider & GetSettingsProvider()                      { return m_settingsProvider;       }
+    void                SetConfigDialog       (HWND hConfigDialog) { m_hConfigDialog = hConfigDialog; }
+    ScreenSaverMode     GetScreenSaverMode()  const                { return m_pScreenSaverContext ? m_pScreenSaverContext->m_mode : ScreenSaverMode::Normal; }
     
-    // Apply display mode change and resize window
-    void               ApplyDisplayModeChange()                   { ResizeWindowForCurrentMode();    }
+    void                SetOpenConfigDialogCallback (std::function<void()> callback) { m_openConfigDialogCallback = callback; }
+    void                SetShowUsageDialogCallback (std::function<void()> callback)  { m_showUsageDialogCallback = callback; }
+    void                ApplyDisplayModeChange()                   { ResizeWindowForCurrentMode();    }
 
     // Window dimensions
     static constexpr UINT            DEFAULT_WIDTH  = 1280;
@@ -44,6 +51,7 @@ public:
 
 private:
     // Core systems
+    RegistrySettingsProvider           m_settingsProvider;
     std::unique_ptr<Viewport>          m_viewport;
     std::unique_ptr<AnimationSystem>   m_animationSystem;
     std::unique_ptr<RenderSystem>      m_renderSystem;
@@ -52,18 +60,22 @@ private:
     std::unique_ptr<InputSystem>       m_inputSystem;
     std::unique_ptr<ApplicationState>  m_appState;
     std::unique_ptr<FPSCounter>        m_fpsCounter;
+    std::unique_ptr<Overlay>           m_helpOverlay;
+    std::unique_ptr<Overlay>           m_hotkeyOverlay;
+    std::unique_ptr<Overlay>           m_usageOverlay;
 
     // Win32 window
     HWND      m_hwnd                    { nullptr };
     HINSTANCE m_hInstance               { nullptr };
     bool      m_isRunning               { false   };
-    bool      m_isPaused                { false   };
-    bool      m_inDisplayModeTransition { false   };
+    std::atomic<bool> m_isPaused                { false };
+    std::atomic<bool> m_inDisplayModeTransition { false };
     
-    // Live overlay configuration dialog (modeless)
     HWND      m_hConfigDialog           { nullptr };
     
-    // Screensaver mode
+    std::function<void()> m_openConfigDialogCallback;
+    std::function<void()> m_showUsageDialogCallback;
+    
     const ScreenSaverModeContext * m_pScreenSaverContext { nullptr };
     
     // Render thread
@@ -84,7 +96,6 @@ private:
     void    ResizeWindowForCurrentMode();
     bool    ShouldExitScreenSaverOnKey    (WPARAM wParam);
     
-    // Render thread
     void    RenderThreadProc();
     
     // Message handlers
@@ -92,6 +103,7 @@ private:
     void OnSysKeyDown               (WPARAM wParam);
     void OnMouseMove                (LPARAM lParam);
     void OnSize                     (LPARAM lParam);
+    void OnDpiChanged               (WPARAM wParam, LPARAM lParam);
     void OnNcHitTest                (LRESULT & result);
     
     // Window procedure

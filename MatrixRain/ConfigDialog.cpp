@@ -13,9 +13,10 @@
 
 struct DialogContext
 {
-    std::unique_ptr<ConfigDialogController> m_controller;
-    Application                           * m_pApp              = nullptr;
-    bool                                    m_ownsContextMemory = false;
+    std::unique_ptr<ConfigDialogController>   m_controller;
+    RegistrySettingsProvider                  m_settingsProvider;
+    Application                             * m_pApp              = nullptr;
+    bool                                      m_ownsContextMemory = false;
 };
 
 
@@ -221,7 +222,11 @@ static BOOL OnInitDialog (HWND hDlg, LPARAM initParam)
     
     CheckDlgButton (hDlg, IDC_STARTFULLSCREEN_CHECK, pSettings->m_startFullscreen ? BST_CHECKED : BST_UNCHECKED);
     CheckDlgButton (hDlg, IDC_SHOWDEBUG_CHECK,       pSettings->m_showDebugStats  ? BST_CHECKED : BST_UNCHECKED);
+#ifdef _DEBUG
     CheckDlgButton (hDlg, IDC_SHOWFADETIMERS_CHECK,  pSettings->m_showFadeTimers  ? BST_CHECKED : BST_UNCHECKED);
+#else
+    ShowWindow (GetDlgItem (hDlg, IDC_SHOWFADETIMERS_CHECK), SW_HIDE);
+#endif
     
     fSuccess = TRUE;
 
@@ -385,6 +390,7 @@ Error:
 
 
 
+#ifdef _DEBUG
 ////////////////////////////////////////////////////////////////////////////////
 //
 //  OnShowFadeTimersCheck
@@ -412,6 +418,7 @@ static void OnShowFadeTimersCheck (HWND hDlg)
 Error:
     return;
 }
+#endif
 
 
 
@@ -461,7 +468,9 @@ static void OnResetButton (HWND hDlg)
     
     CheckDlgButton (hDlg, IDC_STARTFULLSCREEN_CHECK, pDefaults->m_startFullscreen ? BST_CHECKED : BST_UNCHECKED);
     CheckDlgButton (hDlg, IDC_SHOWDEBUG_CHECK,       pDefaults->m_showDebugStats  ? BST_CHECKED : BST_UNCHECKED);
+#ifdef _DEBUG
     CheckDlgButton (hDlg, IDC_SHOWFADETIMERS_CHECK,  pDefaults->m_showFadeTimers  ? BST_CHECKED : BST_UNCHECKED);
+#endif
     
     // If live overlay mode, propagate changes to running application
     // (ResetToDefaults already updated controller settings, now trigger live propagation)
@@ -538,15 +547,24 @@ static BOOL OnCancel (HWND hDlg)
 
     CBRAEx (pController != nullptr, E_UNEXPECTED);
 
-    pController->CancelChanges();
-    
-    // For modeless dialogs, use DestroyWindow instead of EndDialog
+    // For modeless dialogs, revert live preview changes back to snapshot
     if (pController->IsLiveMode())
     {
+        Application * pApp = GetApplicationFromDialog (hDlg);
+
+        pController->CancelLiveMode();
+
+        // Clear the dialog handle before destroying so input handling resumes
+        if (pApp)
+        {
+            pApp->SetConfigDialog (nullptr);
+        }
+
         DestroyWindow (hDlg);
     }
     else
     {
+        pController->CancelChanges();
         EndDialog (hDlg, IDCANCEL);
     }
     
@@ -593,9 +611,11 @@ static BOOL OnCommand (HWND hDlg, WPARAM wParam)
             OnShowDebugCheck (hDlg);
             break;
             
+#ifdef _DEBUG
         case IDC_SHOWFADETIMERS_CHECK:
             OnShowFadeTimersCheck (hDlg);
             break;
+#endif
             
         case IDC_RESET_BUTTON:
             OnResetButton (hDlg);
@@ -603,15 +623,63 @@ static BOOL OnCommand (HWND hDlg, WPARAM wParam)
             
         case IDOK:
             fSuccess = OnOK (hDlg);
-            goto Error;
+            break;
             
         case IDCANCEL:
             fSuccess = OnCancel (hDlg);
-            goto Error;
+            break;
     }
 
 Error:
     return fSuccess;
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  OnDestroy
+//
+////////////////////////////////////////////////////////////////////////////////
+
+static void OnDestroy (HWND hDlg)
+{
+    DialogContext          * pContext    = GetDialogContext (hDlg);
+    ConfigDialogController * pController = pContext ? pContext->m_controller.get() : nullptr;
+
+
+
+    if (pController && pController->IsLiveMode())
+    {
+        Application * pApp = GetApplicationFromDialog (hDlg);
+
+
+
+        if (pApp)
+        {
+            pApp->SetConfigDialog (nullptr);
+
+            // Only quit the app if it was launched in /c settings-only mode
+            if (pApp->GetScreenSaverMode() == ScreenSaverMode::SettingsDialog)
+            {
+                PostQuitMessage (0);
+            }
+        }
+    }
+
+
+
+    if (pContext)
+    {
+        SetWindowLongPtr (hDlg, DWLP_USER, 0);
+        
+        if (pContext->m_ownsContextMemory)
+        {
+            delete pContext;
+        }
+    }
 }
 
 
@@ -639,47 +707,22 @@ static INT_PTR CALLBACK ConfigDialogProc (HWND   hDlg,
     {
         case WM_INITDIALOG:
             result = OnInitDialog (hDlg, lParam);
-            goto Error;
+            break;
         
         case WM_HSCROLL:
             result = OnHScroll (hDlg, lParam);
-            goto Error;
+            break;
         
         case WM_COMMAND:
             result = OnCommand (hDlg, wParam);
-            goto Error;
+            break;
         
         case WM_DESTROY:
-        {
-            DialogContext * pContext = GetDialogContext (hDlg);
-            ConfigDialogController * pController = pContext ? pContext->m_controller.get() : nullptr;
-
-            if (pController && pController->IsLiveMode())
-            {
-                if (Application * pApp = GetApplicationFromDialog (hDlg))
-                {
-                    pApp->SetConfigDialog (nullptr);
-                }
-
-                PostQuitMessage (0);
-            }
-
-            if (pContext)
-            {
-                SetWindowLongPtr (hDlg, DWLP_USER, 0);
-                
-                if (pContext->m_ownsContextMemory)
-                {
-                    delete pContext;
-                }
-            }
-
+            OnDestroy (hDlg);
             result = TRUE;
-            goto Error;
-        }
+            break;
     }
 
-Error:
     return result;
 }
 
@@ -705,7 +748,7 @@ int ShowConfigDialog (HINSTANCE hInstance, const ScreenSaverModeContext & contex
     
 
 
-    dlgContext.m_controller = std::make_unique<ConfigDialogController>();
+    dlgContext.m_controller = std::make_unique<ConfigDialogController> (dlgContext.m_settingsProvider);
     hr = dlgContext.m_controller->Initialize();
     CHRA (hr);
 
@@ -756,7 +799,7 @@ HRESULT CreateConfigDialog (HINSTANCE          hInstance,
 
 
 
-    context->m_controller = std::make_unique<ConfigDialogController>();
+    context->m_controller = std::make_unique<ConfigDialogController> (pApplication->GetSettingsProvider());
     hr = context->m_controller->Initialize();
     CHRA (hr);
 

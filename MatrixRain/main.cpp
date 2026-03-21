@@ -2,6 +2,7 @@
 
 #include "..\MatrixRainCore\Application.h"
 #include "..\MatrixRainCore\ScreenSaverModeParser.h"
+#include "..\MatrixRainCore\UsageText.h"
 #include "ConfigDialog.h"
 
 
@@ -37,6 +38,9 @@ int APIENTRY wWinMain(_In_     HINSTANCE hInstance,
     hr = ParseCommandLine (lpCmdLine, context);
     CHR (hr);
 
+    // Handle help request — runs through Application in HelpRequested mode
+    // (no longer uses UsageDialog — overlay renders via GPU pipeline)
+
     // Handle configuration mode with HWND (modal Control Panel dialog)
     if (context.m_mode == ScreenSaverMode::SettingsDialog && context.m_previewParentHwnd != nullptr)
     {
@@ -62,6 +66,42 @@ int APIENTRY wWinMain(_In_     HINSTANCE hInstance,
         
         app.SetConfigDialog (hConfigDialog);
     }
+
+    // Wire Enter key → open config dialog callback
+    app.SetOpenConfigDialogCallback ([&app, hInstance]()
+    {
+        HWND    hConfigDialog = nullptr;
+        HRESULT hrDialog      = S_OK;
+
+        hrDialog = CreateConfigDialog (hInstance,
+                                       app.GetMainWindowHwnd(),
+                                       &app,
+                                       app.GetApplicationState(),
+                                       &hConfigDialog);
+
+        if (SUCCEEDED (hrDialog))
+        {
+            app.SetConfigDialog (hConfigDialog);
+        }
+    });
+
+    // Wire ? key → show usage dialog callback
+    app.SetShowUsageDialogCallback ([&app]()
+    {
+        static bool s_fDialogOpen = false;
+
+        if (s_fDialogOpen)
+        {
+            return;
+        }
+
+        s_fDialogOpen = true;
+
+        UsageText usage (L'/');
+        MessageBoxW (app.GetMainWindowHwnd(), usage.GetPlainText().c_str(), L"MatrixRain — Help", MB_OK | MB_ICONINFORMATION);
+
+        s_fDialogOpen = false;
+    });
     
     retval = app.Run();
 

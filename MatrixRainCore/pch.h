@@ -14,14 +14,17 @@
 #include <array>
 #include <atomic>
 #include <chrono>
+#include <format>
 #include <functional>
 #include <map>
 #include <memory>
 #include <mutex>
 #include <optional>
 #include <random>
+#include <span>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <thread>
 #include <vector>
 

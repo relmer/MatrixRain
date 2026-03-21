@@ -15,18 +15,18 @@ namespace MatrixRainTests
 
 		TEST_METHOD (TestDensityControllerInitializationWithDefaultPercentage)
 		{
-			// Test DensityController initialization with 80% default
-			// For a 1920px viewport: max = 1920 / 32 * 4 = 240 streaks
-			// At 80%: target = 240 * 0.80 = 192 streaks
+			// Test DensityController initialization with 50% default
+			// For a 1920px viewport: max = 1920 / 24 * 2.4 = 192 streaks
+			// At 50%: target = 192 * 0.50 = 96 streaks
 
 			Viewport viewport;
 			viewport.Resize (1920.0f, 1080.0f);
 
-			DensityController controller(viewport, 32.0f);
+			DensityController controller(viewport, 24.0f);
 
-			Assert::AreEqual (80, controller.GetPercentage(), L"Default percentage should be 80");
-			Assert::AreEqual (240, controller.GetMaxPossibleStreaks(), L"Max possible streaks for 1920px should be 240");
-			Assert::AreEqual (192, controller.GetTargetStreakCount(), L"Target streak count at 80% should be 192");
+			Assert::AreEqual (50, controller.GetPercentage(), L"Default percentage should be 50");
+			Assert::AreEqual (192, controller.GetMaxPossibleStreaks(), L"Max possible streaks for 1920px should be 192");
+			Assert::AreEqual (96, controller.GetTargetStreakCount(), L"Target streak count at 50% should be 96");
 		}
 
 
@@ -36,28 +36,28 @@ namespace MatrixRainTests
 		TEST_METHOD (TestDensityControllerIncreasesToMax100Percent)
 		{
 			// Test DensityController percentage increase to max 100%
-			// Step size is 5%, so 80% → 85% → 90% → 95% → 100%
+			// Step size is 5%, so 50% → 55% → ... → 100%
 
 			Viewport viewport;
 			viewport.Resize (1920.0f, 1080.0f);
 
-			DensityController controller(viewport, 32.0f);
+			DensityController controller(viewport, 24.0f);
 
-			// Increase from 80% to 100% (4 steps of 5%)
-			controller.IncreaseLevel(); // 85%
-			controller.IncreaseLevel(); // 90%
-			controller.IncreaseLevel(); // 95%
-			controller.IncreaseLevel(); // 100%
+			// Increase from 50% to 100% (10 steps of 5%)
+			for (int i = 0; i < 10; ++i)
+			{
+				controller.IncreaseLevel();
+			}
 
 			Assert::AreEqual (100, controller.GetPercentage(), L"Percentage should be at max 100");
-			Assert::AreEqual (240, controller.GetTargetStreakCount(), L"Target at 100% should equal max possible (240)");
+			Assert::AreEqual (192, controller.GetTargetStreakCount(), L"Target at 100% should equal max possible (192)");
 
 			// Try to increase beyond max
 			controller.IncreaseLevel();
 			controller.IncreaseLevel();
 
 			Assert::AreEqual (100, controller.GetPercentage(), L"Percentage should remain at max 100");
-			Assert::AreEqual (240, controller.GetTargetStreakCount(), L"Target should remain at max (240)");
+			Assert::AreEqual (192, controller.GetTargetStreakCount(), L"Target should remain at max (192)");
 		}
 
 
@@ -72,10 +72,10 @@ namespace MatrixRainTests
     		Viewport viewport;
     		viewport.Resize (1920.0f, 1080.0f);
 
-    		DensityController controller(viewport, 32.0f);
+    		DensityController controller(viewport, 24.0f);
 
-    		// Decrease from 80% to 0% (16 steps of 5%)
-    		for (int i = 0; i < 16; ++i)
+    	// Decrease from 50% to 0% (10 steps of 5%)
+    	for (int i = 0; i < 10; ++i)
     		{
 				controller.DecreaseLevel();
     		}
@@ -103,9 +103,9 @@ namespace MatrixRainTests
     		Viewport viewport;
     		viewport.Resize (1920.0f, 1080.0f);
 
-    		DensityController controller(viewport, 32.0f);
+    		DensityController controller(viewport, 24.0f);
 
-    		int target = controller.GetTargetStreakCount(); // 384 for 80% at 1920px
+int target = controller.GetTargetStreakCount(); // 96 for 50% at 1920px
 
     		// Below target: should spawn
     		Assert::IsTrue (controller.ShouldSpawnStreak (0), L"Should spawn when count is 0");
@@ -130,7 +130,7 @@ namespace MatrixRainTests
 			Viewport viewport;
 			viewport.Resize (1920.0f, 1080.0f);
 
-			DensityController controller(viewport, 32.0f);
+			DensityController controller(viewport, 24.0f);
 
 			// Test max bound enforcement
 			for (int i = 0; i < 30; ++i) // Try to go way beyond max
@@ -139,7 +139,7 @@ namespace MatrixRainTests
 			}
 
 			Assert::AreEqual (100, controller.GetPercentage(), L"Percentage should be clamped at max 100");
-			Assert::AreEqual (240, controller.GetTargetStreakCount(), L"Target count should match 100% of max");
+Assert::AreEqual (192, controller.GetTargetStreakCount(), L"Target count should match 100% of max");
 
     		// Test min bound enforcement
     		for (int i = 0; i < 30; ++i) // Try to go way beyond min
@@ -162,26 +162,26 @@ namespace MatrixRainTests
 			// Small viewport: 640px
 			Viewport smallViewport;
 			smallViewport.Resize (640.0f, 480.0f);
-			DensityController smallController(smallViewport, 32.0f);
+			DensityController smallController(smallViewport, 24.0f);
 
-			// Max = 640 / 32 * 4 = 80 streaks
-			Assert::AreEqual (80, smallController.GetMaxPossibleStreaks(), L"Max for 640px should be 80");
+			// Max = 640 / 24 * 2.4 = 64 streaks
+			Assert::AreEqual (64, smallController.GetMaxPossibleStreaks(), L"Max for 640px should be 64");
 
 			// Medium viewport: 1920px
 			Viewport mediumViewport;
 			mediumViewport.Resize (1920.0f, 1080.0f);
-			DensityController mediumController(mediumViewport, 32.0f);
+			DensityController mediumController(mediumViewport, 24.0f);
 
-			// Max = 1920 / 32 * 4 = 240 streaks
-			Assert::AreEqual (240, mediumController.GetMaxPossibleStreaks(), L"Max for 1920px should be 240");
+			// Max = 1920 / 24 * 2.4 = 192 streaks
+			Assert::AreEqual (192, mediumController.GetMaxPossibleStreaks(), L"Max for 1920px should be 192");
 
 			// Large viewport: 3840px (4K)
 			Viewport largeViewport;
 			largeViewport.Resize (3840.0f, 2160.0f);
-			DensityController largeController(largeViewport, 32.0f);
+			DensityController largeController(largeViewport, 24.0f);
 
-			// Max = 3840 / 32 * 4 = 480 streaks
-			Assert::AreEqual (480, largeController.GetMaxPossibleStreaks(), L"Max for 3840px should be 480");
+			// Max = 3840 / 24 * 2.4 = 384 streaks
+			Assert::AreEqual (384, largeController.GetMaxPossibleStreaks(), L"Max for 3840px should be 384");
 		}
     };
 }  // namespace MatrixRainTests

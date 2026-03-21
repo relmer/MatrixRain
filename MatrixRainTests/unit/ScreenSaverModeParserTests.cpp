@@ -241,5 +241,118 @@ namespace MatrixRainTests
 
                 Assert::AreEqual (static_cast<int>(ScreenSaverMode::Normal), static_cast<int>(context.m_mode), L"unknown argument should default to Normal");
             }
+
+
+
+
+            ////////////////////////////////////////////////////////////
+            //  T010: /? and -? return HelpRequested mode
+            ////////////////////////////////////////////////////////////
+
+            TEST_METHOD (ParseCommandLine_SlashQuestion_ReturnsHelpRequested)
+            {
+                HRESULT                hr;
+                ScreenSaverModeContext context;
+
+
+                hr = ParseCommandLine (L"/?", context);
+
+
+
+                Assert::IsTrue (SUCCEEDED (hr), L"ParseCommandLine should succeed for /?");
+                Assert::AreEqual (static_cast<int>(ScreenSaverMode::HelpRequested), static_cast<int>(context.m_mode), L"mode should be HelpRequested");
+                Assert::AreEqual (L'/', context.m_switchPrefix, L"switch prefix should be /");
+            }
+
+
+
+
+            TEST_METHOD (ParseCommandLine_DashQuestion_ReturnsHelpRequested)
+            {
+                HRESULT                hr;
+                ScreenSaverModeContext context;
+
+
+                hr = ParseCommandLine (L"-?", context);
+
+
+
+                Assert::IsTrue (SUCCEEDED (hr), L"ParseCommandLine should succeed for -?");
+                Assert::AreEqual (static_cast<int>(ScreenSaverMode::HelpRequested), static_cast<int>(context.m_mode), L"mode should be HelpRequested");
+                Assert::AreEqual (L'-', context.m_switchPrefix, L"switch prefix should be -");
+            }
+
+
+
+
+            ////////////////////////////////////////////////////////////
+            //  T010: All preexisting switches accept - prefix
+            ////////////////////////////////////////////////////////////
+
+            TEST_METHOD (ParseCommandLine_DashS_ReturnsScreenSaverFullMode)
+            {
+                HRESULT                hr;
+                ScreenSaverModeContext context;
+
+
+                hr = ParseCommandLine (L"-s", context);
+
+
+
+                Assert::IsTrue (SUCCEEDED (hr), L"ParseCommandLine should succeed for -s");
+                Assert::AreEqual (static_cast<int>(ScreenSaverMode::ScreenSaverFull), static_cast<int>(context.m_mode), L"-s should give ScreenSaverFull");
+            }
+
+
+
+
+            TEST_METHOD (ParseCommandLine_DashC_ReturnsSettingsDialogMode)
+            {
+                HRESULT                hr;
+                ScreenSaverModeContext context;
+
+
+                hr = ParseCommandLine (L"-c", context);
+
+
+
+                Assert::IsTrue (SUCCEEDED (hr), L"ParseCommandLine should succeed for -c");
+                Assert::AreEqual (static_cast<int>(ScreenSaverMode::SettingsDialog), static_cast<int>(context.m_mode), L"-c should give SettingsDialog");
+            }
+
+
+
+
+            TEST_METHOD (ParseCommandLine_DashA_ReturnsPasswordChangeUnsupported)
+            {
+                HRESULT                hr;
+                ScreenSaverModeContext context;
+
+
+                hr = ParseCommandLine (L"-a", context);
+
+
+
+                Assert::IsTrue (SUCCEEDED (hr), L"ParseCommandLine should succeed for -a");
+                Assert::AreEqual (static_cast<int>(ScreenSaverMode::PasswordChangeUnsupported), static_cast<int>(context.m_mode), L"-a should give PasswordChangeUnsupported");
+            }
+
+
+
+
+            TEST_METHOD (ParseCommandLine_DashS_CaseInsensitive)
+            {
+                HRESULT                hr;
+                ScreenSaverModeContext contextLower;
+                ScreenSaverModeContext contextUpper;
+
+
+                hr = ParseCommandLine (L"-s", contextLower);
+                hr = ParseCommandLine (L"-S", contextUpper);
+
+
+
+                Assert::AreEqual (static_cast<int>(contextLower.m_mode), static_cast<int>(contextUpper.m_mode), L"-s and -S should give same mode");
+            }
     };
 }  // namespace MatrixRainTests

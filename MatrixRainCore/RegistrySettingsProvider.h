@@ -1,26 +1,26 @@
 #pragma once
 
-#include "ScreenSaverSettings.h"
+#include "ISettingsProvider.h"
 
 
 
 
 
-class RegistrySettingsProvider
+class RegistrySettingsProvider : public ISettingsProvider
 {
 public:
-    static HRESULT Load (ScreenSaverSettings & settings);
-    static HRESULT Save (const ScreenSaverSettings & settings);
-    
-    // For testing: allows overriding the registry key path
-    static void SetRegistryKeyPath (LPCWSTR path);
-    static void ResetRegistryKeyPath();
+    explicit RegistrySettingsProvider (LPCWSTR registryKeyPath = REGISTRY_KEY_PATH) :
+        m_registryKeyPath (registryKeyPath)
+    {
+    }
+
+    HRESULT Load (ScreenSaverSettings & settings) override;
+    HRESULT Save (const ScreenSaverSettings & settings) override;
 
 private:
-    static constexpr LPCWSTR DEFAULT_REGISTRY_KEY_PATH = L"Software\\relmer\\MatrixRain";
-    static LPCWSTR s_registryKeyPath;
-    
-    static LPCWSTR GetRegistryKeyPath();
+    static constexpr LPCWSTR REGISTRY_KEY_PATH = L"Software\\relmer\\MatrixRain";
+
+    LPCWSTR m_registryKeyPath;
     
     static constexpr LPCWSTR VALUE_DENSITY                = L"Density";
     static constexpr LPCWSTR VALUE_COLOR_SCHEME           = L"ColorScheme";
@@ -29,7 +29,6 @@ private:
     static constexpr LPCWSTR VALUE_GLOW_SIZE              = L"GlowSize";
     static constexpr LPCWSTR VALUE_START_FULLSCREEN       = L"StartFullscreen";
     static constexpr LPCWSTR VALUE_SHOW_DEBUG_STATS       = L"ShowDebugStats";
-    static constexpr LPCWSTR VALUE_SHOW_FADE_TIMERS       = L"ShowFadeTimers";
     static constexpr LPCWSTR VALUE_LAST_SAVED             = L"LastSaved";
     
     static HRESULT ReadInt    (HKEY hKey, LPCWSTR valueName, int & outValue);

@@ -13,6 +13,53 @@
 
 class DensityController;
 
+
+
+
+
+/// <summary>
+/// Describes the valid coordinate ranges for streak spawning.
+/// Passed to the spawn position callback so clients can choose positions
+/// without needing internal knowledge of AnimationSystem spawn logic.
+/// </summary>
+struct SpawnRange
+{
+    float minX = 0.0f;
+    float maxX = 0.0f;
+    float minY = 0.0f;
+    float maxY = 0.0f;
+};
+
+
+
+
+
+/// <summary>
+/// Callback type for overriding streak spawn X position.
+/// Receives the valid spawn range; returns an X position to use,
+/// or nullopt to let AnimationSystem pick randomly.
+/// </summary>
+using SpawnPositionCallback = std::function<std::optional<float> (const SpawnRange &)>;
+
+
+
+
+
+/// <summary>
+/// A standalone character rendered through the GPU pipeline but not
+/// attached to any CharacterStreak.  Used for effects like horizontal
+/// tracer streaks in the help dialog.
+/// </summary>
+struct OverlayCharacter
+{
+    CharacterInstance character;       // Glyph, color, brightness, scale
+    Vector3           position;        // World position (x, y, z)
+};
+
+
+
+
+
 /// <summary>
 /// Manages all animated character streaks and camera zoom effects.
 /// Handles spawning, updating, and despawning of streaks based on viewport bounds.
@@ -90,10 +137,42 @@ public:
     /// <param name="speedPercent">Animation speed percentage (1-100)</param>
     void SetAnimationSpeed (int speedPercent);
 
+    /// <summary>
+    /// Override character spacing to prevent viewport-based scaling.
+    /// When set, CalculateCharacterSpacing() returns this value instead
+    /// of computing from viewport height.
+    /// </summary>
+    /// <param name="spacing">Fixed character spacing in pixels</param>
+    void SetCharacterSpacingOverride (float spacing);
+
+    /// <summary>
+    /// Set the DPI scale factor so character spacing scales with display DPI.
+    /// </summary>
+    /// <param name="dpiScale">Scale factor (1.0 at 96 DPI / 100%)</param>
+    void SetDpiScale (float dpiScale);
+
+    /// <summary>
+    /// Set a callback that can override the X position of newly spawned streaks.
+    /// The callback receives the valid spawn range and returns an X position,
+    /// or nullopt to use normal random placement.
+    /// Pass nullptr to clear the callback.
+    /// </summary>
+    /// <param name="callback">Spawn position callback, or nullptr to clear</param>
+    void SetSpawnPositionCallback (SpawnPositionCallback callback);
+
+    /// <summary>
+    /// Set overlay characters to be rendered alongside normal streaks.
+    /// These are standalone characters not attached to any streak,
+    /// useful for effects like horizontal tracer animations.
+    /// </summary>
+    /// <param name="overlays">Vector of overlay characters to render</param>
+    void SetOverlayCharacters (std::vector<OverlayCharacter> overlays);
+
     // Accessors
-    const std::vector<CharacterStreak> & GetStreaks()            const { return m_streaks;        }
-    size_t                               GetActiveStreakCount()  const { return m_streaks.size(); }
-    size_t                               GetActiveHeadCount()    const;
+    const std::vector<CharacterStreak>  & GetStreaks()            const { return m_streaks;            }
+    const std::vector<OverlayCharacter> & GetOverlayCharacters()  const { return m_overlayCharacters;  }
+    size_t                                GetActiveStreakCount()  const { return m_streaks.size();      }
+    size_t                                GetActiveHeadCount()    const;
     float                                GetZoomVelocity()       const { return m_zoomVelocity;   }
 
     void SetZoomVelocity (float velocity) { m_zoomVelocity = velocity; }
@@ -109,6 +188,10 @@ private:
     float                          m_spawnInterval         = SPAWN_INTERVAL; // Time between automatic spawns
     int                            m_previousTargetCount   = 0;            // Previous frame's target count (to detect density changes)
     int                            m_animationSpeedPercent = 100;        // Current animation speed percentage (1-100)
+    std::optional<float>           m_characterSpacingOverride;            // Override for character spacing (bypasses viewport scaling)
+    float                          m_dpiScale              = 1.0f;      // DPI scale factor (1.0 at 96 DPI / 100%)
+    SpawnPositionCallback          m_spawnPositionCallback;               // Optional callback for overriding spawn X position
+    std::vector<OverlayCharacter>  m_overlayCharacters;                   // Extra characters rendered alongside streaks
     
     // Random number generation
     std::random_device             m_randomDevice;

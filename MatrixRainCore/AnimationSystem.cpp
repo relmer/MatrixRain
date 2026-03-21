@@ -138,9 +138,26 @@ void AnimationSystem::SpawnStreak()
         return; // Not initialized
     }
 
-    // Random X position across viewport width
-    std::uniform_real_distribution<float> xDist (0.0f, m_viewport->GetWidth ());
-    float x = xDist (m_generator);
+    float viewportWidth = m_viewport->GetWidth ();
+
+
+
+    // Random X position across viewport width, unless callback overrides
+    std::uniform_real_distribution<float> xDist (0.0f, viewportWidth);
+
+    float x;
+
+    if (m_spawnPositionCallback)
+    {
+        SpawnRange range { 0.0f, viewportWidth, -200.0f, 0.0f };
+        auto       result = m_spawnPositionCallback (range);
+
+        x = result.value_or (xDist (m_generator));
+    }
+    else
+    {
+        x = xDist (m_generator);
+    }
 
     // Random Y position above viewport (between -200 and 0)
     std::uniform_real_distribution<float> yDist (-200.0f, 0.0f);
@@ -172,12 +189,30 @@ void AnimationSystem::SpawnStreakInView()
         return; // Not initialized
     }
 
-    // Random X position across viewport width
-    std::uniform_real_distribution<float> xDist (0.0f, m_viewport->GetWidth ());
-    float x = xDist (m_generator);
+    float viewportWidth  = m_viewport->GetWidth ();
+    float viewportHeight = m_viewport->GetHeight ();
+
+
+
+    // Random X position across viewport width, unless callback overrides
+    std::uniform_real_distribution<float> xDist (0.0f, viewportWidth);
+
+    float x;
+
+    if (m_spawnPositionCallback)
+    {
+        SpawnRange range { 0.0f, viewportWidth, 0.0f, viewportHeight };
+        auto       result = m_spawnPositionCallback (range);
+
+        x = result.value_or (xDist (m_generator));
+    }
+    else
+    {
+        x = xDist (m_generator);
+    }
 
     // Random Y position WITHIN viewport (0 to height) for immediate visibility
-    std::uniform_real_distribution<float> yDist (0.0f, m_viewport->GetHeight ());
+    std::uniform_real_distribution<float> yDist (0.0f, viewportHeight);
     float y = yDist (m_generator);
 
     // Random Z depth (0 = near, 100 = far)
@@ -358,9 +393,92 @@ void AnimationSystem::SetAnimationSpeed (int speedPercent)
 
 
 
+////////////////////////////////////////////////////////////////////////////////
+//
+//  AnimationSystem::SetCharacterSpacingOverride
+//
+//  Overrides the viewport-based character spacing calculation.
+//  Used by UsageDialog to force full-size rain characters in its
+//  smaller window.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+void AnimationSystem::SetCharacterSpacingOverride (float spacing)
+{
+    m_characterSpacingOverride = spacing;
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  AnimationSystem::SetDpiScale
+//
+//  Updates the DPI scale factor and recalculates character spacing on all
+//  active streaks so they don't overlap at high DPI.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+void AnimationSystem::SetDpiScale (float dpiScale)
+{
+    m_dpiScale = dpiScale;
+
+    // Recalculate spacing for all existing streaks
+    float characterSpacing = CalculateCharacterSpacing();
+
+    for (auto & streak : m_streaks)
+    {
+        streak.SetCharacterSpacing (characterSpacing);
+    }
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  AnimationSystem::SetSpawnPositionCallback
+//
+//  Sets or clears the callback used to override streak spawn X positions.
+//  The callback receives the valid spawn coordinate range and returns an
+//  X position override, or nullopt to use normal random placement.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+void AnimationSystem::SetSpawnPositionCallback (SpawnPositionCallback callback)
+{
+    m_spawnPositionCallback = std::move (callback);
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  AnimationSystem::SetOverlayCharacters
+//
+//  Replaces the current set of overlay characters.  These are rendered
+//  alongside normal streaks by the GPU pipeline but are not subject to
+//  density control or despawning — the caller owns their lifecycle.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+void AnimationSystem::SetOverlayCharacters (std::vector<OverlayCharacter> overlays)
+{
+    m_overlayCharacters = std::move (overlays);
+}
+
+
+
+
+
 float AnimationSystem::CalculateCharacterSpacing() const
 {
-    constexpr float BASE_SPACING     = 32.0f;
+    constexpr float BASE_SPACING     = 24.0f;
     constexpr float REFERENCE_HEIGHT = 1080.0f;
     constexpr float MIN_SCALE        = 0.5f;
 
@@ -368,15 +486,24 @@ float AnimationSystem::CalculateCharacterSpacing() const
 
 
 
+    // Use override if set (bypasses viewport-based scaling)
+    if (m_characterSpacingOverride.has_value())
+    {
+        return m_characterSpacingOverride.value();
+    }
+
     if (!m_viewport)
     {
-        return BASE_SPACING;
+        return BASE_SPACING * m_dpiScale;
     }
 
     viewportHeight = static_cast<float> (m_viewport->GetHeight ());
-    if (viewportHeight < REFERENCE_HEIGHT)
+
+    float referenceHeight = REFERENCE_HEIGHT * m_dpiScale;
+
+    if (viewportHeight < referenceHeight)
     {
-        float scale = viewportHeight / REFERENCE_HEIGHT;
+        float scale = viewportHeight / referenceHeight;
 
 
 
@@ -385,10 +512,10 @@ float AnimationSystem::CalculateCharacterSpacing() const
             scale = MIN_SCALE;
         }
 
-        return BASE_SPACING * scale;
+        return BASE_SPACING * scale * m_dpiScale;
     }
 
-    return BASE_SPACING;
+    return BASE_SPACING * m_dpiScale;
 }
 
 

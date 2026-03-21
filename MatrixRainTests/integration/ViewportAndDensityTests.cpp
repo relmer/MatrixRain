@@ -19,7 +19,7 @@ namespace MatrixRainTests
             Viewport viewport;
             viewport.Resize (1440.0f, 900.0f);
 
-            DensityController densityController (viewport, 32.0f);
+            DensityController densityController (viewport, 24.0f);
 
             AnimationSystem animationSystem;
             animationSystem.Initialize (viewport, densityController);
@@ -78,7 +78,7 @@ namespace MatrixRainTests
             Viewport viewport;
             viewport.Resize (1000.0f, 800.0f);
 
-            DensityController densityController (viewport, 32.0f);
+            DensityController densityController (viewport, 24.0f);
 
             AnimationSystem animationSystem;
             animationSystem.Initialize (viewport, densityController);
@@ -118,7 +118,7 @@ namespace MatrixRainTests
             Viewport viewport;
             viewport.Resize (1920.0f, 1080.0f);
 
-            DensityController densityController (viewport, 32.0f);
+            DensityController densityController (viewport, 24.0f);
 
             AnimationSystem animationSystem;
             animationSystem.Initialize (viewport, densityController);
@@ -180,7 +180,7 @@ namespace MatrixRainTests
                 L"Streak head Y position should be scaled");
 
             const auto & characters = streak.GetCharacters ();
-            const float characterSpacing = 32.0f;
+            const float characterSpacing = 24.0f;
 
             for (size_t i = 0; i < characters.size (); ++i)
             {
@@ -203,7 +203,7 @@ namespace MatrixRainTests
             Viewport viewport;
             viewport.Resize (800.0f, 480.0f);
 
-            DensityController densityController (viewport, 32.0f);
+            DensityController densityController (viewport, 24.0f);
             densityController.SetPercentage (0);
 
             AnimationSystem animationSystem;
@@ -234,8 +234,8 @@ namespace MatrixRainTests
             float prevY = characters[characters.size () - 2].positionOffset.y;
             float actualSpacing = headY - prevY;
 
-            // Height 480 → scale clamped to 0.5, so spacing should be 16px
-            Assert::AreEqual (16.0f, actualSpacing, 0.5f,
+            // Height 480 → scale clamped to 0.5, spacing = 24 * 0.5 = 12px
+            Assert::AreEqual (12.0f, actualSpacing, 0.5f,
                 L"Character spacing should shrink with viewport height (clamped at 0.5x)");
         }
     };
@@ -257,7 +257,7 @@ namespace MatrixRainTests
             Viewport viewport;
             viewport.Resize (1920.0f, 1080.0f);
 
-            DensityController densityController (viewport, 32.0f);
+            DensityController densityController (viewport, 24.0f);
             densityController.SetPercentage (20);  // 20% = 24 streaks
 
             AnimationSystem animationSystem;
@@ -296,7 +296,7 @@ namespace MatrixRainTests
             Viewport viewport;
             viewport.Resize (1920.0f, 1080.0f);
 
-            DensityController densityController (viewport, 32.0f);
+            DensityController densityController (viewport, 24.0f);
             densityController.SetPercentage (80);  // 80%
 
             AnimationSystem animationSystem;
@@ -332,7 +332,7 @@ namespace MatrixRainTests
             Viewport viewport;
             viewport.Resize (1920.0f, 1080.0f);
 
-            DensityController densityController (viewport, 32.0f);
+            DensityController densityController (viewport, 24.0f);
             densityController.SetPercentage (40);
 
             AnimationSystem animationSystem;
@@ -368,7 +368,7 @@ namespace MatrixRainTests
             Viewport viewport;
             viewport.Resize (1920.0f, 1080.0f);
 
-            DensityController densityController (viewport, 32.0f);
+            DensityController densityController (viewport, 24.0f);
             AnimationSystem animationSystem;
             animationSystem.Initialize (viewport, densityController);
 

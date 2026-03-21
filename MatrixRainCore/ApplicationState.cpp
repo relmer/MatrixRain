@@ -1,8 +1,16 @@
 #include "pch.h"
 
 #include "ApplicationState.h"
-#include "RegistrySettingsProvider.h"
 #include "ScreenSaverModeContext.h"
+
+
+
+
+
+ApplicationState::ApplicationState (ISettingsProvider & settingsProvider) :
+    m_settingsProvider (settingsProvider)
+{
+}
 
 
 
@@ -12,8 +20,8 @@ void ApplicationState::Initialize (const ScreenSaverModeContext * pScreenSaverCo
 {
     m_pScreenSaverContext = pScreenSaverContext;
     
-    // Load settings from registry (falls back to defaults if key doesn't exist)
-    HRESULT hr = RegistrySettingsProvider::Load (m_settings);
+    // Load settings from provider (falls back to defaults if no data exists)
+    HRESULT hr = m_settingsProvider.Load (m_settings);
     
     // hr == S_FALSE means key didn't exist, used defaults (not an error)
     // hr == S_OK means loaded from registry successfully
@@ -28,7 +36,7 @@ void ApplicationState::Initialize (const ScreenSaverModeContext * pScreenSaverCo
                                   (pScreenSaverContext->m_mode == ScreenSaverMode::ScreenSaverPreview ||
                                    pScreenSaverContext->m_mode == ScreenSaverMode::ScreenSaverFull);
     
-    m_showDebugFadeTimes = isPreviewOrScreenSaver ? false : m_settings.m_showFadeTimers;
+    m_showDebugFadeTimes = false;
     m_showStatistics     = isPreviewOrScreenSaver ? false : m_settings.m_showDebugStats;
     
     // Map color scheme key to enum
@@ -53,7 +61,9 @@ void ApplicationState::ToggleDisplayMode()
     
     // Update settings and save
     m_settings.m_startFullscreen = (m_displayMode == DisplayMode::Fullscreen);
-    SaveSettings();
+
+    HRESULT hr = SaveSettings();
+    IGNORE_RETURN_VALUE (hr, S_OK);
 }
 
 
@@ -67,8 +77,9 @@ void ApplicationState::CycleColorScheme()
     
     // Update settings and save
     m_settings.m_colorSchemeKey = ColorSchemeToKey (m_colorScheme);
-    
-    SaveSettings();
+
+    HRESULT hr = SaveSettings();
+    IGNORE_RETURN_VALUE (hr, S_OK);
 }
 
 
@@ -78,10 +89,6 @@ void ApplicationState::CycleColorScheme()
 void ApplicationState::ToggleDebugFadeTimes()
 {
     m_showDebugFadeTimes = !m_showDebugFadeTimes;
-    
-    // Update settings and save
-    m_settings.m_showFadeTimers = m_showDebugFadeTimes;
-    SaveSettings();
 }
 
 
@@ -97,8 +104,9 @@ void ApplicationState::OnDensityChanged (int densityPercent)
     {
         m_densityChangeCallback (densityPercent);
     }
-    
-    SaveSettings();
+
+    HRESULT hr = SaveSettings();
+    IGNORE_RETURN_VALUE (hr, S_OK);
 }
 
 
@@ -132,8 +140,9 @@ void ApplicationState::SetAnimationSpeed (int speedPercent)
     {
         m_animationSpeedChangeCallback (speedPercent);
     }
-    
-    SaveSettings();
+
+    HRESULT hr = SaveSettings();
+    IGNORE_RETURN_VALUE (hr, S_OK);
 }
 
 
@@ -167,8 +176,9 @@ void ApplicationState::SetGlowIntensity (int intensityPercent)
     {
         m_glowIntensityChangeCallback (intensityPercent);
     }
-    
-    SaveSettings();
+
+    HRESULT hr = SaveSettings();
+    IGNORE_RETURN_VALUE (hr, S_OK);
 }
 
 
@@ -184,8 +194,9 @@ void ApplicationState::SetGlowSize (int sizePercent)
     {
         m_glowSizeChangeCallback (sizePercent);
     }
-    
-    SaveSettings();
+
+    HRESULT hr = SaveSettings();
+    IGNORE_RETURN_VALUE (hr, S_OK);
 }
 
 
@@ -235,7 +246,9 @@ void ApplicationState::SetShowStatistics (bool show)
     
     // Update settings and save
     m_settings.m_showDebugStats = show;
-    SaveSettings();
+
+    HRESULT hr = SaveSettings();
+    IGNORE_RETURN_VALUE (hr, S_OK);
 }
 
 
@@ -255,10 +268,6 @@ void ApplicationState::SetShowDebugFadeTimes (bool show)
     }
     
     m_showDebugFadeTimes = show;
-    
-    // Update settings and save
-    m_settings.m_showFadeTimers = show;
-    SaveSettings();
 }
 
 
@@ -271,7 +280,9 @@ void ApplicationState::ToggleStatistics()
     
     // Update settings and save
     m_settings.m_showDebugStats = m_showStatistics;
-    SaveSettings();
+
+    HRESULT hr = SaveSettings();
+    IGNORE_RETURN_VALUE (hr, S_OK);
 }
 
 
@@ -290,6 +301,6 @@ void ApplicationState::ToggleStatistics()
 HRESULT
 ApplicationState::SaveSettings()
 {
-    return RegistrySettingsProvider::Save (m_settings);
+    return m_settingsProvider.Save (m_settings);
 }
 

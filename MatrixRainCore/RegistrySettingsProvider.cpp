@@ -5,57 +5,6 @@
 
 
 
-// Static member initialization
-LPCWSTR RegistrySettingsProvider::s_registryKeyPath = DEFAULT_REGISTRY_KEY_PATH;
-
-
-
-
-////////////////////////////////////////////////////////////////////////////////
-//
-//  RegistrySettingsProvider::SetRegistryKeyPath
-//
-//  For testing: allows overriding the registry key path
-//
-////////////////////////////////////////////////////////////////////////////////
-
-void RegistrySettingsProvider::SetRegistryKeyPath (LPCWSTR path)
-{
-    s_registryKeyPath = path;
-}
-
-
-
-
-////////////////////////////////////////////////////////////////////////////////
-//
-//  RegistrySettingsProvider::ResetRegistryKeyPath
-//
-//  Resets the registry key path to the default
-//
-////////////////////////////////////////////////////////////////////////////////
-
-void RegistrySettingsProvider::ResetRegistryKeyPath()
-{
-    s_registryKeyPath = DEFAULT_REGISTRY_KEY_PATH;
-}
-
-
-
-
-////////////////////////////////////////////////////////////////////////////////
-//
-//  RegistrySettingsProvider::GetRegistryKeyPath
-//
-//  Returns the current registry key path
-//
-////////////////////////////////////////////////////////////////////////////////
-
-LPCWSTR RegistrySettingsProvider::GetRegistryKeyPath()
-{
-    return s_registryKeyPath;
-}
-
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -75,7 +24,7 @@ HRESULT RegistrySettingsProvider::Load (ScreenSaverSettings & settings)
     
     
     // Try to open the registry key
-    lstat = RegOpenKeyExW (HKEY_CURRENT_USER, GetRegistryKeyPath(), 0, KEY_READ, &hKey);
+    lstat = RegOpenKeyExW (HKEY_CURRENT_USER, m_registryKeyPath, 0, KEY_READ, &hKey);
     
     // If the key doesn't exist, return S_FALSE (use defaults)
     BAIL_OUT_IF (lstat == ERROR_FILE_NOT_FOUND, S_FALSE);
@@ -91,7 +40,6 @@ HRESULT RegistrySettingsProvider::Load (ScreenSaverSettings & settings)
     ReadInt    (hKey, VALUE_GLOW_SIZE,        settings.m_glowSizePercent);
     ReadBool   (hKey, VALUE_START_FULLSCREEN, settings.m_startFullscreen);
     ReadBool   (hKey, VALUE_SHOW_DEBUG_STATS, settings.m_showDebugStats);
-    ReadBool   (hKey, VALUE_SHOW_FADE_TIMERS, settings.m_showFadeTimers);
 
     // Clamp all values to valid ranges
     settings.Clamp();
@@ -129,7 +77,7 @@ HRESULT RegistrySettingsProvider::Save (const ScreenSaverSettings & settings)
     
     // Create or open the registry key
     lstat = RegCreateKeyExW (HKEY_CURRENT_USER,
-                             GetRegistryKeyPath(),
+                             m_registryKeyPath,
                              0,
                              nullptr,
                              REG_OPTION_NON_VOLATILE,
@@ -159,9 +107,6 @@ HRESULT RegistrySettingsProvider::Save (const ScreenSaverSettings & settings)
     CHR (hr);
     
     hr = WriteBool (hKey, VALUE_SHOW_DEBUG_STATS, settings.m_showDebugStats);
-    CHR (hr);
-    
-    hr = WriteBool (hKey, VALUE_SHOW_FADE_TIMERS, settings.m_showFadeTimers);
     CHR (hr);
 
 

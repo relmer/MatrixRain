@@ -75,7 +75,7 @@ private:
     float                          m_dropTimer        { 0.0f }; // Timer for discrete cell dropping
     float                          m_dropInterval     { 0.3f }; // Cached drop interval (set at spawn, constant for streak lifetime)
     float                          m_baseDropInterval { 0.3f }; // Base drop interval before speed multiplier applied
-    float                          m_characterSpacing { 32.0f };// Vertical spacing between characters
+    float                          m_characterSpacing { 24.0f };// Vertical spacing between characters
     size_t                         m_maxLength        { 0 };    // Maximum number of characters in this streak
     bool                           m_isInFadingPhase  { false };// True when head has reached bottom and final fade has started
     uint64_t                       m_id               { 0 };    // Unique ID for debug tracking

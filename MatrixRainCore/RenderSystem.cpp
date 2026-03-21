@@ -2,8 +2,11 @@
 
 #include "RenderSystem.h"
 
+#include "CharacterConstants.h"
 #include "CharacterSet.h"
 #include "ColorScheme.h"
+#include "Overlay.h"
+#include "OverlayColor.h"
 
 using Microsoft::WRL::ComPtr;
 
@@ -27,6 +30,7 @@ HRESULT RenderSystem::Initialize (HWND hwnd, UINT width, UINT height)
 
 
     // Store dimensions for viewport and render target sizing
+    m_hwnd         = hwnd;
     m_renderWidth  = width;
     m_renderHeight = height;
     
@@ -59,6 +63,9 @@ HRESULT RenderSystem::Initialize (HWND hwnd, UINT width, UINT height)
 
     hr = CreateSamplerState();
     CHR (hr);
+
+    // Compute DPI scale BEFORE creating D2D resources so font sizes are correct
+    UpdateDpiScale();
 
     hr = CreateDirect2DResources();
     CHR (hr);
@@ -207,7 +214,9 @@ static const char* s_kszVertexShaderSource = R"(
         {
             float4x4 projection;
             float characterScale;  // Global scale for preview mode
-            float3 padding;
+            float charWidth;       // Base quad width in pixels
+            float charHeight;      // Base quad height in pixels
+            float cbPadding;
         };
 
         struct VSInput
@@ -217,7 +226,8 @@ static const char* s_kszVertexShaderSource = R"(
             float2 uvMax : TEXCOORD1;
             float4 color : COLOR;
             float brightness : BRIGHTNESS;
-            float scale : SCALE;
+            float scaleX : SCALEX;
+            float scaleY : SCALEY;
             uint instanceID : SV_InstanceID;
         };
 
@@ -247,7 +257,7 @@ static const char* s_kszVertexShaderSource = R"(
             float2 quadPos = quadVertices[vertexID % 6];
             
             // Character size in world space (scaled for viewport and per-character)
-            float2 charSize = float2(32.0, 48.0) * input.scale * characterScale;
+            float2 charSize = float2(charWidth * input.scaleX, charHeight * input.scaleY) * characterScale;
             float2 worldPos = input.position.xy + quadPos * charSize;
             
             // Apply projection
@@ -290,13 +300,41 @@ static const char* s_kszPixelShaderSource = R"(
         }
     )";
 
+static const char * s_kszOverlayPixelShaderSource = R"(
+        Texture2D    atlasTexture : register(t0);
+        SamplerState samplerState : register(s0);
+
+        struct PSInput
+        {
+            float4 position   : SV_POSITION;
+            float2 uv         : TEXCOORD;
+            float4 color      : COLOR;
+            float  brightness : BRIGHTNESS;
+        };
+
+        float4 main(PSInput input) : SV_TARGET
+        {
+            // Atlas is rendered by D2D with premultiplied alpha.
+            // Tint RGB by instance color and brightness, preserving
+            // the premultiplied relationship so the blend state
+            // (ONE / INV_SRC_ALPHA) composites correctly.
+            float4 texColor  = atlasTexture.Sample(samplerState, input.uv);
+            float3 tintedRGB = texColor.rgb * input.color.rgb * input.brightness;
+            float  tintedA   = texColor.a   * input.brightness;
+
+            return float4(tintedRGB, tintedA);
+        }
+    )";
+
+
 static const D3D11_INPUT_ELEMENT_DESC s_krgInputLayout[] = {
     { "POSITION",   0, DXGI_FORMAT_R32G32B32_FLOAT,    1, 0,  D3D11_INPUT_PER_INSTANCE_DATA, 1 },
     { "TEXCOORD",   0, DXGI_FORMAT_R32G32_FLOAT,       1, 12, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
     { "TEXCOORD",   1, DXGI_FORMAT_R32G32_FLOAT,       1, 20, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
     { "COLOR",      0, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, 28, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
     { "BRIGHTNESS", 0, DXGI_FORMAT_R32_FLOAT,          1, 44, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-    { "SCALE",      0, DXGI_FORMAT_R32_FLOAT,          1, 48, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+    { "SCALEX",     0, DXGI_FORMAT_R32_FLOAT,          1, 48, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+    { "SCALEY",     0, DXGI_FORMAT_R32_FLOAT,          1, 52, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
 };
 
 
@@ -310,12 +348,13 @@ static const D3D11_INPUT_ELEMENT_DESC s_krgInputLayout[] = {
 
 struct RenderSystem::ShaderCompileEntry
 {
-    const char *   pszSource;
-    const char *   pszName;
-    const char *   pszEntryPoint;
-    const char *   pszTarget;
-    LPCWSTR        pszErrorMsg;
-    ID3DBlob   **  ppBlob;
+    const char *                 pszSource;
+    const char *                 pszName;
+    const char *                 pszEntryPoint;
+    const char *                 pszTarget;
+    LPCWSTR                      pszErrorMsg;
+    ID3DBlob                  ** ppBlob;
+    ComPtr<ID3D11PixelShader>  * ppPixelShader;   // If non-null, create pixel shader from blob
 };
 
 
@@ -327,34 +366,43 @@ struct RenderSystem::ShaderCompileEntry
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-HRESULT RenderSystem::CompileShadersFromTable (const ShaderCompileEntry* pTable, size_t cEntries)
+HRESULT RenderSystem::CompileShadersFromTable (std::span<const ShaderCompileEntry> entries)
 {
     HRESULT          hr        = S_OK;
     ComPtr<ID3DBlob> errorBlob;
 
 
-    for (size_t i = 0; i < cEntries; ++i)
+    for (const auto & entry : entries)
     {
-        const ShaderCompileEntry& entry = pTable[i];
 
         errorBlob.Reset();
 
         hr = D3DCompile (entry.pszSource,
-                            strlen (entry.pszSource),
-                            entry.pszName,
-                            nullptr,
-                            nullptr,
-                            entry.pszEntryPoint,
-                            entry.pszTarget,
-                            D3DCOMPILE_ENABLE_STRICTNESS,
-                            0,
-                            entry.ppBlob,
-                            &errorBlob);
+                         strlen (entry.pszSource),
+                         entry.pszName,
+                         nullptr,
+                         nullptr,
+                         entry.pszEntryPoint,
+                         entry.pszTarget,
+                         D3DCOMPILE_ENABLE_STRICTNESS,
+                         0,
+                         entry.ppBlob,
+                         &errorBlob);
         if (FAILED (hr) && errorBlob)
         {
-            OutputDebugStringA ((char*)errorBlob->GetBufferPointer());
+            OutputDebugStringA ((char *) errorBlob->GetBufferPointer());
         }
         CHRLA (hr, entry.pszErrorMsg);
+
+        // Create pixel shader if target pointer is provided
+        if (entry.ppPixelShader)
+        {
+            hr = m_device->CreatePixelShader ((*entry.ppBlob)->GetBufferPointer(),
+                                              (*entry.ppBlob)->GetBufferSize(),
+                                              nullptr,
+                                              entry.ppPixelShader->GetAddressOf());
+            CHRA (hr);
+        }
     }
 
 Error:
@@ -364,33 +412,30 @@ Error:
 
 
 
+
 HRESULT RenderSystem::CompileCharacterShaders()
 {
     HRESULT             hr            = S_OK;
     ComPtr<ID3DBlob>    vsBlob;
     ComPtr<ID3DBlob>    psBlob;
+    ComPtr<ID3DBlob>    overlayPsBlob;
     ShaderCompileEntry  shaderTable[] = {
-        { s_kszVertexShaderSource, "VS", "main", "vs_5_0",  L"D3DCompile failed for vertex shader", vsBlob.GetAddressOf() },
-        { s_kszPixelShaderSource,  "PS", "main", "ps_5_0",  L"D3DCompile failed for pixel shader",  psBlob.GetAddressOf() }
+        { s_kszVertexShaderSource,        "VS",        "main", "vs_5_0",  L"D3DCompile failed for vertex shader",         vsBlob.GetAddressOf(),        nullptr                },
+        { s_kszPixelShaderSource,         "PS",        "main", "ps_5_0",  L"D3DCompile failed for pixel shader",          psBlob.GetAddressOf(),        &m_pixelShader         },
+        { s_kszOverlayPixelShaderSource,  "OverlayPS", "main", "ps_5_0",  L"D3DCompile failed for overlay pixel shader",  overlayPsBlob.GetAddressOf(), &m_overlayPixelShader  }
     };
     
 
 
-    // Compile shaders from table
-    hr = CompileShadersFromTable (shaderTable, _countof (shaderTable));
-    CHR (hr);        // Create vertex shader
+    // Compile shaders and create pixel shaders from table
+    hr = CompileShadersFromTable (shaderTable);
+    CHR (hr);
 
+    // Create vertex shader
     hr = m_device->CreateVertexShader (vsBlob->GetBufferPointer(),
                                         vsBlob->GetBufferSize(),
                                         nullptr,
                                         &m_vertexShader);
-    CHRA (hr);
-
-    // Create pixel shader
-    hr = m_device->CreatePixelShader (psBlob->GetBufferPointer(),
-                                        psBlob->GetBufferSize(),
-                                        nullptr,
-                                        &m_pixelShader);
     CHRA (hr);
 
     // Create input layout using vertex shader blob
@@ -412,9 +457,9 @@ Error:
 
 HRESULT RenderSystem::CreateDummyVertexBuffer()
 {
-    HRESULT                hr       = S_OK;
-    D3D11_BUFFER_DESC      vbDesc   = {};
-    D3D11_SUBRESOURCE_DATA vbData   = {};
+    HRESULT                hr           = S_OK;
+    D3D11_BUFFER_DESC      vbDesc       = {};
+    D3D11_SUBRESOURCE_DATA vbData       = {};
     float                  dummyData[6] = { 0.0f, 1.0f, 2.0f, 3.0f, 4.0f, 5.0f };  // 6 dummy vertices (4-byte aligned)
 
 
@@ -528,6 +573,14 @@ HRESULT RenderSystem::CreateBlendState()
     hr = m_device->CreateBlendState (&blendDesc, &m_blendState);
     CHRA (hr);
 
+    // Premultiplied alpha blend state for overlay text
+    // (D2D renders with premultiplied alpha, so SrcBlend = ONE)
+    blendDesc.RenderTarget[0].SrcBlend  = D3D11_BLEND_ONE;
+    blendDesc.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC_ALPHA;
+
+    hr = m_device->CreateBlendState (&blendDesc, &m_premultipliedBlendState);
+    CHRA (hr);
+
 Error:
     return hr;
 }
@@ -604,18 +657,8 @@ HRESULT RenderSystem::CreateDirect2DResources()
     CHRA (hr);
 
     // Create text format for FPS display (small, top-right aligned)
-    hr = m_dwriteFactory->CreateTextFormat (L"Consolas",
-                                            nullptr,
-                                            DWRITE_FONT_WEIGHT_NORMAL,
-                                            DWRITE_FONT_STYLE_NORMAL,
-                                            DWRITE_FONT_STRETCH_NORMAL,
-                                            20.0f,
-                                            L"en-us",
-                                            &m_fpsTextFormat);
-    CHRA (hr);
-
-    m_fpsTextFormat->SetTextAlignment (DWRITE_TEXT_ALIGNMENT_TRAILING);
-    m_fpsTextFormat->SetParagraphAlignment (DWRITE_PARAGRAPH_ALIGNMENT_FAR);
+    hr = CreateFpsTextFormat();
+    CHR (hr);
 
     // Create white brush for FPS text
     hr = m_d2dContext->CreateSolidColorBrush (D2D1::ColorF (D2D1::ColorF::White), &m_fpsBrush);
@@ -627,6 +670,101 @@ HRESULT RenderSystem::CreateDirect2DResources()
 
 Error:
     return hr;
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  RenderSystem::CreateFpsTextFormat
+//
+//  Creates (or recreates) the DirectWrite text format used by the FPS counter
+//  and overlay text measurement.  The font size is scaled by m_dpiScale so
+//  the text maintains a consistent logical size across DPI settings.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+HRESULT RenderSystem::CreateFpsTextFormat()
+{
+    HRESULT hr       = S_OK;
+    float   fontSize = 12.0f * m_dpiScale;
+
+
+    CBRAEx (m_dwriteFactory.Get() != nullptr, E_UNEXPECTED);
+
+    m_fpsTextFormat.Reset();
+
+    hr = m_dwriteFactory->CreateTextFormat (L"Consolas",
+                                            nullptr,
+                                            DWRITE_FONT_WEIGHT_NORMAL,
+                                            DWRITE_FONT_STYLE_NORMAL,
+                                            DWRITE_FONT_STRETCH_NORMAL,
+                                            fontSize,
+                                            L"en-us",
+                                            &m_fpsTextFormat);
+    CHRA (hr);
+
+    m_fpsTextFormat->SetTextAlignment (DWRITE_TEXT_ALIGNMENT_TRAILING);
+    m_fpsTextFormat->SetParagraphAlignment (DWRITE_PARAGRAPH_ALIGNMENT_FAR);
+
+Error:
+    return hr;
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  RenderSystem::UpdateDpiScale
+//
+//  Queries the window's current DPI and updates m_dpiScale accordingly.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+void RenderSystem::UpdateDpiScale()
+{
+    if (m_hwnd)
+    {
+        UINT dpi   = GetDpiForWindow (m_hwnd);
+        m_dpiScale = static_cast<float> (dpi) / 96.0f;
+    }
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  RenderSystem::OnDpiChanged
+//
+//  Called when the system notifies us of a DPI change (WM_DPICHANGED).
+//  Updates the DPI scale factor and recreates DPI-sensitive resources.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+void RenderSystem::OnDpiChanged (UINT dpi)
+{
+    m_dpiScale = static_cast<float> (dpi) / 96.0f;
+
+    // Invalidate cached overlay rects (layout depends on DPI scale)
+    m_haloRowRectsKey = nullptr;
+
+    // Recreate text formats at the new DPI scale
+    if (m_dwriteFactory)
+    {
+        CreateFpsTextFormat();
+    }
+
+    // Recreate overlay atlas at the new DPI scale for 1:1 texel-to-pixel mapping
+    if (m_device)
+    {
+        CharacterSet::GetInstance().RecreateOverlayAtlas (m_device.Get(), m_dpiScale);
+    }
 }
 
 
@@ -662,6 +800,13 @@ static const char * s_kszQuadVertexShaderSource = R"(
     )";
 
 static const char * s_kszBlurHorizontalShaderSource = R"(
+        cbuffer BloomConstants : register(b0)
+        {
+            float bloomIntensity;
+            float glowSize;
+            float2 padding;
+        };
+
         Texture2D inputTexture : register(t0);
         SamplerState samplerState : register(s0);
 
@@ -673,18 +818,17 @@ static const char * s_kszBlurHorizontalShaderSource = R"(
 
         float4 main(PSInput input) : SV_TARGET
         {
-            // Get texture dimensions dynamically
             uint width, height;
             inputTexture.GetDimensions(width, height);
-            float2 texelSize = float2(1.0 / width, 1.0 / height);
+            float texelX = glowSize / width;
             
             float4 color = float4(0, 0, 0, 0);
             
-            // 13-tap Gaussian blur for wider spread (horizontal)
+            // 13-tap Gaussian blur (horizontal), spread scaled by glowSize
             float weights[13] = { 0.02, 0.04, 0.06, 0.08, 0.10, 0.12, 0.16, 0.12, 0.10, 0.08, 0.06, 0.04, 0.02 };
             for (int i = -6; i <= 6; i++)
             {
-                float2 offset = float2(i * texelSize.x, 0);
+                float2 offset = float2(i * texelX, 0);
                 color += inputTexture.Sample(samplerState, input.uv + offset) * weights[i + 6];
             }
             
@@ -693,6 +837,13 @@ static const char * s_kszBlurHorizontalShaderSource = R"(
     )";
 
 static const char * s_kszBlurVerticalShaderSource = R"(
+        cbuffer BloomConstants : register(b0)
+        {
+            float bloomIntensity;
+            float glowSize;
+            float2 padding;
+        };
+
         Texture2D inputTexture : register(t0);
         SamplerState samplerState : register(s0);
 
@@ -704,18 +855,17 @@ static const char * s_kszBlurVerticalShaderSource = R"(
 
         float4 main(PSInput input) : SV_TARGET
         {
-            // Get texture dimensions dynamically
             uint width, height;
             inputTexture.GetDimensions(width, height);
-            float2 texelSize = float2(1.0 / width, 1.0 / height);
+            float texelY = glowSize / height;
             
             float4 color = float4(0, 0, 0, 0);
             
-            // 13-tap Gaussian blur for wider spread (vertical)
+            // 13-tap Gaussian blur (vertical), spread scaled by glowSize
             float weights[13] = { 0.02, 0.04, 0.06, 0.08, 0.10, 0.12, 0.16, 0.12, 0.10, 0.08, 0.06, 0.04, 0.02 };
             for (int i = -6; i <= 6; i++)
             {
-                float2 offset = float2(0, i * texelSize.y);
+                float2 offset = float2(0, i * texelY);
                 color += inputTexture.Sample(samplerState, input.uv + offset) * weights[i + 6];
             }
             
@@ -746,13 +896,15 @@ static const char * s_kszBloomExtractShaderSource = R"(
             // Use the higher of luminance or max component as brightness metric
             float brightness = max(luminance, maxComp);
 
-            // Lower threshold to include deep blues/reds while keeping green/amber strong
-            float threshold = 0.45;
+            // Low threshold so even dim characters get a subtle glow.
+            // The wide smoothstep range (0.1 → 0.6) ensures bright streak
+            // heads bloom strongly while dim tail characters still contribute
+            // a soft halo rather than appearing flat.
+            float threshold = 0.1;
 
-            // Smooth falloff near threshold for gradual bloom
-            float bloomAmount = smoothstep(threshold, threshold + 0.25, brightness);
+            // Smooth ramp: dim chars get subtle bloom, bright chars get full
+            float bloomAmount = smoothstep(threshold, threshold + 0.5, brightness);
 
-            // Return the bright color multiplied by bloom amount
             return float4(color.rgb * bloomAmount, 1.0);
         }
     )";
@@ -761,7 +913,8 @@ static const char * s_kszBloomCompositeShaderSource = R"(
         cbuffer BloomConstants : register(b0)
         {
             float bloomIntensity;
-            float3 padding;
+            float glowSize;
+            float2 padding;
         };
 
         Texture2D sceneTexture : register(t0);
@@ -779,8 +932,65 @@ static const char * s_kszBloomCompositeShaderSource = R"(
             float4 scene = sceneTexture.Sample(samplerState, input.uv);
             float4 bloom = bloomTexture.Sample(samplerState, input.uv);
             
-            // Additive blend with dynamic bloom intensity
-            return scene + bloom * bloomIntensity;
+            // Exponential soft-saturation: low bloom values pass through
+            // nearly linearly (good glow on isolated streaks) while high
+            // bloom values from dense overlapping areas hit a ceiling.
+            // This lets the user crank up bloomIntensity without dense
+            // regions becoming a solid wall of glow.
+            float3 bloomContrib = bloom.rgb * bloomIntensity;
+            float3 softBloom   = 1.0 - exp(-bloomContrib);
+
+            return float4(scene.rgb + softBloom * (1.0 - scene.rgb), 1.0);
+        }
+    )";
+
+static constexpr int MAX_HALO_ROWS = 16;  // Must match rowRects[] size in halo shader
+
+static const char * s_kszHaloShaderSource = R"(
+        cbuffer HaloConstants : register(b0)
+        {
+            float4 rowRects[16];    // (left, top, right, bottom) per row — must match MAX_HALO_ROWS
+            float  cornerRadius;
+            float  maxExpand;
+            float  maxOpacity;
+            int    numRows;
+        };
+
+        struct PSInput
+        {
+            float4 position : SV_POSITION;
+            float2 uv : TEXCOORD;
+        };
+
+        // Signed distance to a rounded rectangle (negative = inside)
+        float sdRoundedRect(float2 p, float2 center, float2 halfSize, float radius)
+        {
+            float2 d = abs(p - center) - halfSize + float2(radius, radius);
+            return length(max(d, 0.0)) + min(max(d.x, d.y), 0.0) - radius;
+        }
+
+        float4 main(PSInput input) : SV_TARGET
+        {
+            float2 pixelPos = input.position.xy;
+
+            // Find minimum distance to any row's rounded rect
+            float minDist = 1e9;
+
+            for (int i = 0; i < numRows; i++)
+            {
+                float4 r = rowRects[i];
+                float2 center   = float2((r.x + r.z) * 0.5, (r.y + r.w) * 0.5);
+                float2 halfSize = float2((r.z - r.x) * 0.5, (r.w - r.y) * 0.5);
+
+                float d = sdRoundedRect(pixelPos, center, halfSize, cornerRadius);
+                minDist = min(minDist, d);
+            }
+
+            // Map distance to opacity: inside = maxOpacity, feather over maxExpand
+            float t = saturate(minDist / maxExpand);
+            float opacity = maxOpacity * (1.0 - t * t);  // Quadratic falloff
+
+            return float4(0, 0, 0, opacity);
         }
     )";
 
@@ -813,6 +1023,7 @@ HRESULT RenderSystem::CompileBloomShaders()
     ComPtr<ID3DBlob>       blurHPSBlob;
     ComPtr<ID3DBlob>       blurVPSBlob;
     ComPtr<ID3DBlob>       compositePSBlob;
+    ComPtr<ID3DBlob>       haloPSBlob;
     QuadVertex             quadVertices[]     = {
         { {-1, -1, 0}, {0, 1} },
         { {-1,  1, 0}, {0, 0} },
@@ -824,35 +1035,24 @@ HRESULT RenderSystem::CompileBloomShaders()
     D3D11_BUFFER_DESC      vbDesc             = { };
     D3D11_SUBRESOURCE_DATA vbData             = { };
     ShaderCompileEntry     bloomShaderTable[] = {
-        { s_kszQuadVertexShaderSource,         "QuadVS",    "main", "vs_5_0", L"D3DCompile failed for quad vertex shader",     quadVSBlob.GetAddressOf() },
-        { s_kszBloomExtractShaderSource,       "Extract",   "main", "ps_5_0", L"D3DCompile failed for bloom extract shader",   extractPSBlob.GetAddressOf() },
-        { s_kszBlurHorizontalShaderSource,     "BlurH",     "main", "ps_5_0", L"D3DCompile failed for horizontal blur shader", blurHPSBlob.GetAddressOf() },
-        { s_kszBlurVerticalShaderSource,       "BlurV",     "main", "ps_5_0", L"D3DCompile failed for vertical blur shader",   blurVPSBlob.GetAddressOf() },
-        { s_kszBloomCompositeShaderSource,     "Composite", "main", "ps_5_0", L"D3DCompile failed for composite shader",       compositePSBlob.GetAddressOf() }
+        { s_kszQuadVertexShaderSource,         "QuadVS",    "main", "vs_5_0", L"D3DCompile failed for quad vertex shader",     quadVSBlob.GetAddressOf(),      nullptr              },
+        { s_kszBloomExtractShaderSource,       "Extract",   "main", "ps_5_0", L"D3DCompile failed for bloom extract shader",   extractPSBlob.GetAddressOf(),   &m_bloomExtractPS    },
+        { s_kszBlurHorizontalShaderSource,     "BlurH",     "main", "ps_5_0", L"D3DCompile failed for horizontal blur shader", blurHPSBlob.GetAddressOf(),     &m_blurHorizontalPS  },
+        { s_kszBlurVerticalShaderSource,       "BlurV",     "main", "ps_5_0", L"D3DCompile failed for vertical blur shader",   blurVPSBlob.GetAddressOf(),     &m_blurVerticalPS    },
+        { s_kszBloomCompositeShaderSource,     "Composite", "main", "ps_5_0", L"D3DCompile failed for composite shader",       compositePSBlob.GetAddressOf(), &m_compositePS       },
+        { s_kszHaloShaderSource,               "Halo",      "main", "ps_5_0", L"D3DCompile failed for halo shader",            haloPSBlob.GetAddressOf(),      &m_haloPS            }
     };
 
 
-    // Compile shaders from table
-    hr = CompileShadersFromTable (bloomShaderTable, _countof (bloomShaderTable));
+    // Compile shaders and create pixel shaders from table
+    hr = CompileShadersFromTable (bloomShaderTable);
     CHR (hr);
     
     hr = m_device->CreateVertexShader (quadVSBlob->GetBufferPointer(), quadVSBlob->GetBufferSize(), nullptr, &m_fullscreenQuadVS);
     CHRA (hr);
     
-    hr = m_device->CreatePixelShader (extractPSBlob->GetBufferPointer(), extractPSBlob->GetBufferSize(), nullptr, &m_bloomExtractPS);
-    CHRA (hr);
-    
-    hr = m_device->CreatePixelShader (blurHPSBlob->GetBufferPointer(), blurHPSBlob->GetBufferSize(), nullptr, &m_blurHorizontalPS);
-    CHRA (hr);
-    
-    hr = m_device->CreatePixelShader (blurVPSBlob->GetBufferPointer(), blurVPSBlob->GetBufferSize(), nullptr, &m_blurVerticalPS);
-    CHRA (hr);
-    
-    hr = m_device->CreatePixelShader (compositePSBlob->GetBufferPointer(), compositePSBlob->GetBufferSize(), nullptr, &m_compositePS);
-    CHRA (hr);
-    
     hr = m_device->CreateInputLayout (s_krgQuadInputLayout, _countof (s_krgQuadInputLayout), 
-                                        quadVSBlob->GetBufferPointer(), quadVSBlob->GetBufferSize(), &m_fullscreenQuadInputLayout);
+                                      quadVSBlob->GetBufferPointer(), quadVSBlob->GetBufferSize(), &m_fullscreenQuadInputLayout);
     CHRA (hr);
 
     // Create fullscreen quad vertex buffer
@@ -864,6 +1064,20 @@ HRESULT RenderSystem::CompileBloomShaders()
 
     hr = m_device->CreateBuffer (&vbDesc, &vbData, &m_fullscreenQuadVB);
     CHRA (hr);
+
+    // Create halo constant buffer (MAX_HALO_ROWS row rects + 1 control float4)
+    {
+        D3D11_BUFFER_DESC haloCBDesc = {};
+        constexpr UINT    haloCBSize = (MAX_HALO_ROWS + 1) * 16;  // 16 bytes per float4, rounded to 16-byte alignment
+
+        haloCBDesc.ByteWidth      = haloCBSize;
+        haloCBDesc.Usage          = D3D11_USAGE_DYNAMIC;
+        haloCBDesc.BindFlags      = D3D11_BIND_CONSTANT_BUFFER;
+        haloCBDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+
+        hr = m_device->CreateBuffer (&haloCBDesc, nullptr, &m_haloConstantBuffer);
+        CHRA (hr);
+    }
 
 Error:
     return hr;
@@ -1010,13 +1224,16 @@ void RenderSystem::RenderFullscreenPass(ID3D11RenderTargetView* pRenderTarget,
                                         ID3D11ShaderResourceView* const* ppShaderResources,
                                         UINT numResources)
 {
+    ID3D11ShaderResourceView * nullSRVs[D3D11_COMMONSHADER_INPUT_RESOURCE_SLOT_COUNT] = {};
+
+
+
     m_context->OMSetRenderTargets   (1, &pRenderTarget, nullptr);
     m_context->PSSetShader          (pPixelShader, nullptr, 0);
     m_context->PSSetShaderResources (0, numResources, ppShaderResources);
     m_context->Draw (6, 0);
     
     // Unbind shader resources to avoid hazards
-    ID3D11ShaderResourceView* nullSRVs[D3D11_COMMONSHADER_INPUT_RESOURCE_SLOT_COUNT] = {};
     m_context->PSSetShaderResources (0, numResources, nullSRVs);
 }
 
@@ -1052,9 +1269,10 @@ void RenderSystem::SetViewport(UINT width, UINT height)
 
 HRESULT RenderSystem::ApplyBloom()
 {
-    HRESULT                    hr      = S_OK;
+    HRESULT                    hr            = S_OK;
     ID3D11ShaderResourceView * srvs[2];
-    ID3D11Buffer             * nullCB  = nullptr;
+    ID3D11Buffer             * nullCB        = nullptr;
+    D3D11_MAPPED_SUBRESOURCE   mappedBloomCB;
 
 
 
@@ -1078,27 +1296,38 @@ HRESULT RenderSystem::ApplyBloom()
     
     RenderFullscreenPass (m_bloomRTV.Get(), m_bloomExtractPS.Get(), m_sceneSRV.GetAddressOf(), 1);
     
-    // Horizontal blur pass (bloom → temp)
-    RenderFullscreenPass (m_blurTempRTV.Get(), m_blurHorizontalPS.Get(), m_bloomSRV.GetAddressOf(), 1);
-    
-    // Vertical blur pass (temp → bloom)
-    RenderFullscreenPass (m_bloomRTV.Get(), m_blurVerticalPS.Get(), m_blurTempSRV.GetAddressOf(), 1);
+    // Update bloom constant buffer (shared by blur and composite shaders)
+    hr = m_context->Map (m_bloomConstantBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedBloomCB);
+    CHRA (hr);
+
+    {
+        float * bloomData = static_cast<float *> (mappedBloomCB.pData);
+
+        bloomData[0] = m_glowIntensity;  // Bloom intensity
+        bloomData[1] = m_glowSize;       // Blur radius multiplier
+        bloomData[2] = 0.0f;             // Padding
+        bloomData[3] = 0.0f;             // Padding
+    }
+
+    m_context->Unmap (m_bloomConstantBuffer.Get(), 0);
+
+    // Bind constant buffer for blur shaders (glowSize controls spread)
+    m_context->PSSetConstantBuffers (0, 1, m_bloomConstantBuffer.GetAddressOf());
+
+    // Multiple blur passes: each H+V pass blurs the previous result,
+    // creating an exponentially wider and softer glow.  Three passes with
+    // a 13-tap kernel produce a very wide, cinematic bloom falloff.
+    for (int pass = 0; pass < 3; ++pass)
+    {
+        // Horizontal blur pass (bloom → temp)
+        RenderFullscreenPass (m_blurTempRTV.Get(), m_blurHorizontalPS.Get(), m_bloomSRV.GetAddressOf(), 1);
+
+        // Vertical blur pass (temp → bloom)
+        RenderFullscreenPass (m_bloomRTV.Get(), m_blurVerticalPS.Get(), m_blurTempSRV.GetAddressOf(), 1);
+    }
     
     // Restore full viewport
     SetViewport (m_renderWidth, m_renderHeight);
-    
-    // Update bloom constant buffer with current intensity
-    D3D11_MAPPED_SUBRESOURCE mappedBloomCB;
-    hr = m_context->Map (m_bloomConstantBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedBloomCB);
-    if (SUCCEEDED (hr))
-    {
-        float* bloomData = static_cast<float*> (mappedBloomCB.pData);
-        bloomData[0] = m_glowIntensity;  // Bloom intensity
-        bloomData[1] = 0.0f;             // Padding
-        bloomData[2] = 0.0f;             // Padding
-        bloomData[3] = 0.0f;             // Padding
-        m_context->Unmap (m_bloomConstantBuffer.Get(), 0);
-    }
     
     // Composite back to backbuffer
     m_context->OMSetRenderTargets (1, m_renderTargetView.GetAddressOf(), nullptr);
@@ -1135,13 +1364,16 @@ Error:
 
 void RenderSystem::ClearRenderTarget()
 {
+    // Clear to black
+    constexpr float clearColor[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
+
+
+
     if (!m_renderTargetView)
     {
         return;  // Skip if render target is being recreated during resize
     }
     
-    // Clear to black
-    float clearColor[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
     m_context->ClearRenderTargetView (m_renderTargetView.Get(), clearColor);
 }
 
@@ -1210,7 +1442,8 @@ void RenderSystem::BuildCharacterInstanceData (const CharacterInstance & charact
     
     data.color[3]   = character.color.a;
     data.brightness = character.brightness;
-    data.scale      = character.scale;
+    data.scaleX     = character.scale;
+    data.scaleY     = character.scale;
 }
 
 
@@ -1241,16 +1474,31 @@ HRESULT RenderSystem::UpdateInstanceBuffer (const AnimationSystem& animationSyst
     // Build instance data
     for (const CharacterStreak* streak : m_streakPtrs)
     {
-        const auto& characters = streak->GetCharacters();
-        Vector3 streakPos = streak->GetPosition();
+        const auto & characters = streak->GetCharacters();
+        Vector3      streakPos  = streak->GetPosition();
 
         // Render all characters (they manage their own fading/removal)
-        for (const auto& character : characters)
+        for (const auto & character : characters)
         {
             CharacterInstanceData data;
+
+
+
             BuildCharacterInstanceData (character, streakPos, schemeColor, data);
             m_instanceData.push_back (data);
         }
+    }
+
+    // Render overlay characters (standalone characters not attached to any streak,
+    // such as horizontal tracer animations in the help dialog)
+    for (const auto & overlay : animationSystem.GetOverlayCharacters())
+    {
+        CharacterInstanceData data;
+
+
+
+        BuildCharacterInstanceData (overlay.character, overlay.position, schemeColor, data);
+        m_instanceData.push_back (data);
     }
 
     BAIL_OUT_IF (m_instanceData.empty(), S_OK);
@@ -1260,6 +1508,7 @@ HRESULT RenderSystem::UpdateInstanceBuffer (const AnimationSystem& animationSyst
     {
         UINT newCapacity = static_cast<UINT> (m_instanceData.size() * 2);
         
+
         
         m_instanceBuffer.Reset();
         m_instanceBufferCapacity = newCapacity;
@@ -1274,6 +1523,7 @@ HRESULT RenderSystem::UpdateInstanceBuffer (const AnimationSystem& animationSyst
 
     bytesToCopy = sizeof (CharacterInstanceData) * m_instanceData.size();
     memcpy (mappedResource.pData, m_instanceData.data(), bytesToCopy);
+    
     m_context->Unmap (m_instanceBuffer.Get(), 0);
 
 Error:
@@ -1284,7 +1534,7 @@ Error:
 
 
 
-void RenderSystem::Render (const AnimationSystem & animationSystem, const Viewport & viewport, ColorScheme colorScheme, float fps, int rainPercentage, int streakCount, int activeHeadCount, bool showDebugFadeTimes, float elapsedTime)
+void RenderSystem::Render (const AnimationSystem & animationSystem, const Viewport & viewport, const RenderParams & params)
 {
     if (!m_device || !m_context || !m_renderTargetView)
     {
@@ -1298,6 +1548,7 @@ void RenderSystem::Render (const AnimationSystem & animationSystem, const Viewpo
     const Matrix4x4          & projection = viewport.GetProjectionMatrix();
     D3D11_MAPPED_SUBRESOURCE   mappedResource;
     HRESULT                    hr = m_context->Map (m_constantBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
+
     if (SUCCEEDED (hr))
     {
         ConstantBufferData* cbData = reinterpret_cast<ConstantBufferData*> (mappedResource.pData);
@@ -1305,53 +1556,54 @@ void RenderSystem::Render (const AnimationSystem & animationSystem, const Viewpo
         // Copy projection matrix (4x4 = 16 floats = 64 bytes)
         memcpy (cbData->projection, projection.m, sizeof (projection.m));
 
+        // Rain characters use the standard 24x36 base quad dimensions
+        cbData->charWidth  = 24.0f;
+        cbData->charHeight = 36.0f;
+
         // Calculate character scale based on viewport height
         // Scale down proportionally for preview mode to fit the entire effect
         // Minimum scale ensures characters remain visible (12px tall minimum)
-        float viewportHeight = static_cast<float> (viewport.GetHeight());
-        
-        if (viewportHeight < 1080.0f)
+        //
+        // DPI scaling: The base character size (32×48 in the shader) is in physical pixels.
+        // We multiply by m_dpiScale so characters maintain a consistent logical size
+        // regardless of the monitor's DPI setting.
+        // The reference viewport height (1080) is also DPI-adjusted so that the
+        // same logical viewport produces the same scale across DPI levels.
+        if (m_characterScaleOverride.has_value())
         {
-            // Scale linearly based on viewport height (Full HD = 1.0 reference)
-            cbData->characterScale = viewportHeight / 1080.0f;
-            
-            // Clamp to minimum 0.5 (24px tall from 48px base)
-            if (cbData->characterScale < 0.5f)
-                cbData->characterScale = 0.5f;
+            // Use explicit override (e.g., UsageDialog forcing full-size characters)
+            // UsageDialog handles its own DPI scaling — do NOT multiply by m_dpiScale
+            cbData->characterScale = m_characterScaleOverride.value();
         }
         else
         {
-            // Full HD and above: use normal character size
-            cbData->characterScale = 1.0f;
+            float viewportHeight    = static_cast<float> (viewport.GetHeight());
+            float referenceHeight   = 1080.0f * m_dpiScale;
+            float viewportBaseScale = 1.0f;
+
+            if (viewportHeight < referenceHeight)
+            {
+                // Scale linearly based on viewport height (reference = 1.0)
+                viewportBaseScale = viewportHeight / referenceHeight;
+
+                // Clamp to minimum 0.5 (24px tall from 48px base at 96 DPI)
+                if (viewportBaseScale < 0.5f)
+                    viewportBaseScale = 0.5f;
+            }
+
+            cbData->characterScale = viewportBaseScale * m_dpiScale;
         }
 
         m_context->Unmap (m_constantBuffer.Get(), 0);
     }
 
     // Update instance buffer with character data
-    (void) UpdateInstanceBuffer (animationSystem, colorScheme, elapsedTime);  // Ignore return - errors already handled within
+    (void) UpdateInstanceBuffer (animationSystem, params.colorScheme, params.elapsedTime);
 
-    // Count total characters to render
-    size_t totalCharacters = 0;
-    for (const auto& streak : animationSystem.GetStreaks())
-    {
-        totalCharacters += streak.GetLength();
-    }
-
-    if (totalCharacters == 0)
+    if (m_instanceData.empty())
     {
         return;
     }
-
-    // Set viewport for rendering
-    D3D11_VIEWPORT vp = {};
-    vp.TopLeftX = 0.0f;
-    vp.TopLeftY = 0.0f;
-    vp.Width    = static_cast<FLOAT> (viewport.GetWidth());
-    vp.Height   = static_cast<FLOAT> (viewport.GetHeight());
-    vp.MinDepth = 0.0f;
-    vp.MaxDepth = 1.0f;
-    m_context->RSSetViewports (1, &vp);
 
     // Set render state
     m_context->IASetInputLayout (m_inputLayout.Get());
@@ -1398,26 +1650,46 @@ void RenderSystem::Render (const AnimationSystem & animationSystem, const Viewpo
         m_context->ClearRenderTargetView (m_sceneRTV.Get(), clearColor);
         
         m_context->OMSetRenderTargets (1, m_sceneRTV.GetAddressOf(), nullptr);
-        m_context->DrawInstanced (6, static_cast<UINT> (totalCharacters), 0, 0);
-        
-        // Now apply bloom (which will composite to backbuffer)
-        (void)ApplyBloom();  // Ignore return - errors already handled within
+        m_context->DrawInstanced (6, static_cast<UINT> (m_instanceData.size()), 0, 0);
+
+        // Render overlays to scene texture (before bloom so they get glow for free)
+        // Render overlays to scene texture (before bloom so they get glow for free)
+        auto renderOverlay = [this] (const Overlay * pOverlay)
+        {
+            if (pOverlay && pOverlay->IsActive())
+            {
+                RenderTwoColumnOverlay (pOverlay->GetCharacters(),
+                                        pOverlay->GetMarginCols(),
+                                        pOverlay->GetKeyColChars(),
+                                        pOverlay->GetGapChars(),
+                                        pOverlay->GetCharRows(),
+                                        pOverlay->GetCharHeight(),
+                                        pOverlay->GetPadding());
+            }
+        };
+
+        renderOverlay (params.pHelpOverlay);
+        renderOverlay (params.pHotkeyOverlay);
+        renderOverlay (params.pUsageOverlay);
+
+        // Apply bloom (extracts bright pixels including overlay text, composites to backbuffer)
+        (void)ApplyBloom();
     }
     else
     {
         // Fallback: render directly to backbuffer if bloom not available
         m_context->OMSetRenderTargets (1, m_renderTargetView.GetAddressOf(), nullptr);
-        m_context->DrawInstanced (6, static_cast<UINT> (totalCharacters), 0, 0);
+        m_context->DrawInstanced (6, static_cast<UINT> (m_instanceData.size()), 0, 0);
     }
 
     // Render FPS counter overlay if fps > 0
-    if (fps > 0.0f)
+    if (params.fps > 0.0f)
     {
-        RenderFPSCounter (fps, rainPercentage, streakCount, activeHeadCount);
+        RenderFPSCounter (params.fps, params.rainPercentage, params.streakCount, params.activeHeadCount);
     }
 
     // Debug: Render fade times when enabled and only one streak is visible
-    if (showDebugFadeTimes)
+    if (params.showDebugFadeTimes)
     {
         RenderDebugFadeTimes (animationSystem);
     }
@@ -1506,6 +1778,702 @@ Error:
         m_d2dContext->EndDraw();
     }
 
+    return;
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  RenderSystem::CodepointToUtf16
+//
+//  Converts a Unicode codepoint to a UTF-16 wchar_t string.
+//  Returns the number of wchar_t units written (1 for BMP, 2 for surrogate).
+//
+////////////////////////////////////////////////////////////////////////////////
+
+int RenderSystem::CodepointToUtf16 (uint32_t codepoint, wchar_t * glyphStr)
+{
+    int glyphLen = 0;
+
+
+
+    glyphStr[0] = L'\0';
+    glyphStr[1] = L'\0';
+    glyphStr[2] = L'\0';
+
+    if (codepoint <= 0xFFFF)
+    {
+        glyphStr[0] = static_cast<wchar_t> (codepoint);
+        glyphLen    = 1;
+    }
+    else
+    {
+        glyphStr[0] = static_cast<wchar_t> (0xD800 + ((codepoint - 0x10000) >> 10));
+        glyphStr[1] = static_cast<wchar_t> (0xDC00 + ((codepoint - 0x10000) & 0x3FF));
+        glyphLen    = 2;
+    }
+
+    return glyphLen;
+}
+
+
+
+
+
+// Overlay rendering constants
+static constexpr float OVERLAY_FONT_DIP       = 16.0f;   // Overlay font design size in DIP (matches CharacterSet)
+static constexpr float OVERLAY_CELL_DIP       = 28.0f;   // Base cell height in DIP (matches BASE_CHAR_HEIGHT / BASE_ROW_HEIGHT)
+static constexpr float OVERLAY_ADV_SCALE      = OVERLAY_FONT_DIP / OVERLAY_CELL_DIP;  // Font-to-cell advance ratio
+static constexpr float OVERLAY_CHAR_SCALE     = 1.0f;    // 1:1 pixel mapping (no scale)
+static constexpr float OVERLAY_MIN_OPACITY    = 0.01f;   // Below this opacity, skip rendering
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  RenderSystem::ComputeRowRects
+//
+//  Builds per-row bounding rects from character positions for halo rendering.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+void RenderSystem::ComputeRowRects (std::span<const HintCharacter> chars,
+                                    std::span<const float>         xPositions,
+                                    float                          advanceScale,
+                                    float                          baseY,
+                                    float                          cellHeight,
+                                    int                            numRows,
+                                    float                          hPad,
+                                    float                          vPad)
+{
+    CharacterSet & charSet = CharacterSet::GetInstance();
+
+
+    // Skip recomputation if the same overlay data produced the cached rects
+    if (chars.data() == m_haloRowRectsKey && !m_haloRowRects.empty())
+    {
+        return;
+    }
+
+    m_haloRowRects.clear();
+    m_haloRowRectsKey = chars.data();
+
+    for (int row = 0; row < numRows; ++row)
+    {
+        float rowLeft  =  1e9f;
+        float rowRight = -1e9f;
+        bool  hasChars = false;
+
+        for (size_t i = 0; i < chars.size(); ++i)
+        {
+            if (chars[i].row == row && !chars[i].isSpace)
+            {
+                float charRight = xPositions[i] + charSet.GetGlyph (chars[i].targetGlyphIndex).advanceWidth * advanceScale;
+
+                rowLeft  = std::min (rowLeft, xPositions[i]);
+                rowRight = std::max (rowRight, charRight);
+                hasChars = true;
+            }
+        }
+
+        if (hasChars)
+        {
+            float rowTop    = baseY + static_cast<float> (row) * cellHeight - vPad;
+            float rowBottom = rowTop + cellHeight + 2.0f * vPad;
+
+            D2D1_RECT_F rect = D2D1::RectF (rowLeft - hPad, rowTop, rowRight + hPad, rowBottom);
+
+            m_haloRowRects.push_back (rect);
+        }
+    }
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  RenderSystem::DrawFeatheredBackground
+//
+//  Renders per-row rounded-rect halos via a D3D11 fullscreen pixel shader.
+//  Single draw call — the shader computes signed distance to the nearest
+//  rounded rect per pixel with a smooth quadratic falloff.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+void RenderSystem::DrawFeatheredBackground (std::span<const HintCharacter> chars,
+                                            std::span<const float>         xPositions,
+                                            float                          advanceScale,
+                                            float                          baseY,
+                                            float                          cellHeight,
+                                            int                            numRows,
+                                            float                          padding,
+                                            float                          opacityScale)
+{
+    HRESULT                  hr          = S_OK;
+    const float              haloMaxDark = 0.85f;
+    const float              maxOpacity  = haloMaxDark * opacityScale;
+    const float              hPad        = padding * 0.4f;
+    const float              vPad        = cellHeight * 0.1f;
+    const float              cornerRad   = cellHeight * 0.5f;
+    const float              maxExpand   = 35.0f;
+    D3D11_MAPPED_SUBRESOURCE mapped      = {};
+
+
+
+    BAIL_OUT_IF (!m_haloPS || !m_haloConstantBuffer, S_OK);
+    BAIL_OUT_IF (maxOpacity <= 0.01f, S_OK);
+
+    ComputeRowRects (chars, xPositions, advanceScale, baseY, cellHeight, numRows, hPad, vPad);
+    BAIL_OUT_IF (m_haloRowRects.empty(), S_OK);
+
+    // Upload row rects and control params to constant buffer
+    hr = m_context->Map (m_haloConstantBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
+    CHRA (hr);
+
+    {
+        float * cb       = static_cast<float *> (mapped.pData);
+        int     rowCount = std::min (static_cast<int> (m_haloRowRects.size()), MAX_HALO_ROWS);
+
+        memset (cb, 0, (MAX_HALO_ROWS + 1) * 16);
+
+        for (int i = 0; i < rowCount; i++)
+        {
+            cb[i * 4 + 0] = m_haloRowRects[i].left;
+            cb[i * 4 + 1] = m_haloRowRects[i].top;
+            cb[i * 4 + 2] = m_haloRowRects[i].right;
+            cb[i * 4 + 3] = m_haloRowRects[i].bottom;
+        }
+
+        // Control params at offset MAX_HALO_ROWS * 4 floats
+        cb[MAX_HALO_ROWS * 4 + 0] = cornerRad;
+        cb[MAX_HALO_ROWS * 4 + 1] = maxExpand;
+        cb[MAX_HALO_ROWS * 4 + 2] = maxOpacity;
+        memcpy (&cb[MAX_HALO_ROWS * 4 + 3], &rowCount, sizeof (int));
+    }
+
+    m_context->Unmap (m_haloConstantBuffer.Get(), 0);
+
+    // Set up fullscreen pass
+    SetRenderPipelineState (m_fullscreenQuadInputLayout.Get(),
+                            D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST,
+                            m_fullscreenQuadVB.Get(),
+                            sizeof (float) * 5,
+                            m_fullscreenQuadVS.Get(),
+                            nullptr,
+                            nullptr);
+
+    {
+        float blendFactor[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
+
+        m_context->OMSetBlendState (m_blendState.Get(), blendFactor, 0xffffffff);
+    }
+
+    {
+        D3D11_VIEWPORT vp = {};
+
+        vp.Width    = static_cast<float> (m_renderWidth);
+        vp.Height   = static_cast<float> (m_renderHeight);
+        vp.MinDepth = 0.0f;
+        vp.MaxDepth = 1.0f;
+
+        m_context->RSSetViewports (1, &vp);
+    }
+
+    m_context->OMSetRenderTargets (1, m_sceneRTV.GetAddressOf(), nullptr);
+    m_context->PSSetConstantBuffers (0, 1, m_haloConstantBuffer.GetAddressOf());
+    m_context->PSSetShader (m_haloPS.Get(), nullptr, 0);
+    m_context->Draw (6, 0);
+
+    {
+        ID3D11Buffer * nullCB = nullptr;
+
+        m_context->PSSetConstantBuffers (0, 1, &nullCB);
+    }
+
+Error:
+    return;
+}
+
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  RenderSystem::BuildOverlayInstances
+//
+//  Builds GPU instance data for overlay characters.  One foreground
+//  instance per visible character — bloom provides the glow.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+void RenderSystem::BuildOverlayInstances (std::span<const HintCharacter> chars,
+                                          float                          charScale,
+                                          float                          baseY,
+                                          float                          cellHeight,
+                                          std::span<const float>         xPositions,
+                                          float                          advanceScale)
+{
+    CharacterSet           & charSet    = CharacterSet::GetInstance();
+    float                    posX       = 0.0f;
+    float                    posY       = 0.0f;
+    float                    widthRatio = 1.0f;
+    float                    uvWidth    = 0.0f;
+    CharacterInstanceData    inst;
+
+
+
+    m_overlayInstanceData.clear();
+
+    for (size_t i = 0; i < chars.size(); i++)
+    {
+        const HintCharacter & ch = chars[i];
+
+
+
+        if (ch.phase == CharPhase::Hidden || ch.opacity <= OVERLAY_MIN_OPACITY)
+        {
+            continue;
+        }
+
+        // Skip characters with unresolved glyph indices (spaces, margin columns)
+        if (ch.currentGlyphIndex >= charSet.GetGlyphCount())
+        {
+            continue;
+        }
+
+        const OverlayUV & overlayUV = charSet.GetOverlayUV (ch.currentGlyphIndex);
+        const GlyphInfo & glyph     = charSet.GetGlyph (ch.currentGlyphIndex);
+
+        // Compute width ratio: how much of the atlas cell this character
+        // actually occupies.  Shrink the quad and crop the UV so the
+        // rendered width matches the proportional advance width.
+        widthRatio = std::min (glyph.advanceWidth * advanceScale, 1.0f);
+        uvWidth    = (overlayUV.uvMax.x - overlayUV.uvMin.x) * widthRatio;
+
+        // Normal glyphs are left-aligned in the atlas cell, so crop from
+        // the left.  Mirrored glyphs are horizontally flipped, placing
+        // their ink on the right side — crop from the right instead.
+        float uvMinX = glyph.mirrored ? (overlayUV.uvMax.x - uvWidth) : overlayUV.uvMin.x;
+        float uvMaxX = glyph.mirrored ? (overlayUV.uvMax.x)           : overlayUV.uvMin.x + uvWidth;
+
+        posX = xPositions[i];
+        posY = roundf (baseY + static_cast<float> (ch.row) * cellHeight);
+
+        // Foreground instance only — bloom provides the glow
+        inst             = {};
+        inst.position[0] = posX;
+        inst.position[1] = posY;
+        inst.position[2] = 0.0f;
+        inst.uvMin[0]    = uvMinX;
+        inst.uvMin[1]    = overlayUV.uvMin.y;
+        inst.uvMax[0]    = uvMaxX;
+        inst.uvMax[1]    = overlayUV.uvMax.y;
+        inst.color[0]    = ch.colorR;
+        inst.color[1]    = ch.colorG;
+        inst.color[2]    = ch.colorB;
+        inst.color[3]    = 1.0f;
+        inst.brightness  = ch.opacity;
+        inst.scaleX      = widthRatio;
+        inst.scaleY      = charScale;
+
+        m_overlayInstanceData.push_back (inst);
+    }
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  RenderSystem::RenderOverlayInstances
+//
+//  Uploads overlay instance data to the GPU and renders them using the
+//  overlay pixel shader (no additive glow).  Sets characterScale = 1.0
+//  in the constant buffer so per-instance scale controls character size.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+void RenderSystem::RenderOverlayInstances ()
+{
+    HRESULT                    hr            = S_OK;
+    UINT                       instanceCount = static_cast<UINT> (m_overlayInstanceData.size());
+    D3D11_MAPPED_SUBRESOURCE   mapped        = {};
+    size_t                     bytesToCopy   = 0;
+    CharacterSet             & charSet       = CharacterSet::GetInstance();
+    ID3D11ShaderResourceView * srv           = nullptr;
+    float                      width         = static_cast<float> (m_renderWidth);
+    float                      height        = static_cast<float> (m_renderHeight);
+    float                      overlayCW     = charSet.GetOverlayCellContentWidth();
+    float                      overlayCH     = charSet.GetOverlayCellContentHeight();
+
+
+
+    BAIL_OUT_IF (instanceCount == 0, S_OK);
+
+    // Grow overlay instance buffer if needed
+    if (instanceCount > m_overlayInstanceBufferCapacity)
+    {
+        UINT newCapacity = instanceCount * 2;
+
+        m_overlayInstanceBuffer.Reset();
+        m_overlayInstanceBufferCapacity = newCapacity;
+
+        D3D11_BUFFER_DESC bufDesc = {};
+
+        bufDesc.ByteWidth      = sizeof (CharacterInstanceData) * newCapacity;
+        bufDesc.Usage          = D3D11_USAGE_DYNAMIC;
+        bufDesc.BindFlags      = D3D11_BIND_VERTEX_BUFFER;
+        bufDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+
+        hr = m_device->CreateBuffer (&bufDesc, nullptr, &m_overlayInstanceBuffer);
+        CHRA (hr);
+    }
+
+    // Upload instance data
+    hr = m_context->Map (m_overlayInstanceBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
+    CHRA (hr);
+
+    bytesToCopy = sizeof (CharacterInstanceData) * instanceCount;
+    memcpy (mapped.pData, m_overlayInstanceData.data(), bytesToCopy);
+    m_context->Unmap (m_overlayInstanceBuffer.Get(), 0);
+
+    // Update constant buffer: orthographic projection + characterScale = 1.0
+    hr = m_context->Map (m_constantBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
+    CHRA (hr);
+
+    {
+        ConstantBufferData * cbData = static_cast<ConstantBufferData *> (mapped.pData);
+
+        memset (cbData->projection, 0, sizeof (cbData->projection));
+        cbData->projection[0]  = 2.0f / width;     // m[0][0]
+        cbData->projection[5]  = -2.0f / height;   // m[1][1]
+        cbData->projection[10] = 0.01f;             // m[2][2]  1/(farZ-nearZ) = 1/100
+        cbData->projection[12] = -1.0f;             // m[3][0]
+        cbData->projection[13] = 1.0f;              // m[3][1]
+        cbData->projection[15] = 1.0f;              // m[3][3]
+
+        cbData->characterScale = 1.0f;
+
+        // Exact pixel dimensions for 1:1 texel-to-pixel mapping
+        cbData->charWidth      = overlayCW;
+        cbData->charHeight     = overlayCH;
+    }
+
+    m_context->Unmap (m_constantBuffer.Get(), 0);
+
+    // Set render target to scene texture (before bloom)
+    m_context->OMSetRenderTargets (1, m_sceneRTV.GetAddressOf(), nullptr);
+
+    // Set viewport
+    {
+        D3D11_VIEWPORT vp = {};
+
+        vp.Width    = width;
+        vp.Height   = height;
+        vp.MinDepth = 0.0f;
+        vp.MaxDepth = 1.0f;
+
+        m_context->RSSetViewports (1, &vp);
+    }
+
+    // Set pipeline state
+    m_context->IASetInputLayout (m_inputLayout.Get());
+    m_context->IASetPrimitiveTopology (D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+    {
+        ID3D11Buffer * buffers[2] = { m_dummyVertexBuffer.Get(), m_overlayInstanceBuffer.Get() };
+        UINT           strides[2] = { 4, sizeof (CharacterInstanceData) };
+        UINT           offsets[2] = { 0, 0 };
+
+        m_context->IASetVertexBuffers (0, 2, buffers, strides, offsets);
+    }
+
+    m_context->VSSetShader (m_vertexShader.Get(), nullptr, 0);
+    m_context->VSSetConstantBuffers (0, 1, m_constantBuffer.GetAddressOf());
+    m_context->PSSetShader (m_overlayPixelShader.Get(), nullptr, 0);
+    m_context->PSSetSamplers (0, 1, m_samplerState.GetAddressOf());
+
+    srv = charSet.GetOverlayTextureResourceView();
+    if (srv)
+    {
+        m_context->PSSetShaderResources (0, 1, &srv);
+    }
+
+    {
+        float blendFactor[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
+
+        m_context->OMSetBlendState (m_premultipliedBlendState.Get(), blendFactor, 0xffffffff);
+    }
+
+    // Draw overlay characters
+    m_context->DrawInstanced (6, instanceCount, 0, 0);
+
+Error:
+    return;
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  ComputeMaxCharOpacity
+//
+//  Returns the maximum opacity of any visible (non-space) character.
+//  Used for halo intensity so the background stays visible as long as
+//  any text is still on screen.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+static float ComputeMaxCharOpacity (std::span<const HintCharacter> chars)
+{
+    float maxOpacity = 0.0f;
+
+
+    for (const auto & ch : chars)
+    {
+        if (!ch.isSpace && ch.opacity > maxOpacity)
+        {
+            maxOpacity = ch.opacity;
+        }
+    }
+
+    return maxOpacity;
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  RenderSystem::CalculateColumnAlignedTextPositions
+//
+//  Computes proportional x-positions for a two-column overlay layout.
+//  The key column is right-aligned, the description column is left-aligned,
+//  with a proportional gap between them.  Fills positions with relative
+//  x-coordinates (before centering offset is applied).
+//
+//  Column layout (character indices):
+//
+//    |  margin  |     key col  |  gap  |  desc col           |  margin  |
+//    |          |          F1  |       |  Toggle FPS         |          |
+//    0          |              |       |
+//           marginCols         |   descColStart
+//                         gapColStart
+//
+////////////////////////////////////////////////////////////////////////////////
+
+void RenderSystem::CalculateColumnAlignedTextPositions (
+    std::span<const HintCharacter>   chars,
+    int                              marginCols,
+    int                              keyColChars,
+    int                              descColStart,
+    float                            maxKeyWidth,
+    const std::vector<float>       & keyColWidths,
+    float                            gapWidth,
+    float                            advScaled,
+    std::vector<float>             & positions)
+{
+    CharacterSet & charSet      = CharacterSet::GetInstance();
+    int            gapColStart  = marginCols + keyColChars;
+    float          charPos      = 0.0f;
+    bool           foundKeyText = false;
+
+
+
+    positions.resize (chars.size());
+
+    for (size_t i = 0; i < chars.size(); i++)
+    {
+        const HintCharacter & ch      = chars[i];
+        float                 advance = charSet.GetGlyph (ch.targetGlyphIndex).advanceWidth * advScaled;
+
+
+
+        // Reset position at column boundaries (skip for single-column rows)
+        if (ch.col <= marginCols)
+        {
+            charPos      = 0.0f;
+            foundKeyText = false;
+        }
+        else if (!ch.isSingleColumnRow && ch.col == gapColStart)
+        {
+            charPos = maxKeyWidth;
+        }
+        else if (!ch.isSingleColumnRow && ch.col == descColStart)
+        {
+            charPos = maxKeyWidth + gapWidth;
+        }
+
+        // Right-align within key column (skip for single-column rows)
+        if (!ch.isSingleColumnRow && ch.col >= marginCols && ch.col < gapColStart && !ch.isSpace && !foundKeyText)
+        {
+            charPos      = maxKeyWidth - keyColWidths[ch.row];
+            foundKeyText = true;
+        }
+
+        positions[i] = roundf (charPos);
+        charPos     += advance;
+    }
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  RenderSystem::ComputeOverlayLayout
+//
+//  Measures text, computes proportional x-positions, and determines the
+//  centered bounding rect for a two-column overlay.  Fills xPositions
+//  with absolute screen coordinates, bounds with the overlay rect, baseY
+//  with the first row's Y origin, and advanceScale with the ratio for
+//  BuildOverlayInstances.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+void RenderSystem::ComputeOverlayLayout (
+    std::span<const HintCharacter>   chars,
+    int                              marginCols,
+    int                              keyColChars,
+    int                              gapChars,
+    int                              numRows,
+    float                            cellHeight,
+    float                            padding,
+    std::vector<float>             & xPositions,
+    D2D1_RECT_F                    & bounds,
+    float                          & baseY,
+    float                          & advanceScale)
+{
+    CharacterSet     & charSet      = CharacterSet::GetInstance();
+    float              advScaled    = cellHeight * OVERLAY_ADV_SCALE;
+    int                descColStart = marginCols + keyColChars + gapChars;
+    std::vector<float> keyColWidths;
+    float              maxKeyWidth  = 0.0f;
+    float              gapWidth     = 0.0f;
+    float              maxRowWidth  = 0.0f;
+    float              totalWidth   = 0.0f;
+    float              totalHeight  = 0.0f;
+    float              baseX        = 0.0f;
+
+
+
+    advanceScale = advScaled / charSet.GetOverlayCellContentWidth();
+
+    // Measure proportional width per row of key column (for right-alignment)
+    keyColWidths.resize (numRows, 0.0f);
+
+    for (const auto & ch : chars)
+    {
+        if (ch.col >= marginCols && ch.col < marginCols + keyColChars && !ch.isSpace && !ch.isSingleColumnRow)
+        {
+            keyColWidths[ch.row] += charSet.GetGlyph (ch.targetGlyphIndex).advanceWidth * advScaled;
+        }
+    }
+
+    maxKeyWidth = *std::ranges::max_element (keyColWidths);
+    gapWidth    = charSet.GetSpaceAdvanceWidth() * advScaled * static_cast<float> (gapChars);
+
+    // Compute x-positions with two-column layout
+    CalculateColumnAlignedTextPositions (chars, marginCols, keyColChars,
+                                        descColStart,
+                                        maxKeyWidth, keyColWidths,
+                                        gapWidth, advScaled, xPositions);
+
+    // Compute max row width for bounding rect (non-space characters only)
+    for (size_t i = 0; i < chars.size(); i++)
+    {
+        if (!chars[i].isSpace)
+        {
+            maxRowWidth = std::max (maxRowWidth, xPositions[i] + charSet.GetGlyph (chars[i].targetGlyphIndex).advanceWidth * advScaled);
+        }
+    }
+
+    // Center overlay on screen
+    totalWidth  = maxRowWidth + 2.0f * padding;
+    totalHeight = static_cast<float> (numRows) * cellHeight + 2.0f * padding;
+
+    bounds.left   = (static_cast<float> (m_renderWidth)  - totalWidth)  / 2.0f;
+    bounds.top    = (static_cast<float> (m_renderHeight) - totalHeight) / 2.0f;
+    bounds.right  = bounds.left + totalWidth;
+    bounds.bottom = bounds.top  + totalHeight;
+
+    baseX = roundf (bounds.left + padding);
+    baseY = roundf (bounds.top  + padding);
+
+    // Convert relative x-positions to absolute
+    for (auto & x : xPositions)
+    {
+        x += baseX;
+    }
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  RenderSystem::RenderTwoColumnOverlay
+//
+//  Shared rendering logic for two-column overlay layouts (help hint and
+//  hotkey overlays).  Computes layout positioning, draws a D3D halo
+//  background, and renders characters via GPU instancing to the scene
+//  texture before bloom.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+void RenderSystem::RenderTwoColumnOverlay (
+    std::span<const HintCharacter> chars,
+    int                            marginCols,
+    int                            keyColChars,
+    int                            gapChars,
+    int                            numRows,
+    float                          cellHeight,
+    float                          padding)
+{
+    HRESULT            hr              = S_OK;
+    float              maxCharOpacity = 0.0f;
+    std::vector<float> xPositions;
+    D2D1_RECT_F        bounds         = {};
+    float              baseY          = 0.0f;
+    float              advanceScale   = 0.0f;
+
+
+
+    CBRAEx (m_sceneRTV && m_haloPS, E_UNEXPECTED);
+    BAIL_OUT_IF (chars.empty(), S_OK);
+
+    maxCharOpacity = ComputeMaxCharOpacity (chars);
+
+    ComputeOverlayLayout (chars, marginCols, keyColChars, gapChars,
+                          numRows, cellHeight, padding,
+                          xPositions, bounds, baseY, advanceScale);
+
+    // D3D: per-row feathered background halos (single fullscreen shader pass)
+    DrawFeatheredBackground (chars, std::span<const float> (xPositions), advanceScale,
+                             baseY, cellHeight, numRows, padding, maxCharOpacity);
+
+    // GPU: overlay characters
+    BuildOverlayInstances (chars,
+                           OVERLAY_CHAR_SCALE, baseY, cellHeight,
+                           std::span<const float> (xPositions), advanceScale);
+    RenderOverlayInstances();
+
+Error:
     return;
 }
 
@@ -1607,13 +2575,11 @@ void RenderSystem::RenderDebugFadeTimes (const AnimationSystem& animationSystem)
             );
 
             // Draw text in white
-            m_d2dContext->DrawText (
-                fadeText,
-                static_cast<UINT32> (wcslen (fadeText)),
-                m_fpsTextFormat.Get(),
-                textRect,
-            m_fpsBrush.Get()
-        );
+            m_d2dContext->DrawText (fadeText,
+                                    static_cast<UINT32> (wcslen (fadeText)),
+                                    m_fpsTextFormat.Get(),
+                                    textRect,
+                                    m_fpsBrush.Get());
         }
     }
 
@@ -1624,6 +2590,12 @@ void RenderSystem::RenderDebugFadeTimes (const AnimationSystem& animationSystem)
 
 
 
+////////////////////////////////////////////////////////////////////////////////
+//
+//  RenderSystem::Resize
+//
+////////////////////////////////////////////////////////////////////////////////
+
 void RenderSystem::Resize (UINT width, UINT height)
 {
     HRESULT        hr       = S_OK;
@@ -1632,6 +2604,9 @@ void RenderSystem::Resize (UINT width, UINT height)
 
     m_renderWidth  = width;
     m_renderHeight = height;
+
+    // Invalidate cached overlay rects (they use absolute pixel coordinates)
+    m_haloRowRectsKey = nullptr;
 
     if (!m_swapChain)
     {
@@ -1758,9 +2733,12 @@ void RenderSystem::ReleaseDirectXResources()
     m_blurHorizontalPS.Reset();
     m_blurVerticalPS.Reset();
     m_compositePS.Reset();
+    m_haloPS.Reset();
+    m_haloConstantBuffer.Reset();
     m_bloomConstantBuffer.Reset();
     m_atlasTextureSRV.Reset();
     m_samplerState.Reset();
+    m_premultipliedBlendState.Reset();
     m_blendState.Reset();
     m_constantBuffer.Reset();
     m_instanceBuffer.Reset();
@@ -1786,10 +2764,11 @@ void RenderSystem::ReleaseDirectXResources()
 
 HRESULT RenderSystem::RecreateDirect2DBitmap()
 {
-    HRESULT                                  hr = S_OK;
+    HRESULT                                  hr          = S_OK;
     Microsoft::WRL::ComPtr<ID3D11Texture2D>  backBuffer;
     Microsoft::WRL::ComPtr<IDXGISurface>     dxgiSurface;
     D2D1_BITMAP_PROPERTIES1                  bitmapProps;
+
 
 
     if (!m_d2dContext)
@@ -1821,6 +2800,12 @@ Error:
 
 
 
+////////////////////////////////////////////////////////////////////////////////
+//
+//  RenderSystem::SetGlowIntensity
+//
+////////////////////////////////////////////////////////////////////////////////
+
 void RenderSystem::SetGlowIntensity (int intensityPercent)
 {
     // Convert percentage (0-200) to multiplier (0.0-5.0)
@@ -1831,6 +2816,12 @@ void RenderSystem::SetGlowIntensity (int intensityPercent)
 
 
 
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  RenderSystem::SetGlowSize
+//
+////////////////////////////////////////////////////////////////////////////////
 
 void RenderSystem::SetGlowSize (int sizePercent)
 {
@@ -1843,6 +2834,31 @@ void RenderSystem::SetGlowSize (int sizePercent)
 
 
 
+////////////////////////////////////////////////////////////////////////////////
+//
+//  RenderSystem::SetCharacterScaleOverride
+//
+//  Overrides the viewport-based character scale calculation.
+//  Used by UsageDialog to force full-size rain characters in its
+//  smaller window.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+void RenderSystem::SetCharacterScaleOverride (float scale)
+{
+    m_characterScaleOverride = scale;
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  RenderSystem::Shutdown
+//
+////////////////////////////////////////////////////////////////////////////////
+
 void RenderSystem::Shutdown()
 {
     ReleaseDirect2DResources();
@@ -1853,6 +2869,12 @@ void RenderSystem::Shutdown()
 
 
 
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  RenderSystem::RecreateSwapChain
+//
+////////////////////////////////////////////////////////////////////////////////
 
 bool RenderSystem::RecreateSwapChain (HWND hwnd, UINT width, UINT height, bool fullscreen)
 {
@@ -1895,6 +2917,12 @@ Error:
 
 
 
+////////////////////////////////////////////////////////////////////////////////
+//
+//  RenderSystem::SetFullscreen
+//
+////////////////////////////////////////////////////////////////////////////////
+
 bool RenderSystem::SetFullscreen()
 {
     if (!m_swapChain)
@@ -1909,6 +2937,12 @@ bool RenderSystem::SetFullscreen()
 
 
 
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  RenderSystem::SetWindowed
+//
+////////////////////////////////////////////////////////////////////////////////
 
 bool RenderSystem::SetWindowed()
 {
