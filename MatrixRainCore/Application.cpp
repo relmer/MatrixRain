@@ -88,7 +88,7 @@ HRESULT Application::Initialize (HINSTANCE hInstance, int nCmdShow, const Screen
                 { L"Help",     L"?" },
                 { L"Exit",     L"Esc" }
             },
-            OverlayTimingConfig { .revealDuration = 2.5f, .dismissDuration = 1.0f, .cycleInterval = 0.25f, .flashDuration = 1.0f, .holdDuration = 2.7f },
+            OverlayTimingConfig { .revealDuration = 1.5f, .dismissDuration = 1.0f, .cycleInterval = 0.25f, .flashDuration = 1.0f, .holdDuration = 2.7f },
             OverlayLayoutConfig { .marginCols = 1, .gapChars = 6, .baseCharWidth = 16.0f, .baseRowHeight = 28.0f, .basePadding = 20.0f }
         );
 
@@ -104,7 +104,7 @@ HRESULT Application::Initialize (HINSTANCE hInstance, int nCmdShow, const Screen
                 { L"Alt+Enter",   L"Toggle fullscreen" },
                 { L"Esc",         L"Exit" }
             },
-            OverlayTimingConfig { .revealDuration = 2.5f, .dismissDuration = 1.0f, .cycleInterval = 0.25f, .flashDuration = 1.0f, .holdDuration = 5.4f },
+            OverlayTimingConfig { .revealDuration = 1.5f, .dismissDuration = 1.0f, .cycleInterval = 0.25f, .flashDuration = 1.0f, .holdDuration = 5.4f },
             OverlayLayoutConfig { .marginCols = 2, .gapChars = 6, .baseCharWidth = 16.0f, .baseRowHeight = 28.0f, .basePadding = 30.0f }
         );
     }
