@@ -28,7 +28,7 @@ UsageText::UsageText (wchar_t switchPrefix) :
     m_switches =
     {
         { L'c', L"", L"Show settings dialog"      },
-        { L'?', L"", L"Display this help message"  },
+        { L'?', L"", L"Display this help message" },
     };
 
     BuildFormattedLines();
