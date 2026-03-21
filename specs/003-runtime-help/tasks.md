@@ -271,12 +271,12 @@ The following tasks were completed under the original console-based approach but
 
 ### Known Issues (from manual testing 2026-03-06)
 
-- [ ] T113 [US1/US5] Evaluate and tune reveal speed and per-cell stagger — current values may be too fast or too slow. ScrambleRevealEffect::Initialize() params: revealDuration=1.5, dismissDuration=1.0, cycleInterval=0.045, flashDuration=0.15
-- [ ] T114 [US1/US5] Evaluate margin column visual effect — whether margin columns provide enough smooth entry/exit for the cycling zone
-- [ ] T115 [US1/US5] Evaluate whether characters in cycling phase should cycle through multiple random glyphs over time versus showing one fixed random glyph — current implementation cycles glyphs at cycleInterval
-- [ ] T116 [US1/US5] Evaluate dismiss visual quality — timing, speed, and whether opacity fade looks natural as cells transition Settled → Dismissing → Hidden
-- [ ] T117 [US1/US5] Evaluate ComputeScrambleColor transitions — yellow flash intensity, white pulse timing (rampUp=0.8, hold=1.5, rampDown=1.0), final grey level (0.75)
-- [ ] T118 [US1/US5] Evaluate margin column counts — MARGIN_COLS=1 for HelpHintOverlay, MARGIN_COLS=2 for HotkeyOverlay. May need more or fewer for smooth visual entry/exit
+- [X] T113 [US1/US5] Evaluate and tune reveal speed and per-cell stagger — tuned to revealDuration=1.5, cycleInterval=0.25, flashDuration=1.0. Cycle timers staggered per-cell with random offset.
+- [X] T114 [US1/US5] Evaluate margin column visual effect — margins provide smooth entry/exit. MARGIN_COLS=1 for help hint, MARGIN_COLS=2 for hotkey/usage.
+- [X] T115 [US1/US5] Evaluate whether characters in cycling phase should cycle through multiple random glyphs — kept cycling at cycleInterval with staggered timers for smooth visual.
+- [X] T116 [US1/US5] Evaluate dismiss visual quality — dismiss at 1.0s duration looks natural with staggered per-cell fade.
+- [X] T117 [US1/US5] Evaluate ComputeScrambleColor transitions — cycling/dismissing at 70% scheme color, flash decays to full scheme, pulse ramp 0.33/0.75/0.5s.
+- [X] T118 [US1/US5] Evaluate margin column counts — MARGIN_COLS=1 for help hint, MARGIN_COLS=2 for hotkey and usage overlays. Provides good visual entry/exit.
 
 **Checkpoint**: Scramble-reveal animations are visually polished and match the desired matrix rain aesthetic.
 
