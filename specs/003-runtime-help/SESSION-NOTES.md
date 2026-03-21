@@ -66,47 +66,48 @@ The original spec described per-character random resolve/dissolve (each char has
 - `ScreenSaverSettings::DEFAULT_DENSITY_PERCENT = 50`
 - `DensityController::DEFAULT_PERCENTAGE = 50`
 
-## Open Work: UsageDialog GPU Migration (IN PROGRESS)
+## UsageDialog GPU Migration (COMPLETE — visual tuning in progress)
 
-**Status**: Initial implementation done — builds and tests pass, but needs visual testing and refinement.
+**Status**: Unified Overlay class implemented, /? mode working visually. Old UsageDialog still in codebase (dead code, pending deletion).
 
 **What's done**:
-- `UsageOverlay` class created (builds HintCharacter arrays from UsageText formatted lines)
-- Application handles `HelpRequested` mode: 60%×50% window, title bar, Enter/Esc exit only
-- `main.cpp` routes `/? ` through Application instead of UsageDialog
-- Overlay atlas expanded with punctuation (281 glyphs)
-- `BuildOverlayInstances` race condition fixed (atlas lookups after bounds check)
-- CharacterSet glyph count tests updated (273 → 281)
+- Unified `Overlay` class (Overlay.h/cpp) replaces HelpHintOverlay, HotkeyOverlay, UsageOverlay
+  - Based entirely on HotkeyOverlay's known-good Update/Show/Dismiss/ResolveGlyphIndices
+  - Takes `vector<OverlayEntry>` (left/right per row) + `OverlayTimingConfig` + `OverlayLayoutConfig`
+  - Two-column rows: key in `left`, description in `right`
+  - Single-column rows: text in `left`, `right` empty
+  - `isSingleColumnRow` flag on `HintCharacter` prevents position calculator from misinterpreting single-column text as key column content
+- Application creates all three overlays as `Overlay` instances with C++20 designated initializers
+- RenderSystem uses generic `Overlay*` via lambda — no per-type rendering code
+- `/? ` mode: borderless popup window (60%×50%), full-size rain with spacing override, windowed DisplayMode (click-to-drag), stats suppressed, Enter/Esc exit only
+- Usage text entries built inline: header lines as single-column, switches as two-column with `gapChars = 6`
+- `BuildOverlayInstances`: atlas lookups moved after bounds check to prevent SIZE_MAX race condition
+- Overlay centering fix: `maxRowWidth` excludes trailing space positions for accurate bounding box
 
-**What still needs doing**:
+**Remaining work**:
 - Add `<` and `>` to overlay atlas for `<HWND>` in usage text
-- Visual testing and tuning of /? mode
-- Delete old UsageDialog class once /? mode is verified working
-- Unified Overlay class refactor (see below)
+- Delete old HelpHintOverlay, HotkeyOverlay, UsageOverlay, UsageDialog classes (all dead code now)
+- Run full test suite and verify no regressions in normal mode / hotkey overlay / help hint
+- Verify `ComputeOverlayLayout` centering is correct for existing overlays (the `maxRowWidth` fix could affect them)
 
-**Known issues**:
-- Window sizing is a rough 60%×50% instead of content-aware 2x text bounding box
-- `RenderTwoColumnOverlay` treats all content as single-column (keyCol=0, gap=0)
+## Unified Overlay Class (IMPLEMENTED)
 
-## Planned: Unified Overlay Class Refactor
+Consolidated HelpHintOverlay, HotkeyOverlay, UsageOverlay into a single `Overlay` class (Overlay.h/cpp).
 
-**Goal**: Consolidate HelpHintOverlay, HotkeyOverlay, UsageOverlay into a single `Overlay` class.
+**Architecture**:
+- `OverlayEntry { wstring left; wstring right; }` — per-row content
+- `OverlayTimingConfig` — revealDuration, dismissDuration, cycleInterval, flashDuration, holdDuration
+- `OverlayLayoutConfig` — marginCols, gapChars, baseCharWidth, baseRowHeight, basePadding
+- Single/two-column mixed layout: `isSingleColumnRow` flag on HintCharacter prevents position calculator from applying key/gap/desc column resets to rows without key content
+- Update logic copied directly from HotkeyOverlay (known-good)
+- RenderSystem renders any `Overlay*` via generic lambda — no per-type code
 
-**Design**:
-- Takes `vector<OverlayEntry>` where `OverlayEntry { wstring left; wstring right; }`
-- Single-column rows: text in `left`, `right` empty
-- Two-column rows: key in `left`, description in `right`  
-- Configurable timing: revealDuration, dismissDuration, cycleInterval, flashDuration, holdDuration
-- Configurable layout: marginCols, gapChars, padding
-- Shared Update logic (CellPhase→CharPhase mapping, glyph cycling, color computation)
-- Shared Show/Dismiss/Hide/ResolveGlyphIndices
-- Per-overlay specifics become just constructor configuration
-- Eliminates three overlay classes, the duplicated Update switch statements, and the per-overlay rendering code in RenderSystem
-
-**Benefits**:
-- Single code path = no divergence bugs (like the SIZE_MAX race condition)
-- New overlays are just new sets of OverlayEntry + timing config
-- RenderSystem needs only one overlay rendering code path
+**Key lessons learned**:
+- Single-column rows in mixed overlays must not have characters in the key column range — position calculator measures key widths from those positions
+- `isSingleColumnRow` flag is the cleanest solution — avoids modifying col values or adding per-row metadata to the position calculator
+- `maxRowWidth` must exclude trailing space positions to avoid inflated bounding box
+- Atlas lookups in `BuildOverlayInstances` must be after bounds check on `currentGlyphIndex` (thread safety)
+- Space characters must never have `currentGlyphIndex` mutated in Update() — set SIZE_MAX once in Show()
 
 ## Config Dialog Cancel Bug (FIXED)
 - `OnCancel()` called `CancelLiveMode()` before `DestroyWindow()`, clearing isLiveMode flag
