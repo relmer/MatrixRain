@@ -20,6 +20,67 @@
 
 
 
+//
+//  Overlay timing and layout constants
+//
+
+static constexpr OverlayTimingConfig HELP_HINT_TIMING
+{
+    .revealDuration  = 1.5f,
+    .dismissDuration = 1.0f,
+    .cycleInterval   = 0.25f,
+    .flashDuration   = 1.0f,
+    .holdDuration    = 2.7f
+};
+
+static constexpr OverlayLayoutConfig HELP_HINT_LAYOUT
+{
+    .marginCols    = 1,
+    .gapChars      = 6,
+    .baseCharWidth = 16.0f,
+    .baseRowHeight = 28.0f,
+    .basePadding   = 20.0f
+};
+
+static constexpr OverlayTimingConfig HOTKEY_TIMING
+{
+    .revealDuration  = 1.5f,
+    .dismissDuration = 1.0f,
+    .cycleInterval   = 0.25f,
+    .flashDuration   = 1.0f,
+    .holdDuration    = 5.4f
+};
+
+static constexpr OverlayLayoutConfig HOTKEY_LAYOUT
+{
+    .marginCols    = 2,
+    .gapChars      = 6,
+    .baseCharWidth = 16.0f,
+    .baseRowHeight = 28.0f,
+    .basePadding   = 30.0f
+};
+
+static constexpr OverlayTimingConfig USAGE_TIMING
+{
+    .revealDuration  = 1.8f,
+    .dismissDuration = 0.0f,
+    .cycleInterval   = 0.065f,
+    .flashDuration   = 1.0f,
+    .holdDuration    = -1.0f
+};
+
+static constexpr OverlayLayoutConfig USAGE_LAYOUT
+{
+    .marginCols    = 2,
+    .gapChars      = 6,
+    .baseCharWidth = 16.0f,
+    .baseRowHeight = 28.0f,
+    .basePadding   = 30.0f
+};
+
+
+
+
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -82,18 +143,20 @@ HRESULT Application::Initialize (HINSTANCE hInstance, int nCmdShow, const Screen
     // Overlays are only used in Normal mode
     if (!pScreenSaverContext || pScreenSaverContext->m_mode == ScreenSaverMode::Normal)
     {
-        m_helpOverlay = std::make_unique<Overlay> (
-            std::vector<OverlayEntry> {
+        m_helpOverlay = std::make_unique<Overlay> (HELP_HINT_TIMING, HELP_HINT_LAYOUT);
+
+        hr = m_helpOverlay->Initialize (
+            {
                 { L"Settings", L"Enter" },
                 { L"Help",     L"?" },
                 { L"Exit",     L"Esc" }
-            },
-            OverlayTimingConfig { .revealDuration = 1.5f, .dismissDuration = 1.0f, .cycleInterval = 0.25f, .flashDuration = 1.0f, .holdDuration = 2.7f },
-            OverlayLayoutConfig { .marginCols = 1, .gapChars = 6, .baseCharWidth = 16.0f, .baseRowHeight = 28.0f, .basePadding = 20.0f }
-        );
+            });
+        CHR (hr);
 
-        m_hotkeyOverlay = std::make_unique<Overlay> (
-            std::vector<OverlayEntry> {
+        m_hotkeyOverlay = std::make_unique<Overlay> (HOTKEY_TIMING, HOTKEY_LAYOUT);
+
+        hr = m_hotkeyOverlay->Initialize (
+            {
                 { L"Space",       L"Pause / Resume" },
                 { L"Enter",       L"Settings dialog" },
                 { L"C",           L"Cycle color scheme" },
@@ -103,34 +166,28 @@ HRESULT Application::Initialize (HINSTANCE hInstance, int nCmdShow, const Screen
                 { L"-",           L"Decrease rain density" },
                 { L"Alt+Enter",   L"Toggle fullscreen" },
                 { L"Esc",         L"Exit" }
-            },
-            OverlayTimingConfig { .revealDuration = 1.5f, .dismissDuration = 1.0f, .cycleInterval = 0.25f, .flashDuration = 1.0f, .holdDuration = 5.4f },
-            OverlayLayoutConfig { .marginCols = 2, .gapChars = 6, .baseCharWidth = 16.0f, .baseRowHeight = 28.0f, .basePadding = 30.0f }
-        );
+            });
+        CHR (hr);
     }
 
-    // Usage overlay for /? mode — two-column layout for switches, single-column for headers
+    // Usage overlay for /? mode — entries built from UsageText (single source of truth)
     if (pScreenSaverContext && pScreenSaverContext->m_mode == ScreenSaverMode::HelpRequested)
     {
-        wchar_t prefix = pScreenSaverContext->m_switchPrefix;
+        UsageText usageText (pScreenSaverContext->m_switchPrefix);
 
-        std::vector<OverlayEntry> entries =
+        auto overlayPairs = usageText.GetOverlayEntries();
+
+        std::vector<OverlayEntry> entries;
+        entries.reserve (overlayPairs.size());
+        for (auto & [left, right] : overlayPairs)
         {
-            { std::format (L"MatrixRain v{} {} ({})", VERSION_WSTRING, VERSION_ARCH_WSTRING, std::wstring (VERSION_BUILD_TIMESTAMP)), L"" },
-            { std::format (L"Copyright {} 2024-{} by Robert Elmer", UnicodeSymbols::Copyright, VERSION_YEAR_WSTRING), L"" },
-            { L"", L"" },
-            { std::format (L"Usage: MatrixRain.exe [{}option]", prefix), L"" },
-            { L"", L"" },
-            { L"Options:", L"" },
-            { std::format (L"  {}c", prefix),  L"Show settings dialog" },
-            { std::format (L"  {}?", prefix),  L"Display this help message" },
-        };
+            entries.push_back ({ std::move (left), std::move (right) });
+        }
 
-        m_usageOverlay = std::make_unique<Overlay> (
-            std::move (entries),
-            OverlayTimingConfig { .revealDuration = 1.8f, .dismissDuration = 0.0f, .cycleInterval = 0.065f, .flashDuration = 1.0f, .holdDuration = -1.0f },
-            OverlayLayoutConfig { .marginCols = 2, .gapChars = 6, .baseCharWidth = 16.0f, .baseRowHeight = 28.0f, .basePadding = 30.0f }
-        );
+        m_usageOverlay = std::make_unique<Overlay> (USAGE_TIMING, USAGE_LAYOUT);
+
+        hr = m_usageOverlay->Initialize (std::move (entries));
+        CHR (hr);
     }
 
 
@@ -796,8 +853,9 @@ LRESULT Application::HandleMessage (UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 void Application::OnKeyDown (WPARAM wParam)
 {
-    bool isRecognized  = false;
-    bool isQuestionKey = false;
+    bool isRecognized     = false;
+    bool isQuestionKey    = false;
+    bool shouldExitSaver  = ShouldExitScreenSaverOnKey (wParam);
 
 
     // In /? help mode, only Enter and Escape exit the application
@@ -814,14 +872,14 @@ void Application::OnKeyDown (WPARAM wParam)
 
 
     // If live overlay dialog is active, don't process exit keys
-    if (m_hConfigDialog && (wParam == VK_ESCAPE || ShouldExitScreenSaverOnKey (wParam)))
+    if (m_hConfigDialog && (wParam == VK_ESCAPE || shouldExitSaver))
     {
         return;
     }
 
     // ShouldExitScreenSaverOnKey matches any key in screensaver mode, so it
     // can't be a switch case — check it first before the per-key dispatch.
-    if (ShouldExitScreenSaverOnKey (wParam))
+    if (shouldExitSaver)
     {
         PostQuitMessage (0);
         return;

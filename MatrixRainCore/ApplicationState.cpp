@@ -61,7 +61,9 @@ void ApplicationState::ToggleDisplayMode()
     
     // Update settings and save
     m_settings.m_startFullscreen = (m_displayMode == DisplayMode::Fullscreen);
-    SaveSettings();
+
+    HRESULT hr = SaveSettings();
+    IGNORE_RETURN_VALUE (hr, S_OK);
 }
 
 
@@ -75,8 +77,9 @@ void ApplicationState::CycleColorScheme()
     
     // Update settings and save
     m_settings.m_colorSchemeKey = ColorSchemeToKey (m_colorScheme);
-    
-    SaveSettings();
+
+    HRESULT hr = SaveSettings();
+    IGNORE_RETURN_VALUE (hr, S_OK);
 }
 
 
@@ -101,8 +104,9 @@ void ApplicationState::OnDensityChanged (int densityPercent)
     {
         m_densityChangeCallback (densityPercent);
     }
-    
-    SaveSettings();
+
+    HRESULT hr = SaveSettings();
+    IGNORE_RETURN_VALUE (hr, S_OK);
 }
 
 
@@ -136,8 +140,9 @@ void ApplicationState::SetAnimationSpeed (int speedPercent)
     {
         m_animationSpeedChangeCallback (speedPercent);
     }
-    
-    SaveSettings();
+
+    HRESULT hr = SaveSettings();
+    IGNORE_RETURN_VALUE (hr, S_OK);
 }
 
 
@@ -171,8 +176,9 @@ void ApplicationState::SetGlowIntensity (int intensityPercent)
     {
         m_glowIntensityChangeCallback (intensityPercent);
     }
-    
-    SaveSettings();
+
+    HRESULT hr = SaveSettings();
+    IGNORE_RETURN_VALUE (hr, S_OK);
 }
 
 
@@ -188,8 +194,9 @@ void ApplicationState::SetGlowSize (int sizePercent)
     {
         m_glowSizeChangeCallback (sizePercent);
     }
-    
-    SaveSettings();
+
+    HRESULT hr = SaveSettings();
+    IGNORE_RETURN_VALUE (hr, S_OK);
 }
 
 
@@ -239,7 +246,9 @@ void ApplicationState::SetShowStatistics (bool show)
     
     // Update settings and save
     m_settings.m_showDebugStats = show;
-    SaveSettings();
+
+    HRESULT hr = SaveSettings();
+    IGNORE_RETURN_VALUE (hr, S_OK);
 }
 
 
@@ -271,7 +280,9 @@ void ApplicationState::ToggleStatistics()
     
     // Update settings and save
     m_settings.m_showDebugStats = m_showStatistics;
-    SaveSettings();
+
+    HRESULT hr = SaveSettings();
+    IGNORE_RETURN_VALUE (hr, S_OK);
 }
 
 

@@ -11,10 +11,13 @@ namespace MatrixRainTests
     // Helper: create a help hint overlay with the same entries/config as the original HelpHintOverlay
     static Overlay CreateHelpHintOverlay()
     {
-        return Overlay (
-            {{L"Settings", L"Enter"}, {L"Help", L"?"}, {L"Exit", L"Esc"}},
+        Overlay overlay (
             OverlayTimingConfig {.revealDuration = 2.5f, .dismissDuration = 1.0f, .cycleInterval = 0.25f, .flashDuration = 1.0f, .holdDuration = 2.7f},
             OverlayLayoutConfig {.marginCols = 1, .gapChars = 6, .basePadding = 20.0f});
+
+        overlay.Initialize ({{L"Settings", L"Enter"}, {L"Help", L"?"}, {L"Exit", L"Esc"}});
+
+        return overlay;
     }
 
     TEST_CLASS (HelpHintOverlayTests)

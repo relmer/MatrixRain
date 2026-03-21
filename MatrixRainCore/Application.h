@@ -68,8 +68,8 @@ private:
     HWND      m_hwnd                    { nullptr };
     HINSTANCE m_hInstance               { nullptr };
     bool      m_isRunning               { false   };
-    bool      m_isPaused                { false   };
-    bool      m_inDisplayModeTransition { false   };
+    std::atomic<bool> m_isPaused                { false };
+    std::atomic<bool> m_inDisplayModeTransition { false };
     
     HWND      m_hConfigDialog           { nullptr };
     

@@ -10,12 +10,16 @@ namespace MatrixRainTests
 {
     static Overlay CreateHotkeyOverlay()
     {
-        return Overlay (
-            {{L"Space", L"Pause / Resume"}, {L"Enter", L"Settings dialog"}, {L"C", L"Cycle color scheme"},
-             {L"S", L"Toggle statistics"}, {L"?", L"Help reference"}, {L"+", L"Increase rain density"},
-             {L"-", L"Decrease rain density"}, {L"Alt+Enter", L"Toggle fullscreen"}, {L"Esc", L"Exit"}},
+        Overlay overlay (
             OverlayTimingConfig {.revealDuration = 2.5f, .dismissDuration = 1.0f, .cycleInterval = 0.25f, .flashDuration = 1.0f, .holdDuration = 5.4f},
             OverlayLayoutConfig {.marginCols = 2, .gapChars = 6});
+
+        overlay.Initialize (
+            {{L"Space", L"Pause / Resume"}, {L"Enter", L"Settings dialog"}, {L"C", L"Cycle color scheme"},
+             {L"S", L"Toggle statistics"}, {L"?", L"Help reference"}, {L"+", L"Increase rain density"},
+             {L"-", L"Decrease rain density"}, {L"Alt+Enter", L"Toggle fullscreen"}, {L"Esc", L"Exit"}});
+
+        return overlay;
     }
 
     TEST_CLASS (HotkeyOverlayTests)

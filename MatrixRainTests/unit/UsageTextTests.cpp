@@ -134,40 +134,82 @@ namespace MatrixRainTests
 
 
             ////////////////////////////////////////////////////////////
-            //  T005: DetectSwitchPrefix
+            //  GetOverlayEntries
             ////////////////////////////////////////////////////////////
 
-            TEST_METHOD (DetectSwitchPrefix_SlashQuestion_ReturnsSlash)
+            TEST_METHOD (GetOverlayEntries_ReturnsNonEmptyVector)
             {
-                wchar_t prefix = UsageText::DetectSwitchPrefix (L"/?");
+                UsageText usage (L'/');
+
+
+                auto entries = usage.GetOverlayEntries();
 
 
 
-                Assert::AreEqual (L'/', prefix, L"Should detect / prefix from /?");
+                Assert::IsTrue (entries.size() > 0, L"Should return overlay entries");
             }
 
 
 
 
-            TEST_METHOD (DetectSwitchPrefix_DashQuestion_ReturnsDash)
+            TEST_METHOD (GetOverlayEntries_ContainsVersionLine)
             {
-                wchar_t prefix = UsageText::DetectSwitchPrefix (L"-?");
+                UsageText usage (L'/');
+
+
+                auto entries = usage.GetOverlayEntries();
 
 
 
-                Assert::AreEqual (L'-', prefix, L"Should detect - prefix from -?");
+                Assert::IsTrue (entries[0].first.find (L"MatrixRain v") != std::wstring::npos,
+                                L"First entry should contain version string");
+                Assert::IsTrue (entries[0].second.empty(),
+                                L"Version line should be single-column (empty right)");
             }
 
 
 
 
-            TEST_METHOD (DetectSwitchPrefix_NoMatch_DefaultsToSlash)
+            TEST_METHOD (GetOverlayEntries_SwitchesAreTwoColumn)
             {
-                wchar_t prefix = UsageText::DetectSwitchPrefix (L"something");
+                UsageText usage (L'/');
+
+
+                auto entries = usage.GetOverlayEntries();
+                auto & lastEntry = entries.back();
 
 
 
-                Assert::AreEqual (L'/', prefix, L"Should default to / when no match");
+                Assert::IsFalse (lastEntry.first.empty(),
+                                 L"Switch entry should have non-empty left column");
+                Assert::IsFalse (lastEntry.second.empty(),
+                                 L"Switch entry should have non-empty right column");
+            }
+
+
+
+
+            TEST_METHOD (GetOverlayEntries_UsesSwitchPrefix)
+            {
+                UsageText usage (L'-');
+
+
+                auto entries = usage.GetOverlayEntries();
+                bool foundDashPrefix = false;
+
+                for (const auto & [left, right] : entries)
+                {
+                    if (!right.empty() && left.find (L'-') != std::wstring::npos)
+                    {
+                        foundDashPrefix = true;
+                        break;
+                    }
+                }
+
+
+
+                Assert::IsTrue (foundDashPrefix,
+                                L"Switch entries should use the specified prefix");
             }
 
 

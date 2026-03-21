@@ -151,9 +151,10 @@ struct OverlayLayoutConfig
 class Overlay
 {
 public:
-    Overlay (std::vector<OverlayEntry> entries,
-             OverlayTimingConfig       timing,
-             OverlayLayoutConfig       layout);
+    Overlay (OverlayTimingConfig timing,
+             OverlayLayoutConfig layout);
+
+    HRESULT Initialize (std::vector<OverlayEntry> entries);
 
 
     // DPI scaling

@@ -153,18 +153,35 @@ std::wstring UsageText::GetPlainText () const
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-//  UsageText::DetectSwitchPrefix
+//  UsageText::GetOverlayEntries
 //
-//  Scans command line for /? or -? and returns the prefix character.
+//  Returns two-column pairs suitable for Overlay consumption.
+//  Single-column rows have an empty second element.
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-wchar_t UsageText::DetectSwitchPrefix (std::wstring_view commandLine)
+std::vector<std::pair<std::wstring, std::wstring>> UsageText::GetOverlayEntries () const
 {
-    if (commandLine.find (L"-?") != std::wstring_view::npos)
+    std::vector<std::pair<std::wstring, std::wstring>> entries;
+
+
+
+    entries.push_back ({ std::format (L"MatrixRain v{} {} ({})",
+                                      VERSION_WSTRING,
+                                      VERSION_ARCH_WSTRING,
+                                      std::wstring (VERSION_BUILD_TIMESTAMP)), L"" });
+    entries.push_back ({ std::format (L"Copyright {} 2024-{} by Robert Elmer",
+                                      UnicodeSymbols::Copyright,
+                                      VERSION_YEAR_WSTRING), L"" });
+    entries.push_back ({ L"", L"" });
+    entries.push_back ({ std::format (L"Usage: MatrixRain.exe [{}option]", m_switchPrefix), L"" });
+    entries.push_back ({ L"", L"" });
+    entries.push_back ({ L"Options:", L"" });
+
+    for (const auto & sw : m_switches)
     {
-        return L'-';
+        entries.push_back ({ std::format (L"  {}{}", m_switchPrefix, sw.switchChar), sw.description });
     }
 
-    return L'/';
+    return entries;
 }

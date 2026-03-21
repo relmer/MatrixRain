@@ -223,23 +223,21 @@ void ScrambleRevealEffect::AdvanceCycleTimer (CellState & cell, float deltaTime)
 
 void ScrambleRevealEffect::FadeOpacity (CellState & cell, float deltaTime, float fadeDuration, float target)
 {
+    if (fadeDuration <= 0.0f)
+    {
+        cell.opacity = target;
+        return;
+    }
+
+    float step = deltaTime / fadeDuration;
+
     if (target > cell.opacity)
     {
-        cell.opacity += deltaTime / fadeDuration;
-
-        if (cell.opacity >= target)
-        {
-            cell.opacity = target;
-        }
+        cell.opacity = std::min (cell.opacity + step, target);
     }
     else
     {
-        cell.opacity -= deltaTime / fadeDuration;
-
-        if (cell.opacity <= target)
-        {
-            cell.opacity = target;
-        }
+        cell.opacity = std::max (cell.opacity - step, target);
     }
 }
 

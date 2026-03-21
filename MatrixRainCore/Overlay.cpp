@@ -13,25 +13,48 @@
 //
 //  Overlay::Overlay
 //
-//  Builds the character grid from the provided entries.
-//  Based on HotkeyOverlay's known-good constructor pattern.
+//  Lightweight constructor: stores timing and layout configuration.
+//  Call Initialize() to build the character grid from entries.
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-Overlay::Overlay (std::vector<OverlayEntry> entries,
-                  OverlayTimingConfig       timing,
-                  OverlayLayoutConfig       layout) :
+Overlay::Overlay (OverlayTimingConfig timing,
+                  OverlayLayoutConfig layout) :
     m_scramble (timing.revealDuration, timing.dismissDuration, timing.cycleInterval,
                 timing.flashDuration, timing.holdDuration),
-    m_entries  (std::move (entries)),
     m_layout   (layout)
 {
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  Overlay::Initialize
+//
+//  Builds the character grid from the provided entries.
+//  Returns E_INVALIDARG if entries is empty.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+HRESULT Overlay::Initialize (std::vector<OverlayEntry> entries)
+{
+    HRESULT hr        = S_OK;
+    int     cellCount = 0;
+
+
+
+    CBRA (!entries.empty());
+
+    m_entries = std::move (entries);
     m_numRows = static_cast<int> (m_entries.size());
 
     ComputeColumns();
     InitializeCharacters();
 
-    int cellCount = static_cast<int> (m_chars.size());
+    cellCount = static_cast<int> (m_chars.size());
 
     m_scramble.SetCellCount (cellCount);
 
@@ -42,6 +65,9 @@ Overlay::Overlay (std::vector<OverlayEntry> entries,
             m_scramble.MarkSpace (i);
         }
     }
+
+Error:
+    return hr;
 }
 
 

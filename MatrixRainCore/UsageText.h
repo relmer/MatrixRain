@@ -37,8 +37,8 @@ public:
     std::wstring                        GetPlainText ()       const;
 
 
-    // Static helpers
-    static wchar_t DetectSwitchPrefix (std::wstring_view commandLine);
+    // Overlay-format entries (two-column pairs for Overlay consumption)
+    std::vector<std::pair<std::wstring, std::wstring>> GetOverlayEntries () const;
 
 
 private:
