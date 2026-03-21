@@ -4,9 +4,9 @@
 #include "AnimationSystem.h"
 #include "ApplicationState.h"
 #include "ColorScheme.h"
-#include "HelpHintOverlay.h"
-#include "HotkeyOverlay.h"
+#include "Overlay.h"
 #include "RenderSystem.h"
+#include "UsageText.h"
 #include "Viewport.h"
 #include "Timer.h"
 #include "CharacterSet.h"
@@ -14,7 +14,6 @@
 #include "InputSystem.h"
 #include "FPSCounter.h"
 #include "ScreenSaverModeContext.h"
-#include "UsageOverlay.h"
 
 
 
@@ -81,14 +80,49 @@ HRESULT Application::Initialize (HINSTANCE hInstance, int nCmdShow, const Screen
     // Overlays are only used in Normal mode
     if (!pScreenSaverContext || pScreenSaverContext->m_mode == ScreenSaverMode::Normal)
     {
-        m_helpHintOverlay = std::make_unique<HelpHintOverlay>();
-        m_hotkeyOverlay   = std::make_unique<HotkeyOverlay>();
+        m_helpOverlay = std::make_unique<Overlay> (
+            std::vector<OverlayEntry> {
+                { L"Settings", L"Enter" },
+                { L"Help",     L"?" },
+                { L"Exit",     L"Esc" }
+            },
+            OverlayTimingConfig { .revealDuration = 2.5f, .dismissDuration = 1.0f, .cycleInterval = 0.25f, .flashDuration = 1.0f, .holdDuration = 2.7f },
+            OverlayLayoutConfig { .marginCols = 1, .gapChars = 6, .baseCharWidth = 16.0f, .baseRowHeight = 28.0f, .basePadding = 20.0f }
+        );
+
+        m_hotkeyOverlay = std::make_unique<Overlay> (
+            std::vector<OverlayEntry> {
+                { L"Space",       L"Pause / Resume" },
+                { L"Enter",       L"Settings dialog" },
+                { L"C",           L"Cycle color scheme" },
+                { L"S",           L"Toggle statistics" },
+                { L"?",           L"Help reference" },
+                { L"+",           L"Increase rain density" },
+                { L"-",           L"Decrease rain density" },
+                { L"Alt+Enter",   L"Toggle fullscreen" },
+                { L"Esc",         L"Exit" }
+            },
+            OverlayTimingConfig { .revealDuration = 2.5f, .dismissDuration = 1.0f, .cycleInterval = 0.25f, .flashDuration = 1.0f, .holdDuration = 5.4f },
+            OverlayLayoutConfig { .marginCols = 2, .gapChars = 6, .baseCharWidth = 16.0f, .baseRowHeight = 28.0f, .basePadding = 30.0f }
+        );
     }
 
     // Usage overlay for /? mode
     if (pScreenSaverContext && pScreenSaverContext->m_mode == ScreenSaverMode::HelpRequested)
     {
-        m_usageOverlay = std::make_unique<UsageOverlay> (pScreenSaverContext->m_switchPrefix);
+        UsageText usage (pScreenSaverContext->m_switchPrefix);
+        std::vector<OverlayEntry> entries;
+
+        for (const auto & line : usage.GetFormattedLines())
+        {
+            entries.push_back ({ line, L"" });
+        }
+
+        m_usageOverlay = std::make_unique<Overlay> (
+            std::move (entries),
+            OverlayTimingConfig { .revealDuration = 1.8f, .dismissDuration = 0.0f, .cycleInterval = 0.065f, .flashDuration = 1.0f, .holdDuration = -1.0f },
+            OverlayLayoutConfig { .marginCols = 2, .gapChars = 0, .baseCharWidth = 16.0f, .baseRowHeight = 28.0f, .basePadding = 30.0f }
+        );
     }
 
 
@@ -110,9 +144,9 @@ HRESULT Application::Initialize (HINSTANCE hInstance, int nCmdShow, const Screen
     m_isRunning = true;
 
     // Show help hint overlay on startup (null in screensaver mode)
-    if (m_helpHintOverlay)
+    if (m_helpOverlay)
     {
-        m_helpHintOverlay->Show();
+        m_helpOverlay->Show();
     }
 
     // Start usage overlay in /? mode (no rain until reveal completes)
@@ -225,7 +259,7 @@ HRESULT Application::InitializeApplicationWindow()
     {
         float dpiScale = m_renderSystem->GetDpiScale();
 
-        if (m_helpHintOverlay) m_helpHintOverlay->SetDpiScale (dpiScale);
+        if (m_helpOverlay) m_helpOverlay->SetDpiScale (dpiScale);
         if (m_hotkeyOverlay)   m_hotkeyOverlay->SetDpiScale (dpiScale);
 
         m_animationSystem->SetDpiScale (dpiScale);
@@ -406,15 +440,15 @@ void Application::Update (float deltaTime)
         m_animationSystem->Update (deltaTime);
     }
 
-    if ((m_helpHintOverlay && m_helpHintOverlay->IsActive()) ||
+    if ((m_helpOverlay && m_helpOverlay->IsActive()) ||
         (m_hotkeyOverlay  && m_hotkeyOverlay->IsActive())  ||
         (m_usageOverlay   && m_usageOverlay->IsActive()))
     {
         Color4 scheme = GetColorRGB (m_appState->GetColorScheme(), m_appState->GetElapsedTime());
 
-        if (m_helpHintOverlay && m_helpHintOverlay->IsActive())
+        if (m_helpOverlay && m_helpOverlay->IsActive())
         {
-            m_helpHintOverlay->Update (deltaTime, scheme.r, scheme.g, scheme.b);
+            m_helpOverlay->Update (deltaTime, scheme.r, scheme.g, scheme.b);
         }
 
         if (m_hotkeyOverlay && m_hotkeyOverlay->IsActive())
@@ -578,9 +612,9 @@ void Application::Render()
         float       elapsedTime        = m_appState->GetElapsedTime();
         
         // Pass overlay pointers to render system for rendering
-        const HelpHintOverlay * pOverlay       = (m_helpHintOverlay && m_helpHintOverlay->IsActive()) ? m_helpHintOverlay.get() : nullptr;
-        const HotkeyOverlay   * pHotkeyOverlay = (m_hotkeyOverlay && m_hotkeyOverlay->IsActive())     ? m_hotkeyOverlay.get()  : nullptr;
-        const UsageOverlay    * pUsageOverlay  = (m_usageOverlay && m_usageOverlay->IsActive())        ? m_usageOverlay.get()   : nullptr;
+        const Overlay * pHelpOverlay    = (m_helpOverlay && m_helpOverlay->IsActive())       ? m_helpOverlay.get()    : nullptr;
+        const Overlay * pHotkeyOverlay  = (m_hotkeyOverlay && m_hotkeyOverlay->IsActive())   ? m_hotkeyOverlay.get()  : nullptr;
+        const Overlay * pUsageOverlay   = (m_usageOverlay && m_usageOverlay->IsActive())     ? m_usageOverlay.get()   : nullptr;
 
         RenderSystem::RenderParams renderParams =
         {
@@ -591,7 +625,7 @@ void Application::Render()
             .activeHeadCount    = activeHeadCount,
             .showDebugFadeTimes = showDebugFadeTimes,
             .elapsedTime        = elapsedTime,
-            .pOverlay           = pOverlay,
+            .pHelpOverlay       = pHelpOverlay,
             .pHotkeyOverlay     = pHotkeyOverlay,
             .pUsageOverlay      = pUsageOverlay
         };
@@ -870,17 +904,17 @@ void Application::OnKeyDown (WPARAM wParam)
         return;
     }
 
-    if (m_helpHintOverlay)
+    if (m_helpOverlay)
     {
-        if (m_helpHintOverlay->GetPhase() == OverlayPhase::Holding ||
-            m_helpHintOverlay->GetPhase() == OverlayPhase::Revealing)
+        if (m_helpOverlay->GetPhase() == OverlayPhase::Holding ||
+            m_helpOverlay->GetPhase() == OverlayPhase::Revealing)
         {
-            m_helpHintOverlay->Dismiss();
+            m_helpOverlay->Dismiss();
         }
         else if (!isRecognized)
         {
             // Unrecognized key with overlay hidden or dissolving — (re)show
-            m_helpHintOverlay->Show();
+            m_helpOverlay->Show();
         }
     }
 
@@ -929,9 +963,9 @@ void Application::OnSysKeyDown (WPARAM wParam)
         }
 
         // Immediately hide help hint on Alt+Enter (no fade — viewport is changing)
-        if (m_helpHintOverlay && m_helpHintOverlay->IsActive())
+        if (m_helpOverlay && m_helpOverlay->IsActive())
         {
-            m_helpHintOverlay->Hide();
+            m_helpOverlay->Hide();
         }
 
         // Immediately hide hotkey overlay on Alt+Enter
@@ -1049,9 +1083,9 @@ void Application::OnDpiChanged (WPARAM wParam, LPARAM lParam)
     }
 
     // Propagate new DPI scale to overlays
-    if (m_helpHintOverlay)
+    if (m_helpOverlay)
     {
-        m_helpHintOverlay->SetDpiScale (dpiScale);
+        m_helpOverlay->SetDpiScale (dpiScale);
 
 
     }

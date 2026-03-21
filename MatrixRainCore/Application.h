@@ -18,6 +18,7 @@ class FPSCounter;
 class HelpHintOverlay;
 class HotkeyOverlay;
 class UsageOverlay;
+class Overlay;
 
 
 
@@ -62,9 +63,9 @@ private:
     std::unique_ptr<InputSystem>       m_inputSystem;
     std::unique_ptr<ApplicationState>  m_appState;
     std::unique_ptr<FPSCounter>        m_fpsCounter;
-    std::unique_ptr<HelpHintOverlay>   m_helpHintOverlay;
-    std::unique_ptr<HotkeyOverlay>     m_hotkeyOverlay;
-    std::unique_ptr<UsageOverlay>      m_usageOverlay;
+    std::unique_ptr<Overlay>           m_helpOverlay;
+    std::unique_ptr<Overlay>           m_hotkeyOverlay;
+    std::unique_ptr<Overlay>           m_usageOverlay;
 
     // Win32 window
     HWND      m_hwnd                    { nullptr };

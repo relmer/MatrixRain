@@ -5,10 +5,8 @@
 #include "CharacterConstants.h"
 #include "CharacterSet.h"
 #include "ColorScheme.h"
-#include "HelpHintOverlay.h"
-#include "HotkeyOverlay.h"
+#include "Overlay.h"
 #include "OverlayColor.h"
-#include "UsageOverlay.h"
 
 using Microsoft::WRL::ComPtr;
 
@@ -1655,38 +1653,24 @@ void RenderSystem::Render (const AnimationSystem & animationSystem, const Viewpo
         m_context->DrawInstanced (6, static_cast<UINT> (m_instanceData.size()), 0, 0);
 
         // Render overlays to scene texture (before bloom so they get glow for free)
-        if (params.pOverlay && params.pOverlay->IsActive())
+        // Render overlays to scene texture (before bloom so they get glow for free)
+        auto renderOverlay = [this] (const Overlay * pOverlay)
         {
-            RenderTwoColumnOverlay (params.pOverlay->GetCharacters(),
-                                    HelpHintOverlay::MARGIN_COLS,
-                                    params.pOverlay->GetLeftColChars(),
-                                    params.pOverlay->GetGapChars(),
-                                    params.pOverlay->GetRows(),
-                                    params.pOverlay->GetCharHeight(),
-                                    params.pOverlay->GetPadding());
-        }
+            if (pOverlay && pOverlay->IsActive())
+            {
+                RenderTwoColumnOverlay (pOverlay->GetCharacters(),
+                                        pOverlay->GetMarginCols(),
+                                        pOverlay->GetKeyColChars(),
+                                        pOverlay->GetGapChars(),
+                                        pOverlay->GetCharRows(),
+                                        pOverlay->GetCharHeight(),
+                                        pOverlay->GetPadding());
+            }
+        };
 
-        if (params.pHotkeyOverlay && params.pHotkeyOverlay->IsActive())
-        {
-            RenderTwoColumnOverlay (params.pHotkeyOverlay->GetCharacters(),
-                                    HotkeyOverlay::MARGIN_COLS,
-                                    params.pHotkeyOverlay->GetKeyColChars(),
-                                    params.pHotkeyOverlay->GetGapChars(),
-                                    params.pHotkeyOverlay->GetCharRows(),
-                                    params.pHotkeyOverlay->GetRowHeight(),
-                                    params.pHotkeyOverlay->GetPadding());
-        }
-
-        if (params.pUsageOverlay && params.pUsageOverlay->IsActive())
-        {
-            RenderTwoColumnOverlay (params.pUsageOverlay->GetCharacters(),
-                                    UsageOverlay::MARGIN_COLS,
-                                    params.pUsageOverlay->GetKeyColChars(),
-                                    params.pUsageOverlay->GetGapChars(),
-                                    params.pUsageOverlay->GetCharRows(),
-                                    params.pUsageOverlay->GetCharHeight(),
-                                    params.pUsageOverlay->GetPadding());
-        }
+        renderOverlay (params.pHelpOverlay);
+        renderOverlay (params.pHotkeyOverlay);
+        renderOverlay (params.pUsageOverlay);
 
         // Apply bloom (extracts bright pixels including overlay text, composites to backbuffer)
         (void)ApplyBloom();

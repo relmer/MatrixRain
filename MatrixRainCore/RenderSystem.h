@@ -6,7 +6,7 @@
 
 #include "AnimationSystem.h"
 #include "CharacterInstance.h"
-#include "HelpHintOverlay.h"
+#include "Overlay.h"
 #include "Viewport.h"
 #include "ColorScheme.h"
 
@@ -22,8 +22,6 @@ using Microsoft::WRL::ComPtr;
 
 // Forward declarations
 class CharacterStreak;
-class HotkeyOverlay;
-class UsageOverlay;
 
 /// <summary>
 /// Manages DirectX 11 rendering pipeline for Matrix Rain effect.
@@ -55,9 +53,9 @@ public:
         int                     activeHeadCount    = 0;
         bool                    showDebugFadeTimes = false;
         float                   elapsedTime        = 0.0f;
-        const HelpHintOverlay * pOverlay           = nullptr;
-        const HotkeyOverlay   * pHotkeyOverlay     = nullptr;
-        const UsageOverlay    * pUsageOverlay      = nullptr;
+        const Overlay         * pHelpOverlay       = nullptr;
+        const Overlay         * pHotkeyOverlay     = nullptr;
+        const Overlay         * pUsageOverlay      = nullptr;
     };
 
     /// <summary>
