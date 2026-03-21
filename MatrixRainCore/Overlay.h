@@ -179,6 +179,7 @@ public:
     OverlayPhase                   GetPhase()         const;
     std::span<const HintCharacter> GetCharacters()    const { return std::span<const HintCharacter> (m_chars); }
     int                            GetCharRows()      const { return m_numRows;                                }
+    int                            GetCols()          const { return m_cols;                                   }
     int                            GetKeyColChars()   const { return m_keyColChars;                            }
     int                            GetGapChars()      const { return m_layout.gapChars;                        }
     int                            GetMarginCols()    const { return m_layout.marginCols;                      }
