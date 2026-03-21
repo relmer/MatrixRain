@@ -157,15 +157,14 @@ HRESULT Application::Initialize (HINSTANCE hInstance, int nCmdShow, const Screen
         m_helpOverlay->Show();
     }
 
-    // Start usage overlay in /? mode (no rain until reveal completes)
+    // Start usage overlay in /? mode with background rain
     if (m_usageOverlay)
     {
         float dpiScale = m_renderSystem->GetDpiScale();
 
         m_usageOverlay->SetDpiScale (dpiScale);
         m_usageOverlay->Show();
-        m_densityController->SetPercentage (0);
-        m_animationSystem->ClearAllStreaks();
+        m_densityController->SetPercentage (8);
 
         // Full-size rain characters (same physical size as fullscreen)
         m_renderSystem->SetCharacterScaleOverride (dpiScale);
@@ -458,15 +457,7 @@ void Application::Update (float deltaTime)
 
         if (m_usageOverlay && m_usageOverlay->IsActive())
         {
-            bool wasRevealing = !m_usageOverlay->IsRevealComplete();
-
             m_usageOverlay->Update (deltaTime, scheme.r, scheme.g, scheme.b);
-
-            // Start background rain once reveal completes
-            if (wasRevealing && m_usageOverlay->IsRevealComplete() && m_densityController)
-            {
-                m_densityController->SetPercentage (8);
-            }
         }
     }
 }
@@ -869,6 +860,8 @@ void Application::OnKeyDown (WPARAM wParam)
                 isQuestionKey = true;
                 isRecognized  = true;
 
+                std::lock_guard<std::mutex> lock (m_renderMutex);
+
                 if (m_hotkeyOverlay->GetPhase() == OverlayPhase::Holding ||
                     m_hotkeyOverlay->GetPhase() == OverlayPhase::Revealing)
                 {
@@ -906,6 +899,8 @@ void Application::OnKeyDown (WPARAM wParam)
 
     if (m_helpOverlay)
     {
+        std::lock_guard<std::mutex> lock (m_renderMutex);
+
         if (m_helpOverlay->GetPhase() == OverlayPhase::Holding ||
             m_helpOverlay->GetPhase() == OverlayPhase::Revealing)
         {
@@ -920,6 +915,7 @@ void Application::OnKeyDown (WPARAM wParam)
 
     if (m_hotkeyOverlay && m_hotkeyOverlay->IsActive() && !isQuestionKey)
     {
+        std::lock_guard<std::mutex> lock (m_renderMutex);
         m_hotkeyOverlay->Dismiss();
     }
 }
@@ -962,16 +958,19 @@ void Application::OnSysKeyDown (WPARAM wParam)
             m_inDisplayModeTransition = false;
         }
 
-        // Immediately hide help hint on Alt+Enter (no fade — viewport is changing)
-        if (m_helpOverlay && m_helpOverlay->IsActive())
+        // Immediately hide overlays on Alt+Enter (no fade — viewport is changing)
         {
-            m_helpOverlay->Hide();
-        }
+            std::lock_guard<std::mutex> lock (m_renderMutex);
 
-        // Immediately hide hotkey overlay on Alt+Enter
-        if (m_hotkeyOverlay && m_hotkeyOverlay->IsActive())
-        {
-            m_hotkeyOverlay->Hide();
+            if (m_helpOverlay && m_helpOverlay->IsActive())
+            {
+                m_helpOverlay->Hide();
+            }
+
+            if (m_hotkeyOverlay && m_hotkeyOverlay->IsActive())
+            {
+                m_hotkeyOverlay->Hide();
+            }
         }
     }
 }

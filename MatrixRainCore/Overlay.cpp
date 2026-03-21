@@ -155,7 +155,7 @@ void Overlay::InitializeCharacters ()
         }
 
         // Text columns
-        bool singleCol = entry.right.empty() && m_keyColChars > 0;
+        bool singleCol = entry.right.empty();
 
         for (int col = 0; col < m_textCols; col++)
         {

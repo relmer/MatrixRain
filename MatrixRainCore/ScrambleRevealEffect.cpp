@@ -377,7 +377,8 @@ void ScrambleRevealEffect::UpdateHolding (float deltaTime)
 
 void ScrambleRevealEffect::UpdateDismissing (float deltaTime)
 {
-    float fadeDuration = m_dismissDuration * 0.5f;
+    float                                  fadeDuration = m_dismissDuration * 0.5f;
+    std::uniform_real_distribution<float>  cycleDist (0.0f, m_cycleInterval);
 
 
     m_dismissTimer += deltaTime;
@@ -398,7 +399,7 @@ void ScrambleRevealEffect::UpdateDismissing (float deltaTime)
                 if (m_dismissTimer >= cell.lockTime)
                 {
                     cell.phase      = CellPhase::Dismissing;
-                    cell.cycleTimer = std::uniform_real_distribution<float> (0.0f, m_cycleInterval) (m_rng);
+                    cell.cycleTimer = cycleDist (m_rng);
                     cell.needsCycle = true;
 
                     float overshoot = m_dismissTimer - cell.lockTime;
