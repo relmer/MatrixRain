@@ -81,17 +81,18 @@
 ### Session 2026-03-20 — UsageDialog GPU Migration & Unified Overlay Design
 
 - **UsageDialog eliminated**: `/? ` now runs through Application in `HelpRequested` mode with a smaller windowed view, instead of a separate `UsageDialog` class with its own duplicate RenderSystem/AnimationSystem/D2D rendering stack.
-- **UsageOverlay created**: New overlay class (modeled on HotkeyOverlay) builds `HintCharacter` arrays from `UsageText` formatted lines. Rendered via the same GPU instancing + SDF halo + bloom pipeline as all overlays.
+- **Unified Overlay class implemented**: All three overlays consolidated into a single `Overlay` class (Overlay.h/cpp) based on HotkeyOverlay's known-good implementation:
+  - Takes `vector<OverlayEntry>` where each entry has `left` (key/header) and `right` (description) strings
+  - Single-column rows: text in `left`, `right` empty. Two-column rows: key in `left`, description in `right`
+  - `OverlayTimingConfig` and `OverlayLayoutConfig` structs for parameterized construction
+  - Application creates all three overlays as `Overlay` instances with C++20 designated initializers
+  - RenderSystem renders any `Overlay*` via generic lambda — no per-type code
+- **Single-column row overlap fix**: Characters in single-column rows within mixed-layout overlays were being misinterpreted as key-column text by `CalculateColumnAlignedTextPositions`, causing position jumps and character overlap. Fixed by adding `isSingleColumnRow` flag to `HintCharacter` — position calculator skips key/gap/desc column resets and right-alignment jumps for flagged rows, allowing characters to advance continuously.
+- **Overlay centering fix**: `maxRowWidth` in `ComputeOverlayLayout` was inflated by trailing space positions from padded single-column rows, shifting the centering calculation left. Fixed by excluding space characters from the `maxRowWidth` measurement.
 - **Overlay atlas expanded**: Added `. ( ) [ ] : © —` to overlay codepoints (281 glyphs total, was 273). Still need `<` `>` for `<HWND>`.
-- **Application HelpRequested mode**: Window sized to 60%×50% of screen with title bar and close button. Rain held at 0% until reveal completes, then starts at 8%. Only Enter/Esc exit. Alt+Enter disabled. Help hint overlay not created.
-- **BuildOverlayInstances race fix**: Atlas lookups (`GetOverlayUV`, `GetGlyph`) moved after bounds check on `currentGlyphIndex` to prevent out-of-bounds access when render thread reads stale data during Update().
-- **Unified Overlay design (planned)**: All three overlays (HelpHint, Hotkey, Usage) will be consolidated into a single `Overlay` class parameterized by:
-  - `vector<OverlayEntry>` where each entry has `left` (key/header) and `right` (description) strings
-  - Single-column rows: text in `left`, `right` empty
-  - Two-column rows: key in `left`, description in `right`
-  - Configurable timing (`revealDuration`, `dismissDuration`, `cycleInterval`, `flashDuration`, `holdDuration`)
-  - Configurable layout (`marginCols`, `gapChars`, `padding`)
-  - Shared Update/Show/Dismiss/ResolveGlyphIndices — eliminates duplicated CellPhase→CharPhase mapping code
+- **Application HelpRequested mode**: Borderless popup window (60%×50% of screen, click-to-drag). Full-size rain characters with spacing override. Rain held at 0% until reveal completes, then starts at 8%. Only Enter/Esc exit. Alt+Enter disabled. Stats suppressed. Help hint overlay not created.
+- **BuildOverlayInstances race fix**: Atlas lookups (`GetOverlayUV`, `GetGlyph`) moved after bounds check on `currentGlyphIndex` to prevent out-of-bounds access when render thread reads stale data during Update(). Space characters must never have `currentGlyphIndex` mutated in Update() — set `SIZE_MAX` once in `Show()`.
+- **Usage text layout**: Switch entries use two-column `{ "/c", "Show settings dialog" }` format with `gapChars = 6` matching hotkey overlay. Header/version/copyright lines are single-column. Em dash separator removed from switch descriptions.
 
 ## User Scenarios & Testing *(mandatory)*
 
