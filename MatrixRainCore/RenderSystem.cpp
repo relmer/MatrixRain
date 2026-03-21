@@ -2393,10 +2393,13 @@ void RenderSystem::ComputeOverlayLayout (
                                         maxKeyWidth, keyColWidths,
                                         gapWidth, advScaled, xPositions);
 
-    // Compute max row width for bounding rect
+    // Compute max row width for bounding rect (non-space characters only)
     for (size_t i = 0; i < chars.size(); i++)
     {
-        maxRowWidth = std::max (maxRowWidth, xPositions[i] + charSet.GetGlyph (chars[i].targetGlyphIndex).advanceWidth * advScaled);
+        if (!chars[i].isSpace)
+        {
+            maxRowWidth = std::max (maxRowWidth, xPositions[i] + charSet.GetGlyph (chars[i].targetGlyphIndex).advanceWidth * advScaled);
+        }
     }
 
     // Center overlay on screen
