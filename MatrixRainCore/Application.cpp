@@ -143,9 +143,9 @@ HRESULT Application::Initialize (HINSTANCE hInstance, int nCmdShow, const Screen
     // Overlays are only used in Normal mode
     if (!pScreenSaverContext || pScreenSaverContext->m_mode == ScreenSaverMode::Normal)
     {
-        m_helpOverlay = std::make_unique<Overlay> (HELP_HINT_TIMING, HELP_HINT_LAYOUT);
+        m_overlays.helpOverlay = std::make_unique<Overlay> (HELP_HINT_TIMING, HELP_HINT_LAYOUT);
 
-        hr = m_helpOverlay->Initialize (
+        hr = m_overlays.helpOverlay->Initialize (
             {
                 { L"Settings", L"Enter" },
                 { L"Help",     L"?" },
@@ -153,9 +153,9 @@ HRESULT Application::Initialize (HINSTANCE hInstance, int nCmdShow, const Screen
             });
         CHR (hr);
 
-        m_hotkeyOverlay = std::make_unique<Overlay> (HOTKEY_TIMING, HOTKEY_LAYOUT);
+        m_overlays.hotkeyOverlay = std::make_unique<Overlay> (HOTKEY_TIMING, HOTKEY_LAYOUT);
 
-        hr = m_hotkeyOverlay->Initialize (
+        hr = m_overlays.hotkeyOverlay->Initialize (
             {
                 { L"Space",       L"Pause / Resume" },
                 { L"Enter",       L"Settings dialog" },
@@ -184,9 +184,9 @@ HRESULT Application::Initialize (HINSTANCE hInstance, int nCmdShow, const Screen
             entries.push_back ({ std::move (left), std::move (right) });
         }
 
-        m_usageOverlay = std::make_unique<Overlay> (USAGE_TIMING, USAGE_LAYOUT);
+        m_overlays.usageOverlay = std::make_unique<Overlay> (USAGE_TIMING, USAGE_LAYOUT);
 
-        hr = m_usageOverlay->Initialize (std::move (entries));
+        hr = m_overlays.usageOverlay->Initialize (std::move (entries));
         CHR (hr);
     }
 
@@ -209,18 +209,18 @@ HRESULT Application::Initialize (HINSTANCE hInstance, int nCmdShow, const Screen
     m_isRunning = true;
 
     // Show help hint overlay on startup (null in screensaver mode)
-    if (m_helpOverlay)
+    if (m_overlays.helpOverlay)
     {
-        m_helpOverlay->Show();
+        m_overlays.helpOverlay->Show();
     }
 
     // Start usage overlay in /? mode with background rain
-    if (m_usageOverlay)
+    if (m_overlays.usageOverlay)
     {
         float dpiScale = m_renderSystem->GetDpiScale();
 
-        m_usageOverlay->SetDpiScale (dpiScale);
-        m_usageOverlay->Show();
+        m_overlays.usageOverlay->SetDpiScale (dpiScale);
+        m_overlays.usageOverlay->Show();
         m_densityController->SetPercentage (8);
 
         // Full-size rain characters (same physical size as fullscreen)
@@ -254,13 +254,41 @@ void Application::InitializeApplicationState (const ScreenSaverModeContext * pSc
 
     m_appState->Initialize (m_pScreenSaverContext);
     
-    // Register for settings change notifications
-    m_appState->RegisterDensityChangeCallback    ([this](int densityPercent)   { m_densityController->SetPercentage   (densityPercent);   });
-    m_appState->RegisterAnimationSpeedCallback   ([this](int speedPercent)     { m_animationSystem->SetAnimationSpeed (speedPercent);     });
-    m_appState->RegisterGlowIntensityCallback    ([this](int intensityPercent) { m_renderSystem->SetGlowIntensity     (intensityPercent); });
-    m_appState->RegisterGlowSizeCallback         ([this](int sizePercent)      { m_renderSystem->SetGlowSize          (sizePercent);      });
+    // Register for settings change notifications — write to SharedState
+    m_appState->RegisterDensityChangeCallback ([this](int densityPercent) {
+        std::lock_guard<std::mutex> lock (m_sharedState.mutex);
+        m_sharedState.densityPercent = densityPercent;
+    });
+
+    m_appState->RegisterAnimationSpeedCallback ([this](int speedPercent) {
+        std::lock_guard<std::mutex> lock (m_sharedState.mutex);
+        m_sharedState.animationSpeedPercent = speedPercent;
+    });
     
-    // Apply settings to controller
+    m_appState->RegisterGlowIntensityCallback ([this](int intensityPercent) {
+        std::lock_guard<std::mutex> lock (m_sharedState.mutex);
+        m_sharedState.glowIntensityPercent = intensityPercent;
+    });
+    
+    m_appState->RegisterGlowSizeCallback ([this](int sizePercent) {
+        std::lock_guard<std::mutex> lock (m_sharedState.mutex);
+        m_sharedState.glowSizePercent = sizePercent;
+    });
+    
+    // Initialize SharedState from saved settings
+    {
+        const auto & settings = m_appState->GetSettings();
+
+        m_sharedState.densityPercent        = settings.m_densityPercent;
+        m_sharedState.colorScheme           = m_appState->GetColorScheme();
+        m_sharedState.animationSpeedPercent = settings.m_animationSpeedPercent;
+        m_sharedState.glowIntensityPercent  = settings.m_glowIntensityPercent;
+        m_sharedState.glowSizePercent       = settings.m_glowSizePercent;
+        m_sharedState.showStatistics        = m_appState->GetShowStatistics();
+        m_sharedState.showDebugFadeTimes    = m_appState->GetShowDebugFadeTimes();
+    }
+
+    // Apply settings to subsystems (initial sync before render thread starts)
     m_densityController->SetPercentage   (m_appState->GetSettings().m_densityPercent);
     m_animationSystem->SetAnimationSpeed (m_appState->GetSettings().m_animationSpeedPercent);
     m_renderSystem->SetGlowIntensity     (m_appState->GetSettings().m_glowIntensityPercent);
@@ -333,8 +361,8 @@ HRESULT Application::InitializeApplicationWindow()
     {
         float dpiScale = m_renderSystem->GetDpiScale();
 
-        if (m_helpOverlay) m_helpOverlay->SetDpiScale (dpiScale);
-        if (m_hotkeyOverlay)   m_hotkeyOverlay->SetDpiScale (dpiScale);
+        if (m_overlays.helpOverlay)   m_overlays.helpOverlay->SetDpiScale (dpiScale);
+        if (m_overlays.hotkeyOverlay) m_overlays.hotkeyOverlay->SetDpiScale (dpiScale);
 
         m_animationSystem->SetDpiScale (dpiScale);
     }
@@ -496,25 +524,25 @@ void Application::Update (float deltaTime)
         m_animationSystem->Update (deltaTime);
     }
 
-    if ((m_helpOverlay && m_helpOverlay->IsActive()) ||
-        (m_hotkeyOverlay  && m_hotkeyOverlay->IsActive())  ||
-        (m_usageOverlay   && m_usageOverlay->IsActive()))
+    if ((m_overlays.helpOverlay && m_overlays.helpOverlay->IsActive()) ||
+        (m_overlays.hotkeyOverlay  && m_overlays.hotkeyOverlay->IsActive())  ||
+        (m_overlays.usageOverlay   && m_overlays.usageOverlay->IsActive()))
     {
         Color4 scheme = GetColorRGB (m_appState->GetColorScheme(), m_appState->GetElapsedTime());
 
-        if (m_helpOverlay && m_helpOverlay->IsActive())
+        if (m_overlays.helpOverlay && m_overlays.helpOverlay->IsActive())
         {
-            m_helpOverlay->Update (deltaTime, scheme.r, scheme.g, scheme.b);
+            m_overlays.helpOverlay->Update (deltaTime, scheme.r, scheme.g, scheme.b);
         }
 
-        if (m_hotkeyOverlay && m_hotkeyOverlay->IsActive())
+        if (m_overlays.hotkeyOverlay && m_overlays.hotkeyOverlay->IsActive())
         {
-            m_hotkeyOverlay->Update (deltaTime, scheme.r, scheme.g, scheme.b);
+            m_overlays.hotkeyOverlay->Update (deltaTime, scheme.r, scheme.g, scheme.b);
         }
 
-        if (m_usageOverlay && m_usageOverlay->IsActive())
+        if (m_overlays.usageOverlay && m_overlays.usageOverlay->IsActive())
         {
-            m_usageOverlay->Update (deltaTime, scheme.r, scheme.g, scheme.b);
+            m_overlays.usageOverlay->Update (deltaTime, scheme.r, scheme.g, scheme.b);
         }
     }
 }
@@ -646,23 +674,23 @@ Error:
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void Application::Render()
+void Application::Render (const SharedState::Snapshot & snapshot)
 {
     if (m_renderSystem && m_animationSystem && m_viewport && m_appState)
     {
         // Only pass fps value if statistics are enabled
-        float       fps                = (m_appState->GetShowStatistics() && m_fpsCounter) ? m_fpsCounter->GetFPS() : 0.0f;
-        ColorScheme scheme             = m_appState->GetColorScheme();
-        int         rainPercentage     = m_densityController ? m_densityController->GetPercentage() : 0;
+        float       fps                = (snapshot.showStatistics && m_fpsCounter) ? m_fpsCounter->GetFPS() : 0.0f;
+        ColorScheme scheme             = snapshot.colorScheme;
+        int         rainPercentage     = snapshot.densityPercent;
         int         streakCount        = static_cast<int> (m_animationSystem->GetActiveStreakCount());
         int         activeHeadCount    = static_cast<int> (m_animationSystem->GetActiveHeadCount());
-        bool        showDebugFadeTimes = m_appState->GetShowDebugFadeTimes();
+        bool        showDebugFadeTimes = snapshot.showDebugFadeTimes;
         float       elapsedTime        = m_appState->GetElapsedTime();
         
         // Pass overlay pointers to render system for rendering
-        const Overlay * pHelpOverlay    = (m_helpOverlay && m_helpOverlay->IsActive())       ? m_helpOverlay.get()    : nullptr;
-        const Overlay * pHotkeyOverlay  = (m_hotkeyOverlay && m_hotkeyOverlay->IsActive())   ? m_hotkeyOverlay.get()  : nullptr;
-        const Overlay * pUsageOverlay   = (m_usageOverlay && m_usageOverlay->IsActive())     ? m_usageOverlay.get()   : nullptr;
+        const Overlay * pHelpOverlay    = (m_overlays.helpOverlay && m_overlays.helpOverlay->IsActive())       ? m_overlays.helpOverlay.get()    : nullptr;
+        const Overlay * pHotkeyOverlay  = (m_overlays.hotkeyOverlay && m_overlays.hotkeyOverlay->IsActive())   ? m_overlays.hotkeyOverlay.get()  : nullptr;
+        const Overlay * pUsageOverlay   = (m_overlays.usageOverlay && m_overlays.usageOverlay->IsActive())     ? m_overlays.usageOverlay.get()   : nullptr;
 
         RenderSystem::RenderParams renderParams =
         {
@@ -913,21 +941,21 @@ void Application::OnKeyDown (WPARAM wParam)
 
         case VK_OEM_2:
             // ? key (Shift + /) — toggle hotkey overlay
-            if (m_hotkeyOverlay && (GetKeyState (VK_SHIFT) & 0x8000))
+            if (m_overlays.hotkeyOverlay && (GetKeyState (VK_SHIFT) & 0x8000))
             {
                 isQuestionKey = true;
                 isRecognized  = true;
 
-                std::lock_guard<std::mutex> lock (m_renderMutex);
+                std::lock_guard<std::mutex> lock (m_overlays.mutex);
 
-                if (m_hotkeyOverlay->GetPhase() == OverlayPhase::Holding ||
-                    m_hotkeyOverlay->GetPhase() == OverlayPhase::Revealing)
+                if (m_overlays.hotkeyOverlay->GetPhase() == OverlayPhase::Holding ||
+                    m_overlays.hotkeyOverlay->GetPhase() == OverlayPhase::Revealing)
                 {
-                    m_hotkeyOverlay->Dismiss();
+                    m_overlays.hotkeyOverlay->Dismiss();
                 }
                 else
                 {
-                    m_hotkeyOverlay->Show();
+                    m_overlays.hotkeyOverlay->Show();
                 }
             }
             break;
@@ -937,6 +965,17 @@ void Application::OnKeyDown (WPARAM wParam)
             if (m_inputSystem)
             {
                 isRecognized = m_inputSystem->ProcessKeyDown (static_cast<int> (wParam));
+
+                // Sync SharedState with any changes made by ProcessKeyDown
+                // (e.g., CycleColorScheme, ToggleStatistics, density +/-)
+                if (isRecognized && m_appState)
+                {
+                    std::lock_guard<std::mutex> lock (m_sharedState.mutex);
+
+                    m_sharedState.colorScheme      = m_appState->GetColorScheme();
+                    m_sharedState.showStatistics   = m_appState->GetShowStatistics();
+                    m_sharedState.showDebugFadeTimes = m_appState->GetShowDebugFadeTimes();
+                }
             }
             break;
     }
@@ -955,26 +994,26 @@ void Application::OnKeyDown (WPARAM wParam)
         return;
     }
 
-    if (m_helpOverlay)
+    if (m_overlays.helpOverlay)
     {
-        std::lock_guard<std::mutex> lock (m_renderMutex);
+        std::lock_guard<std::mutex> lock (m_overlays.mutex);
 
-        if (m_helpOverlay->GetPhase() == OverlayPhase::Holding ||
-            m_helpOverlay->GetPhase() == OverlayPhase::Revealing)
+        if (m_overlays.helpOverlay->GetPhase() == OverlayPhase::Holding ||
+            m_overlays.helpOverlay->GetPhase() == OverlayPhase::Revealing)
         {
-            m_helpOverlay->Dismiss();
+            m_overlays.helpOverlay->Dismiss();
         }
         else if (!isRecognized)
         {
             // Unrecognized key with overlay hidden or dissolving — (re)show
-            m_helpOverlay->Show();
+            m_overlays.helpOverlay->Show();
         }
     }
 
-    if (m_hotkeyOverlay && m_hotkeyOverlay->IsActive() && !isQuestionKey)
+    if (m_overlays.hotkeyOverlay && m_overlays.hotkeyOverlay->IsActive() && !isQuestionKey)
     {
-        std::lock_guard<std::mutex> lock (m_renderMutex);
-        m_hotkeyOverlay->Dismiss();
+        std::lock_guard<std::mutex> lock (m_overlays.mutex);
+        m_overlays.hotkeyOverlay->Dismiss();
     }
 }
 
@@ -1018,16 +1057,16 @@ void Application::OnSysKeyDown (WPARAM wParam)
 
         // Immediately hide overlays on Alt+Enter (no fade — viewport is changing)
         {
-            std::lock_guard<std::mutex> lock (m_renderMutex);
+            std::lock_guard<std::mutex> lock (m_overlays.mutex);
 
-            if (m_helpOverlay && m_helpOverlay->IsActive())
+            if (m_overlays.helpOverlay && m_overlays.helpOverlay->IsActive())
             {
-                m_helpOverlay->Hide();
+                m_overlays.helpOverlay->Hide();
             }
 
-            if (m_hotkeyOverlay && m_hotkeyOverlay->IsActive())
+            if (m_overlays.hotkeyOverlay && m_overlays.hotkeyOverlay->IsActive())
             {
-                m_hotkeyOverlay->Hide();
+                m_overlays.hotkeyOverlay->Hide();
             }
         }
     }
@@ -1116,9 +1155,10 @@ void Application::OnSize (LPARAM lParam)
 
 void Application::OnDpiChanged (WPARAM wParam, LPARAM lParam)
 {
-    UINT              newDpi   = HIWORD (wParam);
-    float             dpiScale = static_cast<float> (newDpi) / 96.0f;
-    const RECT      * pRect   = reinterpret_cast<const RECT *> (lParam);
+    UINT         newDpi   = HIWORD (wParam);
+    float        dpiScale = static_cast<float> (newDpi) / 96.0f;
+    const RECT * pRect    = reinterpret_cast<const RECT *> (lParam);
+
 
 
     // Resize window to the rect Windows suggests for the new DPI
@@ -1140,18 +1180,14 @@ void Application::OnDpiChanged (WPARAM wParam, LPARAM lParam)
     }
 
     // Propagate new DPI scale to overlays
-    if (m_helpOverlay)
+    if (m_overlays.helpOverlay)
     {
-        m_helpOverlay->SetDpiScale (dpiScale);
-
-
+        m_overlays.helpOverlay->SetDpiScale (dpiScale);
     }
 
-    if (m_hotkeyOverlay)
+    if (m_overlays.hotkeyOverlay)
     {
-        m_hotkeyOverlay->SetDpiScale (dpiScale);
-
-
+        m_overlays.hotkeyOverlay->SetDpiScale (dpiScale);
     }
 
     // Propagate new DPI scale to animation system for character spacing
@@ -1199,7 +1235,10 @@ void Application::RenderThreadProc()
 {
     using namespace std::chrono;
     
-    auto lastFrameTime = steady_clock::now();
+    auto                  lastFrameTime = steady_clock::now();
+    SharedState::Snapshot snapshot;
+    
+
     
     while (!m_renderThreadShouldStop)
     {
@@ -1216,13 +1255,26 @@ void Application::RenderThreadProc()
                 m_fpsCounter->Update (deltaTime);
             }
             
-            // Update and render (with mutex protection for config changes)
-            // Mutex must cover both Update and Render to prevent the UI thread from
-            // modifying shared state (e.g., streak vectors) while Render reads them.
+            // Snapshot shared state under lock, then push to subsystems.
+            // This keeps the lock hold time minimal (just a memcpy) while
+            // ensuring all subsystem writes happen on the render thread.
             {
-                std::lock_guard<std::mutex> lock (m_renderMutex);
+                std::lock_guard<std::mutex> lock (m_sharedState.mutex);
+                snapshot = m_sharedState.GetSnapshot();
+            }
+
+            // Push shared state to subsystems (single-threaded on render thread)
+            m_densityController->SetPercentage   (snapshot.densityPercent);
+            m_animationSystem->SetAnimationSpeed (snapshot.animationSpeedPercent);
+            m_renderSystem->SetGlowIntensity     (snapshot.glowIntensityPercent);
+            m_renderSystem->SetGlowSize          (snapshot.glowSizePercent);
+
+            // Update and render (no additional lock needed — subsystems are
+            // only accessed from the render thread after the snapshot push)
+            {
+                std::lock_guard<std::mutex> lock (m_overlays.mutex);
                 Update (deltaTime);
-                Render();
+                Render (snapshot);
             }
         }
         

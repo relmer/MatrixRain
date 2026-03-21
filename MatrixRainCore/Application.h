@@ -2,6 +2,7 @@
 
 #include "RegistrySettingsProvider.h"
 #include "ScreenSaverModeContext.h"
+#include "SharedState.h"
 
 
 
@@ -16,6 +17,26 @@ class InputSystem;
 class ApplicationState;
 class FPSCounter;
 class Overlay;
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  OverlayState — Thread-safe container for overlay objects
+//
+//  UI thread locks to call Show()/Dismiss()/Hide().
+//  Render thread locks to call Update() and read characters for rendering.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+struct OverlayState
+{
+    mutable std::mutex mutex;
+
+    std::unique_ptr<Overlay> helpOverlay;
+    std::unique_ptr<Overlay> hotkeyOverlay;
+    std::unique_ptr<Overlay> usageOverlay;
+};
 
 
 
@@ -60,9 +81,7 @@ private:
     std::unique_ptr<InputSystem>       m_inputSystem;
     std::unique_ptr<ApplicationState>  m_appState;
     std::unique_ptr<FPSCounter>        m_fpsCounter;
-    std::unique_ptr<Overlay>           m_helpOverlay;
-    std::unique_ptr<Overlay>           m_hotkeyOverlay;
-    std::unique_ptr<Overlay>           m_usageOverlay;
+    OverlayState                       m_overlays;
 
     // Win32 window
     HWND      m_hwnd                    { nullptr };
@@ -84,14 +103,14 @@ private:
     
     std::thread       m_renderThread;
     std::atomic<bool> m_renderThreadShouldStop { false };
-    std::mutex        m_renderMutex;  // Protects shared state during config updates
+    SharedState       m_sharedState;
 
     // Internal methods
     void    InitializeApplicationState    (const ScreenSaverModeContext * pScreenSaverContext);
     HRESULT InitializeApplicationWindow();
     HRESULT CreateApplicationWindow       (POINT & position, SIZE & size);
     void    Update                        (float deltaTime);
-    void    Render();
+    void    Render                        (const SharedState::Snapshot & snapshot);
     void    GetWindowSizeForCurrentMode   (POINT & position, SIZE & size);
     void    ResizeWindowForCurrentMode();
     bool    ShouldExitScreenSaverOnKey    (WPARAM wParam);
