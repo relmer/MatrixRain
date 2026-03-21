@@ -285,13 +285,9 @@
     <ClInclude Include="ConfigDialogController.h" />
     <ClInclude Include="DensityController.h" />
     <ClInclude Include="FPSCounter.h" />
-    <ClInclude Include="HelpHintOverlay.h" />
     <ClInclude Include="Overlay.h" />
-    <ClInclude Include="UsageDialog.h" />
-    <ClInclude Include="UsageOverlay.h" />
     <ClInclude Include="ScrambleRevealEffect.h" />
     <ClInclude Include="OverlayColor.h" />
-    <ClInclude Include="HotkeyOverlay.h" />
     <ClInclude Include="InMemorySettingsProvider.h" />
     <ClInclude Include="InputSystem.h" />
     <ClInclude Include="ISettingsProvider.h" />
@@ -334,12 +330,7 @@
     <ClCompile Include="Timer.cpp" />
     <ClCompile Include="FPSCounter.cpp" />
     <ClCompile Include="UsageText.cpp" />
-    <ClCompile Include="CommandLineHelp.cpp" />
-    <ClCompile Include="HelpHintOverlay.cpp" />
     <ClCompile Include="Overlay.cpp" />
-    <ClCompile Include="UsageDialog.cpp" />
-    <ClCompile Include="UsageOverlay.cpp" />
-    <ClCompile Include="HotkeyOverlay.cpp" />
     <ClCompile Include="ScrambleRevealEffect.cpp" />
     <ClCompile Include="OverlayColor.cpp" />
   </ItemGroup>

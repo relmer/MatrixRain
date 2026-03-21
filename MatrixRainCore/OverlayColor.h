@@ -1,6 +1,6 @@
 #pragma once
 
-#include "HelpHintOverlay.h"
+#include "Overlay.h"
 #include "ScrambleRevealEffect.h"
 
 

@@ -15,9 +15,6 @@ class DensityController;
 class InputSystem;
 class ApplicationState;
 class FPSCounter;
-class HelpHintOverlay;
-class HotkeyOverlay;
-class UsageOverlay;
 class Overlay;
 
 
