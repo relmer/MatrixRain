@@ -6,7 +6,8 @@
 
 struct SwitchEntry
 {
-    wchar_t      switchChar;
+    wchar_t      switchChar;    // Single-char switch (e.g., L'c'), or L'\0' for multi-char
+    std::wstring switchName;    // Multi-char switch name (e.g., "install"), empty for single-char
     std::wstring argument;
     std::wstring description;
 };

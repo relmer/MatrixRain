@@ -111,15 +111,15 @@
 
 ### Tests (write FIRST, verify they FAIL)
 
-- [ ] T030 [P] [US3] Write test `GetFormattedText_ContainsInstallSwitch` in `MatrixRainTests/unit/UsageTextTests.cpp` — verify help text contains "install" with its description
-- [ ] T031 [P] [US3] Write test `GetFormattedText_ContainsUninstallSwitch` in `MatrixRainTests/unit/UsageTextTests.cpp` — verify help text contains "uninstall" with its description
-- [ ] T032 [US3] Build and run tests — verify new tests FAIL
+- [X] T030 [P] [US3] Write test `GetFormattedText_ContainsInstallSwitch` in `MatrixRainTests/unit/UsageTextTests.cpp` — verify help text contains "install" with its description
+- [X] T031 [P] [US3] Write test `GetFormattedText_ContainsUninstallSwitch` in `MatrixRainTests/unit/UsageTextTests.cpp` — verify help text contains "uninstall" with its description
+- [X] T032 [US3] Build and run tests — verify new tests FAIL
 
 ### Implementation
 
-- [ ] T033 [US3] Update `UsageText` class to support multi-character switches (may need to adjust `SwitchEntry` struct or add a parallel data structure) in `MatrixRainCore/UsageText.h` and `MatrixRainCore/UsageText.cpp`
-- [ ] T034 [US3] Add `/install` and `/uninstall` entries with descriptions to the switch list in `MatrixRainCore/UsageText.cpp`
-- [ ] T035 [US3] Build and run ALL tests — verify help text tests PASS and all previous tests still PASS
+- [X] T033 [US3] Update `UsageText` class to support multi-character switches (may need to adjust `SwitchEntry` struct or add a parallel data structure) in `MatrixRainCore/UsageText.h` and `MatrixRainCore/UsageText.cpp`
+- [X] T034 [US3] Add `/install` and `/uninstall` entries with descriptions to the switch list in `MatrixRainCore/UsageText.cpp`
+- [X] T035 [US3] Build and run ALL tests — verify help text tests PASS and all previous tests still PASS
 
 **Checkpoint**: Help text shows install/uninstall switches. All user stories are independently functional.
 

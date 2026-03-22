@@ -27,8 +27,10 @@ UsageText::UsageText (wchar_t switchPrefix) :
 
     m_switches =
     {
-        { L'c', L"", L"Show settings dialog"      },
-        { L'?', L"", L"Display this help message" },
+        { L'c',  L"",          L"", L"Show settings dialog"                        },
+        { L'?',  L"",          L"", L"Display this help message"                   },
+        { L'\0', L"install",   L"", L"Install MatrixRain as system screensaver"    },
+        { L'\0', L"uninstall", L"", L"Uninstall MatrixRain screensaver"            },
     };
 
     BuildFormattedLines();
@@ -81,7 +83,16 @@ void UsageText::BuildFormattedLines ()
 
     for (const auto & sw : m_switches)
     {
-        std::wstring switchStr = std::format (L"  {}{}", m_switchPrefix, sw.switchChar);
+        std::wstring switchStr;
+
+        if (sw.switchChar != L'\0')
+        {
+            switchStr = std::format (L"  {}{}", m_switchPrefix, sw.switchChar);
+        }
+        else
+        {
+            switchStr = std::format (L"  {}{}", m_switchPrefix, sw.switchName);
+        }
 
         if (!sw.argument.empty())
         {
@@ -180,7 +191,14 @@ std::vector<std::pair<std::wstring, std::wstring>> UsageText::GetOverlayEntries 
 
     for (const auto & sw : m_switches)
     {
-        entries.push_back ({ std::format (L"  {}{}", m_switchPrefix, sw.switchChar), sw.description });
+        if (sw.switchChar != L'\0')
+        {
+            entries.push_back ({ std::format (L"  {}{}", m_switchPrefix, sw.switchChar), sw.description });
+        }
+        else
+        {
+            entries.push_back ({ std::format (L"  {}{}", m_switchPrefix, sw.switchName), sw.description });
+        }
     }
 
     return entries;

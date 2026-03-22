@@ -369,6 +369,48 @@ namespace MatrixRainTests
 
                 Assert::AreEqual (rebuilt, text, L"GetFormattedText() should match LF-joined GetFormattedLines()");
             }
+
+
+
+
+            ////////////////////////////////////////////////////////////
+            //  T030: Help text contains /install switch
+            ////////////////////////////////////////////////////////////
+
+            TEST_METHOD (GetFormattedText_ContainsInstallSwitch)
+            {
+                UsageText usage (L'/');
+
+
+                const std::wstring & text = usage.GetFormattedText();
+
+
+
+                Assert::IsTrue (text.find (L"/install") != std::wstring::npos ||
+                                text.find (L"install") != std::wstring::npos,
+                                L"Help text should contain install switch");
+            }
+
+
+
+
+            ////////////////////////////////////////////////////////////
+            //  T031: Help text contains /uninstall switch
+            ////////////////////////////////////////////////////////////
+
+            TEST_METHOD (GetFormattedText_ContainsUninstallSwitch)
+            {
+                UsageText usage (L'/');
+
+
+                const std::wstring & text = usage.GetFormattedText();
+
+
+
+                Assert::IsTrue (text.find (L"/uninstall") != std::wstring::npos ||
+                                text.find (L"uninstall") != std::wstring::npos,
+                                L"Help text should contain uninstall switch");
+            }
     };
 
 
