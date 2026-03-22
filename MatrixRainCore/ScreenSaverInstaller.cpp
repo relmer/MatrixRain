@@ -158,6 +158,7 @@ HRESULT ScreenSaverInstaller::Install()
     WCHAR   szTargetPath[MAX_PATH];
     WCHAR   szRunDll32Cmd[MAX_PATH * 2];
     DWORD   cchPath                     = 0;
+    BOOL    fSuccess                    = FALSE;
     bool    fElevated                   = false;
 
 
@@ -181,7 +182,8 @@ HRESULT ScreenSaverInstaller::Install()
     if (_wcsicmp (szSourcePath, szTargetPath) != 0)
     {
         // FR-008: CopyFileW with bFailIfExists=FALSE to overwrite existing
-        CWRA (CopyFileW (szSourcePath, szTargetPath, FALSE));
+        fSuccess = CopyFileW (szSourcePath, szTargetPath, FALSE);
+        CWRA (fSuccess);
     }
 
     // FR-004: Invoke desk.cpl InstallScreenSaver to set as active + open Settings
@@ -196,7 +198,8 @@ HRESULT ScreenSaverInstaller::Install()
         sei.lpParameters = szRunDll32Cmd;
         sei.nShow        = SW_SHOWNORMAL;
 
-        CWRA (ShellExecuteExW (&sei));
+        fSuccess = ShellExecuteExW (&sei);
+        CWRA (fSuccess);
     }
 
 Error:
@@ -227,6 +230,7 @@ HRESULT ScreenSaverInstaller::Uninstall (IRegistryProvider & registry)
     HRESULT hr        = S_OK;
     WCHAR   szTargetPath[MAX_PATH];
     DWORD   cchPath   = 0;
+    BOOL    fSuccess  = FALSE;
     bool    fElevated = false;
 
 
@@ -250,7 +254,8 @@ HRESULT ScreenSaverInstaller::Uninstall (IRegistryProvider & registry)
     }
 
     // FR-005: Remove the .scr file
-    CWRA (DeleteFileW (szTargetPath));
+    fSuccess = DeleteFileW (szTargetPath);
+    CWRA (fSuccess);
 
     // FR-013/014/015: Clean up registry if MatrixRain was the active screensaver
     CleanupRegistryForUninstall (registry);
@@ -316,10 +321,11 @@ bool ScreenSaverInstaller::IsElevated()
 
 HRESULT ScreenSaverInstaller::RequestElevation (LPCWSTR pszSwitch)
 {
-    HRESULT            hr = S_OK;
+    HRESULT            hr       = S_OK;
     WCHAR              szExePath[MAX_PATH];
-    DWORD              cchPath = 0;
-    SHELLEXECUTEINFOW  sei     = { sizeof (sei) };
+    DWORD              cchPath  = 0;
+    BOOL               fSuccess = FALSE;
+    SHELLEXECUTEINFOW  sei      = { sizeof (sei) };
 
 
 
@@ -331,11 +337,8 @@ HRESULT ScreenSaverInstaller::RequestElevation (LPCWSTR pszSwitch)
     sei.lpParameters = pszSwitch;
     sei.nShow        = SW_SHOWNORMAL;
 
-    if (!ShellExecuteExW (&sei))
-    {
-        hr = HRESULT_FROM_WIN32 (GetLastError());
-        goto Error;
-    }
+    fSuccess = ShellExecuteExW (&sei);
+    CWRA (fSuccess);
 
 Error:
     return hr;
