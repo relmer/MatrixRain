@@ -155,13 +155,13 @@ HRESULT ScreenSaverInstaller::Install()
     HRESULT hr                          = S_OK;
     WCHAR   szSourcePath[MAX_PATH];
     WCHAR   szTargetPath[MAX_PATH];
-    WCHAR   szSystem32[MAX_PATH];
     WCHAR   szRunDll32Cmd[MAX_PATH * 2];
     DWORD   cchPath                     = 0;
-    bool    fElevated                   = IsElevated();
+    bool    fElevated                   = false;
 
 
     // FR-006: Verify elevation (not an assertion — expected to fail for non-admin callers)
+    fElevated = IsElevated();
     CBREx (fElevated, E_ACCESSDENIED);
 
     // Get the running executable's path (source)
@@ -169,10 +169,11 @@ HRESULT ScreenSaverInstaller::Install()
     CBRA (cchPath > 0 && cchPath < _countof (szSourcePath));
 
     // Build target path: %SystemRoot%\System32\MatrixRain.scr
-    cchPath = GetSystemDirectoryW (szSystem32, _countof (szSystem32));
+    cchPath = GetSystemDirectoryW (szTargetPath, _countof (szTargetPath));
     CBRA (cchPath > 0);
 
-    StringCchPrintfW (szTargetPath, _countof (szTargetPath), L"%ls\\MatrixRain.scr", szSystem32);
+    hr = PathCchAppend (szTargetPath, _countof (szTargetPath), L"MatrixRain.scr");
+    CHRA (hr);
 
     // FR-003 / edge case: Skip copy if source == target (running from installed .scr)
     if (_wcsicmp (szSourcePath, szTargetPath) != 0)
@@ -223,19 +224,20 @@ HRESULT ScreenSaverInstaller::Uninstall (IRegistryProvider & registry)
 {
     HRESULT hr        = S_OK;
     WCHAR   szTargetPath[MAX_PATH];
-    WCHAR   szSystem32[MAX_PATH];
     DWORD   cchPath   = 0;
-    bool    fElevated = IsElevated();
+    bool    fElevated = false;
 
 
     // FR-006: Verify elevation (not an assertion — expected to fail for non-admin callers)
+    fElevated = IsElevated();
     CBREx (fElevated, E_ACCESSDENIED);
 
     // Build target path: %SystemRoot%\System32\MatrixRain.scr
-    cchPath = GetSystemDirectoryW (szSystem32, _countof (szSystem32));
+    cchPath = GetSystemDirectoryW (szTargetPath, _countof (szTargetPath));
     CBRA (cchPath > 0);
 
-    StringCchPrintfW (szTargetPath, _countof (szTargetPath), L"%ls\\MatrixRain.scr", szSystem32);
+    hr = PathCchAppend (szTargetPath, _countof (szTargetPath), L"MatrixRain.scr");
+    CHRA (hr);
 
     // FR-009: Gracefully handle missing .scr file
     if (GetFileAttributesW (szTargetPath) == INVALID_FILE_ATTRIBUTES)
@@ -362,16 +364,17 @@ void ScreenSaverInstaller::CleanupRegistryForUninstall (IRegistryProvider & regi
     HRESULT      hr = S_OK;
     std::wstring currentScr;
     WCHAR        szExpectedPath[MAX_PATH];
-    WCHAR        szSystem32[MAX_PATH];
     DWORD        cchPath = 0;
 
 
     // Build the expected path to compare against
-    cchPath = GetSystemDirectoryW (szSystem32, _countof (szSystem32));
+    cchPath = GetSystemDirectoryW (szExpectedPath, _countof (szExpectedPath));
     if (cchPath == 0)
         return;
 
-    StringCchPrintfW (szExpectedPath, _countof (szExpectedPath), L"%ls\\MatrixRain.scr", szSystem32);
+    hr = PathCchAppend (szExpectedPath, _countof (szExpectedPath), L"MatrixRain.scr");
+    if (FAILED (hr))
+        return;
 
     // Read the current SCRNSAVE.EXE value
     hr = registry.ReadString (HKEY_CURRENT_USER, kpszDesktopKey, kpszScrnsaveExe, currentScr);

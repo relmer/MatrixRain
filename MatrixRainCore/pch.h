@@ -36,6 +36,7 @@
 #include <Windows.h>
 
 #include <CommCtrl.h>
+#include <PathCch.h>
 #include <ShellApi.h>
 #include <ShellScalingApi.h>
 #include <StrSafe.h>
@@ -67,6 +68,7 @@
 #pragma comment(lib, "dwrite.lib")
 
 #pragma comment(lib, "Shcore.lib")
+#pragma comment(lib, "pathcch.lib")
 
 
 
