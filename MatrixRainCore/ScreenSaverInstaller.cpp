@@ -120,8 +120,15 @@ Error:
 //
 //  ScreenSaverInstaller::Install
 //
-//  Copies the running executable to System32 as MatrixRain.scr, then invokes
-//  desk.cpl InstallScreenSaver to set it as active and open Screen Saver Settings.
+//  Install MatrixRain as the system screensaver.
+//
+//  1. Copies the running executable to %SystemRoot%\System32\MatrixRain.scr
+//  2. Invokes desk.cpl InstallScreenSaver to set it as active and open Settings
+//
+//  Returns S_OK on success, or an appropriate HRESULT on failure.
+//  Returns E_ACCESSDENIED if the process is not elevated.
+//  Caller SHOULD check IsElevated() first to trigger UAC re-launch for
+//  optimal UX, but Install() also guards internally.
 //
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -186,6 +193,15 @@ Error:
 //
 //  ScreenSaverInstaller::Uninstall
 //
+//  Uninstall MatrixRain as the system screensaver.
+//
+//  1. Deletes %SystemRoot%\System32\MatrixRain.scr
+//  2. If MatrixRain was the active screensaver, clears registry entries
+//
+//  Returns S_OK on success, S_FALSE if not installed (informational).
+//  Returns E_ACCESSDENIED if the process is not elevated.
+//  Registry operations use the provided IRegistryProvider for testability.
+//
 ////////////////////////////////////////////////////////////////////////////////
 
 HRESULT ScreenSaverInstaller::Uninstall (IRegistryProvider & registry)
@@ -234,6 +250,8 @@ Error:
 //
 //  ScreenSaverInstaller::IsElevated
 //
+//  Check if the current process is running with administrator privileges.
+//
 ////////////////////////////////////////////////////////////////////////////////
 
 bool ScreenSaverInstaller::IsElevated()
@@ -267,6 +285,14 @@ bool ScreenSaverInstaller::IsElevated()
 ////////////////////////////////////////////////////////////////////////////////
 //
 //  ScreenSaverInstaller::RequestElevation
+//
+//  Re-launch the current process with elevated privileges (triggers UAC).
+//
+//  pszSwitch: The command-line switch to pass to the elevated process
+//             (e.g., L"/install" or L"/uninstall")
+//
+//  Returns S_OK if the elevated process was launched successfully.
+//  Returns E_ACCESSDENIED if the user declined the UAC prompt.
 //
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -304,8 +330,14 @@ Error:
 //
 //  ScreenSaverInstaller::CleanupRegistryForUninstall
 //
-//  Reads SCRNSAVE.EXE and clears it if it points to MatrixRain.scr.
-//  Does nothing if a different screensaver is active or the key is missing.
+//  Clean up screensaver registry entries during uninstall.
+//
+//  Reads SCRNSAVE.EXE from HKCU\Control Panel\Desktop.
+//  If it points to MatrixRain.scr: deletes the value and sets
+//  ScreenSaveActive to "0".
+//  If it points to a different screensaver or is missing: does nothing.
+//
+//  Separated from Uninstall() for unit test coverage via mock registry.
 //
 ////////////////////////////////////////////////////////////////////////////////
 
