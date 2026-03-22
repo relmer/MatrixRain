@@ -1,8 +1,7 @@
 #include "pch.h"
 
-#include "ScreenSaverInstaller.h"
-
 #include "WindowsRegistryProvider.h"
+#include "ScreenSaverInstaller.h"
 
 
 
@@ -14,31 +13,49 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-HRESULT WindowsRegistryProvider::ReadString (HKEY    hKey,
-                                             LPCWSTR pszSubKey,
-                                             LPCWSTR pszValueName,
+HRESULT WindowsRegistryProvider::ReadString (HKEY           hKey,
+                                             LPCWSTR        pszSubKey,
+                                             LPCWSTR        pszValueName,
                                              std::wstring & value)
 {
-    HRESULT hr     = S_OK;
-    HKEY    hkOpen = nullptr;
-    WCHAR   szBuffer[MAX_PATH];
-    DWORD   cbBuffer = sizeof (szBuffer);
-    DWORD   dwType   = 0;
-    LONG    lResult  = 0;
+    HRESULT hr      = S_OK;
+    HKEY    hkOpen  = nullptr;
+    DWORD   cbData  = 0;
+    DWORD   dwType  = 0;
+    LONG    lResult = 0;
 
 
     lResult = RegOpenKeyExW (hKey, pszSubKey, 0, KEY_READ, &hkOpen);
     CBRA (lResult == ERROR_SUCCESS);
 
-    lResult = RegQueryValueExW (hkOpen, pszValueName, nullptr, &dwType,
-                                reinterpret_cast<LPBYTE> (szBuffer), &cbBuffer);
-    if (lResult != ERROR_SUCCESS || dwType != REG_SZ)
+    // Query the required buffer size
+    lResult = RegQueryValueExW (hkOpen, pszValueName, nullptr, &dwType, nullptr, &cbData);
+    if (lResult != ERROR_SUCCESS || dwType != REG_SZ || cbData == 0)
     {
-        hr = HRESULT_FROM_WIN32 (lResult);
+        hr = HRESULT_FROM_WIN32 (lResult != ERROR_SUCCESS ? lResult : ERROR_INVALID_DATA);
         goto Error;
     }
 
-    value = szBuffer;
+    // Allocate and read the value
+    {
+        std::wstring buffer (cbData / sizeof (WCHAR), L'\0');
+
+        lResult = RegQueryValueExW (hkOpen, pszValueName, nullptr, nullptr,
+                                    reinterpret_cast<LPBYTE> (buffer.data()), &cbData);
+        if (lResult != ERROR_SUCCESS)
+        {
+            hr = HRESULT_FROM_WIN32 (lResult);
+            goto Error;
+        }
+
+        // Remove trailing null(s) that RegQueryValueExW includes in cbData
+        while (!buffer.empty() && buffer.back() == L'\0')
+        {
+            buffer.pop_back();
+        }
+
+        value = std::move (buffer);
+    }
 
 Error:
     if (hkOpen)
