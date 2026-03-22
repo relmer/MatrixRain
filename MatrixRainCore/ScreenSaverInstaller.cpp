@@ -19,17 +19,18 @@ HRESULT WindowsRegistryProvider::ReadString (HKEY           hKey,
                                              std::wstring & value)
 {
     HRESULT hr      = S_OK;
-    HKEY    hkOpen  = nullptr;
+    HKEY    hkey    = nullptr;
     DWORD   cbData  = 0;
     DWORD   dwType  = 0;
     LONG    lResult = 0;
 
 
-    lResult = RegOpenKeyExW (hKey, pszSubKey, 0, KEY_READ, &hkOpen);
+
+    lResult = RegOpenKeyExW (hKey, pszSubKey, 0, KEY_READ, &hkey);
     CBRAEx (lResult == ERROR_SUCCESS, HRESULT_FROM_WIN32 (lResult));
 
     // Query the required buffer size
-    lResult = RegQueryValueExW (hkOpen, pszValueName, nullptr, &dwType, nullptr, &cbData);
+    lResult = RegQueryValueExW (hkey, pszValueName, nullptr, &dwType, nullptr, &cbData);
     CBRAEx (lResult == ERROR_SUCCESS, HRESULT_FROM_WIN32 (lResult));
     CBRAEx (dwType == REG_SZ && cbData > 0, HRESULT_FROM_WIN32 (ERROR_INVALID_DATA));
 
@@ -37,22 +38,21 @@ HRESULT WindowsRegistryProvider::ReadString (HKEY           hKey,
     {
         std::wstring buffer (cbData / sizeof (WCHAR), L'\0');
 
-        lResult = RegQueryValueExW (hkOpen, pszValueName, nullptr, nullptr,
+        lResult = RegQueryValueExW (hkey, pszValueName, nullptr, nullptr,
                                     reinterpret_cast<LPBYTE> (buffer.data()), &cbData);
         CBRAEx (lResult == ERROR_SUCCESS, HRESULT_FROM_WIN32 (lResult));
 
-        // Remove trailing null(s) that RegQueryValueExW includes in cbData
-        while (!buffer.empty() && buffer.back() == L'\0')
-        {
-            buffer.pop_back();
-        }
-
-        value = std::move (buffer);
+        // Construct from c_str() to stop at the first null (cbData includes the terminator)
+        value = buffer.c_str();
     }
 
+
+    
 Error:
-    if (hkOpen)
-        RegCloseKey (hkOpen);
+    if (hkey)
+    {
+        RegCloseKey (hkey);
+    }
 
     return hr;
 }
