@@ -101,6 +101,71 @@ static void SetContextFlagsFromMode (ScreenSaverModeContext & context, HWND hwnd
 
 ////////////////////////////////////////////////////////////////////////////////
 //
+//  TryParseMultiCharSwitch
+//
+//  Attempts to match a multi-character switch word (e.g., "install", "uninstall")
+//  starting at pszArg.  If matched, sets context.m_mode and returns S_OK.
+//  If the word is unrecognized, sets context.m_errorMessage and returns E_INVALIDARG.
+//  If there's only a single character, returns S_FALSE (caller should fall through
+//  to single-character parsing).
+//
+////////////////////////////////////////////////////////////////////////////////
+
+static HRESULT TryParseMultiCharSwitch (LPCWSTR                pszArg,
+                                        ScreenSaverModeContext & context)
+{
+    HRESULT  hr       = S_OK;
+    LPCWSTR  pszStart = pszArg;
+
+
+
+    while (iswalpha (*pszArg))
+    {
+        pszArg++;
+    }
+
+    size_t cchSwitch = pszArg - pszStart;
+
+    // Single character — not a multi-char switch
+    BAIL_OUT_IF (cchSwitch <= 1, S_FALSE);
+
+    {
+        std::wstring switchWord (pszStart, cchSwitch);
+        for (auto & ch : switchWord)
+        {
+            ch = towlower (ch);
+        }
+
+        if (switchWord == L"install")
+        {
+            context.m_mode = ScreenSaverMode::Install;
+        }
+        else if (switchWord == L"uninstall")
+        {
+            context.m_mode = ScreenSaverMode::Uninstall;
+        }
+        else
+        {
+            wchar_t errorMsg[256];
+
+            StringCchPrintfW (errorMsg, _countof (errorMsg), L"Unrecognized command-line switch: %lc%.*ls",
+                              context.m_switchPrefix, static_cast<int>(cchSwitch), pszStart);
+            context.m_errorMessage = errorMsg;
+
+            CHR (E_INVALIDARG);
+        }
+    }
+
+Error:
+    return hr;
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
 //  ParseCommandLine
 //
 //  Parses screensaver command-line arguments and constructs ScreenSaverModeContext
@@ -133,49 +198,42 @@ HRESULT ParseCommandLine (LPCWSTR pszCommandLine, ScreenSaverModeContext & conte
     // Skip the / or - prefix
     pszCommandLine++;
 
-    // Try multi-character switch matching first (install, uninstall)
+    // Check for -- prefix (long option style, only valid with -)
+    if (context.m_switchPrefix == L'-' && *pszCommandLine == L'-')
     {
-        LPCWSTR pszStart = pszCommandLine;
+        pszCommandLine++;  // Skip second -
 
-        while (iswalpha (*pszCommandLine))
+        // Must be a multi-char switch after --
+        hr = TryParseMultiCharSwitch (pszCommandLine, context);
+        CHR (hr);
+
+        // S_FALSE means single char after -- which is invalid
+        if (hr == S_FALSE)
         {
-            pszCommandLine++;
+            wchar_t errorMsg[256];
+
+            StringCchPrintfW (errorMsg, _countof (errorMsg), L"Unrecognized command-line switch: --%lc", *pszCommandLine);
+            context.m_errorMessage = errorMsg;
+            CHR (E_INVALIDARG);
         }
 
-        size_t cchSwitch = pszCommandLine - pszStart;
+        goto Error;
+    }
 
-        if (cchSwitch > 1)
+    // With / prefix, try multi-char switch matching (e.g., /install, /uninstall)
+    if (context.m_switchPrefix == L'/')
+    {
+        hr = TryParseMultiCharSwitch (pszCommandLine, context);
+        CHR (hr);
+
+        // S_OK means it matched — done
+        if (hr == S_OK)
         {
-            std::wstring switchWord (pszStart, cchSwitch);
-            for (auto & ch : switchWord)
-            {
-                ch = towlower (ch);
-            }
-
-            if (switchWord == L"install")
-            {
-                context.m_mode = ScreenSaverMode::Install;
-                goto Error;
-            }
-            else if (switchWord == L"uninstall")
-            {
-                context.m_mode = ScreenSaverMode::Uninstall;
-                goto Error;
-            }
-            else
-            {
-                wchar_t errorMsg[256];
-
-                StringCchPrintfW (errorMsg, _countof (errorMsg), L"Unrecognized command-line switch: %lc%.*ls",
-                                  context.m_switchPrefix, static_cast<int>(cchSwitch), pszStart);
-                context.m_errorMessage = errorMsg;
-
-                CHR (E_INVALIDARG);
-            }
+            goto Error;
         }
 
-        // Single character — reset pointer and fall through to switch statement
-        pszCommandLine = pszStart;
+        // S_FALSE means single char — fall through to switch statement below
+        hr = S_OK;
     }
 
     // Get the command character (case-insensitive)

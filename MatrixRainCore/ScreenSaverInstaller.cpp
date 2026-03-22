@@ -406,6 +406,8 @@ HRESULT ScreenSaverInstaller::CleanupRegistryForUninstall (IRegistryProvider & r
     // FR-014: Set ScreenSaveActive to "0"
     registry.WriteString (HKEY_CURRENT_USER, kpszDesktopKey, kpszScreenActive, L"0");
 
+
+    
 Error:
     return hr;
 }

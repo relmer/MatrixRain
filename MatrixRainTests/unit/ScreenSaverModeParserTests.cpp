@@ -396,34 +396,34 @@ namespace MatrixRainTests
 
 
 
-            TEST_METHOD (ParseCommandLine_DashInstall_ReturnsInstallMode)
+            TEST_METHOD (ParseCommandLine_DoubleDashInstall_ReturnsInstallMode)
             {
                 HRESULT                hr;
                 ScreenSaverModeContext context;
 
 
-                hr = ParseCommandLine (L"-install", context);
+                hr = ParseCommandLine (L"--install", context);
 
 
 
-                Assert::IsTrue (SUCCEEDED (hr), L"ParseCommandLine should succeed for -install");
+                Assert::IsTrue (SUCCEEDED (hr), L"ParseCommandLine should succeed for --install");
                 Assert::AreEqual (static_cast<int>(ScreenSaverMode::Install), static_cast<int>(context.m_mode), L"mode should be Install");
             }
 
 
 
 
-            TEST_METHOD (ParseCommandLine_DashUninstall_ReturnsUninstallMode)
+            TEST_METHOD (ParseCommandLine_DoubleDashUninstall_ReturnsUninstallMode)
             {
                 HRESULT                hr;
                 ScreenSaverModeContext context;
 
 
-                hr = ParseCommandLine (L"-uninstall", context);
+                hr = ParseCommandLine (L"--uninstall", context);
 
 
 
-                Assert::IsTrue (SUCCEEDED (hr), L"ParseCommandLine should succeed for -uninstall");
+                Assert::IsTrue (SUCCEEDED (hr), L"ParseCommandLine should succeed for --uninstall");
                 Assert::AreEqual (static_cast<int>(ScreenSaverMode::Uninstall), static_cast<int>(context.m_mode), L"mode should be Uninstall");
             }
 
@@ -496,6 +496,22 @@ namespace MatrixRainTests
 
                 hr = ParseCommandLine (L"/?", ctxHelp);
                 Assert::AreEqual (static_cast<int>(ScreenSaverMode::HelpRequested), static_cast<int>(ctxHelp.m_mode), L"/? regression");
+            }
+
+
+
+
+            TEST_METHOD (ParseCommandLine_SingleDashInstall_RejectsLongSwitch)
+            {
+                HRESULT                hr;
+                ScreenSaverModeContext context;
+
+
+                hr = ParseCommandLine (L"-install", context);
+
+
+
+                Assert::AreEqual (static_cast<int>(ScreenSaverMode::Normal), static_cast<int>(context.m_mode), L"-install should not be recognized");
             }
     };
 }  // namespace MatrixRainTests
