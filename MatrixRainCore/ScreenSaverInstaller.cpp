@@ -190,7 +190,7 @@ HRESULT ScreenSaverInstaller::Install()
 
     // FR-004: Invoke desk.cpl InstallScreenSaver to set as active + open Settings
     StringCchPrintfW (szRunDll32Cmd, _countof (szRunDll32Cmd),
-                      L"desk.cpl,InstallScreenSaver %ls", szTargetPath);
+                      L"desk.cpl,InstallScreenSaver \"%ls\"", szTargetPath);
 
     sei.lpVerb       = L"open";
     sei.lpFile       = L"rundll32.exe";
@@ -397,6 +397,17 @@ HRESULT ScreenSaverInstaller::CleanupRegistryForUninstall (IRegistryProvider & r
     hr = registry.ReadString (HKEY_CURRENT_USER, kpszDesktopKey, kpszScrnsaveExe, currentScr);
     CHR (hr);  // Key missing or unreadable — nothing to clean up
 
+    // Normalize short path names (e.g., MATRIX~1.SCR → MatrixRain.scr)
+    // The CPL may store 8.3 short names in the registry
+    {
+        WCHAR szLongPath[MAX_PATH];
+        DWORD cchLong = GetLongPathNameW (currentScr.c_str(), szLongPath, _countof (szLongPath));
+        if (cchLong > 0 && cchLong < _countof (szLongPath))
+        {
+            currentScr = szLongPath;
+        }
+    }
+
     // FR-015: Only clean up if MatrixRain is the active screensaver
     BAIL_OUT_IF (_wcsicmp (currentScr.c_str(), szExpectedPath) != 0, S_OK);
 
@@ -407,7 +418,7 @@ HRESULT ScreenSaverInstaller::CleanupRegistryForUninstall (IRegistryProvider & r
     registry.WriteString (HKEY_CURRENT_USER, kpszDesktopKey, kpszScreenActive, L"0");
 
 
-    
+
 Error:
     return hr;
 }

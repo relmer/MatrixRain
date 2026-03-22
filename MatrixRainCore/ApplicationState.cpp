@@ -30,6 +30,12 @@ void ApplicationState::Initialize (const ScreenSaverModeContext * pScreenSaverCo
     
     // Apply settings to runtime state
     m_displayMode = m_settings.m_startFullscreen ? DisplayMode::Fullscreen : DisplayMode::Windowed;
+
+    // Screensaver mode always forces fullscreen regardless of registry setting
+    if (pScreenSaverContext && pScreenSaverContext->m_mode == ScreenSaverMode::ScreenSaverFull)
+    {
+        m_displayMode = DisplayMode::Fullscreen;
+    }
     
     // Suppress debug overlays in preview and screensaver modes
     bool isPreviewOrScreenSaver = pScreenSaverContext &&
