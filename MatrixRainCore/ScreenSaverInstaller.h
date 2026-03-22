@@ -23,7 +23,7 @@ public:
     static HRESULT Uninstall                   (IRegistryProvider & registry);
     static bool    IsElevated                  ();
     static HRESULT RequestElevation            (LPCWSTR pszSwitch);
-    static void    CleanupRegistryForUninstall (IRegistryProvider & registry);
+    static HRESULT CleanupRegistryForUninstall (IRegistryProvider & registry);
 
 private:
     static constexpr LPCWSTR kpszScrFilename = L"MatrixRain.scr";

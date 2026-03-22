@@ -230,6 +230,7 @@ HRESULT ScreenSaverInstaller::Uninstall (IRegistryProvider & registry)
     DWORD   cchPath                = 0;
     BOOL    fSuccess               = FALSE;
     bool    fElevated              = false;
+    DWORD   dwAttrs                = 0;
 
 
 
@@ -246,22 +247,22 @@ HRESULT ScreenSaverInstaller::Uninstall (IRegistryProvider & registry)
     CHRA (hr);
 
     // FR-009: Gracefully handle missing .scr file (but surface access-denied)
+    dwAttrs = GetFileAttributesW (szTargetPath);
+    if (dwAttrs == INVALID_FILE_ATTRIBUTES)
     {
-        DWORD dwAttrs = GetFileAttributesW (szTargetPath);
         DWORD dwError = GetLastError();
 
-        BAIL_OUT_IF (dwAttrs == INVALID_FILE_ATTRIBUTES &&
-                     (dwError == ERROR_FILE_NOT_FOUND || dwError == ERROR_PATH_NOT_FOUND), S_FALSE);
-
-        CBRAEx (dwAttrs != INVALID_FILE_ATTRIBUTES, HRESULT_FROM_WIN32 (dwError));
+        BAIL_OUT_IF (dwError == ERROR_FILE_NOT_FOUND || dwError == ERROR_PATH_NOT_FOUND, S_FALSE);
+        CHRA (HRESULT_FROM_WIN32 (dwError));
     }
+
+    // FR-013/014/015: Clean up registry if MatrixRain was the active screensaver
+    // (do this before file deletion so registry is cleaned even if delete fails)
+    CleanupRegistryForUninstall (registry);
 
     // FR-005: Remove the .scr file
     fSuccess = DeleteFileW (szTargetPath);
     CWRA (fSuccess);
-
-    // FR-013/014/015: Clean up registry if MatrixRain was the active screensaver
-    CleanupRegistryForUninstall (registry);
 
 Error:
     return hr;
@@ -281,27 +282,30 @@ Error:
 
 bool ScreenSaverInstaller::IsElevated()
 {
-    HANDLE hToken   = nullptr;
-    BOOL   fSuccess = FALSE;
+    HRESULT         hr        = S_OK;
+    HANDLE          hToken    = nullptr;
+    BOOL            fSuccess  = FALSE;
+    TOKEN_ELEVATION elevation = {};
+    DWORD           cbSize    = 0;
 
 
 
     fSuccess = OpenProcessToken (GetCurrentProcess(), TOKEN_QUERY, &hToken);
-    if (fSuccess)
+    CWRA (fSuccess);
+
+    cbSize   = sizeof (elevation);
+    fSuccess = GetTokenInformation (hToken, TokenElevation, &elevation, sizeof (elevation), &cbSize);
+    CWRA (fSuccess);
+
+
+
+Error:
+    if (hToken != nullptr)
     {
-        TOKEN_ELEVATION elevation = {};
-        DWORD           cbSize    = sizeof (elevation);
-
-        fSuccess = GetTokenInformation (hToken, TokenElevation, &elevation, sizeof (elevation), &cbSize);
         CloseHandle (hToken);
-
-        if (fSuccess)
-        {
-            return elevation.TokenIsElevated != 0;
-        }
     }
 
-    return false;
+    return elevation.TokenIsElevated != 0;
 }
 
 
@@ -324,11 +328,11 @@ bool ScreenSaverInstaller::IsElevated()
 
 HRESULT ScreenSaverInstaller::RequestElevation (LPCWSTR pszSwitch)
 {
-    HRESULT            hr       = S_OK;
-    WCHAR              szExePath[MAX_PATH];
-    DWORD              cchPath  = 0;
-    BOOL               fSuccess = FALSE;
-    SHELLEXECUTEINFOW  sei      = { sizeof (sei) };
+    HRESULT           hr                  = S_OK;
+    WCHAR             szExePath[MAX_PATH];
+    DWORD             cchPath             = 0;
+    BOOL              fSuccess            = FALSE;
+    SHELLEXECUTEINFOW sei                 = { sizeof (sei) };
 
 
 
@@ -342,6 +346,8 @@ HRESULT ScreenSaverInstaller::RequestElevation (LPCWSTR pszSwitch)
 
     fSuccess = ShellExecuteExW (&sei);
     CWRA (fSuccess);
+
+
 
 Error:
     return hr;
@@ -366,40 +372,40 @@ Error:
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void ScreenSaverInstaller::CleanupRegistryForUninstall (IRegistryProvider & registry)
+HRESULT ScreenSaverInstaller::CleanupRegistryForUninstall (IRegistryProvider & registry)
 {
-    static constexpr LPCWSTR kpszDesktopKey    = L"Control Panel\\Desktop";
-    static constexpr LPCWSTR kpszScrnsaveExe   = L"SCRNSAVE.EXE";
-    static constexpr LPCWSTR kpszScreenActive   = L"ScreenSaveActive";
+    static constexpr LPCWSTR kpszDesktopKey   = L"Control Panel\\Desktop";
+    static constexpr LPCWSTR kpszScrnsaveExe  = L"SCRNSAVE.EXE";
+    static constexpr LPCWSTR kpszScreenActive = L"ScreenSaveActive";
 
-    HRESULT      hr = S_OK;
+    HRESULT      hr                       = S_OK;
     std::wstring currentScr;
     WCHAR        szExpectedPath[MAX_PATH];
-    DWORD        cchPath = 0;
+    DWORD        cchPath                  = 0;
 
 
 
     // Build the expected path to compare against
     cchPath = GetSystemDirectoryW (szExpectedPath, _countof (szExpectedPath));
-    if (cchPath == 0 || cchPath >= _countof (szExpectedPath))
-        return;
+    CWRA (cchPath);
+    CBRAEx (cchPath < _countof (szExpectedPath), HRESULT_FROM_WIN32 (ERROR_INSUFFICIENT_BUFFER));
 
     hr = PathCchAppend (szExpectedPath, _countof (szExpectedPath), kpszScrFilename);
-    if (FAILED (hr))
-        return;
+    CHRA (hr);
 
     // Read the current SCRNSAVE.EXE value
     hr = registry.ReadString (HKEY_CURRENT_USER, kpszDesktopKey, kpszScrnsaveExe, currentScr);
-    if (FAILED (hr))
-        return;  // Key missing or unreadable — nothing to clean up
+    CHR (hr);  // Key missing or unreadable — nothing to clean up
 
     // FR-015: Only clean up if MatrixRain is the active screensaver
-    if (_wcsicmp (currentScr.c_str(), szExpectedPath) != 0)
-        return;
+    BAIL_OUT_IF (_wcsicmp (currentScr.c_str(), szExpectedPath) != 0, S_OK);
 
     // FR-013: Delete SCRNSAVE.EXE value
     registry.DeleteValue (HKEY_CURRENT_USER, kpszDesktopKey, kpszScrnsaveExe);
 
     // FR-014: Set ScreenSaveActive to "0"
     registry.WriteString (HKEY_CURRENT_USER, kpszDesktopKey, kpszScreenActive, L"0");
+
+Error:
+    return hr;
 }
