@@ -3,7 +3,7 @@
 #include "..\MatrixRainCore\Application.h"
 #include "..\MatrixRainCore\ScreenSaverInstaller.h"
 #include "..\MatrixRainCore\WindowsRegistryProvider.h"
-#include "..\MatrixRainCore\ScreenSaverModeParser.h"
+#include "..\MatrixRainCore\CommandLine.h"
 #include "..\MatrixRainCore\UsageText.h"
 #include "ConfigDialog.h"
 
@@ -37,8 +37,12 @@ int APIENTRY wWinMain(_In_     HINSTANCE hInstance,
     SetProcessDpiAwarenessContext (DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
 
     // Parse command-line arguments
-    hr = ParseCommandLine (lpCmdLine, context);
-    CHR (hr);
+    {
+        CommandLine cmdLine;
+
+        hr = cmdLine.Parse (lpCmdLine, context);
+        CHR (hr);
+    }
 
     // Handle install/uninstall — early exit before application initialization
     if (context.m_mode == ScreenSaverMode::Install || context.m_mode == ScreenSaverMode::Uninstall)

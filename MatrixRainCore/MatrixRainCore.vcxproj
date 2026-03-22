@@ -295,7 +295,7 @@
     <ClInclude Include="Math.h" />
     <ClInclude Include="RegistrySettingsProvider.h" />
     <ClInclude Include="RenderSystem.h" />
-    <ClInclude Include="ScreenSaverModeParser.h" />
+    <ClInclude Include="CommandLine.h" />
     <ClInclude Include="RegistryProvider.h" />
     <ClInclude Include="ScreenSaverInstaller.h" />
     <ClInclude Include="WindowsRegistryProvider.h" />
@@ -326,7 +326,7 @@
     <ClCompile Include="Math.cpp" />
     <ClCompile Include="RegistrySettingsProvider.cpp" />
     <ClCompile Include="RenderSystem.cpp" />
-    <ClCompile Include="ScreenSaverModeParser.cpp" />
+    <ClCompile Include="CommandLine.cpp" />
     <ClCompile Include="ScreenSaverInstaller.cpp" />
     <ClCompile Include="ApplicationState.cpp" />
     <ClCompile Include="ColorScheme.cpp" />

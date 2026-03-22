@@ -2,7 +2,7 @@
 
 #include "..\..\MatrixRainCore\ScreenSaverMode.h"
 #include "..\..\MatrixRainCore\ScreenSaverModeContext.h"
-#include "..\..\MatrixRainCore\ScreenSaverModeParser.h"
+#include "..\..\MatrixRainCore\CommandLine.h"
 
 
 
@@ -23,7 +23,7 @@ namespace MatrixRainTests
             
             
             // Act
-            hr = ParseCommandLine (commandLine, context);
+            hr = CommandLine().Parse (commandLine, context);
             
             
             // Assert

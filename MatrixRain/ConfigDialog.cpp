@@ -4,7 +4,7 @@
 #include "..\MatrixRainCore\Application.h"
 #include "..\MatrixRainCore\ApplicationState.h"
 #include "..\MatrixRainCore\ConfigDialogController.h"
-#include "..\MatrixRainCore\ScreenSaverModeParser.h"
+#include "..\MatrixRainCore\CommandLine.h"
 #include "resource.h"
 
 

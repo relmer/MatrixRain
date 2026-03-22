@@ -2,7 +2,7 @@
 
 #include "..\..\MatrixRainCore\ScreenSaverMode.h"
 #include "..\..\MatrixRainCore\ScreenSaverModeContext.h"
-#include "..\..\MatrixRainCore\ScreenSaverModeParser.h"
+#include "..\..\MatrixRainCore\CommandLine.h"
 
 
 
@@ -14,7 +14,7 @@ namespace MatrixRainTests
 
 
 
-    TEST_CLASS (ScreenSaverModeParserTests)
+    TEST_CLASS (CommandLineTests)
     {
         public:
             // T010: Verify /s launches screensaver full-screen mode
@@ -24,7 +24,7 @@ namespace MatrixRainTests
                 ScreenSaverModeContext context;
 
 
-                hr = ParseCommandLine (L"/s", context);
+                hr = CommandLine().Parse (L"/s", context);
 
 
 
@@ -47,8 +47,8 @@ namespace MatrixRainTests
                 ScreenSaverModeContext contextUpper;
 
 
-                hr = ParseCommandLine (L"/s", contextLower);
-                hr = ParseCommandLine (L"/S", contextUpper);
+                hr = CommandLine().Parse (L"/s", contextLower);
+                hr = CommandLine().Parse (L"/S", contextUpper);
 
 
 
@@ -67,7 +67,7 @@ namespace MatrixRainTests
                 std::wstring           cmdLine  = std::format (L"/p {}", reinterpret_cast<uintptr_t>(testHwnd));
 
 
-                hr = ParseCommandLine (cmdLine.c_str(), context);
+                hr = CommandLine().Parse (cmdLine.c_str(), context);
 
 
 
@@ -89,7 +89,7 @@ namespace MatrixRainTests
                 ScreenSaverModeContext context;
 
 
-                hr = ParseCommandLine (L"/c", context);
+                hr = CommandLine().Parse (L"/c", context);
 
 
 
@@ -111,7 +111,7 @@ namespace MatrixRainTests
                 std::wstring           cmdLine  = std::format (L"/c:{}", reinterpret_cast<uintptr_t>(testHwnd));
 
 
-                hr = ParseCommandLine (cmdLine.c_str(), context);
+                hr = CommandLine().Parse (cmdLine.c_str(), context);
 
 
 
@@ -129,7 +129,7 @@ namespace MatrixRainTests
                 ScreenSaverModeContext context;
 
 
-                hr = ParseCommandLine (L"/a", context);
+                hr = CommandLine().Parse (L"/a", context);
 
 
 
@@ -146,7 +146,7 @@ namespace MatrixRainTests
                 ScreenSaverModeContext context;
 
 
-                hr = ParseCommandLine (L"", context);
+                hr = CommandLine().Parse (L"", context);
 
 
 
@@ -167,7 +167,7 @@ namespace MatrixRainTests
                 ScreenSaverModeContext context;
 
 
-                hr = ParseCommandLine (nullptr, context);
+                hr = CommandLine().Parse (nullptr, context);
                 Assert::IsTrue (SUCCEEDED (hr), L"ParseCommandLine should return success HRESULT");
                 Assert::IsTrue (context.m_errorMessage.empty(), L"Error message should not be populated");
 
@@ -184,7 +184,7 @@ namespace MatrixRainTests
                 ScreenSaverModeContext context;
 
 
-                hr = ParseCommandLine (L"   \t  ", context);
+                hr = CommandLine().Parse (L"   \t  ", context);
 
 
 
@@ -200,8 +200,8 @@ namespace MatrixRainTests
                 HRESULT                hr;
                 ScreenSaverModeContext context;
 
-                hr = ParseCommandLine (L"/p", context);
-                hr = ParseCommandLine (L"/p", context);
+                hr = CommandLine().Parse (L"/p", context);
+                hr = CommandLine().Parse (L"/p", context);
 
 
 
@@ -218,7 +218,7 @@ namespace MatrixRainTests
                 ScreenSaverModeContext context;
 
 
-                hr = ParseCommandLine (L"/p invalid", context);
+                hr = CommandLine().Parse (L"/p invalid", context);
 
 
 
@@ -235,7 +235,7 @@ namespace MatrixRainTests
                 ScreenSaverModeContext context;
 
 
-                hr = ParseCommandLine (L"/x", context);
+                hr = CommandLine().Parse (L"/x", context);
 
 
 
@@ -255,7 +255,7 @@ namespace MatrixRainTests
                 ScreenSaverModeContext context;
 
 
-                hr = ParseCommandLine (L"/?", context);
+                hr = CommandLine().Parse (L"/?", context);
 
 
 
@@ -273,7 +273,7 @@ namespace MatrixRainTests
                 ScreenSaverModeContext context;
 
 
-                hr = ParseCommandLine (L"-?", context);
+                hr = CommandLine().Parse (L"-?", context);
 
 
 
@@ -295,7 +295,7 @@ namespace MatrixRainTests
                 ScreenSaverModeContext context;
 
 
-                hr = ParseCommandLine (L"-s", context);
+                hr = CommandLine().Parse (L"-s", context);
 
 
 
@@ -312,7 +312,7 @@ namespace MatrixRainTests
                 ScreenSaverModeContext context;
 
 
-                hr = ParseCommandLine (L"-c", context);
+                hr = CommandLine().Parse (L"-c", context);
 
 
 
@@ -329,7 +329,7 @@ namespace MatrixRainTests
                 ScreenSaverModeContext context;
 
 
-                hr = ParseCommandLine (L"-a", context);
+                hr = CommandLine().Parse (L"-a", context);
 
 
 
@@ -347,8 +347,8 @@ namespace MatrixRainTests
                 ScreenSaverModeContext contextUpper;
 
 
-                hr = ParseCommandLine (L"-s", contextLower);
-                hr = ParseCommandLine (L"-S", contextUpper);
+                hr = CommandLine().Parse (L"-s", contextLower);
+                hr = CommandLine().Parse (L"-S", contextUpper);
 
 
 
@@ -368,7 +368,7 @@ namespace MatrixRainTests
                 ScreenSaverModeContext context;
 
 
-                hr = ParseCommandLine (L"/install", context);
+                hr = CommandLine().Parse (L"/install", context);
 
 
 
@@ -385,7 +385,7 @@ namespace MatrixRainTests
                 ScreenSaverModeContext context;
 
 
-                hr = ParseCommandLine (L"/uninstall", context);
+                hr = CommandLine().Parse (L"/uninstall", context);
 
 
 
@@ -402,7 +402,7 @@ namespace MatrixRainTests
                 ScreenSaverModeContext context;
 
 
-                hr = ParseCommandLine (L"--install", context);
+                hr = CommandLine().Parse (L"--install", context);
 
 
 
@@ -419,7 +419,7 @@ namespace MatrixRainTests
                 ScreenSaverModeContext context;
 
 
-                hr = ParseCommandLine (L"--uninstall", context);
+                hr = CommandLine().Parse (L"--uninstall", context);
 
 
 
@@ -438,9 +438,9 @@ namespace MatrixRainTests
                 ScreenSaverModeContext contextMixed;
 
 
-                hr = ParseCommandLine (L"/install", contextLower);
-                hr = ParseCommandLine (L"/INSTALL", contextUpper);
-                hr = ParseCommandLine (L"/Install", contextMixed);
+                hr = CommandLine().Parse (L"/install", contextLower);
+                hr = CommandLine().Parse (L"/INSTALL", contextUpper);
+                hr = CommandLine().Parse (L"/Install", contextMixed);
 
 
 
@@ -460,9 +460,9 @@ namespace MatrixRainTests
                 ScreenSaverModeContext contextMixed;
 
 
-                hr = ParseCommandLine (L"/uninstall", contextLower);
-                hr = ParseCommandLine (L"/UNINSTALL", contextUpper);
-                hr = ParseCommandLine (L"/Uninstall", contextMixed);
+                hr = CommandLine().Parse (L"/uninstall", contextLower);
+                hr = CommandLine().Parse (L"/UNINSTALL", contextUpper);
+                hr = CommandLine().Parse (L"/Uninstall", contextMixed);
 
 
 
@@ -482,19 +482,19 @@ namespace MatrixRainTests
                 std::wstring           pCmd = std::format (L"/p {}", static_cast<uintptr_t>(0x12345678));
 
 
-                hr = ParseCommandLine (L"/s", ctxS);
+                hr = CommandLine().Parse (L"/s", ctxS);
                 Assert::AreEqual (static_cast<int>(ScreenSaverMode::ScreenSaverFull), static_cast<int>(ctxS.m_mode), L"/s regression");
 
-                hr = ParseCommandLine (L"/c", ctxC);
+                hr = CommandLine().Parse (L"/c", ctxC);
                 Assert::AreEqual (static_cast<int>(ScreenSaverMode::SettingsDialog), static_cast<int>(ctxC.m_mode), L"/c regression");
 
-                hr = ParseCommandLine (pCmd.c_str(), ctxP);
+                hr = CommandLine().Parse (pCmd.c_str(), ctxP);
                 Assert::AreEqual (static_cast<int>(ScreenSaverMode::ScreenSaverPreview), static_cast<int>(ctxP.m_mode), L"/p regression");
 
-                hr = ParseCommandLine (L"/a", ctxA);
+                hr = CommandLine().Parse (L"/a", ctxA);
                 Assert::AreEqual (static_cast<int>(ScreenSaverMode::PasswordChangeUnsupported), static_cast<int>(ctxA.m_mode), L"/a regression");
 
-                hr = ParseCommandLine (L"/?", ctxHelp);
+                hr = CommandLine().Parse (L"/?", ctxHelp);
                 Assert::AreEqual (static_cast<int>(ScreenSaverMode::HelpRequested), static_cast<int>(ctxHelp.m_mode), L"/? regression");
             }
 
@@ -507,7 +507,7 @@ namespace MatrixRainTests
                 ScreenSaverModeContext context;
 
 
-                hr = ParseCommandLine (L"-install", context);
+                hr = CommandLine().Parse (L"-install", context);
 
 
 
