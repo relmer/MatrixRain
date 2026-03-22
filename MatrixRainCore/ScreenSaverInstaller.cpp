@@ -68,28 +68,29 @@ Error:
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-HRESULT WindowsRegistryProvider::WriteString (HKEY    hKey,
+HRESULT WindowsRegistryProvider::WriteString (HKEY    hkeyParent,
                                               LPCWSTR pszSubKey,
                                               LPCWSTR pszValueName,
                                               LPCWSTR pszValue)
 {
-    HRESULT hr     = S_OK;
-    HKEY    hkOpen = nullptr;
+    HRESULT hr      = S_OK;
+    HKEY    hkey    = nullptr;
     LONG    lResult;
 
 
-    lResult = RegOpenKeyExW (hKey, pszSubKey, 0, KEY_SET_VALUE, &hkOpen);
+
+    lResult = RegOpenKeyExW (hkeyParent, pszSubKey, 0, KEY_SET_VALUE, &hkey);
     CBRAEx (lResult == ERROR_SUCCESS, HRESULT_FROM_WIN32 (lResult));
 
-    lResult = RegSetValueExW (hkOpen, pszValueName, 0, REG_SZ,
+    lResult = RegSetValueExW (hkey, pszValueName, 0, REG_SZ,
                               reinterpret_cast<const BYTE *> (pszValue),
                               static_cast<DWORD> ((wcslen (pszValue) + 1) * sizeof (WCHAR)));
     CBRAEx (lResult == ERROR_SUCCESS, HRESULT_FROM_WIN32 (lResult));
 
 Error:
-    if (hkOpen)
+    if (hkey)
     {
-        RegCloseKey (hkOpen);
+        RegCloseKey (hkey);
     }
 
     return hr;
@@ -105,24 +106,26 @@ Error:
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-HRESULT WindowsRegistryProvider::DeleteValue (HKEY    hKey,
+HRESULT WindowsRegistryProvider::DeleteValue (HKEY    hkeyParent,
                                               LPCWSTR pszSubKey,
                                               LPCWSTR pszValueName)
 {
     HRESULT hr     = S_OK;
-    HKEY    hkOpen = nullptr;
+    HKEY    hkey    = nullptr;
     LONG    lResult;
 
 
-    lResult = RegOpenKeyExW (hKey, pszSubKey, 0, KEY_SET_VALUE, &hkOpen);
+    lResult = RegOpenKeyExW (hkeyParent, pszSubKey, 0, KEY_SET_VALUE, &hkey);
     CBRAEx (lResult == ERROR_SUCCESS, HRESULT_FROM_WIN32 (lResult));
 
-    lResult = RegDeleteValueW (hkOpen, pszValueName);
+    lResult = RegDeleteValueW (hkey, pszValueName);
     CBRAEx (lResult == ERROR_SUCCESS, HRESULT_FROM_WIN32 (lResult));
 
 Error:
-    if (hkOpen)
-        RegCloseKey (hkOpen);
+    if (hkey)
+    {
+        RegCloseKey (hkey);
+    }
 
     return hr;
 }
@@ -149,20 +152,17 @@ Error:
 
 HRESULT ScreenSaverInstaller::Install()
 {
-    HRESULT hr = S_OK;
+    HRESULT hr                          = S_OK;
     WCHAR   szSourcePath[MAX_PATH];
     WCHAR   szTargetPath[MAX_PATH];
     WCHAR   szSystem32[MAX_PATH];
     WCHAR   szRunDll32Cmd[MAX_PATH * 2];
-    DWORD   cchPath = 0;
+    DWORD   cchPath                     = 0;
+    bool    fElevated                   = IsElevated();
 
 
     // FR-006: Verify elevation (not an assertion — expected to fail for non-admin callers)
-    if (!IsElevated())
-    {
-        hr = E_ACCESSDENIED;
-        goto Error;
-    }
+    CBREx (fElevated, E_ACCESSDENIED);
 
     // Get the running executable's path (source)
     cchPath = GetModuleFileNameW (nullptr, szSourcePath, _countof (szSourcePath));
@@ -221,18 +221,15 @@ Error:
 
 HRESULT ScreenSaverInstaller::Uninstall (IRegistryProvider & registry)
 {
-    HRESULT hr = S_OK;
+    HRESULT hr        = S_OK;
     WCHAR   szTargetPath[MAX_PATH];
     WCHAR   szSystem32[MAX_PATH];
-    DWORD   cchPath = 0;
+    DWORD   cchPath   = 0;
+    bool    fElevated = IsElevated();
 
 
     // FR-006: Verify elevation (not an assertion — expected to fail for non-admin callers)
-    if (!IsElevated())
-    {
-        hr = E_ACCESSDENIED;
-        goto Error;
-    }
+    CBREx (fElevated, E_ACCESSDENIED);
 
     // Build target path: %SystemRoot%\System32\MatrixRain.scr
     cchPath = GetSystemDirectoryW (szSystem32, _countof (szSystem32));
