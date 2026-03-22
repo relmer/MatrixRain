@@ -38,19 +38,19 @@
 
 ### Tests (write FIRST, verify they FAIL)
 
-- [ ] T007 [P] Write test `ParseCommandLine_SlashInstall_ReturnsInstallMode` in `MatrixRainTests/unit/ScreenSaverModeParserTests.cpp`
-- [ ] T008 [P] Write test `ParseCommandLine_SlashUninstall_ReturnsUninstallMode` in `MatrixRainTests/unit/ScreenSaverModeParserTests.cpp`
-- [ ] T009 [P] Write test `ParseCommandLine_DashInstall_ReturnsInstallMode` in `MatrixRainTests/unit/ScreenSaverModeParserTests.cpp`
-- [ ] T010 [P] Write test `ParseCommandLine_DashUninstall_ReturnsUninstallMode` in `MatrixRainTests/unit/ScreenSaverModeParserTests.cpp`
-- [ ] T011 [P] Write test `ParseCommandLine_SlashInstall_CaseInsensitive` in `MatrixRainTests/unit/ScreenSaverModeParserTests.cpp`
-- [ ] T012 [P] Write test `ParseCommandLine_SlashUninstall_CaseInsensitive` in `MatrixRainTests/unit/ScreenSaverModeParserTests.cpp`
-- [ ] T013 Write test `ParseCommandLine_ExistingSingleCharSwitches_StillWork` regression test in `MatrixRainTests/unit/ScreenSaverModeParserTests.cpp` (verify `/s`, `/c`, `/p`, `/a`, `/?` still parse correctly after multi-char refactor)
-- [ ] T014 Build and run tests — verify new tests FAIL, existing tests PASS
+- [X] T007 [P] Write test `ParseCommandLine_SlashInstall_ReturnsInstallMode` in `MatrixRainTests/unit/ScreenSaverModeParserTests.cpp`
+- [X] T008 [P] Write test `ParseCommandLine_SlashUninstall_ReturnsUninstallMode` in `MatrixRainTests/unit/ScreenSaverModeParserTests.cpp`
+- [X] T009 [P] Write test `ParseCommandLine_DashInstall_ReturnsInstallMode` in `MatrixRainTests/unit/ScreenSaverModeParserTests.cpp`
+- [X] T010 [P] Write test `ParseCommandLine_DashUninstall_ReturnsUninstallMode` in `MatrixRainTests/unit/ScreenSaverModeParserTests.cpp`
+- [X] T011 [P] Write test `ParseCommandLine_SlashInstall_CaseInsensitive` in `MatrixRainTests/unit/ScreenSaverModeParserTests.cpp`
+- [X] T012 [P] Write test `ParseCommandLine_SlashUninstall_CaseInsensitive` in `MatrixRainTests/unit/ScreenSaverModeParserTests.cpp`
+- [X] T013 Write test `ParseCommandLine_ExistingSingleCharSwitches_StillWork` regression test in `MatrixRainTests/unit/ScreenSaverModeParserTests.cpp` (verify `/s`, `/c`, `/p`, `/a`, `/?` still parse correctly after multi-char refactor)
+- [X] T014 Build and run tests — verify new tests FAIL, existing tests PASS
 
 ### Implementation
 
-- [ ] T015 Extend `ParseCommandLine` in `MatrixRainCore/ScreenSaverModeParser.cpp` to collect multi-character switch words after prefix, match "install"/"uninstall" (case-insensitive) before falling through to single-character logic per research.md R1
-- [ ] T016 Build and run ALL tests — verify new parsing tests PASS and all existing tests still PASS
+- [X] T015 Extend `ParseCommandLine` in `MatrixRainCore/ScreenSaverModeParser.cpp` to collect multi-character switch words after prefix, match "install"/"uninstall" (case-insensitive) before falling through to single-character logic per research.md R1
+- [X] T016 Build and run ALL tests — verify new parsing tests PASS and all existing tests still PASS
 
 **Checkpoint**: `/install` and `/uninstall` are parsed into correct `ScreenSaverMode` values. All existing switch parsing unchanged.
 

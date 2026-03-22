@@ -76,6 +76,13 @@ static void SetContextFlagsFromMode (ScreenSaverModeContext & context, HWND hwnd
             context.m_exitOnInput   = false;
             break;
 
+        case ScreenSaverMode::Install:
+        case ScreenSaverMode::Uninstall:
+            context.m_enableHotkeys = false;
+            context.m_hideCursor    = false;
+            context.m_exitOnInput   = false;
+            break;
+
         case ScreenSaverMode::Normal:
         default:
             // Fallback to Normal mode on unexpected value
@@ -125,6 +132,51 @@ HRESULT ParseCommandLine (LPCWSTR pszCommandLine, ScreenSaverModeContext & conte
 
     // Skip the / or - prefix
     pszCommandLine++;
+
+    // Try multi-character switch matching first (install, uninstall)
+    {
+        LPCWSTR pszStart = pszCommandLine;
+
+        while (iswalpha (*pszCommandLine))
+        {
+            pszCommandLine++;
+        }
+
+        size_t cchSwitch = pszCommandLine - pszStart;
+
+        if (cchSwitch > 1)
+        {
+            std::wstring switchWord (pszStart, cchSwitch);
+            for (auto & ch : switchWord)
+            {
+                ch = towlower (ch);
+            }
+
+            if (switchWord == L"install")
+            {
+                context.m_mode = ScreenSaverMode::Install;
+                goto Error;
+            }
+            else if (switchWord == L"uninstall")
+            {
+                context.m_mode = ScreenSaverMode::Uninstall;
+                goto Error;
+            }
+            else
+            {
+                wchar_t errorMsg[256];
+
+                StringCchPrintfW (errorMsg, _countof (errorMsg), L"Unrecognized command-line switch: %lc%.*ls",
+                                  context.m_switchPrefix, static_cast<int>(cchSwitch), pszStart);
+                context.m_errorMessage = errorMsg;
+
+                CHR (E_INVALIDARG);
+            }
+        }
+
+        // Single character — reset pointer and fall through to switch statement
+        pszCommandLine = pszStart;
+    }
 
     // Get the command character (case-insensitive)
     cmd = towlower (*pszCommandLine);

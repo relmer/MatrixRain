@@ -354,5 +354,148 @@ namespace MatrixRainTests
 
                 Assert::AreEqual (static_cast<int>(contextLower.m_mode), static_cast<int>(contextUpper.m_mode), L"-s and -S should give same mode");
             }
+
+
+
+
+            ////////////////////////////////////////////////////////////
+            //  T007-T013: Multi-character switch tests (install/uninstall)
+            ////////////////////////////////////////////////////////////
+
+            TEST_METHOD (ParseCommandLine_SlashInstall_ReturnsInstallMode)
+            {
+                HRESULT                hr;
+                ScreenSaverModeContext context;
+
+
+                hr = ParseCommandLine (L"/install", context);
+
+
+
+                Assert::IsTrue (SUCCEEDED (hr), L"ParseCommandLine should succeed for /install");
+                Assert::AreEqual (static_cast<int>(ScreenSaverMode::Install), static_cast<int>(context.m_mode), L"mode should be Install");
+            }
+
+
+
+
+            TEST_METHOD (ParseCommandLine_SlashUninstall_ReturnsUninstallMode)
+            {
+                HRESULT                hr;
+                ScreenSaverModeContext context;
+
+
+                hr = ParseCommandLine (L"/uninstall", context);
+
+
+
+                Assert::IsTrue (SUCCEEDED (hr), L"ParseCommandLine should succeed for /uninstall");
+                Assert::AreEqual (static_cast<int>(ScreenSaverMode::Uninstall), static_cast<int>(context.m_mode), L"mode should be Uninstall");
+            }
+
+
+
+
+            TEST_METHOD (ParseCommandLine_DashInstall_ReturnsInstallMode)
+            {
+                HRESULT                hr;
+                ScreenSaverModeContext context;
+
+
+                hr = ParseCommandLine (L"-install", context);
+
+
+
+                Assert::IsTrue (SUCCEEDED (hr), L"ParseCommandLine should succeed for -install");
+                Assert::AreEqual (static_cast<int>(ScreenSaverMode::Install), static_cast<int>(context.m_mode), L"mode should be Install");
+            }
+
+
+
+
+            TEST_METHOD (ParseCommandLine_DashUninstall_ReturnsUninstallMode)
+            {
+                HRESULT                hr;
+                ScreenSaverModeContext context;
+
+
+                hr = ParseCommandLine (L"-uninstall", context);
+
+
+
+                Assert::IsTrue (SUCCEEDED (hr), L"ParseCommandLine should succeed for -uninstall");
+                Assert::AreEqual (static_cast<int>(ScreenSaverMode::Uninstall), static_cast<int>(context.m_mode), L"mode should be Uninstall");
+            }
+
+
+
+
+            TEST_METHOD (ParseCommandLine_SlashInstall_CaseInsensitive)
+            {
+                HRESULT                hr;
+                ScreenSaverModeContext contextLower;
+                ScreenSaverModeContext contextUpper;
+                ScreenSaverModeContext contextMixed;
+
+
+                hr = ParseCommandLine (L"/install", contextLower);
+                hr = ParseCommandLine (L"/INSTALL", contextUpper);
+                hr = ParseCommandLine (L"/Install", contextMixed);
+
+
+
+                Assert::AreEqual (static_cast<int>(ScreenSaverMode::Install), static_cast<int>(contextLower.m_mode), L"/install should be Install");
+                Assert::AreEqual (static_cast<int>(ScreenSaverMode::Install), static_cast<int>(contextUpper.m_mode), L"/INSTALL should be Install");
+                Assert::AreEqual (static_cast<int>(ScreenSaverMode::Install), static_cast<int>(contextMixed.m_mode), L"/Install should be Install");
+            }
+
+
+
+
+            TEST_METHOD (ParseCommandLine_SlashUninstall_CaseInsensitive)
+            {
+                HRESULT                hr;
+                ScreenSaverModeContext contextLower;
+                ScreenSaverModeContext contextUpper;
+                ScreenSaverModeContext contextMixed;
+
+
+                hr = ParseCommandLine (L"/uninstall", contextLower);
+                hr = ParseCommandLine (L"/UNINSTALL", contextUpper);
+                hr = ParseCommandLine (L"/Uninstall", contextMixed);
+
+
+
+                Assert::AreEqual (static_cast<int>(ScreenSaverMode::Uninstall), static_cast<int>(contextLower.m_mode), L"/uninstall should be Uninstall");
+                Assert::AreEqual (static_cast<int>(ScreenSaverMode::Uninstall), static_cast<int>(contextUpper.m_mode), L"/UNINSTALL should be Uninstall");
+                Assert::AreEqual (static_cast<int>(ScreenSaverMode::Uninstall), static_cast<int>(contextMixed.m_mode), L"/Uninstall should be Uninstall");
+            }
+
+
+
+
+            TEST_METHOD (ParseCommandLine_ExistingSingleCharSwitches_StillWork)
+            {
+                HRESULT                hr;
+                ScreenSaverModeContext ctxS, ctxC, ctxA, ctxHelp;
+                ScreenSaverModeContext ctxP;
+                std::wstring           pCmd = std::format (L"/p {}", static_cast<uintptr_t>(0x12345678));
+
+
+                hr = ParseCommandLine (L"/s", ctxS);
+                Assert::AreEqual (static_cast<int>(ScreenSaverMode::ScreenSaverFull), static_cast<int>(ctxS.m_mode), L"/s regression");
+
+                hr = ParseCommandLine (L"/c", ctxC);
+                Assert::AreEqual (static_cast<int>(ScreenSaverMode::SettingsDialog), static_cast<int>(ctxC.m_mode), L"/c regression");
+
+                hr = ParseCommandLine (pCmd.c_str(), ctxP);
+                Assert::AreEqual (static_cast<int>(ScreenSaverMode::ScreenSaverPreview), static_cast<int>(ctxP.m_mode), L"/p regression");
+
+                hr = ParseCommandLine (L"/a", ctxA);
+                Assert::AreEqual (static_cast<int>(ScreenSaverMode::PasswordChangeUnsupported), static_cast<int>(ctxA.m_mode), L"/a regression");
+
+                hr = ParseCommandLine (L"/?", ctxHelp);
+                Assert::AreEqual (static_cast<int>(ScreenSaverMode::HelpRequested), static_cast<int>(ctxHelp.m_mode), L"/? regression");
+            }
     };
 }  // namespace MatrixRainTests
