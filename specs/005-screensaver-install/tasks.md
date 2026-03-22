@@ -64,16 +64,16 @@
 
 ### Tests (write FIRST, verify they FAIL)
 
-- [ ] T017 [P] [US1] Write test `IsElevated_ReturnsBoolean` in `MatrixRainTests/unit/ScreenSaverInstallerTests.cpp` — verify `IsElevated()` returns `true` or `false` without crashing (non-elevated test runner returns `false`)
-- [ ] T018 [P] [US1] Write test `Install_NotElevated_ReturnsAccessDenied` in `MatrixRainTests/unit/ScreenSaverInstallerTests.cpp` — verify `Install()` returns `E_ACCESSDENIED` or appropriate error when called without elevation (test runner is not elevated)
-- [ ] T019 [US1] Build and run tests — verify new tests FAIL (stubs return `E_NOTIMPL`)
+- [X] T017 [P] [US1] Write test `IsElevated_ReturnsBoolean` in `MatrixRainTests/unit/ScreenSaverInstallerTests.cpp` — verify `IsElevated()` returns `true` or `false` without crashing (non-elevated test runner returns `false`)
+- [X] T018 [P] [US1] Write test `Install_NotElevated_ReturnsAccessDenied` in `MatrixRainTests/unit/ScreenSaverInstallerTests.cpp` — verify `Install()` returns `E_ACCESSDENIED` or appropriate error when called without elevation (test runner is not elevated)
+- [X] T019 [US1] Build and run tests — verify new tests FAIL (stubs return `E_NOTIMPL`)
 
 ### Implementation
 
-- [ ] T020 [US1] Implement `IsElevated()` in `MatrixRainCore/ScreenSaverInstaller.cpp` using `OpenProcessToken` + `GetTokenInformation(TokenElevation)` per research.md R3
-- [ ] T021 [US1] Implement `RequestElevation(pszSwitch)` in `MatrixRainCore/ScreenSaverInstaller.cpp` using `ShellExecuteExW` with `lpVerb = L"runas"` per research.md R3
-- [ ] T022 [US1] Implement `Install()` in `MatrixRainCore/ScreenSaverInstaller.cpp`: (1) check elevation with `IsElevated()`, return `E_ACCESSDENIED` if not elevated, (2) `GetModuleFileNameW` to get source exe path, (3) `GetSystemDirectoryW` + `\MatrixRain.scr` for target path, (4) if source == target, skip copy (handles running from installed `.scr`), (5) `CopyFileW` with overwrite per research.md R5, (6) invoke `rundll32.exe desk.cpl,InstallScreenSaver` with target path per research.md R2
-- [ ] T024 [US1] Build and run tests — verify `IsElevated` and `Install` tests PASS
+- [X] T020 [US1] Implement `IsElevated()` in `MatrixRainCore/ScreenSaverInstaller.cpp` using `OpenProcessToken` + `GetTokenInformation(TokenElevation)` per research.md R3
+- [X] T021 [US1] Implement `RequestElevation(pszSwitch)` in `MatrixRainCore/ScreenSaverInstaller.cpp` using `ShellExecuteExW` with `lpVerb = L"runas"` per research.md R3
+- [X] T022 [US1] Implement `Install()` in `MatrixRainCore/ScreenSaverInstaller.cpp`: (1) check elevation with `IsElevated()`, return `E_ACCESSDENIED` if not elevated, (2) `GetModuleFileNameW` to get source exe path, (3) `GetSystemDirectoryW` + `\MatrixRain.scr` for target path, (4) if source == target, skip copy (handles running from installed `.scr`), (5) `CopyFileW` with overwrite per research.md R5, (6) invoke `rundll32.exe desk.cpl,InstallScreenSaver` with target path per research.md R2
+- [X] T024 [US1] Build and run tests — verify `IsElevated` and `Install` tests PASS
 
 **Checkpoint**: `/install` copies `.scr` to System32 (skipping self-copy when source==target) and opens Screen Saver Settings. UAC elevation works. Manually verify via quickstart.md steps 1–3.
 

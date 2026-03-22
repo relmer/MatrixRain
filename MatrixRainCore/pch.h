@@ -36,6 +36,7 @@
 #include <Windows.h>
 
 #include <CommCtrl.h>
+#include <ShellApi.h>
 #include <ShellScalingApi.h>
 #include <StrSafe.h>
 

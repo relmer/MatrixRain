@@ -120,11 +120,62 @@ Error:
 //
 //  ScreenSaverInstaller::Install
 //
+//  Copies the running executable to System32 as MatrixRain.scr, then invokes
+//  desk.cpl InstallScreenSaver to set it as active and open Screen Saver Settings.
+//
 ////////////////////////////////////////////////////////////////////////////////
 
 HRESULT ScreenSaverInstaller::Install()
 {
-    return E_NOTIMPL;
+    HRESULT hr = S_OK;
+    WCHAR   szSourcePath[MAX_PATH];
+    WCHAR   szTargetPath[MAX_PATH];
+    WCHAR   szSystem32[MAX_PATH];
+    WCHAR   szRunDll32Cmd[MAX_PATH * 2];
+    DWORD   cchPath = 0;
+
+
+    // FR-006: Verify elevation (not an assertion — expected to fail for non-admin callers)
+    if (!IsElevated())
+    {
+        hr = E_ACCESSDENIED;
+        goto Error;
+    }
+
+    // Get the running executable's path (source)
+    cchPath = GetModuleFileNameW (nullptr, szSourcePath, _countof (szSourcePath));
+    CBRA (cchPath > 0 && cchPath < _countof (szSourcePath));
+
+    // Build target path: %SystemRoot%\System32\MatrixRain.scr
+    cchPath = GetSystemDirectoryW (szSystem32, _countof (szSystem32));
+    CBRA (cchPath > 0);
+
+    StringCchPrintfW (szTargetPath, _countof (szTargetPath), L"%ls\\MatrixRain.scr", szSystem32);
+
+    // FR-003 / edge case: Skip copy if source == target (running from installed .scr)
+    if (_wcsicmp (szSourcePath, szTargetPath) != 0)
+    {
+        // FR-008: CopyFileW with bFailIfExists=FALSE to overwrite existing
+        CWRA (CopyFileW (szSourcePath, szTargetPath, FALSE));
+    }
+
+    // FR-004: Invoke desk.cpl InstallScreenSaver to set as active + open Settings
+    StringCchPrintfW (szRunDll32Cmd, _countof (szRunDll32Cmd),
+                      L"desk.cpl,InstallScreenSaver %ls", szTargetPath);
+
+    {
+        SHELLEXECUTEINFOW sei = { sizeof (sei) };
+
+        sei.lpVerb       = L"open";
+        sei.lpFile       = L"rundll32.exe";
+        sei.lpParameters = szRunDll32Cmd;
+        sei.nShow        = SW_SHOWNORMAL;
+
+        CWRA (ShellExecuteExW (&sei));
+    }
+
+Error:
+    return hr;
 }
 
 
@@ -154,6 +205,25 @@ HRESULT ScreenSaverInstaller::Uninstall (IRegistryProvider & /*registry*/)
 
 bool ScreenSaverInstaller::IsElevated()
 {
+    HANDLE hToken   = nullptr;
+    BOOL   fSuccess = FALSE;
+
+
+    fSuccess = OpenProcessToken (GetCurrentProcess(), TOKEN_QUERY, &hToken);
+    if (fSuccess)
+    {
+        TOKEN_ELEVATION elevation = {};
+        DWORD           cbSize    = sizeof (elevation);
+
+        fSuccess = GetTokenInformation (hToken, TokenElevation, &elevation, sizeof (elevation), &cbSize);
+        CloseHandle (hToken);
+
+        if (fSuccess)
+        {
+            return elevation.TokenIsElevated != 0;
+        }
+    }
+
     return false;
 }
 
@@ -167,7 +237,28 @@ bool ScreenSaverInstaller::IsElevated()
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-HRESULT ScreenSaverInstaller::RequestElevation (LPCWSTR /*pszSwitch*/)
+HRESULT ScreenSaverInstaller::RequestElevation (LPCWSTR pszSwitch)
 {
-    return E_NOTIMPL;
+    HRESULT            hr = S_OK;
+    WCHAR              szExePath[MAX_PATH];
+    DWORD              cchPath = 0;
+    SHELLEXECUTEINFOW  sei     = { sizeof (sei) };
+
+
+    cchPath = GetModuleFileNameW (nullptr, szExePath, _countof (szExePath));
+    CBRA (cchPath > 0 && cchPath < _countof (szExePath));
+
+    sei.lpVerb       = L"runas";
+    sei.lpFile       = szExePath;
+    sei.lpParameters = pszSwitch;
+    sei.nShow        = SW_SHOWNORMAL;
+
+    if (!ShellExecuteExW (&sei))
+    {
+        hr = HRESULT_FROM_WIN32 (GetLastError());
+        goto Error;
+    }
+
+Error:
+    return hr;
 }
