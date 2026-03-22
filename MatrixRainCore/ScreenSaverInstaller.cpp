@@ -177,7 +177,7 @@ HRESULT ScreenSaverInstaller::Install()
     CWRA (cchPath);
     CBRAEx (cchPath < _countof (szTargetPath), HRESULT_FROM_WIN32 (ERROR_INSUFFICIENT_BUFFER));
 
-    hr = PathCchAppend (szTargetPath, _countof (szTargetPath), L"MatrixRain.scr");
+    hr = PathCchAppend (szTargetPath, _countof (szTargetPath), kpszScrFilename);
     CHRA (hr);
 
     // FR-003 / edge case: Skip copy if source == target (running from installed .scr)
@@ -192,16 +192,13 @@ HRESULT ScreenSaverInstaller::Install()
     StringCchPrintfW (szRunDll32Cmd, _countof (szRunDll32Cmd),
                       L"desk.cpl,InstallScreenSaver %ls", szTargetPath);
 
-    {
+    sei.lpVerb       = L"open";
+    sei.lpFile       = L"rundll32.exe";
+    sei.lpParameters = szRunDll32Cmd;
+    sei.nShow        = SW_SHOWNORMAL;
 
-        sei.lpVerb       = L"open";
-        sei.lpFile       = L"rundll32.exe";
-        sei.lpParameters = szRunDll32Cmd;
-        sei.nShow        = SW_SHOWNORMAL;
-
-        fSuccess = ShellExecuteExW (&sei);
-        CWRA (fSuccess);
-    }
+    fSuccess = ShellExecuteExW (&sei);
+    CWRA (fSuccess);
 
 Error:
     return hr;
@@ -228,11 +225,11 @@ Error:
 
 HRESULT ScreenSaverInstaller::Uninstall (IRegistryProvider & registry)
 {
-    HRESULT hr        = S_OK;
+    HRESULT hr                     = S_OK;
     WCHAR   szTargetPath[MAX_PATH];
-    DWORD   cchPath   = 0;
-    BOOL    fSuccess  = FALSE;
-    bool    fElevated = false;
+    DWORD   cchPath                = 0;
+    BOOL    fSuccess               = FALSE;
+    bool    fElevated              = false;
 
 
 
@@ -245,7 +242,7 @@ HRESULT ScreenSaverInstaller::Uninstall (IRegistryProvider & registry)
     CWRA (cchPath);
     CBRAEx (cchPath < _countof (szTargetPath), HRESULT_FROM_WIN32 (ERROR_INSUFFICIENT_BUFFER));
 
-    hr = PathCchAppend (szTargetPath, _countof (szTargetPath), L"MatrixRain.scr");
+    hr = PathCchAppend (szTargetPath, _countof (szTargetPath), kpszScrFilename);
     CHRA (hr);
 
     // FR-009: Gracefully handle missing .scr file
@@ -383,7 +380,7 @@ void ScreenSaverInstaller::CleanupRegistryForUninstall (IRegistryProvider & regi
     if (cchPath == 0 || cchPath >= _countof (szExpectedPath))
         return;
 
-    hr = PathCchAppend (szExpectedPath, _countof (szExpectedPath), L"MatrixRain.scr");
+    hr = PathCchAppend (szExpectedPath, _countof (szExpectedPath), kpszScrFilename);
     if (FAILED (hr))
         return;
 
