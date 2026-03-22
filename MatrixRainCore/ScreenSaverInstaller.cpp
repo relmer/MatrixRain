@@ -26,15 +26,12 @@ HRESULT WindowsRegistryProvider::ReadString (HKEY           hKey,
 
 
     lResult = RegOpenKeyExW (hKey, pszSubKey, 0, KEY_READ, &hkOpen);
-    CBRA (lResult == ERROR_SUCCESS);
+    CBRAEx (lResult == ERROR_SUCCESS, HRESULT_FROM_WIN32 (lResult));
 
     // Query the required buffer size
     lResult = RegQueryValueExW (hkOpen, pszValueName, nullptr, &dwType, nullptr, &cbData);
-    if (lResult != ERROR_SUCCESS || dwType != REG_SZ || cbData == 0)
-    {
-        hr = HRESULT_FROM_WIN32 (lResult != ERROR_SUCCESS ? lResult : ERROR_INVALID_DATA);
-        goto Error;
-    }
+    CBRAEx (lResult == ERROR_SUCCESS, HRESULT_FROM_WIN32 (lResult));
+    CBRAEx (dwType == REG_SZ && cbData > 0, HRESULT_FROM_WIN32 (ERROR_INVALID_DATA));
 
     // Allocate and read the value
     {
@@ -42,11 +39,7 @@ HRESULT WindowsRegistryProvider::ReadString (HKEY           hKey,
 
         lResult = RegQueryValueExW (hkOpen, pszValueName, nullptr, nullptr,
                                     reinterpret_cast<LPBYTE> (buffer.data()), &cbData);
-        if (lResult != ERROR_SUCCESS)
-        {
-            hr = HRESULT_FROM_WIN32 (lResult);
-            goto Error;
-        }
+        CBRAEx (lResult == ERROR_SUCCESS, HRESULT_FROM_WIN32 (lResult));
 
         // Remove trailing null(s) that RegQueryValueExW includes in cbData
         while (!buffer.empty() && buffer.back() == L'\0')
