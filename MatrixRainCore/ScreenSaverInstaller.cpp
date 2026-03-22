@@ -115,6 +115,7 @@ HRESULT WindowsRegistryProvider::DeleteValue (HKEY    hkeyParent,
     LONG    lResult;
 
 
+
     lResult = RegOpenKeyExW (hkeyParent, pszSubKey, 0, KEY_SET_VALUE, &hkey);
     CBRAEx (lResult == ERROR_SUCCESS, HRESULT_FROM_WIN32 (lResult));
 
@@ -160,7 +161,8 @@ HRESULT ScreenSaverInstaller::Install()
     bool    fElevated                   = false;
 
 
-    // FR-006: Verify elevation (not an assertion — expected to fail for non-admin callers)
+
+    // FR-006: Verify elevation
     fElevated = IsElevated();
     CBREx (fElevated, E_ACCESSDENIED);
 
@@ -228,7 +230,8 @@ HRESULT ScreenSaverInstaller::Uninstall (IRegistryProvider & registry)
     bool    fElevated = false;
 
 
-    // FR-006: Verify elevation (not an assertion — expected to fail for non-admin callers)
+
+    // FR-006: Verify elevation
     fElevated = IsElevated();
     CBREx (fElevated, E_ACCESSDENIED);
 
@@ -274,6 +277,7 @@ bool ScreenSaverInstaller::IsElevated()
     BOOL   fSuccess = FALSE;
 
 
+
     fSuccess = OpenProcessToken (GetCurrentProcess(), TOKEN_QUERY, &hToken);
     if (fSuccess)
     {
@@ -316,6 +320,7 @@ HRESULT ScreenSaverInstaller::RequestElevation (LPCWSTR pszSwitch)
     WCHAR              szExePath[MAX_PATH];
     DWORD              cchPath = 0;
     SHELLEXECUTEINFOW  sei     = { sizeof (sei) };
+
 
 
     cchPath = GetModuleFileNameW (nullptr, szExePath, _countof (szExePath));
@@ -365,6 +370,7 @@ void ScreenSaverInstaller::CleanupRegistryForUninstall (IRegistryProvider & regi
     std::wstring currentScr;
     WCHAR        szExpectedPath[MAX_PATH];
     DWORD        cchPath = 0;
+
 
 
     // Build the expected path to compare against
