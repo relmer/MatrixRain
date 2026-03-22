@@ -129,10 +129,10 @@
 
 **Purpose**: Final validation, error handling review, dispatch integration, and cleanup.
 
-- [ ] T036 Review error messages for Install/Uninstall — ensure clear user-facing messages per FR-010 (console output with message box fallback if no console attached) in `MatrixRainCore/ScreenSaverInstaller.cpp`
-- [ ] T036a Add Install/Uninstall dispatch in `MatrixRain/main.cpp`: before `app.Initialize`, check for `ScreenSaverMode::Install` or `ScreenSaverMode::Uninstall`, call `IsElevated()`/`RequestElevation()` or `Install()`/`Uninstall()` per contracts/api.md dispatch contract
-- [ ] T037 Build Release configuration and verify clean build: run `Build Release (current arch)` task
-- [ ] T038 Run full test suite in both Debug and Release: run `Build + Test Debug (current arch)` and `Build + Test Release (current arch)` tasks
+- [X] T036 Review error messages for Install/Uninstall — ensure clear user-facing messages per FR-010 (console output with message box fallback if no console attached) in `MatrixRainCore/ScreenSaverInstaller.cpp`
+- [X] T036a Add Install/Uninstall dispatch in `MatrixRain/main.cpp`: before `app.Initialize`, check for `ScreenSaverMode::Install` or `ScreenSaverMode::Uninstall`, call `IsElevated()`/`RequestElevation()` or `Install()`/`Uninstall()` per contracts/api.md dispatch contract
+- [X] T037 Build Release configuration and verify clean build: run `Build Release (current arch)` task
+- [X] T038 Run full test suite in both Debug and Release: run `Build + Test Debug (current arch)` and `Build + Test Release (current arch)` tasks
 - [ ] T039 Run quickstart.md full manual verification sequence (install → verify file → verify registry → uninstall → verify removed → verify registry cleaned → help text check)
 
 ---

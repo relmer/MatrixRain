@@ -1,6 +1,7 @@
 #include "pch.h"
 
 #include "..\MatrixRainCore\Application.h"
+#include "..\MatrixRainCore\ScreenSaverInstaller.h"
 #include "..\MatrixRainCore\ScreenSaverModeParser.h"
 #include "..\MatrixRainCore\UsageText.h"
 #include "ConfigDialog.h"
@@ -37,6 +38,30 @@ int APIENTRY wWinMain(_In_     HINSTANCE hInstance,
     // Parse command-line arguments
     hr = ParseCommandLine (lpCmdLine, context);
     CHR (hr);
+
+    // Handle install/uninstall — early exit before application initialization
+    if (context.m_mode == ScreenSaverMode::Install || context.m_mode == ScreenSaverMode::Uninstall)
+    {
+        LPCWSTR pszSwitch = (context.m_mode == ScreenSaverMode::Install) ? L"/install" : L"/uninstall";
+
+        if (!ScreenSaverInstaller::IsElevated())
+        {
+            hr = ScreenSaverInstaller::RequestElevation (pszSwitch);
+            goto Error;
+        }
+
+        if (context.m_mode == ScreenSaverMode::Install)
+        {
+            hr = ScreenSaverInstaller::Install();
+        }
+        else
+        {
+            WindowsRegistryProvider registry;
+            hr = ScreenSaverInstaller::Uninstall (registry);
+        }
+
+        goto Error;
+    }
 
     // Handle help request — runs through Application in HelpRequested mode
     // (no longer uses UsageDialog — overlay renders via GPU pipeline)
