@@ -34,7 +34,7 @@ static inline void SkipWhitespace (LPCWSTR & psz)
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-static void SetContextFlagsFromMode (ScreenSaverModeContext & context, HWND hwnd)
+static void SetContextFlagsFromMode (ScreenSaverModeContext & context)
 {
     switch (context.m_mode)
     {
@@ -46,36 +46,21 @@ static void SetContextFlagsFromMode (ScreenSaverModeContext & context, HWND hwnd
             break;
 
         case ScreenSaverMode::ScreenSaverPreview:
-            ASSERT (hwnd != 0);
-            context.m_previewParentHwnd = hwnd;
-            context.m_enableHotkeys     = false;
-            context.m_hideCursor        = false;
-            context.m_exitOnInput       = false;
-            context.m_suppressDebug     = true;
+            ASSERT (context.m_previewParentHwnd != 0);
+            context.m_enableHotkeys = false;
+            context.m_hideCursor    = false;
+            context.m_exitOnInput   = false;
+            context.m_suppressDebug = true;
             break;
 
         case ScreenSaverMode::SettingsDialog:
             context.m_enableHotkeys = false;
             context.m_hideCursor    = false;
             context.m_exitOnInput   = false;
-            if (hwnd != nullptr)
-            {
-                context.m_previewParentHwnd = hwnd;
-            }
             break;
 
         case ScreenSaverMode::PasswordChangeUnsupported:
-            context.m_enableHotkeys = false;
-            context.m_hideCursor    = false;
-            context.m_exitOnInput   = false;
-            break;
-
         case ScreenSaverMode::HelpRequested:
-            context.m_enableHotkeys = false;
-            context.m_hideCursor    = false;
-            context.m_exitOnInput   = false;
-            break;
-
         case ScreenSaverMode::Install:
         case ScreenSaverMode::Uninstall:
             context.m_enableHotkeys = false;
@@ -85,7 +70,6 @@ static void SetContextFlagsFromMode (ScreenSaverModeContext & context, HWND hwnd
 
         case ScreenSaverMode::Normal:
         default:
-            // Fallback to Normal mode on unexpected value
             context.m_mode          = ScreenSaverMode::Normal;
             context.m_enableHotkeys = true;
             context.m_hideCursor    = false;
@@ -111,11 +95,13 @@ static void SetContextFlagsFromMode (ScreenSaverModeContext & context, HWND hwnd
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-static HRESULT TryParseMultiCharSwitch (LPCWSTR                pszArg,
+static HRESULT TryParseMultiCharSwitch (LPCWSTR                  pszArg,
                                         ScreenSaverModeContext & context)
 {
-    HRESULT  hr       = S_OK;
-    LPCWSTR  pszStart = pszArg;
+    HRESULT      hr         = S_OK;
+    LPCWSTR      pszStart   = pszArg;
+    size_t       cchSwitch  = 0;
+    std::wstring switchWord;
 
 
 
@@ -124,41 +110,185 @@ static HRESULT TryParseMultiCharSwitch (LPCWSTR                pszArg,
         pszArg++;
     }
 
-    size_t cchSwitch = pszArg - pszStart;
-
     // Single character — not a multi-char switch
+    cchSwitch = pszArg - pszStart;
     BAIL_OUT_IF (cchSwitch <= 1, S_FALSE);
 
+    switchWord.assign (pszStart, cchSwitch);
+    for (auto & ch : switchWord)
     {
-        std::wstring switchWord (pszStart, cchSwitch);
-        for (auto & ch : switchWord)
-        {
-            ch = towlower (ch);
-        }
-
-        if (switchWord == L"install")
-        {
-            context.m_mode = ScreenSaverMode::Install;
-        }
-        else if (switchWord == L"uninstall")
-        {
-            context.m_mode = ScreenSaverMode::Uninstall;
-        }
-        else
-        {
-            wchar_t errorMsg[256];
-
-            StringCchPrintfW (errorMsg, _countof (errorMsg), L"Unrecognized command-line switch: %lc%.*ls",
-                              context.m_switchPrefix, static_cast<int>(cchSwitch), pszStart);
-            context.m_errorMessage = errorMsg;
-
-            CHR (E_INVALIDARG);
-        }
+        ch = towlower (ch);
     }
 
+    if (switchWord == L"install")
+    {
+        context.m_mode = ScreenSaverMode::Install;
+    }
+    else if (switchWord == L"uninstall")
+    {
+        context.m_mode = ScreenSaverMode::Uninstall;
+    }
+    else
+    {
+        context.m_errorMessage = std::format (L"Unrecognized command-line switch: {}{}", 
+                                              context.m_switchPrefix, 
+                                              switchWord);
+        CHR (E_INVALIDARG);
+    }
+
+
+    
 Error:
     return hr;
 }
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  Single-character switch handler function type
+//
+////////////////////////////////////////////////////////////////////////////////
+
+using SwitchHandlerFn = HRESULT (*)(LPCWSTR & pszCommandLine, ScreenSaverModeContext & context);
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  HandleScreenSaver
+//
+//  /s — Launch full-screen screensaver mode.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+static HRESULT HandleScreenSaver (LPCWSTR & /*pszCommandLine*/, ScreenSaverModeContext & context)
+{
+    context.m_mode = ScreenSaverMode::ScreenSaverFull;
+    return S_OK;
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  HandleScreenSaverPreview
+//
+//  /p <HWND> — Preview mode parented to the specified window handle.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+static HRESULT HandleScreenSaverPreview (LPCWSTR & pszCommandLine, ScreenSaverModeContext & context)
+{
+    pszCommandLine++;
+    SkipWhitespace (pszCommandLine);
+
+    HWND hwnd = (HWND) wcstoull (pszCommandLine, nullptr, 10);
+    if (hwnd != 0)
+    {
+        context.m_mode              = ScreenSaverMode::ScreenSaverPreview;
+        context.m_previewParentHwnd = hwnd;
+    }
+
+    return S_OK;
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  HandleConfigDialog
+//
+//  /c or /c:<HWND> — Show configuration dialog, optionally parented to HWND.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+static HRESULT HandleConfigDialog (LPCWSTR & pszCommandLine, ScreenSaverModeContext & context)
+{
+    context.m_mode = ScreenSaverMode::SettingsDialog;
+
+    pszCommandLine++;
+    if (*pszCommandLine == L':')
+    {
+        pszCommandLine++;
+        HWND hwnd = (HWND) wcstoull (pszCommandLine, nullptr, 10);
+        if (hwnd != 0)
+        {
+            context.m_previewParentHwnd = hwnd;
+        }
+    }
+
+    return S_OK;
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  HandlePasswordChange
+//
+//  /a — Password change request (unsupported, exits immediately).
+//
+////////////////////////////////////////////////////////////////////////////////
+
+static HRESULT HandlePasswordChange (LPCWSTR & /*pszCommandLine*/, ScreenSaverModeContext & context)
+{
+    context.m_mode = ScreenSaverMode::PasswordChangeUnsupported;
+    return S_OK;
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  HandleHelp
+//
+//  /? or -? — Display usage/help text.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+static HRESULT HandleHelp (LPCWSTR & /*pszCommandLine*/, ScreenSaverModeContext & context)
+{
+    context.m_mode = ScreenSaverMode::HelpRequested;
+    return S_OK;
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  Single-character switch dispatch table
+//
+////////////////////////////////////////////////////////////////////////////////
+
+struct SingleCharSwitch
+{
+    wchar_t         ch;
+    SwitchHandlerFn pfnHandler;
+};
+
+static constexpr SingleCharSwitch s_krgSingleCharSwitches[] =
+{
+    { L's', HandleScreenSaver        },
+    { L'p', HandleScreenSaverPreview },
+    { L'c', HandleConfigDialog       },
+    { L'a', HandlePasswordChange     },
+    { L'?', HandleHelp               },
+};
 
 
 
@@ -174,10 +304,9 @@ Error:
 
 HRESULT ParseCommandLine (LPCWSTR pszCommandLine, ScreenSaverModeContext & context)
 {
-    HRESULT                hr        = S_OK;
-    bool                   hasSwitch = false;   
-    wchar_t                cmd       = L'\0';    // To store the command character
-    HWND                   hwnd      = nullptr;  // To store parsed HWND value for /p and /c commands
+    HRESULT hr        = S_OK;
+    bool    hasSwitch = false;
+    wchar_t cmd       = L'\0';
 
 
 
@@ -201,23 +330,19 @@ HRESULT ParseCommandLine (LPCWSTR pszCommandLine, ScreenSaverModeContext & conte
     // Check for -- prefix (long option style, only valid with -)
     if (context.m_switchPrefix == L'-' && *pszCommandLine == L'-')
     {
-        pszCommandLine++;  // Skip second -
+        pszCommandLine++;
 
-        // Must be a multi-char switch after --
         hr = TryParseMultiCharSwitch (pszCommandLine, context);
         CHR (hr);
 
         // S_FALSE means single char after -- which is invalid
         if (hr == S_FALSE)
         {
-            wchar_t errorMsg[256];
-
-            StringCchPrintfW (errorMsg, _countof (errorMsg), L"Unrecognized command-line switch: --%lc", *pszCommandLine);
-            context.m_errorMessage = errorMsg;
+            context.m_errorMessage = std::format (L"Unrecognized command-line switch: --{}", *pszCommandLine);
             CHR (E_INVALIDARG);
         }
 
-        goto Error;
+        BAIL_OUT_IF (true, hr);
     }
 
     // With / prefix, try multi-char switch matching (e.g., /install, /uninstall)
@@ -226,75 +351,31 @@ HRESULT ParseCommandLine (LPCWSTR pszCommandLine, ScreenSaverModeContext & conte
         hr = TryParseMultiCharSwitch (pszCommandLine, context);
         CHR (hr);
 
-        // S_OK means it matched — done
-        if (hr == S_OK)
-        {
-            goto Error;
-        }
+        BAIL_OUT_IF (hr == S_OK, hr);
 
-        // S_FALSE means single char — fall through to switch statement below
+        // S_FALSE means single char — fall through to table lookup below
         hr = S_OK;
     }
 
-    // Get the command character (case-insensitive)
+    // Table-driven single-character switch dispatch
     cmd = towlower (*pszCommandLine);
-    switch (cmd)
+
+    for (const auto & entry : s_krgSingleCharSwitches)
     {
-        case L's':  //  /s - Full-screen screensaver
-            context.m_mode = ScreenSaverMode::ScreenSaverFull;
-            break;
-
-        case L'p':  //  /p <HWND> - Preview mode
-            pszCommandLine++;  // Skip 'p'
-            SkipWhitespace (pszCommandLine);
-
-            // Try to parse HWND as decimal integer.  If this fails, we'll stay in Normal mode.
-            hwnd = (HWND) wcstoull (pszCommandLine, nullptr, 10);
-            if (hwnd != 0)
-            {
-                context.m_mode = ScreenSaverMode::ScreenSaverPreview;
-            }
-            break;
-
-        case L'c':  // /c or /c:<HWND> - Configuration dialog
+        if (entry.ch == cmd)
         {
-            context.m_mode = ScreenSaverMode::SettingsDialog;
-            
-            // Check for optional :<HWND>
-            pszCommandLine++;  // Skip 'c'
-            if (*pszCommandLine == L':')
-            {
-                pszCommandLine++;  // Skip ':'
-                hwnd = (HWND) wcstoull (pszCommandLine, NULL, 10);
-            }
-            break;
-        }
-
-        case L'a':  // /a - Password change (unsupported)
-            context.m_mode = ScreenSaverMode::PasswordChangeUnsupported;
-            break;
-
-        case L'?':  // /? or -? - Display help
-            context.m_mode = ScreenSaverMode::HelpRequested;
-            break;
-
-        default:  // Unknown argument - return error
-        {
-            wchar_t errorMsg[256];
-            
-            
-
-            StringCchPrintfW (errorMsg, _countof (errorMsg), L"Unrecognized command-line switch: /%lc", cmd);
-            context.m_errorMessage = errorMsg;
-            
-            CHR (E_INVALIDARG);
+            hr = entry.pfnHandler (pszCommandLine, context);
+            CHR (hr);
+            BAIL_OUT_IF (true, hr);
         }
     }
 
-
+    // No match — unrecognized switch
+    context.m_errorMessage = std::format (L"Unrecognized command-line switch: {}{}", context.m_switchPrefix, cmd);
+    CHR (E_INVALIDARG);
 
 Error:
-    SetContextFlagsFromMode (context, hwnd);
+    SetContextFlagsFromMode (context);
 
     return hr;
 }
