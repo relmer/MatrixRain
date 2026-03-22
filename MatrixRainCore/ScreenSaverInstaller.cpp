@@ -246,18 +246,14 @@ HRESULT ScreenSaverInstaller::Uninstall (IRegistryProvider & registry)
     CHRA (hr);
 
     // FR-009: Gracefully handle missing .scr file (but surface access-denied)
-    if (GetFileAttributesW (szTargetPath) == INVALID_FILE_ATTRIBUTES)
     {
+        DWORD dwAttrs = GetFileAttributesW (szTargetPath);
         DWORD dwError = GetLastError();
 
-        if (dwError == ERROR_FILE_NOT_FOUND || dwError == ERROR_PATH_NOT_FOUND)
-        {
-            hr = S_FALSE;
-            goto Error;
-        }
+        BAIL_OUT_IF (dwAttrs == INVALID_FILE_ATTRIBUTES &&
+                     (dwError == ERROR_FILE_NOT_FOUND || dwError == ERROR_PATH_NOT_FOUND), S_FALSE);
 
-        hr = HRESULT_FROM_WIN32 (dwError);
-        goto Error;
+        CBRAEx (dwAttrs != INVALID_FILE_ATTRIBUTES, HRESULT_FROM_WIN32 (dwError));
     }
 
     // FR-005: Remove the .scr file
