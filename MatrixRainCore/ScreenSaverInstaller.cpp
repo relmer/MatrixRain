@@ -169,11 +169,12 @@ HRESULT ScreenSaverInstaller::Install()
 
     // Get the running executable's path (source)
     cchPath = GetModuleFileNameW (nullptr, szSourcePath, _countof (szSourcePath));
-    CBRA (cchPath > 0 && cchPath < _countof (szSourcePath));
+    CWRA (cchPath);
+    CBRA (cchPath < _countof (szSourcePath));
 
     // Build target path: %SystemRoot%\System32\MatrixRain.scr
     cchPath = GetSystemDirectoryW (szTargetPath, _countof (szTargetPath));
-    CBRA (cchPath > 0);
+    CWRA (cchPath);
 
     hr = PathCchAppend (szTargetPath, _countof (szTargetPath), L"MatrixRain.scr");
     CHRA (hr);
@@ -241,7 +242,7 @@ HRESULT ScreenSaverInstaller::Uninstall (IRegistryProvider & registry)
 
     // Build target path: %SystemRoot%\System32\MatrixRain.scr
     cchPath = GetSystemDirectoryW (szTargetPath, _countof (szTargetPath));
-    CBRA (cchPath > 0);
+    CWRA (cchPath);
 
     hr = PathCchAppend (szTargetPath, _countof (szTargetPath), L"MatrixRain.scr");
     CHRA (hr);
@@ -330,7 +331,8 @@ HRESULT ScreenSaverInstaller::RequestElevation (LPCWSTR pszSwitch)
 
 
     cchPath = GetModuleFileNameW (nullptr, szExePath, _countof (szExePath));
-    CBRA (cchPath > 0 && cchPath < _countof (szExePath));
+    CWRA (cchPath);
+    CBRA (cchPath < _countof (szExePath));
 
     sei.lpVerb       = L"runas";
     sei.lpFile       = szExePath;
