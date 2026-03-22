@@ -13,7 +13,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-HRESULT WindowsRegistryProvider::ReadString (HKEY           hKey,
+HRESULT WindowsRegistryProvider::ReadString (HKEY           hkeyParent,
                                              LPCWSTR        pszSubKey,
                                              LPCWSTR        pszValueName,
                                              std::wstring & value)
@@ -26,7 +26,7 @@ HRESULT WindowsRegistryProvider::ReadString (HKEY           hKey,
 
 
 
-    lResult = RegOpenKeyExW (hKey, pszSubKey, 0, KEY_READ, &hkey);
+    lResult = RegOpenKeyExW (hkeyParent, pszSubKey, 0, KEY_READ, &hkey);
     CBRAEx (lResult == ERROR_SUCCESS, HRESULT_FROM_WIN32 (lResult));
 
     // Query the required buffer size
@@ -79,16 +79,18 @@ HRESULT WindowsRegistryProvider::WriteString (HKEY    hKey,
 
 
     lResult = RegOpenKeyExW (hKey, pszSubKey, 0, KEY_SET_VALUE, &hkOpen);
-    CBRA (lResult == ERROR_SUCCESS);
+    CBRAEx (lResult == ERROR_SUCCESS, HRESULT_FROM_WIN32 (lResult));
 
     lResult = RegSetValueExW (hkOpen, pszValueName, 0, REG_SZ,
                               reinterpret_cast<const BYTE *> (pszValue),
                               static_cast<DWORD> ((wcslen (pszValue) + 1) * sizeof (WCHAR)));
-    CBRA (lResult == ERROR_SUCCESS);
+    CBRAEx (lResult == ERROR_SUCCESS, HRESULT_FROM_WIN32 (lResult));
 
 Error:
     if (hkOpen)
+    {
         RegCloseKey (hkOpen);
+    }
 
     return hr;
 }
@@ -113,10 +115,10 @@ HRESULT WindowsRegistryProvider::DeleteValue (HKEY    hKey,
 
 
     lResult = RegOpenKeyExW (hKey, pszSubKey, 0, KEY_SET_VALUE, &hkOpen);
-    CBRA (lResult == ERROR_SUCCESS);
+    CBRAEx (lResult == ERROR_SUCCESS, HRESULT_FROM_WIN32 (lResult));
 
     lResult = RegDeleteValueW (hkOpen, pszValueName);
-    CBRA (lResult == ERROR_SUCCESS);
+    CBRAEx (lResult == ERROR_SUCCESS, HRESULT_FROM_WIN32 (lResult));
 
 Error:
     if (hkOpen)
