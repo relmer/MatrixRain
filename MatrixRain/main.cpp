@@ -2,6 +2,7 @@
 
 #include "..\MatrixRainCore\Application.h"
 #include "..\MatrixRainCore\ScreenSaverInstaller.h"
+#include "..\MatrixRainCore\WindowsRegistryProvider.h"
 #include "..\MatrixRainCore\ScreenSaverModeParser.h"
 #include "..\MatrixRainCore\UsageText.h"
 #include "ConfigDialog.h"
