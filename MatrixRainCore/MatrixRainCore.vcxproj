@@ -296,7 +296,7 @@
     <ClInclude Include="RegistrySettingsProvider.h" />
     <ClInclude Include="RenderSystem.h" />
     <ClInclude Include="ScreenSaverModeParser.h" />
-    <ClInclude Include="IRegistryProvider.h" />
+    <ClInclude Include="RegistryProvider.h" />
     <ClInclude Include="ScreenSaverInstaller.h" />
     <ClInclude Include="WindowsRegistryProvider.h" />
     <ClInclude Include="Timer.h" />

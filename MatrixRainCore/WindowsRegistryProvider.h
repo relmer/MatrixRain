@@ -1,6 +1,6 @@
 #pragma once
 
-#include "IRegistryProvider.h"
+#include "RegistryProvider.h"
 
 
 
