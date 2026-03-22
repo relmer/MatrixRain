@@ -188,9 +188,42 @@ Error:
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-HRESULT ScreenSaverInstaller::Uninstall (IRegistryProvider & /*registry*/)
+HRESULT ScreenSaverInstaller::Uninstall (IRegistryProvider & registry)
 {
-    return E_NOTIMPL;
+    HRESULT hr = S_OK;
+    WCHAR   szTargetPath[MAX_PATH];
+    WCHAR   szSystem32[MAX_PATH];
+    DWORD   cchPath = 0;
+
+
+    // FR-006: Verify elevation (not an assertion — expected to fail for non-admin callers)
+    if (!IsElevated())
+    {
+        hr = E_ACCESSDENIED;
+        goto Error;
+    }
+
+    // Build target path: %SystemRoot%\System32\MatrixRain.scr
+    cchPath = GetSystemDirectoryW (szSystem32, _countof (szSystem32));
+    CBRA (cchPath > 0);
+
+    StringCchPrintfW (szTargetPath, _countof (szTargetPath), L"%ls\\MatrixRain.scr", szSystem32);
+
+    // FR-009: Gracefully handle missing .scr file
+    if (GetFileAttributesW (szTargetPath) == INVALID_FILE_ATTRIBUTES)
+    {
+        hr = S_FALSE;
+        goto Error;
+    }
+
+    // FR-005: Remove the .scr file
+    CWRA (DeleteFileW (szTargetPath));
+
+    // FR-013/014/015: Clean up registry if MatrixRain was the active screensaver
+    CleanupRegistryForUninstall (registry);
+
+Error:
+    return hr;
 }
 
 
@@ -261,4 +294,53 @@ HRESULT ScreenSaverInstaller::RequestElevation (LPCWSTR pszSwitch)
 
 Error:
     return hr;
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  ScreenSaverInstaller::CleanupRegistryForUninstall
+//
+//  Reads SCRNSAVE.EXE and clears it if it points to MatrixRain.scr.
+//  Does nothing if a different screensaver is active or the key is missing.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+void ScreenSaverInstaller::CleanupRegistryForUninstall (IRegistryProvider & registry)
+{
+    static constexpr LPCWSTR kpszDesktopKey    = L"Control Panel\\Desktop";
+    static constexpr LPCWSTR kpszScrnsaveExe   = L"SCRNSAVE.EXE";
+    static constexpr LPCWSTR kpszScreenActive   = L"ScreenSaveActive";
+
+    HRESULT      hr = S_OK;
+    std::wstring currentScr;
+    WCHAR        szExpectedPath[MAX_PATH];
+    WCHAR        szSystem32[MAX_PATH];
+    DWORD        cchPath = 0;
+
+
+    // Build the expected path to compare against
+    cchPath = GetSystemDirectoryW (szSystem32, _countof (szSystem32));
+    if (cchPath == 0)
+        return;
+
+    StringCchPrintfW (szExpectedPath, _countof (szExpectedPath), L"%ls\\MatrixRain.scr", szSystem32);
+
+    // Read the current SCRNSAVE.EXE value
+    hr = registry.ReadString (HKEY_CURRENT_USER, kpszDesktopKey, kpszScrnsaveExe, currentScr);
+    if (FAILED (hr))
+        return;  // Key missing or unreadable — nothing to clean up
+
+    // FR-015: Only clean up if MatrixRain is the active screensaver
+    if (_wcsicmp (currentScr.c_str(), szExpectedPath) != 0)
+        return;
+
+    // FR-013: Delete SCRNSAVE.EXE value
+    registry.DeleteValue (HKEY_CURRENT_USER, kpszDesktopKey, kpszScrnsaveExe);
+
+    // FR-014: Set ScreenSaveActive to "0"
+    registry.WriteString (HKEY_CURRENT_USER, kpszDesktopKey, kpszScreenActive, L"0");
 }

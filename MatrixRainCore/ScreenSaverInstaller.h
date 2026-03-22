@@ -125,4 +125,15 @@ public:
     //  Returns E_ACCESSDENIED if the user declined the UAC prompt.
     //
     static HRESULT RequestElevation (LPCWSTR pszSwitch);
+
+
+    //  Clean up screensaver registry entries during uninstall.
+    //
+    //  Reads SCRNSAVE.EXE from HKCU\Control Panel\Desktop.
+    //  If it points to MatrixRain.scr: deletes the value and sets ScreenSaveActive to "0".
+    //  If it points to a different screensaver or is missing: does nothing.
+    //
+    //  Separated from Uninstall() for unit test coverage via mock registry.
+    //
+    static void CleanupRegistryForUninstall (IRegistryProvider & registry);
 };

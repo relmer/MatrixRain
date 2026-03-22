@@ -87,17 +87,17 @@
 
 ### Tests (write FIRST, verify they FAIL)
 
-- [ ] T025 [P] [US2] Write test `Uninstall_NotElevated_ReturnsAccessDenied` in `MatrixRainTests/unit/ScreenSaverInstallerTests.cpp` — verify `Uninstall()` returns `E_ACCESSDENIED` or appropriate error when called without elevation
-- [ ] T026 [P] [US2] Write test `Uninstall_ScrFileNotPresent_ReturnsSOK` in `MatrixRainTests/unit/ScreenSaverInstallerTests.cpp` — verify `Uninstall()` returns `S_OK` or `S_FALSE` when `.scr` file doesn't exist (graceful "not installed" case per FR-009)
-- [ ] T026a [P] [US2] Write test `Uninstall_MatrixRainActive_ClearsRegistryEntries` using mock registry interface — verify that when mock `SCRNSAVE.EXE` points to `MatrixRain.scr`, uninstall clears `SCRNSAVE.EXE` and sets `ScreenSaveActive` to `"0"` (FR-013, FR-014)
-- [ ] T026b [P] [US2] Write test `Uninstall_DifferentScreensaverActive_LeavesRegistryUntouched` using mock registry interface — verify that when mock `SCRNSAVE.EXE` points to a different `.scr`, uninstall does NOT modify registry values (FR-015)
-- [ ] T026c [P] [US2] Write test `Uninstall_RegistryKeyMissing_DoesNotCrash` using mock registry interface — verify graceful handling when `SCRNSAVE.EXE` value does not exist
-- [ ] T027 [US2] Build and run tests — verify new tests FAIL (stubs return `E_NOTIMPL`)
+- [X] T025 [P] [US2] Write test `Uninstall_NotElevated_ReturnsAccessDenied` in `MatrixRainTests/unit/ScreenSaverInstallerTests.cpp` — verify `Uninstall()` returns `E_ACCESSDENIED` or appropriate error when called without elevation
+- [X] T026 [P] [US2] Write test `Uninstall_ScrFileNotPresent_ReturnsSOK` in `MatrixRainTests/unit/ScreenSaverInstallerTests.cpp` — verify `Uninstall()` returns `S_OK` or `S_FALSE` when `.scr` file doesn't exist (graceful "not installed" case per FR-009)
+- [X] T026a [P] [US2] Write test `Uninstall_MatrixRainActive_ClearsRegistryEntries` using mock registry interface — verify that when mock `SCRNSAVE.EXE` points to `MatrixRain.scr`, uninstall clears `SCRNSAVE.EXE` and sets `ScreenSaveActive` to `"0"` (FR-013, FR-014)
+- [X] T026b [P] [US2] Write test `Uninstall_DifferentScreensaverActive_LeavesRegistryUntouched` using mock registry interface — verify that when mock `SCRNSAVE.EXE` points to a different `.scr`, uninstall does NOT modify registry values (FR-015)
+- [X] T026c [P] [US2] Write test `Uninstall_RegistryKeyMissing_DoesNotCrash` using mock registry interface — verify graceful handling when `SCRNSAVE.EXE` value does not exist
+- [X] T027 [US2] Build and run tests — verify new tests FAIL (stubs return `E_NOTIMPL`)
 
 ### Implementation
 
-- [ ] T028 [US2] Implement `Uninstall()` in `MatrixRainCore/ScreenSaverInstaller.cpp`: (1) check elevation, return `E_ACCESSDENIED` if not elevated, (2) build target path `%SystemRoot%\System32\MatrixRain.scr`, (3) if file doesn't exist return `S_FALSE` with informational message, (4) `DeleteFileW` to remove `.scr`, (5) read `HKCU\Control Panel\Desktop\SCRNSAVE.EXE` and compare case-insensitively to target path per research.md R4, (6) if match: delete `SCRNSAVE.EXE` value and set `ScreenSaveActive` to `"0"`, (7) if different screensaver: leave registry untouched per FR-015
-- [ ] T029 [US2] Build and run ALL tests — verify uninstall tests PASS and all previous tests still PASS
+- [X] T028 [US2] Implement `Uninstall()` in `MatrixRainCore/ScreenSaverInstaller.cpp`: (1) check elevation, return `E_ACCESSDENIED` if not elevated, (2) build target path `%SystemRoot%\System32\MatrixRain.scr`, (3) if file doesn't exist return `S_FALSE` with informational message, (4) `DeleteFileW` to remove `.scr`, (5) read `HKCU\Control Panel\Desktop\SCRNSAVE.EXE` and compare case-insensitively to target path per research.md R4, (6) if match: delete `SCRNSAVE.EXE` value and set `ScreenSaveActive` to `"0"`, (7) if different screensaver: leave registry untouched per FR-015
+- [X] T029 [US2] Build and run ALL tests — verify uninstall tests PASS and all previous tests still PASS
 
 **Checkpoint**: `/uninstall` removes `.scr` and cleans registry correctly. Manually verify via quickstart.md steps 4–6.
 
