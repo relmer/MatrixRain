@@ -51,7 +51,7 @@
 
 | File | Change |
 |------|--------|
-| `ScreenSaverModeParser.cpp` | Add `?` switch parsing, detect prefix style |
+| `CommandLine.cpp` | Add `?` switch parsing, detect prefix style |
 | `Application.cpp` | Add Enter/? key handling in `OnKeyDown`, show/dismiss overlay |
 | `InputSystem.cpp/h` | Route unrecognized keys to trigger help hint |
 | `RenderSystem.cpp/h` | Render overlays to scene texture before bloom, SDF halo shader, `RenderParams` struct |

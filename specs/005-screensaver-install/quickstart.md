@@ -50,8 +50,8 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\Invoke-MatrixRainTests.ps1
 | `MatrixRainCore/ScreenSaverInstaller.h` | New: Install/uninstall class declaration |
 | `MatrixRainCore/ScreenSaverInstaller.cpp` | New: Install/uninstall implementation |
 | `MatrixRainCore/ScreenSaverMode.h` | Modified: Add Install, Uninstall enum values |
-| `MatrixRainCore/ScreenSaverModeParser.cpp` | Modified: Parse multi-char switches |
+| `MatrixRainCore/CommandLine.cpp` | Modified: Parse multi-char switches |
 | `MatrixRainCore/UsageText.cpp` | Modified: Add new switches to help text |
 | `MatrixRain/main.cpp` | Modified: Dispatch Install/Uninstall modes |
 | `MatrixRainTests/unit/ScreenSaverInstallerTests.cpp` | New: Unit tests |
-| `MatrixRainTests/unit/ScreenSaverModeParserTests.cpp` | Modified: Add parsing tests |
+| `MatrixRainTests/unit/CommandLineTests.cpp` | Modified: Add parsing tests |

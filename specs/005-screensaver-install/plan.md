@@ -60,8 +60,8 @@ specs/005-screensaver-install/
 ```text
 MatrixRainCore/                          # Core static library
 ├── ScreenSaverMode.h                    # MODIFY: Add Install, Uninstall enum values
-├── ScreenSaverModeParser.cpp            # MODIFY: Parse "install" and "uninstall" multi-char switches
-├── ScreenSaverModeParser.h              # MODIFY: (if needed for new declarations)
+├── CommandLine.cpp            # MODIFY: Parse "install" and "uninstall" multi-char switches
+├── CommandLine.h              # MODIFY: (if needed for new declarations)
 ├── ScreenSaverInstaller.cpp             # NEW: Install/uninstall logic
 ├── ScreenSaverInstaller.h              # NEW: ScreenSaverInstaller class declaration
 ├── UsageText.cpp                        # MODIFY: Add /install and /uninstall to help text
@@ -72,7 +72,7 @@ MatrixRain/                              # Application executable
 
 MatrixRainTests/                         # Test project
 └── unit/
-    ├── ScreenSaverModeParserTests.cpp   # MODIFY: Add tests for /install and /uninstall parsing
+    ├── CommandLineTests.cpp   # MODIFY: Add tests for /install and /uninstall parsing
     ├── ScreenSaverInstallerTests.cpp    # NEW: Unit tests for install/uninstall logic
     └── UsageTextTests.cpp               # MODIFY: Verify new switches in help text
 ```
