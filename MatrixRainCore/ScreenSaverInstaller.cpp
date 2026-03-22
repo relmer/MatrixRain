@@ -42,8 +42,9 @@ HRESULT WindowsRegistryProvider::ReadString (HKEY           hKey,
                                     reinterpret_cast<LPBYTE> (buffer.data()), &cbData);
         CBRAEx (lResult == ERROR_SUCCESS, HRESULT_FROM_WIN32 (lResult));
 
-        // Construct from c_str() to stop at the first null (cbData includes the terminator)
-        value = buffer.c_str();
+        // Trim to actual string length (cbData includes the null terminator)
+        buffer.resize (wcslen (buffer.c_str()));
+        value = std::move (buffer);
     }
 
 
