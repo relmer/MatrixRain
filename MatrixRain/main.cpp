@@ -63,6 +63,15 @@ int APIENTRY wWinMain(_In_     HINSTANCE hInstance,
         {
             WindowsRegistryProvider registry;
             hr = ScreenSaverInstaller::Uninstall (registry);
+
+            if (hr == S_OK)
+            {
+                MessageBoxW (nullptr, L"MatrixRain screensaver has been uninstalled.", L"MatrixRain", MB_OK | MB_ICONINFORMATION);
+            }
+            else if (hr == S_FALSE)
+            {
+                MessageBoxW (nullptr, L"MatrixRain screensaver is not installed.", L"MatrixRain", MB_OK | MB_ICONINFORMATION);
+            }
         }
 
         goto Error;
