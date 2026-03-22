@@ -153,13 +153,14 @@ Error:
 
 HRESULT ScreenSaverInstaller::Install()
 {
-    HRESULT hr                          = S_OK;
-    WCHAR   szSourcePath[MAX_PATH];
-    WCHAR   szTargetPath[MAX_PATH];
-    WCHAR   szRunDll32Cmd[MAX_PATH * 2];
-    DWORD   cchPath                     = 0;
-    BOOL    fSuccess                    = FALSE;
-    bool    fElevated                   = false;
+    HRESULT           hr                          = S_OK;
+    WCHAR             szSourcePath[MAX_PATH];
+    WCHAR             szTargetPath[MAX_PATH];
+    WCHAR             szRunDll32Cmd[MAX_PATH * 2];
+    DWORD             cchPath                     = 0;
+    BOOL              fSuccess                    = FALSE;
+    bool              fElevated                   = false;
+    SHELLEXECUTEINFOW sei                         = { sizeof (sei) };
 
 
 
@@ -174,6 +175,7 @@ HRESULT ScreenSaverInstaller::Install()
     // Build target path: %SystemRoot%\System32\MatrixRain.scr
     cchPath = GetSystemDirectoryW (szTargetPath, _countof (szTargetPath));
     CWRA (cchPath);
+    CBRAEx (cchPath < _countof (szTargetPath), HRESULT_FROM_WIN32 (ERROR_INSUFFICIENT_BUFFER));
 
     hr = PathCchAppend (szTargetPath, _countof (szTargetPath), L"MatrixRain.scr");
     CHRA (hr);
@@ -191,7 +193,6 @@ HRESULT ScreenSaverInstaller::Install()
                       L"desk.cpl,InstallScreenSaver %ls", szTargetPath);
 
     {
-        SHELLEXECUTEINFOW sei = { sizeof (sei) };
 
         sei.lpVerb       = L"open";
         sei.lpFile       = L"rundll32.exe";
@@ -242,6 +243,7 @@ HRESULT ScreenSaverInstaller::Uninstall (IRegistryProvider & registry)
     // Build target path: %SystemRoot%\System32\MatrixRain.scr
     cchPath = GetSystemDirectoryW (szTargetPath, _countof (szTargetPath));
     CWRA (cchPath);
+    CBRAEx (cchPath < _countof (szTargetPath), HRESULT_FROM_WIN32 (ERROR_INSUFFICIENT_BUFFER));
 
     hr = PathCchAppend (szTargetPath, _countof (szTargetPath), L"MatrixRain.scr");
     CHRA (hr);
@@ -378,7 +380,7 @@ void ScreenSaverInstaller::CleanupRegistryForUninstall (IRegistryProvider & regi
 
     // Build the expected path to compare against
     cchPath = GetSystemDirectoryW (szExpectedPath, _countof (szExpectedPath));
-    if (cchPath == 0)
+    if (cchPath == 0 || cchPath >= _countof (szExpectedPath))
         return;
 
     hr = PathCchAppend (szExpectedPath, _countof (szExpectedPath), L"MatrixRain.scr");
