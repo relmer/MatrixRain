@@ -19,12 +19,12 @@
 
 **Purpose**: Add new enum values and extend command-line parsing infrastructure — shared by all stories.
 
-- [ ] T001 Add `Install` and `Uninstall` values to `ScreenSaverMode` enum in `MatrixRainCore/ScreenSaverMode.h`
-- [ ] T002 Create `ScreenSaverInstaller.h` class declaration (static methods: `Install`, `Uninstall`, `IsElevated`, `RequestElevation`) in `MatrixRainCore/ScreenSaverInstaller.h`
-- [ ] T003 Create stub `ScreenSaverInstaller.cpp` with empty method bodies returning `E_NOTIMPL` in `MatrixRainCore/ScreenSaverInstaller.cpp`
-- [ ] T004 Add `ScreenSaverInstaller.h` and `ScreenSaverInstaller.cpp` to `MatrixRainCore/MatrixRainCore.vcxproj`
-- [ ] T005 Add `ScreenSaverInstallerTests.cpp` to `MatrixRainTests/MatrixRainTests.vcxproj`
-- [ ] T006 Verify solution builds with new files: run `Build Debug (current arch)` task
+- [X] T001 Add `Install` and `Uninstall` values to `ScreenSaverMode` enum in `MatrixRainCore/ScreenSaverMode.h`
+- [X] T002 Create `ScreenSaverInstaller.h` class declaration (static methods: `Install`, `Uninstall`, `IsElevated`, `RequestElevation`) in `MatrixRainCore/ScreenSaverInstaller.h`
+- [X] T003 Create stub `ScreenSaverInstaller.cpp` with empty method bodies returning `E_NOTIMPL` in `MatrixRainCore/ScreenSaverInstaller.cpp`
+- [X] T004 Add `ScreenSaverInstaller.h` and `ScreenSaverInstaller.cpp` to `MatrixRainCore/MatrixRainCore.vcxproj`
+- [X] T005 Add `ScreenSaverInstallerTests.cpp` to `MatrixRainTests/MatrixRainTests.vcxproj`
+- [X] T006 Verify solution builds with new files: run `Build Debug (current arch)` task
 
 **Checkpoint**: Solution compiles with new enum values and stub class. No behavior changes yet.
 

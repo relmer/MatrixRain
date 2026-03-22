@@ -296,6 +296,7 @@
     <ClInclude Include="RegistrySettingsProvider.h" />
     <ClInclude Include="RenderSystem.h" />
     <ClInclude Include="ScreenSaverModeParser.h" />
+    <ClInclude Include="ScreenSaverInstaller.h" />
     <ClInclude Include="Timer.h" />
     <ClInclude Include="UsageText.h" />
     <ClInclude Include="UnicodeSymbols.h" />
@@ -324,6 +325,7 @@
     <ClCompile Include="RegistrySettingsProvider.cpp" />
     <ClCompile Include="RenderSystem.cpp" />
     <ClCompile Include="ScreenSaverModeParser.cpp" />
+    <ClCompile Include="ScreenSaverInstaller.cpp" />
     <ClCompile Include="ApplicationState.cpp" />
     <ClCompile Include="ColorScheme.cpp" />
     <ClCompile Include="DensityController.cpp" />
