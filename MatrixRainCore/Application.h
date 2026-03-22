@@ -62,7 +62,7 @@ public:
     ScreenSaverMode     GetScreenSaverMode()  const                { return m_pScreenSaverContext ? m_pScreenSaverContext->m_mode : ScreenSaverMode::Normal; }
     
     void                SetOpenConfigDialogCallback (std::function<void()> callback) { m_openConfigDialogCallback = callback; }
-    void                SetShowUsageDialogCallback (std::function<void()> callback)  { m_showUsageDialogCallback = callback; }
+    void                SetShowUsageDialogCallback  (std::function<void()> callback) { m_showUsageDialogCallback  = callback; }
     void                ApplyDisplayModeChange()                   { ResizeWindowForCurrentMode();    }
 
     // Window dimensions
@@ -83,14 +83,14 @@ private:
     std::unique_ptr<FPSCounter>        m_fpsCounter;
     OverlayState                       m_overlays;
 
-    // Win32 window
-    HWND      m_hwnd                    { nullptr };
-    HINSTANCE m_hInstance               { nullptr };
-    bool      m_isRunning               { false   };
-    std::atomic<bool> m_isPaused                { false };
-    std::atomic<bool> m_inDisplayModeTransition { false };
+    // Win32 window`
+    HWND              m_hwnd                    { nullptr };
+    HINSTANCE         m_hInstance               { nullptr };
+    bool              m_isRunning               { false   };
+    std::atomic<bool> m_isPaused                { false   };
+    std::atomic<bool> m_inDisplayModeTransition { false   };
     
-    HWND      m_hConfigDialog           { nullptr };
+    HWND              m_hConfigDialog           { nullptr };
     
     std::function<void()> m_openConfigDialogCallback;
     std::function<void()> m_showUsageDialogCallback;
@@ -98,7 +98,7 @@ private:
     const ScreenSaverModeContext * m_pScreenSaverContext { nullptr };
     
     // Render thread
-    static constexpr int RENDER_FPS = 60;
+    static constexpr int                       RENDER_FPS        { 60 };
     static constexpr std::chrono::milliseconds RENDER_FRAME_TIME { 1000 / RENDER_FPS };
     
     std::thread       m_renderThread;
