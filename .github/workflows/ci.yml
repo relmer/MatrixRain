@@ -17,10 +17,10 @@ jobs:
       fail-fast: false
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Add MSBuild to PATH
-        uses: microsoft/setup-msbuild@v2
+        uses: microsoft/setup-msbuild@v3
 
       - name: Setup VSTest
         uses: darenm/Setup-VSTest@v1.3
@@ -50,10 +50,10 @@ jobs:
       fail-fast: false
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Add MSBuild to PATH
-        uses: microsoft/setup-msbuild@v2
+        uses: microsoft/setup-msbuild@v3
 
       - name: Build ARM64
         run: msbuild MatrixRain.sln -p:Configuration=${{ matrix.configuration }} -p:Platform=ARM64 -p:PlatformToolset=v143

@@ -89,7 +89,7 @@ jobs:
           Write-Output "version=$version" >> $env:GITHUB_OUTPUT
           Write-Host "Release tag: $tag  Version: $version"
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -111,7 +111,7 @@ jobs:
           Write-Host "Version validated: $headerVersion"
 
       - name: Add MSBuild to PATH
-        uses: microsoft/setup-msbuild@v2
+        uses: microsoft/setup-msbuild@v3
 
       - name: Setup VSTest
         uses: darenm/Setup-VSTest@v1.3
@@ -141,7 +141,7 @@ jobs:
       # --- Sign release binaries ---
 
       - name: Azure Login (OIDC)
-        uses: azure/login@v2
+        uses: azure/login@v3
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
