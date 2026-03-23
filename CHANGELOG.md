@@ -4,6 +4,24 @@ All notable changes to MatrixRain are documented in this file.
 
 ## [Unreleased]
 
+## [1.2.1953] - 2026-03-22
+
+### Added
+- Screensaver install/uninstall via `/install` and `/uninstall` switches
+- UAC elevation prompt for install/uninstall operations
+- Group Policy and MDM/Intune policy detection before install
+- `/force` or `--force` switch to bypass policy warnings on install
+- `IFileSystemProvider` interface for testable file system operations
+- `MockFileSystemProvider` for fully isolated unit tests
+
+### Changed
+- `Uninstall()` and `CleanupRegistryForUninstall()` accept `IFileSystemProvider` for testability
+- Elevation check uses injectable function pointer for mock support
+
+### Fixed
+- CI test failures: screensaver installer tests no longer assume elevation state
+- All unit tests fully mocked — no real filesystem, registry, or OS calls
+
 ## [1.1.1819] - 2026-03-21
 
 ### Added
