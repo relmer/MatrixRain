@@ -4,7 +4,7 @@
 #include "..\MatrixRainCore\Application.h"
 #include "..\MatrixRainCore\ApplicationState.h"
 #include "..\MatrixRainCore\ConfigDialogController.h"
-#include "..\MatrixRainCore\ScreenSaverModeParser.h"
+#include "..\MatrixRainCore\CommandLine.h"
 #include "resource.h"
 
 
@@ -17,6 +17,7 @@ struct DialogContext
     RegistrySettingsProvider                  m_settingsProvider;
     Application                             * m_pApp              = nullptr;
     bool                                      m_ownsContextMemory = false;
+    bool                                      m_isScreenSaverCPL  = false;
 };
 
 
@@ -222,6 +223,12 @@ static BOOL OnInitDialog (HWND hDlg, LPARAM initParam)
     
     CheckDlgButton (hDlg, IDC_STARTFULLSCREEN_CHECK, pSettings->m_startFullscreen ? BST_CHECKED : BST_UNCHECKED);
     CheckDlgButton (hDlg, IDC_SHOWDEBUG_CHECK,       pSettings->m_showDebugStats  ? BST_CHECKED : BST_UNCHECKED);
+
+    // Hide fullscreen checkbox in screensaver CPL mode — screensaver always forces fullscreen
+    if (pContext->m_isScreenSaverCPL)
+    {
+        ShowWindow (GetDlgItem (hDlg, IDC_STARTFULLSCREEN_CHECK), SW_HIDE);
+    }
 #ifdef _DEBUG
     CheckDlgButton (hDlg, IDC_SHOWFADETIMERS_CHECK,  pSettings->m_showFadeTimers  ? BST_CHECKED : BST_UNCHECKED);
 #else
@@ -749,6 +756,7 @@ int ShowConfigDialog (HINSTANCE hInstance, const ScreenSaverModeContext & contex
 
 
     dlgContext.m_controller = std::make_unique<ConfigDialogController> (dlgContext.m_settingsProvider);
+    dlgContext.m_isScreenSaverCPL = true;
     hr = dlgContext.m_controller->Initialize();
     CHRA (hr);
 

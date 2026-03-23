@@ -145,7 +145,7 @@ Post-design, all gates remain satisfied: logic continues to reside in the core l
 1. **Command-line Dispatch & Mode Context**
 
 - Write failing tests for argument parsing and mode determination.
-- Implement `ScreenSaverModeParser` and integrate into `WinMain` to forward context into `MatrixRainCore` startup.
+- Implement `CommandLine` and integrate into `WinMain` to forward context into `MatrixRainCore` startup.
 
 2. **Registry-backed Settings Provider**
 

@@ -1,7 +1,9 @@
 #include "pch.h"
 
 #include "..\MatrixRainCore\Application.h"
-#include "..\MatrixRainCore\ScreenSaverModeParser.h"
+#include "..\MatrixRainCore\ScreenSaverInstaller.h"
+#include "..\MatrixRainCore\WindowsRegistryProvider.h"
+#include "..\MatrixRainCore\CommandLine.h"
 #include "..\MatrixRainCore\UsageText.h"
 #include "ConfigDialog.h"
 
@@ -35,8 +37,65 @@ int APIENTRY wWinMain(_In_     HINSTANCE hInstance,
     SetProcessDpiAwarenessContext (DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
 
     // Parse command-line arguments
-    hr = ParseCommandLine (lpCmdLine, context);
-    CHR (hr);
+    {
+        CommandLine cmdLine;
+
+        hr = cmdLine.Parse (lpCmdLine, context);
+        CHR (hr);
+    }
+
+    // Handle install/uninstall — early exit before application initialization
+    if (context.m_mode == ScreenSaverMode::Install || context.m_mode == ScreenSaverMode::Uninstall)
+    {
+        LPCWSTR pszSwitch = (context.m_mode == ScreenSaverMode::Uninstall)  ? L"/uninstall" :
+                            context.m_forceInstall                          ? L"/install /force" :
+                                                                              L"/install";
+
+        // Check for policies that would block the screensaver (before UAC prompt)
+        // /force or --force skips the policy check
+        if (context.m_mode == ScreenSaverMode::Install && !context.m_forceInstall)
+        {
+            std::wstring policyWarning;
+            bool         fBlocked = false;
+
+
+            hr = ScreenSaverInstaller::CheckScreenSaverPolicies (fBlocked, policyWarning);
+            CHR (hr);
+
+            if (fBlocked)
+            {
+                MessageBoxW (nullptr, policyWarning.c_str(), L"MatrixRain", MB_OK | MB_ICONERROR);
+                goto Error;
+            }
+        }
+
+        if (!ScreenSaverInstaller::IsElevated())
+        {
+            hr = ScreenSaverInstaller::RequestElevation (pszSwitch);
+            goto Error;
+        }
+
+        if (context.m_mode == ScreenSaverMode::Install)
+        {
+            hr = ScreenSaverInstaller::Install();
+        }
+        else
+        {
+            WindowsRegistryProvider registry;
+            hr = ScreenSaverInstaller::Uninstall (registry);
+
+            if (hr == S_OK)
+            {
+                MessageBoxW (nullptr, L"MatrixRain screensaver has been uninstalled.", L"MatrixRain", MB_OK | MB_ICONINFORMATION);
+            }
+            else if (hr == S_FALSE)
+            {
+                MessageBoxW (nullptr, L"MatrixRain screensaver is not installed.", L"MatrixRain", MB_OK | MB_ICONINFORMATION);
+            }
+        }
+
+        goto Error;
+    }
 
     // Handle help request — runs through Application in HelpRequested mode
     // (no longer uses UsageDialog — overlay renders via GPU pipeline)
@@ -97,7 +156,7 @@ int APIENTRY wWinMain(_In_     HINSTANCE hInstance,
 
         s_fDialogOpen = true;
 
-        UsageText usage (L'/');
+        UsageText usage (L"/");
         MessageBoxW (app.GetMainWindowHwnd(), usage.GetPlainText().c_str(), L"MatrixRain — Help", MB_OK | MB_ICONINFORMATION);
 
         s_fDialogOpen = false;

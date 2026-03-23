@@ -11,5 +11,7 @@ enum class ScreenSaverMode
     ScreenSaverPreview,
     SettingsDialog,
     PasswordChangeUnsupported,
-    HelpRequested
+    HelpRequested,
+    Install,
+    Uninstall
 };

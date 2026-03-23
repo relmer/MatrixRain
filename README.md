@@ -25,36 +25,41 @@ I built this Win32/DirectX C++ Matrix-rain screensaver/demo as a test project to
 
 ## Overview
 
-MatrixRain is a small C++ project that implements the classic "Matrix" falling-character animation using a lightweight animation + rendering architecture. It works as both a standalone desktop application and a fully-featured Windows screensaver with configurable settings. The screenshot above is included as `MatrixRain/MatrixRain.png` — the repository includes an image at that path which is used by this README.
+MatrixRain is a small C++ project that implements the classic "Matrix" falling-character animation using a lightweight animation + rendering architecture. It works as both a standalone desktop application and a fully-featured Windows screensaver with configurable settings. The video above is included as `assets/MatrixRainColors.mp4`.
 
 ## Screensaver Installation
 
-After building the project, you'll find both `MatrixRain.exe` (standalone app) and `MatrixRain.scr` (screensaver) in the output directory (`x64\Debug` or `x64\Release`).
+After building the project, you'll find `MatrixRain.exe` in the output directory (`x64\Debug` or `x64\Release`).
 
-### Option 1: Install via File Explorer
+To install as a screensaver:
 
-1. Locate `MatrixRain.scr` in `x64\Debug` or `x64\Release`
-2. Right-click `MatrixRain.scr` and select **Install**
-3. Windows will open the Screen Saver Settings dialog with MatrixRain selected
-4. Click **Settings** to configure options (density, color scheme, animation speed, glow effects)
-5. Click **Preview** to test, then **OK** to save
+```text
+MatrixRain.exe /install
+```
 
-### Option 2: Manual Installation
+This copies the executable to `C:\Windows\System32\MatrixRain.scr`, sets it as the active screensaver, and opens the Screen Saver Settings dialog. A UAC elevation prompt will appear since writing to System32 requires admin privileges.
 
-1. Copy `MatrixRain.scr` to `C:\Windows\System32\` (requires admin privileges)
-2. Open **Control Panel** → **Appearance and Personalization** → **Change screen saver**
-3. Select **MatrixRain** from the dropdown
-4. Configure and save as above
+To uninstall:
+
+```text
+MatrixRain.exe /uninstall
+```
+
+This removes the `.scr` file from System32 and cleans up the screensaver registry entries. A confirmation message is displayed on completion.
+
+> **Note:** Certain Group Policy settings can block screensaver use.  If a device lock or screensaver-blocking policy is detected, the install is aborted with an error message showing the specific policy. You can override the policy check with `/install /force`, but the policy may still block the screensaver from running.
 
 ## Screensaver Usage
 
 MatrixRain supports the following command-line arguments:
 
 | Argument | Description |
-| -------- | ----------- |
+| -------------- | ----------- |
 | *(none)* | Run as desktop application with hotkeys enabled |
 | `/?` | Display usage (command-line switches) |
-| `/c` | Show settings dialog |
+| `/install` | Install MatrixRain as system screensaver |
+| `/uninstall` | Uninstall MatrixRain screensaver |
+| `/force` | Skip policy checks (use with `/install`) |
 
 The following switches are part of the Windows screensaver protocol and are invoked automatically by the operating system. They are not intended for manual use:
 
@@ -62,7 +67,7 @@ The following switches are part of the Windows screensaver protocol and are invo
 | ------------ | ----------- |
 | `/s` | Screensaver mode (fullscreen, exit on input) |
 | `/p <HWND>` | Preview mode in Control Panel window |
-| `/c:<HWND>` | Settings dialog parented to Control Panel |
+| `/c[:<HWND>]` | Settings dialog parented to HWND, if present  |
 | `/a` | Password change (not supported, handled gracefully) |
 
 ### Settings Dialog Features
@@ -140,7 +145,7 @@ SpecKit docs: <https://github.com/github/spec-kit>
 ## Build (VS Code)
 
 - Open the workspace file `MatrixRain.code-workspace` in VS Code.
-- From the menu: `Terminal` -> `Run Task...` and choose `Build MatrixRain (Debug)` or `Build MatrixRain (Release)`.
+- From the menu: `Terminal` -> `Run Task...` and choose `Build Debug (current arch)` or `Build Release (current arch)`.
 - Or open the Command Palette (Ctrl+Shift+P) and run `Tasks: Run Task`, then pick the desired build task.
 
 ## Run
@@ -176,7 +181,7 @@ vstest.console.exe .\x64\Debug\MatrixRainTests.dll
 
 ## Contributing
 
-- Fork, create a feature branch, and open a pull request against `001-matrix-rain` (or `main` as appropriate).
+- Fork, create a feature branch, and open a pull request against `master`.
 - Run unit and integration tests locally before submitting.
 - If you're adding features that affect rendering, include a short spec in `specs/` describing behavior and configuration knobs.
 

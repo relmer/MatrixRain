@@ -68,7 +68,7 @@ MatrixRainCore/                    # Static library — all new feature code her
 ├── UsageText.h/cpp                # NEW: Command-line switch text content + formatting
 ├── CommandLineHelp.h/cpp          # NEW: /? orchestration (legacy — /? now routes through Application)
 ├── UnicodeSymbols.h               # NEW: Named constants for Unicode characters (em dash, etc.)
-├── ScreenSaverModeParser.h/cpp    # MODIFIED: Add /? parsing, prefix detection
+├── CommandLine.h/cpp    # MODIFIED: Add /? parsing, prefix detection
 ├── Application.h/cpp              # MODIFIED: Enter/? keys, overlay show/dismiss, HelpRequested mode
 ├── InputSystem.h/cpp              # MODIFIED: Unrecognized key → help hint trigger
 ├── RenderSystem.h/cpp             # MODIFIED: Render overlay to scene texture, SDF halo shader, RenderParams struct

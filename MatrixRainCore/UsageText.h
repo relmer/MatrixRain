@@ -6,7 +6,8 @@
 
 struct SwitchEntry
 {
-    wchar_t      switchChar;
+    wchar_t      switchChar;    // Single-char switch (e.g., L'c'), or L'\0' for multi-char
+    std::wstring switchName;    // Multi-char switch name (e.g., "install"), empty for single-char
     std::wstring argument;
     std::wstring description;
 };
@@ -27,13 +28,13 @@ struct HotkeyEntry
 class UsageText
 {
 public:
-    explicit UsageText (wchar_t switchPrefix);
+    explicit UsageText (std::wstring_view switchPrefix);
 
 
     // Queries
     const std::wstring                & GetFormattedText ()   const { return m_formattedText;   }
     const std::vector<std::wstring>   & GetFormattedLines ()  const { return m_formattedLines;  }
-    wchar_t                             GetSwitchPrefix ()    const { return m_switchPrefix;    }
+    const std::wstring                & GetSwitchPrefix ()    const { return m_switchPrefix;    }
     std::wstring                        GetPlainText ()       const;
 
 
@@ -45,7 +46,7 @@ private:
     void BuildFormattedLines ();
 
 
-    wchar_t                    m_switchPrefix = L'/';
+    std::wstring               m_switchPrefix = L"/";
     std::vector<SwitchEntry>   m_switches;
     std::vector<std::wstring>  m_formattedLines;
     std::wstring               m_formattedText;

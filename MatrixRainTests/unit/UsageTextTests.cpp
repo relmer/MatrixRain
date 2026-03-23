@@ -25,7 +25,7 @@ namespace MatrixRainTests
 
             TEST_METHOD (GetFormattedLines_SlashPrefix_ContainsSlashSwitches)
             {
-                UsageText usage (L'/');
+                UsageText usage (L"/");
 
 
                 auto lines = usage.GetFormattedLines();
@@ -35,16 +35,16 @@ namespace MatrixRainTests
                 Assert::IsFalse (lines.empty(), L"Should have formatted lines");
 
                 // Verify switches use / prefix
-                bool foundSlashC = false;
-                bool foundSlashQ = false;
+                bool foundSlashInstall = false;
+                bool foundSlashQ       = false;
 
                 for (const auto & line : lines)
                 {
-                    if (line.find (L"/c") != std::wstring::npos) foundSlashC = true;
-                    if (line.find (L"/?") != std::wstring::npos) foundSlashQ = true;
+                    if (line.find (L"/install") != std::wstring::npos) foundSlashInstall = true;
+                    if (line.find (L"/?") != std::wstring::npos)       foundSlashQ       = true;
                 }
 
-                Assert::IsTrue (foundSlashC, L"Should contain /c switch");
+                Assert::IsTrue (foundSlashInstall, L"Should contain /install switch");
                 Assert::IsTrue (foundSlashQ, L"Should contain /? switch");
             }
 
@@ -53,11 +53,11 @@ namespace MatrixRainTests
 
             TEST_METHOD (GetSwitchPrefix_SlashPrefix_ReturnsSlash)
             {
-                UsageText usage (L'/');
+                UsageText usage (L"/");
 
 
 
-                Assert::AreEqual (L'/', usage.GetSwitchPrefix(), L"Prefix should be /");
+                Assert::AreEqual (std::wstring (L"/"), usage.GetSwitchPrefix(), L"Prefix should be /");
             }
 
 
@@ -69,7 +69,7 @@ namespace MatrixRainTests
 
             TEST_METHOD (GetFormattedLines_DashPrefix_ContainsDashSwitches)
             {
-                UsageText usage (L'-');
+                UsageText usage (L"-");
 
 
                 auto lines = usage.GetFormattedLines();
@@ -78,16 +78,16 @@ namespace MatrixRainTests
 
                 Assert::IsFalse (lines.empty(), L"Should have formatted lines");
 
-                bool foundDashC = false;
-                bool foundDashQ = false;
+                bool foundDashInstall = false;
+                bool foundDashQ      = false;
 
                 for (const auto & line : lines)
                 {
-                    if (line.find (L"-c") != std::wstring::npos) foundDashC = true;
-                    if (line.find (L"-?") != std::wstring::npos) foundDashQ = true;
+                    if (line.find (L"-install") != std::wstring::npos) foundDashInstall = true;
+                    if (line.find (L"-?") != std::wstring::npos)       foundDashQ       = true;
                 }
 
-                Assert::IsTrue (foundDashC, L"Should contain -c switch");
+                Assert::IsTrue (foundDashInstall, L"Should contain -install switch");
                 Assert::IsTrue (foundDashQ, L"Should contain -? switch");
             }
 
@@ -96,11 +96,11 @@ namespace MatrixRainTests
 
             TEST_METHOD (GetSwitchPrefix_DashPrefix_ReturnsDash)
             {
-                UsageText usage (L'-');
+                UsageText usage (L"-");
 
 
 
-                Assert::AreEqual (L'-', usage.GetSwitchPrefix(), L"Prefix should be -");
+                Assert::AreEqual (std::wstring (L"-"), usage.GetSwitchPrefix(), L"Prefix should be -");
             }
 
 
@@ -112,7 +112,7 @@ namespace MatrixRainTests
 
             TEST_METHOD (GetPlainText_ReturnsCRLFJoinedLines)
             {
-                UsageText usage (L'/');
+                UsageText usage (L"/");
 
 
                 std::wstring plainText = usage.GetPlainText();
@@ -139,7 +139,7 @@ namespace MatrixRainTests
 
             TEST_METHOD (GetOverlayEntries_ReturnsNonEmptyVector)
             {
-                UsageText usage (L'/');
+                UsageText usage (L"/");
 
 
                 auto entries = usage.GetOverlayEntries();
@@ -154,7 +154,7 @@ namespace MatrixRainTests
 
             TEST_METHOD (GetOverlayEntries_ContainsVersionLine)
             {
-                UsageText usage (L'/');
+                UsageText usage (L"/");
 
 
                 auto entries = usage.GetOverlayEntries();
@@ -172,7 +172,7 @@ namespace MatrixRainTests
 
             TEST_METHOD (GetOverlayEntries_SwitchesAreTwoColumn)
             {
-                UsageText usage (L'/');
+                UsageText usage (L"/");
 
 
                 auto entries = usage.GetOverlayEntries();
@@ -191,7 +191,7 @@ namespace MatrixRainTests
 
             TEST_METHOD (GetOverlayEntries_UsesSwitchPrefix)
             {
-                UsageText usage (L'-');
+                UsageText usage (L"-");
 
 
                 auto entries = usage.GetOverlayEntries();
@@ -221,7 +221,7 @@ namespace MatrixRainTests
 
             TEST_METHOD (GetFormattedText_ContainsOptionsSectionHeader)
             {
-                UsageText usage (L'/');
+                UsageText usage (L"/");
 
 
                 const std::wstring & text = usage.GetFormattedText();
@@ -237,7 +237,7 @@ namespace MatrixRainTests
 
             TEST_METHOD (GetFormattedText_DoesNotContainScreensaverOptions)
             {
-                UsageText usage (L'/');
+                UsageText usage (L"/");
 
 
                 const std::wstring & text = usage.GetFormattedText();
@@ -259,7 +259,7 @@ namespace MatrixRainTests
 
             TEST_METHOD (GetFormattedText_ContainsVersionString)
             {
-                UsageText usage (L'/');
+                UsageText usage (L"/");
 
 
                 const std::wstring & text = usage.GetFormattedText();
@@ -275,7 +275,7 @@ namespace MatrixRainTests
 
             TEST_METHOD (GetFormattedText_ContainsCopyrightLine)
             {
-                UsageText usage (L'/');
+                UsageText usage (L"/");
 
 
                 const std::wstring & text = usage.GetFormattedText();
@@ -293,7 +293,7 @@ namespace MatrixRainTests
 
             TEST_METHOD (GetFormattedText_ContainsArchitecture)
             {
-                UsageText usage (L'/');
+                UsageText usage (L"/");
 
 
                 const std::wstring & text = usage.GetFormattedText();
@@ -312,7 +312,7 @@ namespace MatrixRainTests
 
             TEST_METHOD (GetFormattedText_UsesEmDashSeparator)
             {
-                UsageText usage (L'/');
+                UsageText usage (L"/");
 
 
                 const std::wstring & text = usage.GetFormattedText();
@@ -328,7 +328,7 @@ namespace MatrixRainTests
 
             TEST_METHOD (GetFormattedText_DoesNotContainHotkeys)
             {
-                UsageText usage (L'/');
+                UsageText usage (L"/");
 
 
                 const std::wstring & text = usage.GetFormattedText();
@@ -348,7 +348,7 @@ namespace MatrixRainTests
 
             TEST_METHOD (GetFormattedText_MatchesFormattedLinesContent)
             {
-                UsageText usage (L'/');
+                UsageText usage (L"/");
 
 
                 const std::wstring &              text  = usage.GetFormattedText();
@@ -368,6 +368,48 @@ namespace MatrixRainTests
 
 
                 Assert::AreEqual (rebuilt, text, L"GetFormattedText() should match LF-joined GetFormattedLines()");
+            }
+
+
+
+
+            ////////////////////////////////////////////////////////////
+            //  T030: Help text contains /install switch
+            ////////////////////////////////////////////////////////////
+
+            TEST_METHOD (GetFormattedText_ContainsInstallSwitch)
+            {
+                UsageText usage (L"/");
+
+
+                const std::wstring & text = usage.GetFormattedText();
+
+
+
+                Assert::IsTrue (text.find (L"/install") != std::wstring::npos ||
+                                text.find (L"install") != std::wstring::npos,
+                                L"Help text should contain install switch");
+            }
+
+
+
+
+            ////////////////////////////////////////////////////////////
+            //  T031: Help text contains /uninstall switch
+            ////////////////////////////////////////////////////////////
+
+            TEST_METHOD (GetFormattedText_ContainsUninstallSwitch)
+            {
+                UsageText usage (L"/");
+
+
+                const std::wstring & text = usage.GetFormattedText();
+
+
+
+                Assert::IsTrue (text.find (L"/uninstall") != std::wstring::npos ||
+                                text.find (L"uninstall") != std::wstring::npos,
+                                L"Help text should contain uninstall switch");
             }
     };
 

@@ -39,6 +39,15 @@ IDI_MATRIXRAIN          ICON                    "MatrixRain.ico"
 
 
 
+// Screensaver display name — ID 1 is read by the Screen Saver Settings CPL
+// to populate the screensaver picker dropdown.
+STRINGTABLE
+BEGIN
+    1, "MatrixRain"
+END
+
+
+
 VS_VERSION_INFO VERSIONINFO
  FILEVERSION VER_FILEVERSION
  PRODUCTVERSION VER_PRODUCTVERSION

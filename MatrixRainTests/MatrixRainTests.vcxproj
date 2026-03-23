@@ -298,7 +298,8 @@
     <ClCompile Include="unit\MathTests.cpp" />
     <ClCompile Include="unit\DepthSortingTests.cpp" />
     <ClCompile Include="unit\SwapChainTests.cpp" />
-    <ClCompile Include="unit\ScreenSaverModeParserTests.cpp" />
+    <ClCompile Include="unit\CommandLineTests.cpp" />
+    <ClCompile Include="unit\ScreenSaverInstallerTests.cpp" />
     <ClCompile Include="unit\ScreenSaverErrorHandlingTests.cpp" />
     <ClCompile Include="unit\ApplicationStateTests.cpp" />
     <ClCompile Include="unit\ColorSchemeTests.cpp" />

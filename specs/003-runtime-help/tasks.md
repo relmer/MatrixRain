@@ -52,7 +52,7 @@ The following tasks were completed under the original console-based approach but
 - [X] T003 [P] [US3] Test UsageText construction with `-` prefix
 - [X] T004 [P] [US3] Test UsageText::GetPlainText() returns all lines joined with CRLF, no ANSI codes
 - [X] T005 [P] [US3] Test UsageText::DetectSwitchPrefix()
-- [X] T010 [P] [US3] Test ScreenSaverModeParser handles `/?` and `-?` arguments
+- [X] T010 [P] [US3] Test CommandLine handles `/?` and `-?` arguments
 
 ### Superseded Tests for User Story 3
 
@@ -65,7 +65,7 @@ The following tasks were completed under the original console-based approach but
 
 - [X] T011 [US3] Implement UsageText constructor and queries
 - [X] T012 [US3] Implement UsageText::DetectSwitchPrefix()
-- [X] T020 [US3] Add `/?`/`-?` parsing to ScreenSaverModeParser
+- [X] T020 [US3] Add `/?`/`-?` parsing to CommandLine
 - [X] T021 [US3] Wire CLI help early exit in main.cpp
 
 ### Superseded Implementation for User Story 3
@@ -304,7 +304,7 @@ The following tasks were completed under the original console-based approach but
 
 ### Phase Dependencies
 
-- **User Story 3 (Phase 2)**: No external dependencies — **MVP, start here**. Retained tasks (UsageText, ScreenSaverModeParser, main.cpp wiring) already complete. New work: UsageText section grouping (T086–T088), UsageDialog (T067–T077, T083–T085, T089)
+- **User Story 3 (Phase 2)**: No external dependencies — **MVP, start here**. Retained tasks (UsageText, CommandLine, main.cpp wiring) already complete. New work: UsageText section grouping (T086–T088), UsageDialog (T067–T077, T083–T085, T089)
 - **User Story 1 (Phase 3)**: Independent of US3 — already complete
 - **User Story 2 (Phase 4)**: Depends on User Story 1 (needs HelpHintOverlay with Show/Dismiss) — already complete
 - **User Story 4 (Phase 5)**: Depends on User Story 2 (needs Dismiss() wired for recognized hotkeys) — already complete
