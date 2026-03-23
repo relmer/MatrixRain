@@ -186,6 +186,22 @@ HRESULT ScreenSaverInstaller::Install()
         // FR-008: CopyFileW with bFailIfExists=FALSE to overwrite existing
         fSuccess = CopyFileW (szSourcePath, szTargetPath, FALSE);
         CWRA (fSuccess);
+
+        // Clear the 8.3 short name alias that CopyFileW creates (e.g., MATRIX~1.SCR).
+        // The CPL enumerates both long and short names as separate screensavers.
+        // Rename to a temp name and back — this drops the 8.3 alias on NTFS.
+        {
+            WCHAR szTempPath[MAX_PATH];
+
+            StringCchCopyW (szTempPath, _countof (szTempPath), szTargetPath);
+            PathCchRemoveFileSpec (szTempPath, _countof (szTempPath));
+            PathCchAppend (szTempPath, _countof (szTempPath), L"_MatrixRain.scr");
+
+            if (MoveFileW (szTargetPath, szTempPath))
+            {
+                MoveFileW (szTempPath, szTargetPath);
+            }
+        }
     }
 
     // FR-004: Invoke desk.cpl InstallScreenSaver to set as active + open Settings
