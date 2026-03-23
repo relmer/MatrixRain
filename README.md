@@ -1,8 +1,25 @@
 # MatrixRain
 
+[![CI](https://github.com/relmer/MatrixRain/actions/workflows/ci.yml/badge.svg)](https://github.com/relmer/MatrixRain/actions/workflows/ci.yml)
+[![Latest Release](https://img.shields.io/github/v/release/relmer/MatrixRain)](https://github.com/relmer/MatrixRain/releases/latest)
+[![License: MIT](https://img.shields.io/github/license/relmer/MatrixRain)](LICENSE)
+<!--
+[![Downloads](https://img.shields.io/github/downloads/relmer/MatrixRain/total)](https://github.com/relmer/MatrixRain/releases)
+-->
+
 <!-- markdownlint-disable MD033 -->
 <video src="https://github.com/user-attachments/assets/bb39535d-49a2-4c40-8d8e-56a37b4a8f1c" autoplay loop muted playsinline></video>
 <!-- markdownlint-enable MD033 -->
+
+## Install
+
+MatrixRain is available through winget:
+
+```powershell
+winget install relmer.MatrixRain
+```
+
+## About MatrixRain
 
 I built this Win32/DirectX C++ Matrix-rain screensaver/demo as a test project to try out [SpecKit](https://github.com/github/spec-kit), which worked really well. The app supports configurable density, color schemes, and has some snazzy glow effects for that classic CRT vibe.
 
@@ -26,6 +43,7 @@ I built this Win32/DirectX C++ Matrix-rain screensaver/demo as a test project to
 ## Overview
 
 MatrixRain is a small C++ project that implements the classic "Matrix" falling-character animation using a lightweight animation + rendering architecture. It works as both a standalone desktop application and a fully-featured Windows screensaver with configurable settings. The video above is included as `assets/MatrixRainColors.mp4`.
+
 
 ## Screensaver Installation
 
@@ -67,7 +85,7 @@ The following switches are part of the Windows screensaver protocol and are invo
 | ------------ | ----------- |
 | `/s` | Screensaver mode (fullscreen, exit on input) |
 | `/p <HWND>` | Preview mode in Control Panel window |
-| `/c[:<HWND>]` | Settings dialog parented to HWND, if present  |
+| `/c[:<HWND>]` | Settings dialog parented to HWND, if present |
 | `/a` | Password change (not supported, handled gracefully) |
 
 ### Settings Dialog Features
