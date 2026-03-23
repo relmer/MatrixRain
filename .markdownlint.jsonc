@@ -1,0 +1,7 @@
+{
+    // Allow duplicate headings in different sections (standard for changelogs)
+    "MD024": { "siblings_only": true, "allow_different_nesting": true },
+
+    // Disable line length limit — too restrictive for changelogs and tables
+    "MD013": false
+}
