@@ -296,8 +296,10 @@
     <ClInclude Include="RegistrySettingsProvider.h" />
     <ClInclude Include="RenderSystem.h" />
     <ClInclude Include="CommandLine.h" />
+    <ClInclude Include="FileSystemProvider.h" />
     <ClInclude Include="RegistryProvider.h" />
     <ClInclude Include="ScreenSaverInstaller.h" />
+    <ClInclude Include="WindowsFileSystemProvider.h" />
     <ClInclude Include="WindowsRegistryProvider.h" />
     <ClInclude Include="Timer.h" />
     <ClInclude Include="UsageText.h" />

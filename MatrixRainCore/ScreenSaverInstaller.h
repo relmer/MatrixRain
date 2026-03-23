@@ -1,5 +1,6 @@
 #pragma once
 
+#include "FileSystemProvider.h"
 #include "RegistryProvider.h"
 
 
@@ -19,12 +20,17 @@
 class ScreenSaverInstaller
 {
 public:
+    using IsElevatedFn = bool (*)();
+
     static HRESULT Install                     ();
-    static HRESULT Uninstall                   (IRegistryProvider & registry);
+    static HRESULT Uninstall                   (IRegistryProvider & registry, IFileSystemProvider & fileSystem);
     static bool    IsElevated                  ();
     static HRESULT RequestElevation            (LPCWSTR pszSwitch);
-    static HRESULT CleanupRegistryForUninstall (IRegistryProvider & registry);
+    static HRESULT CleanupRegistryForUninstall (IRegistryProvider & registry, IFileSystemProvider & fileSystem);
     static HRESULT CheckScreenSaverPolicies    (bool & fBlocked, std::wstring & errorMessage);
+
+    // Test seam: override to control elevation check in unit tests
+    static inline IsElevatedFn s_pfnIsElevated = &IsElevated;
 
 private:
     static constexpr LPCWSTR kpszScrFilename = L"MatrixRain.scr";

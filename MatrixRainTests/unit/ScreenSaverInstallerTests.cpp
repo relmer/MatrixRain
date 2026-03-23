@@ -72,11 +72,87 @@ public:
 
 
 
+////////////////////////////////////////////////////////////////////////////////
+//
+//  MockFileSystemProvider
+//
+//  In-memory mock for IFileSystemProvider — tests NEVER touch the real FS.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+class MockFileSystemProvider : public IFileSystemProvider
+{
+public:
+
+    std::wstring  m_systemDirectory    = L"C:\\Windows\\System32";
+    DWORD         m_fileAttributes     = INVALID_FILE_ATTRIBUTES;
+    DWORD         m_lastError          = ERROR_FILE_NOT_FOUND;
+    bool          m_deleteFileSuccess  = true;
+    std::wstring  m_longPathResult;
+
+
+    DWORD GetSystemDirectory (LPWSTR lpBuffer, UINT uSize) override
+    {
+        if (m_systemDirectory.size() >= uSize)
+            return 0;
+
+        wcscpy_s (lpBuffer, uSize, m_systemDirectory.c_str());
+        return static_cast<DWORD> (m_systemDirectory.size());
+    }
+
+
+    DWORD GetFileAttributes (LPCWSTR /*lpFileName*/) override
+    {
+        return m_fileAttributes;
+    }
+
+
+    DWORD GetLastError () override
+    {
+        return m_lastError;
+    }
+
+
+    BOOL DeleteFile (LPCWSTR /*lpFileName*/) override
+    {
+        return m_deleteFileSuccess ? TRUE : FALSE;
+    }
+
+
+    DWORD GetLongPathName (LPCWSTR lpszShortPath,
+                           LPWSTR  lpszLongPath,
+                           DWORD   cchBuffer) override
+    {
+        // If no override set, return the input unchanged
+        const std::wstring & result = m_longPathResult.empty()
+            ? std::wstring (lpszShortPath)
+            : m_longPathResult;
+
+        if (result.size() >= cchBuffer)
+            return 0;
+
+        wcscpy_s (lpszLongPath, cchBuffer, result.c_str());
+        return static_cast<DWORD> (result.size());
+    }
+};
+
+
+
+
+
 namespace MatrixRainTests
 {
     TEST_CLASS (ScreenSaverInstallerTests)
     {
     public:
+
+        TEST_METHOD_CLEANUP (ResetElevationMock)
+        {
+            ScreenSaverInstaller::s_pfnIsElevated = &ScreenSaverInstaller::IsElevated;
+        }
+
+
+
 
         ////////////////////////////////////////////////////////////
         //  T017: IsElevated returns a boolean without crashing
@@ -84,12 +160,12 @@ namespace MatrixRainTests
 
         TEST_METHOD (IsElevated_ReturnsBoolean)
         {
+            // Verify IsElevated() runs without crashing; the result depends on
+            // the test runner's security context and cannot be asserted.
             bool elevated = ScreenSaverInstaller::IsElevated();
 
 
-            // Test runner is not elevated, so we expect false.
-            // The key assertion is that it doesn't crash.
-            Assert::IsFalse (elevated, L"Test runner should not be elevated");
+            UNREFERENCED_PARAMETER (elevated);
         }
 
 
@@ -101,7 +177,11 @@ namespace MatrixRainTests
 
         TEST_METHOD (Install_NotElevated_ReturnsAccessDenied)
         {
+            ScreenSaverInstaller::s_pfnIsElevated = []() { return false; };
+
+
             HRESULT hr = ScreenSaverInstaller::Install();
+
 
 
             Assert::AreEqual (E_ACCESSDENIED, hr, L"Install should return E_ACCESSDENIED when not elevated");
@@ -116,10 +196,13 @@ namespace MatrixRainTests
 
         TEST_METHOD (Uninstall_NotElevated_ReturnsAccessDenied)
         {
-            MockRegistryProvider mockRegistry;
+            ScreenSaverInstaller::s_pfnIsElevated = []() { return false; };
+
+            MockRegistryProvider     mockRegistry;
+            MockFileSystemProvider   mockFS;
 
 
-            HRESULT hr = ScreenSaverInstaller::Uninstall (mockRegistry);
+            HRESULT hr = ScreenSaverInstaller::Uninstall (mockRegistry, mockFS);
 
 
 
@@ -135,17 +218,20 @@ namespace MatrixRainTests
 
         TEST_METHOD (Uninstall_ScrFileNotPresent_ReturnsSOK)
         {
-            // This test can only fully run when elevated (file deletion).
-            // When not elevated, we verify the elevation check returns E_ACCESSDENIED.
-            MockRegistryProvider mockRegistry;
+            ScreenSaverInstaller::s_pfnIsElevated = []() { return true; };
+
+            MockRegistryProvider     mockRegistry;
+            MockFileSystemProvider   mockFS;
+
+            mockFS.m_fileAttributes = INVALID_FILE_ATTRIBUTES;
+            mockFS.m_lastError      = ERROR_FILE_NOT_FOUND;
 
 
-            HRESULT hr = ScreenSaverInstaller::Uninstall (mockRegistry);
+            HRESULT hr = ScreenSaverInstaller::Uninstall (mockRegistry, mockFS);
 
 
 
-            // Non-elevated: E_ACCESSDENIED is expected
-            Assert::AreEqual (E_ACCESSDENIED, hr, L"Non-elevated uninstall should return E_ACCESSDENIED");
+            Assert::AreEqual (S_FALSE, hr, L"Uninstall should return S_FALSE when .scr file not present");
         }
 
 
@@ -157,19 +243,18 @@ namespace MatrixRainTests
 
         TEST_METHOD (Uninstall_MatrixRainActive_ClearsRegistryEntries)
         {
-            MockRegistryProvider mockRegistry;
-            WCHAR                szSystem32[MAX_PATH];
-            std::wstring         expectedScrPath;
+            MockRegistryProvider     mockRegistry;
+            MockFileSystemProvider   mockFS;
+            std::wstring             expectedScrPath;
 
 
-            GetSystemDirectoryW (szSystem32, _countof (szSystem32));
-            expectedScrPath = std::wstring (szSystem32) + L"\\MatrixRain.scr";
+            expectedScrPath = mockFS.m_systemDirectory + L"\\MatrixRain.scr";
 
             // Simulate MatrixRain being the active screensaver
             mockRegistry.m_values[L"SCRNSAVE.EXE"]     = expectedScrPath;
             mockRegistry.m_values[L"ScreenSaveActive"]  = L"1";
 
-            ScreenSaverInstaller::CleanupRegistryForUninstall (mockRegistry);
+            ScreenSaverInstaller::CleanupRegistryForUninstall (mockRegistry, mockFS);
 
 
 
@@ -191,14 +276,15 @@ namespace MatrixRainTests
 
         TEST_METHOD (Uninstall_DifferentScreensaverActive_LeavesRegistryUntouched)
         {
-            MockRegistryProvider mockRegistry;
+            MockRegistryProvider     mockRegistry;
+            MockFileSystemProvider   mockFS;
 
 
             // Simulate a different screensaver being active
             mockRegistry.m_values[L"SCRNSAVE.EXE"]     = L"C:\\Windows\\System32\\OtherSaver.scr";
             mockRegistry.m_values[L"ScreenSaveActive"]  = L"1";
 
-            ScreenSaverInstaller::CleanupRegistryForUninstall (mockRegistry);
+            ScreenSaverInstaller::CleanupRegistryForUninstall (mockRegistry, mockFS);
 
 
 
@@ -220,11 +306,12 @@ namespace MatrixRainTests
 
         TEST_METHOD (Uninstall_RegistryKeyMissing_DoesNotCrash)
         {
-            MockRegistryProvider mockRegistry;
+            MockRegistryProvider     mockRegistry;
+            MockFileSystemProvider   mockFS;
 
 
             // Empty registry — no SCRNSAVE.EXE key at all
-            ScreenSaverInstaller::CleanupRegistryForUninstall (mockRegistry);
+            ScreenSaverInstaller::CleanupRegistryForUninstall (mockRegistry, mockFS);
 
 
 

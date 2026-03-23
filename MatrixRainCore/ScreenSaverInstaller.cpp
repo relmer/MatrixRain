@@ -256,7 +256,7 @@ HRESULT ScreenSaverInstaller::Install()
 
 
     // FR-006: Verify elevation
-    fElevated = IsElevated();
+    fElevated = s_pfnIsElevated();
     CBREx (fElevated, E_ACCESSDENIED);
 
     // Get the running executable's path (source)
@@ -314,7 +314,7 @@ Error:
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-HRESULT ScreenSaverInstaller::Uninstall (IRegistryProvider & registry)
+HRESULT ScreenSaverInstaller::Uninstall (IRegistryProvider & registry, IFileSystemProvider & fileSystem)
 {
     HRESULT hr                     = S_OK;
     WCHAR   szTargetPath[MAX_PATH];
@@ -326,11 +326,11 @@ HRESULT ScreenSaverInstaller::Uninstall (IRegistryProvider & registry)
 
 
     // FR-006: Verify elevation
-    fElevated = IsElevated();
+    fElevated = s_pfnIsElevated();
     CBREx (fElevated, E_ACCESSDENIED);
 
     // Build target path: %SystemRoot%\System32\MatrixRain.scr
-    cchPath = GetSystemDirectoryW (szTargetPath, _countof (szTargetPath));
+    cchPath = fileSystem.GetSystemDirectory (szTargetPath, _countof (szTargetPath));
     CWRA (cchPath);
     CBRAEx (cchPath < _countof (szTargetPath), HRESULT_FROM_WIN32 (ERROR_INSUFFICIENT_BUFFER));
 
@@ -338,10 +338,10 @@ HRESULT ScreenSaverInstaller::Uninstall (IRegistryProvider & registry)
     CHRA (hr);
 
     // FR-009: Gracefully handle missing .scr file (but surface access-denied)
-    dwAttrs = GetFileAttributesW (szTargetPath);
+    dwAttrs = fileSystem.GetFileAttributes (szTargetPath);
     if (dwAttrs == INVALID_FILE_ATTRIBUTES)
     {
-        DWORD dwError = GetLastError();
+        DWORD dwError = fileSystem.GetLastError();
 
         BAIL_OUT_IF (dwError == ERROR_FILE_NOT_FOUND || dwError == ERROR_PATH_NOT_FOUND, S_FALSE);
         CHRA (HRESULT_FROM_WIN32 (dwError));
@@ -349,10 +349,10 @@ HRESULT ScreenSaverInstaller::Uninstall (IRegistryProvider & registry)
 
     // FR-013/014/015: Clean up registry if MatrixRain was the active screensaver
     // (do this before file deletion so registry is cleaned even if delete fails)
-    CleanupRegistryForUninstall (registry);
+    CleanupRegistryForUninstall (registry, fileSystem);
 
     // FR-005: Remove the .scr file
-    fSuccess = DeleteFileW (szTargetPath);
+    fSuccess = fileSystem.DeleteFile (szTargetPath);
     CWRA (fSuccess);
 
 Error:
@@ -463,7 +463,7 @@ Error:
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-HRESULT ScreenSaverInstaller::CleanupRegistryForUninstall (IRegistryProvider & registry)
+HRESULT ScreenSaverInstaller::CleanupRegistryForUninstall (IRegistryProvider & registry, IFileSystemProvider & fileSystem)
 {
     static constexpr LPCWSTR kpszDesktopKey   = L"Control Panel\\Desktop";
     static constexpr LPCWSTR kpszScrnsaveExe  = L"SCRNSAVE.EXE";
@@ -477,7 +477,7 @@ HRESULT ScreenSaverInstaller::CleanupRegistryForUninstall (IRegistryProvider & r
 
 
     // Build the expected path to compare against
-    cchPath = GetSystemDirectoryW (szExpectedPath, _countof (szExpectedPath));
+    cchPath = fileSystem.GetSystemDirectory (szExpectedPath, _countof (szExpectedPath));
     CWRA (cchPath);
     CBRAEx (cchPath < _countof (szExpectedPath), HRESULT_FROM_WIN32 (ERROR_INSUFFICIENT_BUFFER));
 
@@ -492,7 +492,7 @@ HRESULT ScreenSaverInstaller::CleanupRegistryForUninstall (IRegistryProvider & r
     // The CPL may store 8.3 short names in the registry
     {
         WCHAR szLongPath[MAX_PATH];
-        DWORD cchLong = GetLongPathNameW (currentScr.c_str(), szLongPath, _countof (szLongPath));
+        DWORD cchLong = fileSystem.GetLongPathName (currentScr.c_str(), szLongPath, _countof (szLongPath));
         if (cchLong > 0 && cchLong < _countof (szLongPath))
         {
             currentScr = szLongPath;

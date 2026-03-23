@@ -3,6 +3,7 @@
 #include "..\MatrixRainCore\Application.h"
 #include "..\MatrixRainCore\ScreenSaverInstaller.h"
 #include "..\MatrixRainCore\WindowsRegistryProvider.h"
+#include "..\MatrixRainCore\WindowsFileSystemProvider.h"
 #include "..\MatrixRainCore\CommandLine.h"
 #include "..\MatrixRainCore\UsageText.h"
 #include "ConfigDialog.h"
@@ -81,8 +82,10 @@ int APIENTRY wWinMain(_In_     HINSTANCE hInstance,
         }
         else
         {
-            WindowsRegistryProvider registry;
-            hr = ScreenSaverInstaller::Uninstall (registry);
+            WindowsRegistryProvider     registry;
+            WindowsFileSystemProvider   fileSystem;
+
+            hr = ScreenSaverInstaller::Uninstall (registry, fileSystem);
 
             if (hr == S_OK)
             {
