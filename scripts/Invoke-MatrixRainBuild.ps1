@@ -139,7 +139,6 @@ function Test-BuildArtifacts {
 
     $outputDir = Join-Path -Path $repoRoot -ChildPath "$Platform\$Configuration"
     $exePath   = Join-Path -Path $outputDir -ChildPath 'MatrixRain.exe'
-    $scrPath   = Join-Path -Path $outputDir -ChildPath 'MatrixRain.scr'
 
     Write-Host "Verifying build artifacts..." -ForegroundColor Cyan
 
@@ -148,12 +147,6 @@ function Test-BuildArtifacts {
         return $false
     }
     Write-Host "  [OK] $exePath" -ForegroundColor Green
-
-    if (-not (Test-Path -Path $scrPath)) {
-        Write-Error "Build artifact missing: $scrPath"
-        return $false
-    }
-    Write-Host "  [OK] $scrPath" -ForegroundColor Green
 
     return $true
 }

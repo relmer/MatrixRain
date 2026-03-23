@@ -31,6 +31,7 @@ private:
     };
 
     HRESULT TryParseMultiCharSwitch (LPCWSTR pszArg, ScreenSaverModeContext & context);
+    HRESULT ValidateRemainingArgs    (LPCWSTR & pszCommandLine, ScreenSaverModeContext & context);
 
     HRESULT HandleScreenSaver        (LPCWSTR & pszCommandLine, ScreenSaverModeContext & context);
     HRESULT HandleScreenSaverPreview (LPCWSTR & pszCommandLine, ScreenSaverModeContext & context);

@@ -82,7 +82,12 @@ A user runs `MatrixRain.exe /?` and sees the install/uninstall switches document
 - **FR-013**: Uninstall MUST clear the `SCRNSAVE.EXE` registry value (under `HKCU\Control Panel\Desktop`) if it currently points to the MatrixRain `.scr` file (do not clear it if the user has since switched to a different screensaver).
 - **FR-014**: Uninstall MUST set `ScreenSaveActive` to `"0"` when removing the active MatrixRain screensaver.
 - **FR-015**: Uninstall MUST NOT modify `SCRNSAVE.EXE` or `ScreenSaveActive` if a different screensaver is currently selected (only remove the `.scr` file from System32).
-- **FR-016**: The help text (`/?`) MUST document both `/install` and `/uninstall` switches.
+- **FR-016**: The help text (`/?`) MUST document `/install`, `/uninstall`, and `/force` switches.
+- **FR-017**: Install MUST check for Group Policy and MDM/Intune policies that would block screensaver activation before requesting elevation. If a blocking policy is detected, the install MUST display an error with the specific policy details and abort.
+- **FR-018**: The `/force` switch MUST skip the policy check during install, allowing installation on managed devices where the user accepts the limitation.
+- **FR-019**: The `/s` (screensaver) mode MUST always force fullscreen regardless of the `StartFullscreen` registry setting, and MUST NOT persist the fullscreen state back to the registry.
+- **FR-020**: The config dialog opened by the screensaver CPL (`/c` with parent HWND) MUST hide the fullscreen checkbox, since screensaver mode always forces fullscreen.
+- **FR-021**: The `.scr` file MUST include a STRINGTABLE resource with string ID 1 set to "MatrixRain" for the Screen Saver Settings CPL to display the correct name.
 
 ### Key Entities
 

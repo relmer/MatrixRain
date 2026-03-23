@@ -127,11 +127,116 @@ HRESULT CommandLine::TryParseMultiCharSwitch (LPCWSTR                  pszArg,
     {
         context.m_mode = ScreenSaverMode::Uninstall;
     }
+    else if (switchWord == L"force")
+    {
+        // --force is only valid as a modifier for --install
+        context.m_errorMessage = std::format (L"{}force is valid only with {}install",
+                                              context.m_switchPrefix,
+                                              context.m_switchPrefix);
+        CHR (E_INVALIDARG);
+    }
     else
     {
         context.m_errorMessage = std::format (L"Unrecognized command-line switch: {}{}",
                                               context.m_switchPrefix,
                                               switchWord);
+        CHR (E_INVALIDARG);
+    }
+
+Error:
+    return hr;
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  CommandLine::ValidateRemainingArgs
+//
+//  After parsing the primary switch, checks whether any trailing arguments
+//  remain.  Only /install (or --install) accepts a trailing modifier (/force).
+//  All other switches reject additional arguments.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+HRESULT CommandLine::ValidateRemainingArgs (LPCWSTR                & pszCommandLine,
+                                            ScreenSaverModeContext & context)
+{
+    HRESULT      hr       = S_OK;
+    LPCWSTR      pszStart = nullptr;
+    size_t       cchWord  = 0;
+    std::wstring word;
+
+
+
+    SkipWhitespace (pszCommandLine);
+    BAIL_OUT_IF (*pszCommandLine == L'\0', S_OK);
+
+    // Only --install / /install accepts additional arguments (/force)
+    if (context.m_mode != ScreenSaverMode::Install)
+    {
+        context.m_errorMessage = L"This option does not accept additional arguments";
+        CHR (E_INVALIDARG);
+    }
+
+    // Must start with a switch prefix (/ or --)
+    if (*pszCommandLine == L'/')
+    {
+        pszCommandLine++;
+    }
+    else if (*pszCommandLine == L'-' && *(pszCommandLine + 1) == L'-')
+    {
+        pszCommandLine += 2;
+    }
+    else
+    {
+        // Extract the full invalid token for the error message
+        LPCWSTR pszTokenStart = pszCommandLine;
+        while (*pszCommandLine != L'\0' && *pszCommandLine != L' ' && *pszCommandLine != L'\t')
+        {
+            pszCommandLine++;
+        }
+
+        std::wstring invalidToken (pszTokenStart, pszCommandLine - pszTokenStart);
+        context.m_errorMessage = std::format (L"Invalid argument: {}", invalidToken);
+        CHR (E_INVALIDARG);
+    }
+
+    // Extract the word
+    pszStart = pszCommandLine;
+
+    while (iswalpha (*pszCommandLine))
+    {
+        pszCommandLine++;
+    }
+
+    cchWord = pszCommandLine - pszStart;
+    word.assign (pszStart, cchWord);
+
+    for (auto & ch : word)
+    {
+        ch = towlower (ch);
+    }
+
+    if (word != L"force")
+    {
+        context.m_errorMessage = std::format (L"{}install only accepts {}force as an additional option",
+                                              context.m_switchPrefix,
+                                              context.m_switchPrefix);
+        CHR (E_INVALIDARG);
+    }
+
+    context.m_forceInstall = true;
+
+    // Nothing should follow force
+    SkipWhitespace (pszCommandLine);
+
+    if (*pszCommandLine != L'\0')
+    {
+        context.m_errorMessage = std::format (L"Unexpected arguments after {}force",
+                                              context.m_switchPrefix);
         CHR (E_INVALIDARG);
     }
 
@@ -282,14 +387,15 @@ HRESULT CommandLine::Parse (LPCWSTR pszCommandLine, ScreenSaverModeContext & con
     BAIL_OUT_IF (!hasSwitch, S_OK);
 
     // Remember which prefix the user used
-    context.m_switchPrefix = *pszCommandLine;
+    context.m_switchPrefix = std::wstring (1, *pszCommandLine);
 
     // Skip the / or - prefix
     pszCommandLine++;
 
     // Check for -- prefix (long option style, only valid with -)
-    if (context.m_switchPrefix == L'-' && *pszCommandLine == L'-')
+    if (context.m_switchPrefix == L"-" && *pszCommandLine == L'-')
     {
+        context.m_switchPrefix = L"--";
         pszCommandLine++;
 
         hr = TryParseMultiCharSwitch (pszCommandLine, context);
@@ -302,16 +408,31 @@ HRESULT CommandLine::Parse (LPCWSTR pszCommandLine, ScreenSaverModeContext & con
             CHR (E_INVALIDARG);
         }
 
+        // Advance past the matched word
+        while (iswalpha (*pszCommandLine)) pszCommandLine++;
+
+        hr = ValidateRemainingArgs (pszCommandLine, context);
+        CHR (hr);
+
         BAIL_OUT_IF (true, hr);
     }
 
     // With / prefix, try multi-char switch matching (e.g., /install, /uninstall)
-    if (context.m_switchPrefix == L'/')
+    if (context.m_switchPrefix == L"/")
     {
         hr = TryParseMultiCharSwitch (pszCommandLine, context);
         CHR (hr);
 
-        BAIL_OUT_IF (hr == S_OK, hr);
+        if (hr == S_OK)
+        {
+            // Advance past the matched word
+            while (iswalpha (*pszCommandLine)) pszCommandLine++;
+
+            hr = ValidateRemainingArgs (pszCommandLine, context);
+            CHR (hr);
+
+            BAIL_OUT_IF (true, hr);
+        }
 
         // S_FALSE means single char — fall through to table lookup below
         hr = S_OK;
@@ -326,6 +447,24 @@ HRESULT CommandLine::Parse (LPCWSTR pszCommandLine, ScreenSaverModeContext & con
         {
             hr = (this->*entry.pfnHandler) (pszCommandLine, context);
             CHR (hr);
+
+            // Advance past the switch char if the handler didn't consume it
+            if (towlower (*pszCommandLine) == cmd)
+            {
+                pszCommandLine++;
+            }
+
+            // Skip past any remaining argument consumed by the handler
+            while (*pszCommandLine != L'\0' && *pszCommandLine != L' ' &&
+                   *pszCommandLine != L'\t' && *pszCommandLine != L'/' &&
+                   *pszCommandLine != L'-')
+            {
+                pszCommandLine++;
+            }
+
+            hr = ValidateRemainingArgs (pszCommandLine, context);
+            CHR (hr);
+
             BAIL_OUT_IF (true, hr);
         }
     }

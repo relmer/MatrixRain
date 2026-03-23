@@ -261,7 +261,7 @@ namespace MatrixRainTests
 
                 Assert::IsTrue (SUCCEEDED (hr), L"ParseCommandLine should succeed for /?");
                 Assert::AreEqual (static_cast<int>(ScreenSaverMode::HelpRequested), static_cast<int>(context.m_mode), L"mode should be HelpRequested");
-                Assert::AreEqual (L'/', context.m_switchPrefix, L"switch prefix should be /");
+                Assert::AreEqual (std::wstring (L"/"), context.m_switchPrefix, L"switch prefix should be /");
             }
 
 
@@ -279,7 +279,7 @@ namespace MatrixRainTests
 
                 Assert::IsTrue (SUCCEEDED (hr), L"ParseCommandLine should succeed for -?");
                 Assert::AreEqual (static_cast<int>(ScreenSaverMode::HelpRequested), static_cast<int>(context.m_mode), L"mode should be HelpRequested");
-                Assert::AreEqual (L'-', context.m_switchPrefix, L"switch prefix should be -");
+                Assert::AreEqual (std::wstring (L"-"), context.m_switchPrefix, L"switch prefix should be -");
             }
 
 
@@ -512,6 +512,196 @@ namespace MatrixRainTests
 
 
                 Assert::AreEqual (static_cast<int>(ScreenSaverMode::Normal), static_cast<int>(context.m_mode), L"-install should not be recognized");
+            }
+
+
+
+
+            ////////////////////////////////////////////////////////////
+            //  Force modifier and switch combination tests
+            ////////////////////////////////////////////////////////////
+
+            TEST_METHOD (ParseCommandLine_InstallForce_SetsForceFlag)
+            {
+                HRESULT                hr;
+                ScreenSaverModeContext context;
+
+
+                hr = CommandLine().Parse (L"/install /force", context);
+
+
+
+                Assert::IsTrue (SUCCEEDED (hr), L"/install /force should succeed");
+                Assert::AreEqual (static_cast<int>(ScreenSaverMode::Install), static_cast<int>(context.m_mode));
+                Assert::IsTrue (context.m_forceInstall, L"forceInstall should be true");
+            }
+
+
+
+
+            TEST_METHOD (ParseCommandLine_DoubleDashInstallForce_SetsForceFlag)
+            {
+                HRESULT                hr;
+                ScreenSaverModeContext context;
+
+
+                hr = CommandLine().Parse (L"--install --force", context);
+
+
+
+                Assert::IsTrue (SUCCEEDED (hr), L"--install --force should succeed");
+                Assert::AreEqual (static_cast<int>(ScreenSaverMode::Install), static_cast<int>(context.m_mode));
+                Assert::IsTrue (context.m_forceInstall, L"forceInstall should be true");
+            }
+
+
+
+
+            TEST_METHOD (ParseCommandLine_InstallWithoutForce_ForceFlagIsFalse)
+            {
+                HRESULT                hr;
+                ScreenSaverModeContext context;
+
+
+                hr = CommandLine().Parse (L"/install", context);
+
+
+
+                Assert::IsTrue (SUCCEEDED (hr));
+                Assert::IsFalse (context.m_forceInstall, L"forceInstall should be false without /force");
+            }
+
+
+
+
+            TEST_METHOD (ParseCommandLine_ForceAlone_ReturnsError)
+            {
+                HRESULT                hr;
+                ScreenSaverModeContext context;
+
+
+                hr = CommandLine().Parse (L"/force", context);
+
+
+
+                Assert::AreEqual (E_INVALIDARG, hr, L"/force alone should fail");
+                Assert::IsTrue (context.m_errorMessage.find (L"install") != std::wstring::npos, L"error should mention install");
+            }
+
+
+
+
+            TEST_METHOD (ParseCommandLine_DoubleDashForceAlone_ReturnsError)
+            {
+                HRESULT                hr;
+                ScreenSaverModeContext context;
+
+
+                hr = CommandLine().Parse (L"--force", context);
+
+
+
+                Assert::AreEqual (E_INVALIDARG, hr, L"--force alone should fail");
+                Assert::IsTrue (context.m_errorMessage.find (L"--install") != std::wstring::npos, L"error should mention --install");
+            }
+
+
+
+
+            TEST_METHOD (ParseCommandLine_DoubleDashForceAlone_ShowsDoubleDashPrefix)
+            {
+                HRESULT                hr;
+                ScreenSaverModeContext context;
+
+
+                hr = CommandLine().Parse (L"--force", context);
+
+
+
+                Assert::AreEqual (E_INVALIDARG, hr);
+                Assert::AreEqual (std::wstring (L"--"), context.m_switchPrefix, L"prefix should be --");
+            }
+
+
+
+
+            TEST_METHOD (ParseCommandLine_UninstallWithForce_ReturnsError)
+            {
+                HRESULT                hr;
+                ScreenSaverModeContext context;
+
+
+                hr = CommandLine().Parse (L"/uninstall /force", context);
+
+
+
+                Assert::AreEqual (E_INVALIDARG, hr, L"/uninstall /force should fail");
+            }
+
+
+
+
+            TEST_METHOD (ParseCommandLine_HelpWithExtra_ReturnsError)
+            {
+                HRESULT                hr;
+                ScreenSaverModeContext context;
+
+
+                hr = CommandLine().Parse (L"/? /install", context);
+
+
+
+                Assert::AreEqual (E_INVALIDARG, hr, L"/? /install should fail");
+            }
+
+
+
+
+            TEST_METHOD (ParseCommandLine_InstallForce_CaseInsensitive)
+            {
+                HRESULT                hr;
+                ScreenSaverModeContext context;
+
+
+                hr = CommandLine().Parse (L"/install /FORCE", context);
+
+
+
+                Assert::IsTrue (SUCCEEDED (hr), L"/install /FORCE should succeed");
+                Assert::IsTrue (context.m_forceInstall, L"forceInstall should be true for /FORCE");
+            }
+
+
+
+
+            TEST_METHOD (ParseCommandLine_InstallWithBadSecondSwitch_ReturnsError)
+            {
+                HRESULT                hr;
+                ScreenSaverModeContext context;
+
+
+                hr = CommandLine().Parse (L"/install /blah", context);
+
+
+
+                Assert::AreEqual (E_INVALIDARG, hr, L"/install /blah should fail");
+            }
+
+
+
+
+            TEST_METHOD (ParseCommandLine_InstallWithSingleDashForce_ReturnsError)
+            {
+                HRESULT                hr;
+                ScreenSaverModeContext context;
+
+
+                hr = CommandLine().Parse (L"/install -force", context);
+
+
+
+                Assert::AreEqual (E_INVALIDARG, hr, L"/install -force should fail (single dash not valid for multi-char)");
+                Assert::IsTrue (context.m_errorMessage.find (L"-force") != std::wstring::npos, L"error should show the invalid argument");
             }
     };
 }  // namespace MatrixRainTests

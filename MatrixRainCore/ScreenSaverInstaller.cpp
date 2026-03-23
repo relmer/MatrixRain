@@ -137,6 +137,97 @@ Error:
 
 ////////////////////////////////////////////////////////////////////////////////
 //
+//  ScreenSaverInstaller::CheckPolicy
+//
+//  Checks a single registry-based policy.  Sets fBlocked to true and populates
+//  errorMessage if the policy value matches the blocking condition.  Returns
+//  S_OK if the check completed (regardless of whether it blocked).
+//
+////////////////////////////////////////////////////////////////////////////////
+
+HRESULT ScreenSaverInstaller::CheckPolicy (const ScreenSaverInstaller::PolicyCheck & check, bool & fBlocked, std::wstring & errorMessage)
+{
+    HRESULT hr      = S_OK;
+    HKEY    hkey    = nullptr;
+    LONG    lResult = 0;
+    DWORD   dwValue = 0;
+    DWORD   cbValue = sizeof (dwValue);
+    DWORD   dwType  = 0;
+    LPCWSTR pszRoot = (check.hkeyRoot == HKEY_LOCAL_MACHINE) ? L"HKLM" : L"HKCU";
+
+
+
+    lResult = RegOpenKeyExW (check.hkeyRoot, check.pszSubKey, 0, KEY_READ, &hkey);
+    BAIL_OUT_IF (lResult != ERROR_SUCCESS, S_OK);
+
+    lResult = RegQueryValueExW (hkey, check.pszValueName, nullptr, &dwType,
+                                reinterpret_cast<LPBYTE> (&dwValue), &cbValue);
+    BAIL_OUT_IF (lResult != ERROR_SUCCESS || dwType != REG_DWORD, S_OK);
+
+    fBlocked = check.fBlockIfNonZero ? (dwValue > 0) : (dwValue == check.dwBlockingValue);
+    BAIL_OUT_IF (!fBlocked, S_OK);
+
+    errorMessage = std::format (L"{}\n\n{}\\{}\\{} = {}",
+                                check.pszMessage, 
+                                pszRoot,
+                                check.pszSubKey, 
+                                check.pszValueName, 
+                                dwValue);
+
+
+
+Error:
+    if (hkey)
+    {
+        RegCloseKey (hkey);
+    }
+
+    return hr;
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  ScreenSaverInstaller::CheckScreenSaverPolicies
+//
+//  Checks for Group Policy or MDM/Intune settings that would prevent a
+//  screensaver from functioning.  Returns S_OK always (unless registry read
+//  fails).  Sets fBlocked to true and populates errorMessage if a blocking
+//  policy is detected.  Call this BEFORE elevation so the user sees the
+//  warning without a UAC prompt.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+HRESULT ScreenSaverInstaller::CheckScreenSaverPolicies (bool & fBlocked, std::wstring & errorMessage)
+{
+    HRESULT hr = S_OK;
+
+
+
+    fBlocked = false;
+
+    for (const auto & check : s_krgPolicyChecks)
+    {
+        hr = CheckPolicy (check, fBlocked, errorMessage);
+        CHR (hr);
+
+        if (fBlocked)
+            break;
+    }
+
+Error:
+    return hr;
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
 //  ScreenSaverInstaller::Install
 //
 //  Install MatrixRain as the system screensaver.
@@ -186,27 +277,11 @@ HRESULT ScreenSaverInstaller::Install()
         // FR-008: CopyFileW with bFailIfExists=FALSE to overwrite existing
         fSuccess = CopyFileW (szSourcePath, szTargetPath, FALSE);
         CWRA (fSuccess);
-
-        // Clear the 8.3 short name alias that CopyFileW creates (e.g., MATRIX~1.SCR).
-        // The CPL enumerates both long and short names as separate screensavers.
-        // Rename to a temp name and back — this drops the 8.3 alias on NTFS.
-        {
-            WCHAR szTempPath[MAX_PATH];
-
-            StringCchCopyW (szTempPath, _countof (szTempPath), szTargetPath);
-            PathCchRemoveFileSpec (szTempPath, _countof (szTempPath));
-            PathCchAppend (szTempPath, _countof (szTempPath), L"_MatrixRain.scr");
-
-            if (MoveFileW (szTargetPath, szTempPath))
-            {
-                MoveFileW (szTempPath, szTargetPath);
-            }
-        }
     }
 
     // FR-004: Invoke desk.cpl InstallScreenSaver to set as active + open Settings
     StringCchPrintfW (szRunDll32Cmd, _countof (szRunDll32Cmd),
-                      L"desk.cpl,InstallScreenSaver \"%ls\"", szTargetPath);
+                      L"desk.cpl,InstallScreenSaver %ls", szTargetPath);
 
     sei.lpVerb       = L"open";
     sei.lpFile       = L"rundll32.exe";

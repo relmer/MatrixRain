@@ -47,7 +47,27 @@ int APIENTRY wWinMain(_In_     HINSTANCE hInstance,
     // Handle install/uninstall — early exit before application initialization
     if (context.m_mode == ScreenSaverMode::Install || context.m_mode == ScreenSaverMode::Uninstall)
     {
-        LPCWSTR pszSwitch = (context.m_mode == ScreenSaverMode::Install) ? L"/install" : L"/uninstall";
+        LPCWSTR pszSwitch = (context.m_mode == ScreenSaverMode::Uninstall)  ? L"/uninstall" :
+                            context.m_forceInstall                          ? L"/install /force" :
+                                                                              L"/install";
+
+        // Check for policies that would block the screensaver (before UAC prompt)
+        // /force or --force skips the policy check
+        if (context.m_mode == ScreenSaverMode::Install && !context.m_forceInstall)
+        {
+            std::wstring policyWarning;
+            bool         fBlocked = false;
+
+
+            hr = ScreenSaverInstaller::CheckScreenSaverPolicies (fBlocked, policyWarning);
+            CHR (hr);
+
+            if (fBlocked)
+            {
+                MessageBoxW (nullptr, policyWarning.c_str(), L"MatrixRain", MB_OK | MB_ICONERROR);
+                goto Error;
+            }
+        }
 
         if (!ScreenSaverInstaller::IsElevated())
         {
@@ -136,7 +156,7 @@ int APIENTRY wWinMain(_In_     HINSTANCE hInstance,
 
         s_fDialogOpen = true;
 
-        UsageText usage (L'/');
+        UsageText usage (L"/");
         MessageBoxW (app.GetMainWindowHwnd(), usage.GetPlainText().c_str(), L"MatrixRain — Help", MB_OK | MB_ICONINFORMATION);
 
         s_fDialogOpen = false;

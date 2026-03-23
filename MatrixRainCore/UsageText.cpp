@@ -17,7 +17,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-UsageText::UsageText (wchar_t switchPrefix) :
+UsageText::UsageText (std::wstring_view switchPrefix) :
     m_switchPrefix (switchPrefix)
 {
     //
@@ -27,10 +27,10 @@ UsageText::UsageText (wchar_t switchPrefix) :
 
     m_switches =
     {
-        { L'c',  L"",          L"", L"Show settings dialog"                        },
         { L'?',  L"",          L"", L"Display this help message"                   },
         { L'\0', L"install",   L"", L"Install MatrixRain as system screensaver"    },
         { L'\0', L"uninstall", L"", L"Uninstall MatrixRain screensaver"            },
+        { L'\0', L"force",     L"", L"Skip policy checks during install"           },
     };
 
     BuildFormattedLines();
