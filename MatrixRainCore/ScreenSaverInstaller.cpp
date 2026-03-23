@@ -188,18 +188,6 @@ HRESULT ScreenSaverInstaller::Install()
         CWRA (fSuccess);
     }
 
-    // Strip 8.3 short name to prevent CPL from showing duplicate entries
-    // (e.g., both "MatrixRain" and "MATRIX~1" in the screensaver picker)
-    {
-        HANDLE hFile = CreateFileW (szTargetPath, GENERIC_WRITE | DELETE, 0, nullptr,
-                                    OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
-        if (hFile != INVALID_HANDLE_VALUE)
-        {
-            SetFileShortNameW (hFile, L"");
-            CloseHandle (hFile);
-        }
-    }
-
     // FR-004: Invoke desk.cpl InstallScreenSaver to set as active + open Settings
     StringCchPrintfW (szRunDll32Cmd, _countof (szRunDll32Cmd),
                       L"desk.cpl,InstallScreenSaver \"%ls\"", szTargetPath);
