@@ -353,7 +353,11 @@ HRESULT ScreenSaverInstaller::Uninstall (IRegistryProvider & registry, IFileSyst
 
     // FR-005: Remove the .scr file
     fSuccess = fileSystem.DeleteFile (szTargetPath);
-    CWRA (fSuccess);
+    if (!fSuccess)
+    {
+        DWORD dwError = fileSystem.GetLastError();
+        CHR (HRESULT_FROM_WIN32 (dwError));
+    }
 
 Error:
     return hr;

@@ -4,6 +4,18 @@ All notable changes to MatrixRain are documented in this file.
 
 ## [Unreleased]
 
+## [1.2.1954] - 2026-03-23
+
+### Fixed
+
+- Infinite recursion in WindowsFileSystemProvider due to Win32 macro name collision
+- Silent failure on uninstall errors — now shows user-facing error messages
+- Use non-assert error handling for runtime file system failures in uninstall path
+
+### Added
+
+- VS Code "Attach to MatrixRain" debug configuration for attaching to running processes
+
 ## [1.2.1953] - 2026-03-22
 
 ### Added

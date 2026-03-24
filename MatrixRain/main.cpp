@@ -95,6 +95,15 @@ int APIENTRY wWinMain(_In_     HINSTANCE hInstance,
             {
                 MessageBoxW (nullptr, L"MatrixRain screensaver is not installed.", L"MatrixRain", MB_OK | MB_ICONINFORMATION);
             }
+            else if (FAILED (hr))
+            {
+                LPCWSTR pszMsg = (hr == HRESULT_FROM_WIN32 (ERROR_SHARING_VIOLATION))
+                    ? L"Cannot delete MatrixRain.scr because it is currently running.\n\n"
+                      L"Close any running MatrixRain screensaver instances and try again."
+                    : L"Uninstall failed.";
+
+                MessageBoxW (nullptr, pszMsg, L"MatrixRain", MB_OK | MB_ICONERROR);
+            }
         }
 
         goto Error;

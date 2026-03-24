@@ -21,13 +21,13 @@ public:
     DWORD GetSystemDirectory (LPWSTR  lpBuffer,
                               UINT    uSize) override
     {
-        return GetSystemDirectoryW (lpBuffer, uSize);
+        return ::GetSystemDirectoryW (lpBuffer, uSize);
     }
 
 
     DWORD GetFileAttributes (LPCWSTR lpFileName) override
     {
-        return GetFileAttributesW (lpFileName);
+        return ::GetFileAttributesW (lpFileName);
     }
 
 
@@ -39,7 +39,7 @@ public:
 
     BOOL DeleteFile (LPCWSTR lpFileName) override
     {
-        return DeleteFileW (lpFileName);
+        return ::DeleteFileW (lpFileName);
     }
 
 
@@ -47,6 +47,6 @@ public:
                            LPWSTR  lpszLongPath,
                            DWORD   cchBuffer) override
     {
-        return GetLongPathNameW (lpszShortPath, lpszLongPath, cchBuffer);
+        return ::GetLongPathNameW (lpszShortPath, lpszLongPath, cchBuffer);
     }
 };
