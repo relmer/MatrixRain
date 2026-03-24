@@ -97,10 +97,7 @@ private:
     
     const ScreenSaverModeContext * m_pScreenSaverContext { nullptr };
     
-    // Render thread
-    static constexpr int                       RENDER_FPS        { 60 };
-    static constexpr std::chrono::milliseconds RENDER_FRAME_TIME { 1000 / RENDER_FPS };
-    
+    // Render thread — frame pacing is driven by VSync (Present(1, 0))
     std::thread       m_renderThread;
     std::atomic<bool> m_renderThreadShouldStop { false };
     SharedState       m_sharedState;

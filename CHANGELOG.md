@@ -4,6 +4,13 @@ All notable changes to MatrixRain are documented in this file.
 
 ## [Unreleased]
 
+## [1.2.1973] - 2026-03-23
+
+### Fixed
+
+- Render loop double-pacing: VSync (`Present(1, 0)`) and `sleep_for(16ms)` both ran per frame, capping FPS at ~32 instead of 60
+- Input latency for overlay show/dismiss: moved `Present()` outside the overlay mutex so the UI thread's `OnKeyDown` no longer blocks up to 16ms waiting on VSync
+
 ## [1.2.1954] - 2026-03-23
 
 ### Fixed

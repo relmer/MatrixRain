@@ -707,7 +707,6 @@ void Application::Render (const SharedState::Snapshot & snapshot)
         };
 
         m_renderSystem->Render (*m_animationSystem, *m_viewport, renderParams);
-        m_renderSystem->Present();
     }
 }
 
@@ -1239,7 +1238,7 @@ void Application::RenderThreadProc()
     SharedState::Snapshot snapshot;
     
 
-    
+
     while (!m_renderThreadShouldStop)
     {
         auto currentTime = steady_clock::now();
@@ -1276,9 +1275,20 @@ void Application::RenderThreadProc()
                 Update (deltaTime);
                 Render (snapshot);
             }
+
+            // Present OUTSIDE the overlay lock — VSync blocks for up to 16ms
+            // and holding the lock during that wait causes input lag (the UI
+            // thread's OnKeyDown needs the overlay lock to call Show/Dismiss).
+            if (m_renderSystem)
+            {
+                m_renderSystem->Present();
+            }
         }
-        
-        // Sleep to maintain target framerate
-        std::this_thread::sleep_for (RENDER_FRAME_TIME);
+        else
+        {
+            // Yield CPU while display mode transition is in progress —
+            // Present() is not called so VSync cannot pace the loop.
+            std::this_thread::sleep_for (std::chrono::milliseconds (1));
+        }
     }
 }
