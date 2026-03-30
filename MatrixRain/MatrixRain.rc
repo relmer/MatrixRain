@@ -65,11 +65,11 @@ BEGIN
     BEGIN
         BLOCK "040904B0"
         BEGIN
-            VALUE "CompanyName",      "relmer"
+            VALUE "CompanyName",      "Robert Elmer"
             VALUE "FileDescription",  "Matrix Rain"
             VALUE "FileVersion",      VER_FILEVERSION_STR
             VALUE "InternalName",     "MatrixRain"
-            VALUE "LegalCopyright",   "Copyright (C) " STRINGIFY(VERSION_YEAR) " relmer"
+            VALUE "LegalCopyright",   "Copyright (C) " STRINGIFY(VERSION_YEAR) " Robert Elmer"
             VALUE "OriginalFilename", "MatrixRain.exe"
             VALUE "ProductName",      "MatrixRain"
             VALUE "ProductVersion",   VER_PRODUCTVERSION_STR
