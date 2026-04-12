@@ -63,7 +63,7 @@ jobs:
 
   build-and-release:
     needs: [wait-for-ci]
-    if: always() && (needs.wait-for-ci.result == 'success' || needs.wait-for-ci.result == 'skipped')
+    if: ${{ !cancelled() && (needs.wait-for-ci.result == 'success' || needs.wait-for-ci.result == 'skipped') }}
     runs-on: windows-latest
     timeout-minutes: 30
     environment: release
@@ -274,6 +274,14 @@ jobs:
 
       # --- Publish to WinGet ---
 
+      - name: Sync winget-pkgs fork
+        if: env.WINGET_PAT != ''
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.WINGET_PAT }}
+        run: |
+          gh api repos/relmer/winget-pkgs/merge-upstream -f branch=master
+
       - name: Install wingetcreate
         if: env.WINGET_PAT != ''
         shell: pwsh
@@ -285,7 +293,6 @@ jobs:
 
       - name: Publish to WinGet
         if: env.WINGET_PAT != ''
-        continue-on-error: true
         shell: pwsh
         run: |
           $tag = "${{ steps.tag.outputs.tag }}"
