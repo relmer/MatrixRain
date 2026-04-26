@@ -1044,3 +1044,8 @@ git diff       # Bad - will paginate
 
 *Last Updated: 2026-02-23*
 *These rules apply globally to all projects and conversations*
+
+<!-- SPECKIT START -->
+For additional context about technologies to be used, project structure,
+shell commands, and other important information, read the current plan
+<!-- SPECKIT END -->
