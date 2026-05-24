@@ -67,6 +67,10 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 30
     environment: release
+    env:
+      # Suppress the IncrementVersion.ps1 PreBuildEvent so the binaries produced
+      # by this job carry the exact VERSION_BUILD that matches the release tag.
+      SKIP_VERSION_INCREMENT: '1'
 
     steps:
       - name: Determine tag

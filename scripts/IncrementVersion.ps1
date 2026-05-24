@@ -1,6 +1,14 @@
 # IncrementVersion.ps1
 # Automatically increments the build number and updates the year in Version.h before each build
 
+# Allow CI (or any caller) to opt out of mutating Version.h.
+# Used by the release workflow so the tag/Version.h validation stays stable
+# across the x64 and ARM64 build steps.
+if ($env:SKIP_VERSION_INCREMENT -eq '1' -or $env:SKIP_VERSION_INCREMENT -eq 'true') {
+    Write-Host "Skipping version increment (SKIP_VERSION_INCREMENT is set)"
+    exit 0
+}
+
 $repoRoot = Split-Path $PSScriptRoot -Parent
 $versionFile = "$repoRoot\MatrixRainCore\Version.h"
 $tempFile = "$versionFile.tmp"
