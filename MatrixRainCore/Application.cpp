@@ -274,6 +274,21 @@ void Application::InitializeApplicationState (const ScreenSaverModeContext * pSc
         std::lock_guard<std::mutex> lock (m_sharedState.mutex);
         m_sharedState.glowSizePercent = sizePercent;
     });
+
+    m_appState->RegisterColorSchemeCallback ([this](ColorScheme scheme) {
+        std::lock_guard<std::mutex> lock (m_sharedState.mutex);
+        m_sharedState.colorScheme = scheme;
+    });
+
+    m_appState->RegisterShowStatisticsCallback ([this](bool show) {
+        std::lock_guard<std::mutex> lock (m_sharedState.mutex);
+        m_sharedState.showStatistics = show;
+    });
+
+    m_appState->RegisterShowDebugFadeTimesCallback ([this](bool show) {
+        std::lock_guard<std::mutex> lock (m_sharedState.mutex);
+        m_sharedState.showDebugFadeTimes = show;
+    });
     
     // Initialize SharedState from saved settings
     {

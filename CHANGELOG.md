@@ -4,6 +4,13 @@ All notable changes to MatrixRain are documented in this file.
 
 ## [Unreleased]
 
+## [1.2.1983] - 2026-05-23
+
+### Fixed
+
+- Settings dialog changes not taking effect on the running animation in standalone mode: color scheme, "Show debug stats", and "Show fade timers" toggles updated `ApplicationState` but never propagated to the render thread's `SharedState`, so the visual change only appeared after a restart
+- Copyright string corrected to "Robert Elmer"
+
 ## [1.2.1973] - 2026-03-23
 
 ### Fixed

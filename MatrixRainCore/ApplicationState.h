@@ -87,6 +87,27 @@ public:
     void RegisterGlowSizeCallback (std::function<void(int)> callback);
 
     /// <summary>
+    /// Register a callback to be notified when the color scheme changes
+    /// (via dialog, hotkey, or full settings apply).
+    /// </summary>
+    /// <param name="callback">Function to call with the new color scheme</param>
+    void RegisterColorSchemeCallback (std::function<void(ColorScheme)> callback);
+
+    /// <summary>
+    /// Register a callback to be notified when the show-statistics flag
+    /// changes (via dialog, hotkey, or full settings apply).
+    /// </summary>
+    /// <param name="callback">Function to call with the new visibility flag</param>
+    void RegisterShowStatisticsCallback (std::function<void(bool)> callback);
+
+    /// <summary>
+    /// Register a callback to be notified when the show-debug-fade-times
+    /// flag changes (via dialog, hotkey, or full settings apply).
+    /// </summary>
+    /// <param name="callback">Function to call with the new visibility flag</param>
+    void RegisterShowDebugFadeTimesCallback (std::function<void(bool)> callback);
+
+    /// <summary>
     /// Update animation speed setting.
     /// </summary>
     /// <param name="speedPercent">Animation speed percentage (1-100)</param>
@@ -126,25 +147,28 @@ public:
     const ScreenSaverSettings GetSettings()            const { return m_settings;            }
 
     void    SetDisplayMode        (DisplayMode mode)   { m_displayMode = mode;                 }
-    void    SetColorScheme        (ColorScheme scheme) { m_colorScheme = scheme; m_settings.m_colorSchemeKey = ColorSchemeToKey (scheme); }
+    void    SetColorScheme        (ColorScheme scheme);
     void    SetShowStatistics     (bool show);
     void    SetShowDebugFadeTimes (bool show);
     void    ToggleStatistics();
     HRESULT SaveSettings();
 
 private:
-    ISettingsProvider            & m_settingsProvider;                                        // Settings provider (not owned)
-    DisplayMode                    m_displayMode                  = DisplayMode::Fullscreen; // Current display mode
-    ColorScheme                    m_colorScheme                  = ColorScheme::Green;      // Current color scheme
-    bool                           m_showDebugFadeTimes           = false;                   // Show debug fade time overlay
-    bool                           m_showStatistics               = false;                   // Show FPS and density statistics
-    float                          m_elapsedTime                  = 0.0f;     // Elapsed time for color cycling animation
-    ScreenSaverSettings            m_settings;                                        // User-configurable settings
-    const ScreenSaverModeContext * m_pScreenSaverContext          = nullptr;           // Screensaver mode context (nullptr = normal mode)
-    std::function<void(int)>       m_densityChangeCallback        = nullptr;           // Callback for density changes
-    std::function<void(int)>       m_animationSpeedChangeCallback = nullptr;           // Callback for animation speed changes
-    std::function<void(int)>       m_glowIntensityChangeCallback  = nullptr;           // Callback for glow intensity changes
-    std::function<void(int)>       m_glowSizeChangeCallback       = nullptr;           // Callback for glow size changes
+    ISettingsProvider              & m_settingsProvider;                                           // Settings provider (not owned)
+    DisplayMode                      m_displayMode                      = DisplayMode::Fullscreen; // Current display mode
+    ColorScheme                      m_colorScheme                      = ColorScheme::Green;      // Current color scheme
+    bool                             m_showDebugFadeTimes               = false;                   // Show debug fade time overlay
+    bool                             m_showStatistics                   = false;                   // Show FPS and density statistics
+    float                            m_elapsedTime                      = 0.0f;                    // Elapsed time for color cycling animation
+    ScreenSaverSettings              m_settings;                                                   // User-configurable settings
+    const ScreenSaverModeContext   * m_pScreenSaverContext              = nullptr;                 // Screensaver mode context (nullptr = normal mode)
+    std::function<void(int)>         m_densityChangeCallback            = nullptr;                 // Callback for density changes
+    std::function<void(int)>         m_animationSpeedChangeCallback     = nullptr;                 // Callback for animation speed changes
+    std::function<void(int)>         m_glowIntensityChangeCallback      = nullptr;                 // Callback for glow intensity changes
+    std::function<void(int)>         m_glowSizeChangeCallback           = nullptr;                 // Callback for glow size changes
+    std::function<void(ColorScheme)> m_colorSchemeChangeCallback        = nullptr;                 // Callback for color scheme changes
+    std::function<void(bool)>        m_showStatisticsChangeCallback     = nullptr;                 // Callback for show-statistics changes
+    std::function<void(bool)>        m_showDebugFadeTimesChangeCallback = nullptr;                 // Callback for show-debug-fade-times changes
 };
 
 

@@ -84,6 +84,12 @@ void ApplicationState::CycleColorScheme()
     // Update settings and save
     m_settings.m_colorSchemeKey = ColorSchemeToKey (m_colorScheme);
 
+    // Notify registered listener (e.g., Application's SharedState sync)
+    if (m_colorSchemeChangeCallback)
+    {
+        m_colorSchemeChangeCallback (m_colorScheme);
+    }
+
     HRESULT hr = SaveSettings();
     IGNORE_RETURN_VALUE (hr, S_OK);
 }
@@ -95,6 +101,12 @@ void ApplicationState::CycleColorScheme()
 void ApplicationState::ToggleDebugFadeTimes()
 {
     m_showDebugFadeTimes = !m_showDebugFadeTimes;
+
+    // Notify registered listener (e.g., Application's SharedState sync)
+    if (m_showDebugFadeTimesChangeCallback)
+    {
+        m_showDebugFadeTimesChangeCallback (m_showDebugFadeTimes);
+    }
 }
 
 
@@ -173,6 +185,49 @@ void ApplicationState::RegisterGlowSizeCallback (std::function<void(int)> callba
 
 
 
+void ApplicationState::RegisterColorSchemeCallback (std::function<void(ColorScheme)> callback)
+{
+    m_colorSchemeChangeCallback = callback;
+}
+
+
+
+
+
+void ApplicationState::SetColorScheme (ColorScheme scheme)
+{
+    m_colorScheme               = scheme;
+    m_settings.m_colorSchemeKey = ColorSchemeToKey (scheme);
+
+    // Notify registered listener (e.g., Application's SharedState sync)
+    if (m_colorSchemeChangeCallback)
+    {
+        m_colorSchemeChangeCallback (scheme);
+    }
+}
+
+
+
+
+
+void ApplicationState::RegisterShowStatisticsCallback (std::function<void(bool)> callback)
+{
+    m_showStatisticsChangeCallback = callback;
+}
+
+
+
+
+
+void ApplicationState::RegisterShowDebugFadeTimesCallback (std::function<void(bool)> callback)
+{
+    m_showDebugFadeTimesChangeCallback = callback;
+}
+
+
+
+
+
 void ApplicationState::SetGlowIntensity (int intensityPercent)
 {
     m_settings.m_glowIntensityPercent = intensityPercent;
@@ -220,6 +275,22 @@ void ApplicationState::ApplySettings (const ScreenSaverSettings & settings)
     
     // Map color scheme key to enum
     m_colorScheme = ParseColorSchemeKey (m_settings.m_colorSchemeKey);
+
+    // Notify registered listeners so renderer-side state (e.g., SharedState) stays in sync
+    if (m_colorSchemeChangeCallback)
+    {
+        m_colorSchemeChangeCallback (m_colorScheme);
+    }
+
+    if (m_showStatisticsChangeCallback)
+    {
+        m_showStatisticsChangeCallback (m_showStatistics);
+    }
+
+    if (m_showDebugFadeTimesChangeCallback)
+    {
+        m_showDebugFadeTimesChangeCallback (m_showDebugFadeTimes);
+    }
 }
 
 
@@ -253,6 +324,12 @@ void ApplicationState::SetShowStatistics (bool show)
     // Update settings and save
     m_settings.m_showDebugStats = show;
 
+    // Notify registered listener (e.g., Application's SharedState sync)
+    if (m_showStatisticsChangeCallback)
+    {
+        m_showStatisticsChangeCallback (show);
+    }
+
     HRESULT hr = SaveSettings();
     IGNORE_RETURN_VALUE (hr, S_OK);
 }
@@ -274,6 +351,12 @@ void ApplicationState::SetShowDebugFadeTimes (bool show)
     }
     
     m_showDebugFadeTimes = show;
+
+    // Notify registered listener (e.g., Application's SharedState sync)
+    if (m_showDebugFadeTimesChangeCallback)
+    {
+        m_showDebugFadeTimesChangeCallback (show);
+    }
 }
 
 
@@ -286,6 +369,12 @@ void ApplicationState::ToggleStatistics()
     
     // Update settings and save
     m_settings.m_showDebugStats = m_showStatistics;
+
+    // Notify registered listener (e.g., Application's SharedState sync)
+    if (m_showStatisticsChangeCallback)
+    {
+        m_showStatisticsChangeCallback (m_showStatistics);
+    }
 
     HRESULT hr = SaveSettings();
     IGNORE_RETURN_VALUE (hr, S_OK);
