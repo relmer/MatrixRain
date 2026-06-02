@@ -291,8 +291,11 @@
     <ClInclude Include="OverlayColor.h" />
     <ClInclude Include="InMemorySettingsProvider.h" />
     <ClInclude Include="InputSystem.h" />
+    <ClInclude Include="IMonitorProvider.h" />
+    <ClInclude Include="InMemoryMonitorProvider.h" />
     <ClInclude Include="ISettingsProvider.h" />
     <ClInclude Include="Math.h" />
+    <ClInclude Include="MonitorInfo.h" />
     <ClInclude Include="RegistrySettingsProvider.h" />
     <ClInclude Include="RenderSystem.h" />
     <ClInclude Include="CommandLine.h" />
@@ -300,6 +303,7 @@
     <ClInclude Include="RegistryProvider.h" />
     <ClInclude Include="ScreenSaverInstaller.h" />
     <ClInclude Include="WindowsFileSystemProvider.h" />
+    <ClInclude Include="WindowsMonitorProvider.h" />
     <ClInclude Include="WindowsRegistryProvider.h" />
     <ClInclude Include="Timer.h" />
     <ClInclude Include="UsageText.h" />
@@ -328,6 +332,7 @@
     <ClCompile Include="Math.cpp" />
     <ClCompile Include="RegistrySettingsProvider.cpp" />
     <ClCompile Include="RenderSystem.cpp" />
+    <ClCompile Include="WindowsMonitorProvider.cpp" />
     <ClCompile Include="CommandLine.cpp" />
     <ClCompile Include="ScreenSaverInstaller.cpp" />
     <ClCompile Include="ApplicationState.cpp" />
