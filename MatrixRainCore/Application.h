@@ -18,6 +18,7 @@ class ApplicationState;
 class FPSCounter;
 class Overlay;
 class MonitorRenderContext;
+class IMonitorProvider;
 
 
 
@@ -73,11 +74,13 @@ public:
 
 private:
     // Core systems
-    RegistrySettingsProvider              m_settingsProvider;
-    std::unique_ptr<MonitorRenderContext> m_primaryContext;
-    std::unique_ptr<InputSystem>          m_inputSystem;
-    std::unique_ptr<ApplicationState>     m_appState;
-    OverlayState                          m_overlays;
+    RegistrySettingsProvider                           m_settingsProvider;
+    std::unique_ptr<IMonitorProvider>                  m_monitorProvider;
+    std::vector<std::unique_ptr<MonitorRenderContext>> m_contexts;
+    MonitorRenderContext *                             m_primary { nullptr };
+    std::unique_ptr<InputSystem>                       m_inputSystem;
+    std::unique_ptr<ApplicationState>                  m_appState;
+    OverlayState                                       m_overlays;
 
     // Win32 window`
     HWND              m_hwnd                    { nullptr };
@@ -96,8 +99,14 @@ private:
 
     // Internal methods
     void    InitializeApplicationState    (const ScreenSaverModeContext * pScreenSaverContext);
-    HRESULT InitializeApplicationWindow();
-    HRESULT CreateApplicationWindow       (POINT & position, SIZE & size);
+    HRESULT CreateRenderContexts();
+    HRESULT AddContext                    (const POINT & position, const SIZE & size, DWORD dwStyle, HWND hwndParent, bool isPrimary);
+    HRESULT CreateWindowAtBounds          (const POINT & position, const SIZE & size, DWORD dwStyle, HWND hwndParent, HWND & hwndOut);
+    void    WirePrimaryContext();
+    HRESULT InitializeContextResources();
+    void    StartRenderThreads();
+    void    StopRenderThreads();
+    MonitorRenderContext * ContextForHwnd (HWND hwnd) const;
     void    GetWindowSizeForCurrentMode   (POINT & position, SIZE & size);
     void    ResizeWindowForCurrentMode();
     bool    ShouldExitScreenSaverOnKey    (WPARAM wParam);
@@ -106,8 +115,8 @@ private:
     void OnKeyDown                  (WPARAM wParam);
     void OnSysKeyDown               (WPARAM wParam);
     void OnMouseMove                (LPARAM lParam);
-    void OnSize                     (LPARAM lParam);
-    void OnDpiChanged               (WPARAM wParam, LPARAM lParam);
+    void OnSize                     (HWND hwnd, LPARAM lParam);
+    void OnDpiChanged               (HWND hwnd, WPARAM wParam, LPARAM lParam);
     void OnNcHitTest                (LRESULT & result);
     
     // Window procedure
