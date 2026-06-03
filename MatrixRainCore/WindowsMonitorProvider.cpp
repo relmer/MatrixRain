@@ -58,30 +58,20 @@ BOOL CALLBACK WindowsMonitorProvider::EnumProc (HMONITOR hMonitor, HDC hdc, LPRE
     UINT                       dpiY      = 96;
     MonitorInfo                descriptor;
 
+    
 
     UNREFERENCED_PARAMETER (hdc);
     UNREFERENCED_PARAMETER (lprcMonitor);
 
 
-    // A missing accumulator is a caller programming error: abort the entire
-    // enumeration.  Handled outside EHM because the Error path below
-    // intentionally continues enumeration for per-monitor failures.
-    if (pMonitors == nullptr)
-    {
-        return FALSE;
-    }
+    
+    CBRAEx (dwData != 0, E_POINTER);
 
-    // Read this monitor's geometry; on failure skip it but keep enumerating.
-    // A handle EnumDisplayMonitors just produced should never be unreadable,
-    // so assert at the point of failure while still degrading gracefully.
     fSuccess = GetMonitorInfoW (hMonitor, &info);
     CWRA (fSuccess);
 
-    // Per-monitor effective DPI is best-effort; fall back to 96 on failure.
-    if (FAILED (GetDpiForMonitor (hMonitor, MDT_EFFECTIVE_DPI, &dpiX, &dpiY)))
-    {
-        dpiX = 96;
-    }
+    hr = GetDpiForMonitor (hMonitor, MDT_EFFECTIVE_DPI, &dpiX, &dpiY);
+    CHRA (hr);
 
     descriptor.m_bounds    = info.rcMonitor;
     descriptor.m_dpi       = dpiX;
