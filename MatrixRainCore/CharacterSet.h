@@ -15,6 +15,8 @@ struct ID3D11Device;
 struct ID3D11Texture2D;
 struct ID3D11ShaderResourceView;
 
+class GlyphAtlas;
+
 
 
 
@@ -66,7 +68,7 @@ public:
     static CharacterSet & GetInstance();
 
     bool    Initialize();
-    HRESULT CreateTextureAtlas   (ID3D11Device * d3dDevice, float dpiScale);
+    HRESULT CreateTextureAtlas   (ID3D11Device * d3dDevice, float dpiScale, GlyphAtlas & atlas);
     size_t  GetRandomGlyphIndex  (size_t count) const;
     size_t  FindGlyphByCodepoint (uint32_t codepoint) const;
 
@@ -75,16 +77,13 @@ public:
     size_t            GetGlyphCount        ()             const { return m_glyphs.size(); }
     size_t            GetRainGlyphCount    ()             const { return m_rainGlyphCount; }
 
-    ID3D11Texture2D          * GetTextureResource()             const { return m_textureResource.Get();              }
-    ID3D11ShaderResourceView * GetTextureResourceView()          const { return m_textureResourceView.Get();          }
-    ID3D11ShaderResourceView * GetOverlayTextureResourceView()  const { return m_overlayTextureResourceView.Get();   }
     const OverlayUV          & GetOverlayUV (size_t index)      const { return m_overlayUVs[index];                  }
 
     // Overlay atlas cell content dimensions (display pixels at current DPI)
     float GetOverlayCellContentWidth()  const { return static_cast<float> (m_overlayDisplayWidth);  }
     float GetOverlayCellContentHeight() const { return static_cast<float> (m_overlayDisplayHeight); }
 
-    HRESULT RecreateOverlayAtlas (ID3D11Device * d3dDevice, float dpiScale);
+    HRESULT RecreateOverlayAtlas (ID3D11Device * d3dDevice, float dpiScale, GlyphAtlas & atlas);
 
     void Shutdown();
 
@@ -99,9 +98,9 @@ private:
 
     // Internal initialization helpers
     HRESULT CreateD2DRenderContext         (ID3D11Device * d3dDevice, ID3D11Texture2D * texture, ID2D1DeviceContext ** ppContext, IDWriteFactory ** ppDWriteFactory, ID2D1SolidColorBrush ** ppBrush);
-    HRESULT RenderGlyphsToAtlas                (ID3D11Device * d3dDevice);
-    HRESULT CreateOverlayAtlas                 (ID3D11Device * d3dDevice, float dpiScale);
-    HRESULT RenderOverlayGlyphsToAtlas         (ID3D11Device * d3dDevice);
+    HRESULT RenderGlyphsToAtlas                (ID3D11Device * d3dDevice, ID3D11Texture2D * rainTexture);
+    HRESULT CreateOverlayAtlas                 (ID3D11Device * d3dDevice, float dpiScale, GlyphAtlas & atlas);
+    HRESULT RenderOverlayGlyphsToAtlas         (ID3D11Device * d3dDevice, ID3D11Texture2D * overlayTexture);
     void    CalculateUVCoordinates             ();
     void    CalculateOverlayUVCoordinates      ();
     void    MeasureProportionalAdvanceWidths   (const std::vector<uint32_t> & rainCodepoints, const std::vector<uint32_t> & overlayCodepoints);
@@ -111,10 +110,6 @@ private:
     std::vector<GlyphInfo>                       m_glyphs;                         // Array of all glyphs (rain + overlay)
     size_t                                       m_rainGlyphCount = 0;             // Count of rain-only glyphs (normal + mirrored)
     std::unordered_map<uint32_t, size_t>         m_codepointToGlyph;               // Codepoint → glyph index (non-mirrored)
-    ComPtr<ID3D11Texture2D>                      m_textureResource;                // DirectX texture resource (Consolas rain atlas)
-    ComPtr<ID3D11ShaderResourceView>             m_textureResourceView;            // DirectX shader resource view (rain)
-    ComPtr<ID3D11Texture2D>                      m_overlayTextureResource;         // DirectX texture resource (Segoe UI overlay atlas)
-    ComPtr<ID3D11ShaderResourceView>             m_overlayTextureResourceView;     // DirectX shader resource view (overlay)
 
     // Overlay atlas parameters (DPI-dependent, recomputed on DPI change)
     std::vector<OverlayUV>                       m_overlayUVs;

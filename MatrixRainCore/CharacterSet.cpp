@@ -2,6 +2,7 @@
 
 #include "CharacterSet.h"
 #include "CharacterConstants.h"
+#include "GlyphAtlas.h"
 
 
 
@@ -325,10 +326,6 @@ Error:
 void CharacterSet::Shutdown()
 {
     m_overlayUVs.clear();
-    m_overlayTextureResourceView.Reset();
-    m_overlayTextureResource.Reset();
-    m_textureResourceView.Reset();
-    m_textureResource.Reset();
     m_glyphs.clear();
     m_initialized = false;
 }
@@ -346,13 +343,13 @@ void CharacterSet::Shutdown()
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-HRESULT CharacterSet::RecreateOverlayAtlas (ID3D11Device * d3dDevice, float dpiScale)
+HRESULT CharacterSet::RecreateOverlayAtlas (ID3D11Device * d3dDevice, float dpiScale, GlyphAtlas & atlas)
 {
     m_overlayUVs.clear();
-    m_overlayTextureResourceView.Reset();
-    m_overlayTextureResource.Reset();
+    atlas.m_overlaySRV.Reset();
+    atlas.m_overlayTexture.Reset();
 
-    return CreateOverlayAtlas (d3dDevice, dpiScale);
+    return CreateOverlayAtlas (d3dDevice, dpiScale, atlas);
 }
 
 
@@ -368,7 +365,7 @@ HRESULT CharacterSet::RecreateOverlayAtlas (ID3D11Device * d3dDevice, float dpiS
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-HRESULT CharacterSet::CreateTextureAtlas (ID3D11Device * d3dDevice, float dpiScale)
+HRESULT CharacterSet::CreateTextureAtlas (ID3D11Device * d3dDevice, float dpiScale, GlyphAtlas & atlas)
 {
     HRESULT                            hr          = S_OK;
     ID3D11Device                     * device      = d3dDevice;
@@ -377,8 +374,8 @@ HRESULT CharacterSet::CreateTextureAtlas (ID3D11Device * d3dDevice, float dpiSca
     
 
 
-    CBRAEx (d3dDevice != nullptr, E_INVALIDARG);
-    CBRAEx (!m_textureResource,   E_UNEXPECTED);
+    CBRAEx (d3dDevice != nullptr,    E_INVALIDARG);
+    CBRAEx (!atlas.m_rainTexture,    E_UNEXPECTED);
     
 
     // Create texture atlas: 2048x2048 RGBA texture
@@ -394,7 +391,7 @@ HRESULT CharacterSet::CreateTextureAtlas (ID3D11Device * d3dDevice, float dpiSca
     textureDesc.CPUAccessFlags     = 0;
     textureDesc.MiscFlags          = D3D11_RESOURCE_MISC_SHARED; // Required for Direct2D interop
 
-    hr = device->CreateTexture2D (&textureDesc, nullptr, &m_textureResource);
+    hr = device->CreateTexture2D (&textureDesc, nullptr, &atlas.m_rainTexture);
     CHRA (hr);
     
     // Create shader resource view
@@ -403,15 +400,15 @@ HRESULT CharacterSet::CreateTextureAtlas (ID3D11Device * d3dDevice, float dpiSca
     srvDesc.Texture2D.MipLevels       = 1;
     srvDesc.Texture2D.MostDetailedMip = 0;
 
-    hr = device->CreateShaderResourceView (m_textureResource.Get(), &srvDesc, &m_textureResourceView);
+    hr = device->CreateShaderResourceView (atlas.m_rainTexture.Get(), &srvDesc, &atlas.m_rainSRV);
     CHRA (hr);
 
     // Render glyphs to the atlas
-    hr = RenderGlyphsToAtlas (device);
+    hr = RenderGlyphsToAtlas (device, atlas.m_rainTexture.Get());
     CHRA (hr);
 
     // Create overlay atlas (DPI-aware, sized for 1:1 texel-to-pixel mapping)
-    hr = CreateOverlayAtlas (device, dpiScale);
+    hr = CreateOverlayAtlas (device, dpiScale, atlas);
     CHR (hr);
 
     
@@ -419,10 +416,7 @@ Error:
     if (FAILED (hr))
     {
         m_overlayUVs.clear();
-        m_overlayTextureResourceView.Reset();
-        m_overlayTextureResource.Reset();
-        m_textureResourceView.Reset();
-        m_textureResource.Reset();
+        atlas.Reset();
     }
 
     return hr;
@@ -443,7 +437,7 @@ Error:
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-HRESULT CharacterSet::CreateOverlayAtlas (ID3D11Device * d3dDevice, float dpiScale)
+HRESULT CharacterSet::CreateOverlayAtlas (ID3D11Device * d3dDevice, float dpiScale, GlyphAtlas & atlas)
 {
     HRESULT                            hr          = S_OK;
     ID3D11Device                     * device      = d3dDevice;
@@ -489,7 +483,7 @@ HRESULT CharacterSet::CreateOverlayAtlas (ID3D11Device * d3dDevice, float dpiSca
     textureDesc.CPUAccessFlags     = 0;
     textureDesc.MiscFlags          = D3D11_RESOURCE_MISC_SHARED;
 
-    hr = device->CreateTexture2D (&textureDesc, nullptr, &m_overlayTextureResource);
+    hr = device->CreateTexture2D (&textureDesc, nullptr, &atlas.m_overlayTexture);
     CHRA (hr);
 
     srvDesc.Format                    = textureDesc.Format;
@@ -497,10 +491,10 @@ HRESULT CharacterSet::CreateOverlayAtlas (ID3D11Device * d3dDevice, float dpiSca
     srvDesc.Texture2D.MipLevels       = 1;
     srvDesc.Texture2D.MostDetailedMip = 0;
 
-    hr = device->CreateShaderResourceView (m_overlayTextureResource.Get(), &srvDesc, &m_overlayTextureResourceView);
+    hr = device->CreateShaderResourceView (atlas.m_overlayTexture.Get(), &srvDesc, &atlas.m_overlaySRV);
     CHRA (hr);
 
-    hr = RenderOverlayGlyphsToAtlas (device);
+    hr = RenderOverlayGlyphsToAtlas (device, atlas.m_overlayTexture.Get());
     CHRA (hr);
 
     CalculateOverlayUVCoordinates();
@@ -509,8 +503,8 @@ Error:
     if (FAILED (hr))
     {
         m_overlayUVs.clear();
-        m_overlayTextureResourceView.Reset();
-        m_overlayTextureResource.Reset();
+        atlas.m_overlaySRV.Reset();
+        atlas.m_overlayTexture.Reset();
     }
 
     return hr;
@@ -616,7 +610,7 @@ Error:
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-HRESULT CharacterSet::RenderGlyphsToAtlas (ID3D11Device * d3dDevice)
+HRESULT CharacterSet::RenderGlyphsToAtlas (ID3D11Device * d3dDevice, ID3D11Texture2D * rainTexture)
 {
     HRESULT                      hr             = S_OK;
     ComPtr<ID2D1DeviceContext>   d2dContext;
@@ -630,9 +624,9 @@ HRESULT CharacterSet::RenderGlyphsToAtlas (ID3D11Device * d3dDevice)
 
 
 
-    CBRAEx (m_textureResource.Get() != nullptr, E_UNEXPECTED);
+    CBRAEx (rainTexture != nullptr, E_UNEXPECTED);
 
-    hr = CreateD2DRenderContext (d3dDevice, m_textureResource.Get(),
+    hr = CreateD2DRenderContext (d3dDevice, rainTexture,
                                 &d2dContext, &dwriteFactory, &brush);
     CHR (hr);
 
@@ -706,7 +700,7 @@ Error:
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-HRESULT CharacterSet::RenderOverlayGlyphsToAtlas (ID3D11Device * d3dDevice)
+HRESULT CharacterSet::RenderOverlayGlyphsToAtlas (ID3D11Device * d3dDevice, ID3D11Texture2D * overlayTexture)
 {
     HRESULT                      hr            = S_OK;
     ComPtr<ID2D1DeviceContext>   d2dContext;
@@ -719,9 +713,9 @@ HRESULT CharacterSet::RenderOverlayGlyphsToAtlas (ID3D11Device * d3dDevice)
 
 
 
-    CBRAEx (m_overlayTextureResource.Get() != nullptr, E_UNEXPECTED);
+    CBRAEx (overlayTexture != nullptr, E_UNEXPECTED);
 
-    hr = CreateD2DRenderContext (d3dDevice, m_overlayTextureResource.Get(),
+    hr = CreateD2DRenderContext (d3dDevice, overlayTexture,
                                 &d2dContext, &dwriteFactory, &brush);
     CHR (hr);
 

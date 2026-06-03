@@ -6,6 +6,7 @@
 
 #include "AnimationSystem.h"
 #include "CharacterInstance.h"
+#include "GlyphAtlas.h"
 #include "IRenderSystem.h"
 #include "Overlay.h"
 #include "RenderParams.h"
@@ -42,6 +43,14 @@ public:
     /// <param name="height">Initial viewport height</param>
     /// <returns>True on success, false on failure</returns>
     HRESULT Initialize (HWND hwnd, UINT width, UINT height);
+
+    /// <summary>
+    /// Build this render system's glyph atlas on its own device.  Must be called
+    /// after CharacterSet::Initialize() has computed the shared glyph layout.
+    /// Each per-monitor device owns its own atlas (an SRV cannot be bound on a
+    /// device that did not create it).
+    /// </summary>
+    HRESULT BuildGlyphAtlas();
 
     /// <summary>
     /// Render all character streaks from the animation system.
@@ -289,8 +298,8 @@ private:
     ComPtr<ID3D11BlendState>   m_premultipliedBlendState;
     ComPtr<ID3D11SamplerState> m_samplerState;
 
-    // Texture atlas reference
-    ComPtr<ID3D11ShaderResourceView> m_atlasTextureSRV;
+    // Texture atlas (per-device: rain + overlay glyph atlases on this device)
+    GlyphAtlas m_glyphAtlas;
 
     // Window handle (for DPI queries)
     HWND m_hwnd { nullptr };

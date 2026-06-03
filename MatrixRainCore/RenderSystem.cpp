@@ -90,6 +90,32 @@ Error:
 
 
 
+////////////////////////////////////////////////////////////////////////////////
+//
+//  RenderSystem::BuildGlyphAtlas
+//
+//  Builds this render system's rain + overlay glyph atlas on its own D3D11
+//  device.  CharacterSet::Initialize() must have already computed the shared
+//  device-independent glyph layout.  Each per-monitor device owns its atlas
+//  because a shader resource view cannot be bound on a device that did not
+//  create it.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+HRESULT RenderSystem::BuildGlyphAtlas()
+{
+    HRESULT hr = S_OK;
+
+
+    hr = CharacterSet::GetInstance().CreateTextureAtlas (m_device.Get(), m_dpiScale, m_glyphAtlas);
+    CHR (hr);
+
+Error:
+    return hr;
+}
+
+
+
 
 HRESULT RenderSystem::CreateDevice()
 {
@@ -763,7 +789,7 @@ void RenderSystem::OnDpiChanged (UINT dpi)
     // Recreate overlay atlas at the new DPI scale for 1:1 texel-to-pixel mapping
     if (m_device)
     {
-        CharacterSet::GetInstance().RecreateOverlayAtlas (m_device.Get(), m_dpiScale);
+        CharacterSet::GetInstance().RecreateOverlayAtlas (m_device.Get(), m_dpiScale, m_glyphAtlas);
     }
 }
 
@@ -1623,9 +1649,8 @@ void RenderSystem::Render (const AnimationSystem & animationSystem, const Viewpo
     m_context->PSSetShader (m_pixelShader.Get(), nullptr, 0);
     m_context->PSSetSamplers (0, 1, m_samplerState.GetAddressOf());
     
-    // Bind texture atlas from CharacterSet
-    CharacterSet& charSet = CharacterSet::GetInstance();
-    ID3D11ShaderResourceView * srv = charSet.GetTextureResourceView();
+    // Bind this device's rain glyph atlas
+    ID3D11ShaderResourceView * srv = m_glyphAtlas.RainResourceView();
     if (srv)
     {
         m_context->PSSetShaderResources (0, 1, &srv);
@@ -2203,7 +2228,7 @@ void RenderSystem::RenderOverlayInstances ()
     m_context->PSSetShader (m_overlayPixelShader.Get(), nullptr, 0);
     m_context->PSSetSamplers (0, 1, m_samplerState.GetAddressOf());
 
-    srv = charSet.GetOverlayTextureResourceView();
+    srv = m_glyphAtlas.OverlayResourceView();
     if (srv)
     {
         m_context->PSSetShaderResources (0, 1, &srv);
@@ -2736,7 +2761,7 @@ void RenderSystem::ReleaseDirectXResources()
     m_haloPS.Reset();
     m_haloConstantBuffer.Reset();
     m_bloomConstantBuffer.Reset();
-    m_atlasTextureSRV.Reset();
+    m_glyphAtlas.Reset();
     m_samplerState.Reset();
     m_premultipliedBlendState.Reset();
     m_blendState.Reset();

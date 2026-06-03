@@ -202,7 +202,7 @@ HRESULT Application::Initialize (HINSTANCE hInstance, int nCmdShow, const Screen
 
     m_animationSystem->Initialize (*m_viewport, *m_densityController);
 
-    hr = charSet.CreateTextureAtlas (m_renderSystem->GetDevice(), m_renderSystem->GetDpiScale());
+    hr = m_renderSystem->BuildGlyphAtlas();
     CHR (hr);
 
 

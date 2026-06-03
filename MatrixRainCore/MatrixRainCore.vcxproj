@@ -291,6 +291,7 @@
     <ClInclude Include="OverlayColor.h" />
     <ClInclude Include="InMemorySettingsProvider.h" />
     <ClInclude Include="InputSystem.h" />
+    <ClInclude Include="GlyphAtlas.h" />
     <ClInclude Include="IMonitorProvider.h" />
     <ClInclude Include="InMemoryMonitorProvider.h" />
     <ClInclude Include="IRenderSystem.h" />
