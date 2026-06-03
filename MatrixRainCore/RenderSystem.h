@@ -26,107 +26,46 @@ using Microsoft::WRL::ComPtr;
 // Forward declarations
 class CharacterStreak;
 
-/// <summary>
-/// Manages DirectX 11 rendering pipeline for Matrix Rain effect.
-/// Handles device creation, shader compilation, instanced rendering, and presentation.
-/// </summary>
+////////////////////////////////////////////////////////////////////////////////
+//
+//  RenderSystem
+//
+//  Manages the Direct3D 11 rendering pipeline for the Matrix rain effect:
+//  device creation, shader compilation, instanced rendering, and presentation.
+//
+////////////////////////////////////////////////////////////////////////////////
+
 class RenderSystem : public IRenderSystem
 {
 public:
     ~RenderSystem();
 
-    /// <summary>
-    /// Initialize DirectX 11 device, swap chain, and rendering resources.
-    /// </summary>
-    /// <param name="hwnd">Window handle for swap chain creation</param>
-    /// <param name="width">Initial viewport width</param>
-    /// <param name="height">Initial viewport height</param>
-    /// <returns>True on success, false on failure</returns>
     HRESULT Initialize (HWND hwnd, UINT width, UINT height);
 
-    /// <summary>
-    /// Build this render system's glyph atlas on its own device.  Must be called
-    /// after CharacterSet::Initialize() has computed the shared glyph layout.
-    /// Each per-monitor device owns its own atlas (an SRV cannot be bound on a
-    /// device that did not create it).
-    /// </summary>
     HRESULT BuildGlyphAtlas();
 
-    /// <summary>
-    /// Render all character streaks from the animation system.
-    /// </summary>
     void Render (const AnimationSystem & animationSystem, const Viewport & viewport, const RenderParams & params) override;
 
-    /// <summary>
-    /// Present the rendered frame to the screen.
-    /// </summary>
     void Present() override;
 
-    /// <summary>
-    /// Handle window resize by recreating swap chain buffers.
-    /// </summary>
-    /// <param name="width">New viewport width</param>
-    /// <param name="height">New viewport height</param>
     void Resize (UINT width, UINT height) override;
 
-    /// <summary>
-    /// Recreate swap chain for display mode transitions (windowed ↔ fullscreen).
-    /// </summary>
-    /// <param name="hwnd">Window handle</param>
-    /// <param name="width">New width</param>
-    /// <param name="height">New height</param>
-    /// <param name="fullscreen">True for fullscreen, false for windowed</param>
-    /// <returns>True on success, false on failure</returns>
     bool RecreateSwapChain (HWND hwnd, UINT width, UINT height, bool fullscreen);
 
-    /// <summary>
-    /// Set swap chain to fullscreen mode.
-    /// </summary>
-    /// <returns>True on success, false on failure</returns>
     bool SetFullscreen();
 
-    /// <summary>
-    /// Set swap chain to windowed mode.
-    /// </summary>
-    /// <returns>True on success, false on failure</returns>
     bool SetWindowed();
 
-    /// <summary>
-    /// Clean up all DirectX resources.
-    /// </summary>
     void Shutdown();
 
-    /// <summary>
-    /// Set glow intensity multiplier from percentage (0-200).
-    /// </summary>
-    /// <param name="intensityPercent">Glow intensity percentage (100 = default)</param>
     void SetGlowIntensity (int intensityPercent) override;
 
-    /// <summary>
-    /// Set glow blur size from percentage (50-200).
-    /// </summary>
-    /// <param name="sizePercent">Glow size percentage (100 = default)</param>
     void SetGlowSize (int sizePercent) override;
 
-    /// <summary>
-    /// Override character scale to prevent viewport-based scaling.
-    /// When set, the constant buffer characterScale uses this value
-    /// instead of computing from viewport height.
-    /// </summary>
-    /// <param name="scale">Fixed character scale (1.0 = full size)</param>
     void SetCharacterScaleOverride (float scale) override;
 
-    /// <summary>
-    /// Notify the render system of a DPI change.  Recreates DPI-sensitive
-    /// resources (text formats) and stores the new scale factor for use
-    /// by the character-scale constant buffer and overlay layout.
-    /// </summary>
-    /// <param name="dpi">New dots-per-inch value from GetDpiForWindow</param>
     void OnDpiChanged (UINT dpi) override;
 
-    /// <summary>
-    /// Returns the current DPI scale factor (1.0 at 96 DPI / 100%).
-    /// </summary>
     float GetDpiScale() const override { return m_dpiScale; }
 
     // Accessors
@@ -136,10 +75,8 @@ public:
     IDWriteFactory      * GetDWriteFactory() const { return m_dwriteFactory.Get(); }
 
 private:
-    /// <summary>
-    /// Instance data for rendering a single character glyph.
-    /// Packed tightly for GPU upload.
-    /// </summary>
+    // Instance data for rendering a single character glyph; packed tightly for
+    // GPU upload.
     #pragma warning(push)
     #pragma warning(disable: 4324)  // structure was padded due to alignment specifier
     struct alignas(16) CharacterInstanceData
@@ -165,9 +102,7 @@ private:
     };
     #pragma warning(pop)
 
-    /// <summary>
-    /// Constant buffer data passed to shaders each frame.
-    /// </summary>
+    // Constant buffer data passed to shaders each frame.
     struct ConstantBufferData
     {
         float projection[16];   // 4x4 projection matrix (column-major)
