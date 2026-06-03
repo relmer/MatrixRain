@@ -14,6 +14,8 @@
 #include "InputSystem.h"
 #include "FPSCounter.h"
 #include "MonitorRenderContext.h"
+#include "MonitorLayout.h"
+#include "RenderThreadInputs.h"
 #include "WindowsMonitorProvider.h"
 #include "ScreenSaverModeContext.h"
 #include "UnicodeSymbols.h"
@@ -456,21 +458,11 @@ Error:
 
 HRESULT Application::CreateFullscreenContexts()
 {
-    HRESULT                  hr           = S_OK;
-    std::vector<MonitorInfo> monitors     = m_monitorProvider->GetMonitors();
-    std::vector<MonitorInfo> valid;
-    size_t                   primaryIndex = 0;
+    HRESULT                       hr         = S_OK;
+    std::vector<MonitorPlacement> placements = PlanFullscreenPlacements (m_monitorProvider->GetMonitors());
 
 
-    for (const MonitorInfo & monitor : monitors)
-    {
-        if (monitor.Width() > 0 && monitor.Height() > 0)
-        {
-            valid.push_back (monitor);
-        }
-    }
-
-    if (valid.empty())
+    if (placements.empty())
     {
         // No usable topology reported — degrade gracefully to one window
         hr = CreateSingleContext();
@@ -478,23 +470,9 @@ HRESULT Application::CreateFullscreenContexts()
     }
     else
     {
-        for (size_t i = 0; i < valid.size(); ++i)
+        for (const MonitorPlacement & placement : placements)
         {
-            if (valid[i].m_isPrimary)
-            {
-                primaryIndex = i;
-                break;
-            }
-        }
-
-        for (size_t i = 0; i < valid.size(); ++i)
-        {
-            const MonitorInfo & monitor = valid[i];
-
-            POINT position = { monitor.m_bounds.left, monitor.m_bounds.top };
-            SIZE  size     = { monitor.Width(), monitor.Height() };
-
-            hr = AddContext (position, size, WS_POPUP | WS_VISIBLE, nullptr, i == primaryIndex);
+            hr = AddContext (placement.position, placement.size, WS_POPUP | WS_VISIBLE, nullptr, placement.isPrimary);
             CHR (hr);
         }
     }
@@ -741,10 +719,13 @@ void Application::StartRenderThreads()
 {
     for (auto & context : m_contexts)
     {
-        ApplicationState * primaryClock = context->IsPrimary() ? m_appState.get() : nullptr;
-        OverlayState     * overlays     = context->IsPrimary() ? &m_overlays      : nullptr;
+        RenderThreadInputs inputs = MakeRenderThreadInputs (context->IsPrimary(),
+                                                            &m_sharedState,
+                                                            &m_overlays,
+                                                            m_appState.get(),
+                                                            &m_inDisplayModeTransition);
 
-        context->StartRenderThread (m_sharedState, overlays, primaryClock, m_inDisplayModeTransition);
+        context->StartRenderThread (*inputs.sharedState, inputs.overlays, inputs.primaryClock, *inputs.inTransition);
     }
 }
 
