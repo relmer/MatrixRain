@@ -82,15 +82,177 @@ static Application * GetApplicationFromDialog (HWND hDlg)
 
 ////////////////////////////////////////////////////////////////////////////////
 //
+//  Slider value-label helpers
+//
+////////////////////////////////////////////////////////////////////////////////
+
+static std::wstring FormatPercentLabel (int sliderId, int value)
+{
+    // Glow Intensity reads "0% (glow disabled)" at 0 (FR-031).
+    if (sliderId == IDC_GLOWINTENSITY_SLIDER && value == 0)
+    {
+        return std::wstring (L"0% (glow disabled)");
+    }
+
+    return std::format (L"{}%", value);
+}
+
+
+
+
+static const wchar_t * FormatResolutionLabel (int divisor)
+{
+    switch (divisor)
+    {
+        case 1: return L"Full";
+        case 2: return L"Half";
+        case 4: return L"Quarter";
+        case 8: return L"Eighth";
+        default: return L"Half";
+    }
+}
+
+
+
+
+static const wchar_t * FormatSmoothnessLabel (int taps)
+{
+    switch (taps)
+    {
+        case 5:  return L"Low";
+        case 9:  return L"Medium";
+        case 13: return L"High";
+        default: return L"High";
+    }
+}
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  Tick-frequency conventions for percentage sliders (research R-011).
+//  Returns the TBM_SETTICFREQ value for the given slider id.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+static int TickFrequencyForSlider (int sliderId)
+{
+    switch (sliderId)
+    {
+        case IDC_DENSITY_SLIDER:        return 5;   // 0..100 -> 21 ticks
+        case IDC_ANIMSPEED_SLIDER:      return 5;   // 1..100 -> 20 ticks + explicit at 100
+        case IDC_GLOWINTENSITY_SLIDER:  return 10;  // 0..200 -> 21 ticks
+        case IDC_GLOWSIZE_SLIDER:       return 5;   // 50..200 -> 31 ticks (midpoint at 125)
+        default:                        return 1;
+    }
+}
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
 //  InitializeSlider
 //
 ////////////////////////////////////////////////////////////////////////////////
 
 static void InitializeSlider (HWND hDlg, int sliderId, int labelId, int minValue, int maxValue, int currentValue)
 {
-    SendDlgItemMessageW (hDlg, sliderId, TBM_SETRANGE, TRUE, MAKELPARAM (minValue, maxValue));
+    SendDlgItemMessageW (hDlg, sliderId, TBM_SETRANGE,    TRUE, MAKELPARAM (minValue, maxValue));
+    SendDlgItemMessageW (hDlg, sliderId, TBM_SETTICFREQ,  TickFrequencyForSlider (sliderId), 0);
+
+    // Speed (1..100) at freq=5 lands the last tick at 96; add an explicit
+    // tick at 100 for the documented 21-tick total.
+    if (sliderId == IDC_ANIMSPEED_SLIDER)
+    {
+        SendDlgItemMessageW (hDlg, sliderId, TBM_SETTIC, 0, 100);
+    }
+
     SendDlgItemMessageW (hDlg, sliderId, TBM_SETPOS, TRUE, currentValue);
-    SetDlgItemTextW     (hDlg, labelId, std::format (L"{}%", currentValue).c_str());
+    SetDlgItemTextW     (hDlg, labelId, FormatPercentLabel (sliderId, currentValue).c_str());
+}
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  Discrete-slider initializers (Passes / Resolution / Smoothness).  These
+//  use the same trackbar control but with small integer ranges and mapped
+//  labels rather than percentages.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+static void InitializePassesSlider (HWND hDlg, int currentPasses)
+{
+    SendDlgItemMessageW (hDlg, IDC_GLOWPASSES_SLIDER, TBM_SETRANGE, TRUE, MAKELPARAM (1, 4));
+    SendDlgItemMessageW (hDlg, IDC_GLOWPASSES_SLIDER, TBM_SETTICFREQ, 1, 0);
+    SendDlgItemMessageW (hDlg, IDC_GLOWPASSES_SLIDER, TBM_SETPOS,   TRUE, currentPasses);
+    SetDlgItemTextW     (hDlg, IDC_GLOWPASSES_LABEL, std::format (L"{}", currentPasses).c_str());
+}
+
+
+static void InitializeResolutionSlider (HWND hDlg, int currentDivisor)
+{
+    // Slider position 0..3 maps to divisor 8/4/2/1 (Eighth/Quarter/Half/Full)
+    int pos = 2;  // default Half
+
+    switch (currentDivisor)
+    {
+        case 8: pos = 0; break;
+        case 4: pos = 1; break;
+        case 2: pos = 2; break;
+        case 1: pos = 3; break;
+    }
+
+    SendDlgItemMessageW (hDlg, IDC_GLOWRES_SLIDER, TBM_SETRANGE, TRUE, MAKELPARAM (0, 3));
+    SendDlgItemMessageW (hDlg, IDC_GLOWRES_SLIDER, TBM_SETTICFREQ, 1, 0);
+    SendDlgItemMessageW (hDlg, IDC_GLOWRES_SLIDER, TBM_SETPOS,   TRUE, pos);
+    SetDlgItemTextW     (hDlg, IDC_GLOWRES_LABEL, FormatResolutionLabel (currentDivisor));
+}
+
+
+static void InitializeSmoothnessSlider (HWND hDlg, int currentTaps)
+{
+    int pos = 2;  // default High
+
+    switch (currentTaps)
+    {
+        case 5:  pos = 0; break;
+        case 9:  pos = 1; break;
+        case 13: pos = 2; break;
+    }
+
+    SendDlgItemMessageW (hDlg, IDC_GLOWSMOOTH_SLIDER, TBM_SETRANGE, TRUE, MAKELPARAM (0, 2));
+    SendDlgItemMessageW (hDlg, IDC_GLOWSMOOTH_SLIDER, TBM_SETTICFREQ, 1, 0);
+    SendDlgItemMessageW (hDlg, IDC_GLOWSMOOTH_SLIDER, TBM_SETPOS,   TRUE, pos);
+    SetDlgItemTextW     (hDlg, IDC_GLOWSMOOTH_LABEL, FormatSmoothnessLabel (currentTaps));
+}
+
+
+static int ResolutionSliderPosToDivisor (int pos)
+{
+    switch (pos)
+    {
+        case 0: return 8;
+        case 1: return 4;
+        case 2: return 2;
+        case 3: return 1;
+        default: return 2;
+    }
+}
+
+
+static int SmoothnessSliderPosToTaps (int pos)
+{
+    switch (pos)
+    {
+        case 0: return 5;
+        case 1: return 9;
+        case 2: return 13;
+        default: return 13;
+    }
 }
 
 
@@ -311,6 +473,21 @@ static BOOL OnInitDialog (HWND hDlg, LPARAM initParam)
     
     InitializeColorSchemeCombo (hDlg, pSettings->m_colorSchemeKey);
     InitializeGpuCombo         (hDlg, pContext, pSettings->m_gpuAdapter);
+
+    // Quality preset combo + advanced disclosure.  Three named presets +
+    // Custom; the dialog code selects whichever matches the loaded
+    // settings.
+    SendDlgItemMessageW (hDlg, IDC_QUALITY_PRESET_COMBO, CB_ADDSTRING, 0, (LPARAM) L"Low");
+    SendDlgItemMessageW (hDlg, IDC_QUALITY_PRESET_COMBO, CB_ADDSTRING, 0, (LPARAM) L"Medium");
+    SendDlgItemMessageW (hDlg, IDC_QUALITY_PRESET_COMBO, CB_ADDSTRING, 0, (LPARAM) L"High");
+    SendDlgItemMessageW (hDlg, IDC_QUALITY_PRESET_COMBO, CB_ADDSTRING, 0, (LPARAM) L"Custom");
+    SendDlgItemMessageW (hDlg, IDC_QUALITY_PRESET_COMBO, CB_SETCURSEL, static_cast<int> (pSettings->m_qualityPreset), 0);
+
+    InitializePassesSlider      (hDlg, pSettings->m_advancedValues.m_blurPasses);
+    InitializeResolutionSlider  (hDlg, static_cast<int> (pSettings->m_advancedValues.m_bloomResolutionDivisor));
+    InitializeSmoothnessSlider  (hDlg, static_cast<int> (pSettings->m_advancedValues.m_blurTaps));
+
+    CheckDlgButton (hDlg, IDC_GRAPHICS_ADVANCED_CHECK, pSettings->m_showAdvancedGraphics ? BST_CHECKED : BST_UNCHECKED);
     
     CheckDlgButton (hDlg, IDC_STARTFULLSCREEN_CHECK, pSettings->m_startFullscreen     ? BST_CHECKED : BST_UNCHECKED);
     CheckDlgButton (hDlg, IDC_MULTIMONITOR_CHECK,    pSettings->m_multiMonitorEnabled ? BST_CHECKED : BST_UNCHECKED);
@@ -364,23 +541,69 @@ static BOOL OnHScroll (HWND hDlg, LPARAM lParam)
     {
         case IDC_DENSITY_SLIDER:
             pController->UpdateDensity (pos);
-            SetDlgItemTextW (hDlg, IDC_DENSITY_LABEL, std::format (L"{}%", pos).c_str());
+            SetDlgItemTextW (hDlg, IDC_DENSITY_LABEL, FormatPercentLabel (ctrlId, pos).c_str());
             break;
             
         case IDC_ANIMSPEED_SLIDER:
             pController->UpdateAnimationSpeed (pos);
-            SetDlgItemTextW (hDlg, IDC_ANIMSPEED_LABEL, std::format (L"{}%", pos).c_str());
+            SetDlgItemTextW (hDlg, IDC_ANIMSPEED_LABEL, FormatPercentLabel (ctrlId, pos).c_str());
             break;
             
         case IDC_GLOWINTENSITY_SLIDER:
+        {
             pController->UpdateGlowIntensity (pos);
-            SetDlgItemTextW (hDlg, IDC_GLOWINTENSITY_LABEL, std::format (L"{}%", pos).c_str());
+            SetDlgItemTextW (hDlg, IDC_GLOWINTENSITY_LABEL, FormatPercentLabel (ctrlId, pos).c_str());
+
+            // Glow Intensity is part of the advanced-graphics value set;
+            // changing it drifts the preset to Custom (FR-023) the same
+            // way moving Passes / Resolution / Smoothness would.
+            AdvancedGraphicsValues v = pController->GetSettings().m_advancedValues;
+            v.m_glowIntensityPercent = pos;
+            pController->UpdateAdvancedGraphicsValues (v);
+            SendDlgItemMessageW (hDlg, IDC_QUALITY_PRESET_COMBO, CB_SETCURSEL,
+                                 static_cast<int> (pController->GetSettings().m_qualityPreset), 0);
             break;
+        }
             
         case IDC_GLOWSIZE_SLIDER:
             pController->UpdateGlowSize (pos);
-            SetDlgItemTextW (hDlg, IDC_GLOWSIZE_LABEL, std::format (L"{}%", pos).c_str());
+            SetDlgItemTextW (hDlg, IDC_GLOWSIZE_LABEL, FormatPercentLabel (ctrlId, pos).c_str());
             break;
+
+        case IDC_GLOWPASSES_SLIDER:
+        {
+            AdvancedGraphicsValues v = pController->GetSettings().m_advancedValues;
+            v.m_blurPasses = pos;
+            pController->UpdateAdvancedGraphicsValues (v);
+            SetDlgItemTextW (hDlg, IDC_GLOWPASSES_LABEL, std::format (L"{}", pos).c_str());
+            SendDlgItemMessageW (hDlg, IDC_QUALITY_PRESET_COMBO, CB_SETCURSEL,
+                                 static_cast<int> (pController->GetSettings().m_qualityPreset), 0);
+            break;
+        }
+
+        case IDC_GLOWRES_SLIDER:
+        {
+            int divisor = ResolutionSliderPosToDivisor (pos);
+            AdvancedGraphicsValues v = pController->GetSettings().m_advancedValues;
+            v.m_bloomResolutionDivisor = static_cast<ResolutionDivisor> (divisor);
+            pController->UpdateAdvancedGraphicsValues (v);
+            SetDlgItemTextW (hDlg, IDC_GLOWRES_LABEL, FormatResolutionLabel (divisor));
+            SendDlgItemMessageW (hDlg, IDC_QUALITY_PRESET_COMBO, CB_SETCURSEL,
+                                 static_cast<int> (pController->GetSettings().m_qualityPreset), 0);
+            break;
+        }
+
+        case IDC_GLOWSMOOTH_SLIDER:
+        {
+            int taps = SmoothnessSliderPosToTaps (pos);
+            AdvancedGraphicsValues v = pController->GetSettings().m_advancedValues;
+            v.m_blurTaps = static_cast<BlurTaps> (taps);
+            pController->UpdateAdvancedGraphicsValues (v);
+            SetDlgItemTextW (hDlg, IDC_GLOWSMOOTH_LABEL, FormatSmoothnessLabel (taps));
+            SendDlgItemMessageW (hDlg, IDC_QUALITY_PRESET_COMBO, CB_SETCURSEL,
+                                 static_cast<int> (pController->GetSettings().m_qualityPreset), 0);
+            break;
+        }
     }
     
     fSuccess = TRUE;
@@ -459,6 +682,74 @@ Error:
     return;
 }
 
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  OnQualityPresetChange
+//
+////////////////////////////////////////////////////////////////////////////////
+
+static void OnQualityPresetChange (HWND hDlg)
+{
+    HRESULT                  hr          = S_OK;
+    ConfigDialogController * pController = GetControllerFromDialog (hDlg);
+    int                      index       = 0;
+
+
+
+    CBRAEx (pController != nullptr, E_UNEXPECTED);
+
+    index = (int) SendDlgItemMessageW (hDlg, IDC_QUALITY_PRESET_COMBO, CB_GETCURSEL, 0, 0);
+
+    CBRAEx (index >= 0 && index <= 3, E_UNEXPECTED);
+
+    pController->UpdateQualityPreset (static_cast<QualityPreset> (index));
+
+    {
+        // Reflect the snapped advanced values back into the three sliders and
+        // the Glow Intensity slider; the controller already updated them.
+        const ScreenSaverSettings & s = pController->GetSettings();
+
+        SendDlgItemMessageW (hDlg, IDC_GLOWINTENSITY_SLIDER, TBM_SETPOS, TRUE, s.m_advancedValues.m_glowIntensityPercent);
+        SetDlgItemTextW     (hDlg, IDC_GLOWINTENSITY_LABEL,
+                             FormatPercentLabel (IDC_GLOWINTENSITY_SLIDER, s.m_advancedValues.m_glowIntensityPercent).c_str());
+
+        InitializePassesSlider     (hDlg, s.m_advancedValues.m_blurPasses);
+        InitializeResolutionSlider (hDlg, static_cast<int> (s.m_advancedValues.m_bloomResolutionDivisor));
+        InitializeSmoothnessSlider (hDlg, static_cast<int> (s.m_advancedValues.m_blurTaps));
+    }
+
+Error:
+    return;
+}
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  OnGraphicsAdvancedCheck
+//
+////////////////////////////////////////////////////////////////////////////////
+
+static void OnGraphicsAdvancedCheck (HWND hDlg)
+{
+    HRESULT                  hr          = S_OK;
+    ConfigDialogController * pController = GetControllerFromDialog (hDlg);
+    bool                     checked     = IsDlgButtonChecked (hDlg, IDC_GRAPHICS_ADVANCED_CHECK) == BST_CHECKED;
+
+
+
+    CBRAEx (pController != nullptr, E_UNEXPECTED);
+
+    pController->UpdateShowAdvancedGraphics (checked);
+
+Error:
+    return;
+}
 
 
 
@@ -786,6 +1077,17 @@ static BOOL OnCommand (HWND hDlg, WPARAM wParam)
             {
                 OnGpuChange (hDlg);
             }
+            break;
+
+        case IDC_QUALITY_PRESET_COMBO:
+            if (HIWORD (wParam) == CBN_SELCHANGE)
+            {
+                OnQualityPresetChange (hDlg);
+            }
+            break;
+
+        case IDC_GRAPHICS_ADVANCED_CHECK:
+            OnGraphicsAdvancedCheck (hDlg);
             break;
             
         case IDC_STARTFULLSCREEN_CHECK:
