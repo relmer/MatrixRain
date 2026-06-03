@@ -4,6 +4,8 @@ All notable changes to MatrixRain are documented in this file.
 
 ## [Unreleased]
 
+## [1.3.1984] - 2026-06-03
+
 ### Added
 
 - Multi-monitor support: in fullscreen and screensaver modes, every connected display now renders its own independent Matrix rain animation. Each monitor runs on a dedicated render thread and is paced by its own VSync, so animation stays smooth across displays.
