@@ -289,7 +289,10 @@
     <ClInclude Include="ScrambleRevealEffect.h" />
     <ClInclude Include="SharedState.h" />
     <ClInclude Include="OverlayColor.h" />
+    <ClInclude Include="AdapterSelection.h" />
     <ClInclude Include="DeviceLost.h" />
+    <ClInclude Include="IAdapterProvider.h" />
+    <ClInclude Include="InMemoryAdapterProvider.h" />
     <ClInclude Include="MultiMonitorGate.h" />
     <ClInclude Include="RebuildCoalescer.h" />
     <ClInclude Include="InMemorySettingsProvider.h" />
@@ -345,6 +348,7 @@
     <ClCompile Include="MonitorLayout.cpp" />
     <ClCompile Include="RenderThreadInputs.cpp" />
     <ClCompile Include="WindowsMonitorProvider.cpp" />
+    <ClCompile Include="AdapterSelection.cpp" />
     <ClCompile Include="DeviceLost.cpp" />
     <ClCompile Include="MultiMonitorGate.cpp" />
     <ClCompile Include="RebuildCoalescer.cpp" />
