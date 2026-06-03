@@ -88,6 +88,50 @@ static void InitializeSlider (HWND hDlg, int sliderId, int labelId, int minValue
 
 
 
+// Color scheme combo entries: capitalized display label paired with the
+// lowercase persisted key.  Index order MUST stay in sync between population,
+// selection, and read-back so the UI label never leaks into storage/enums.
+struct ColorSchemeEntry
+{
+    const WCHAR * key;
+    const WCHAR * label;
+};
+
+
+
+
+static constexpr ColorSchemeEntry s_colorSchemeEntries[] =
+{
+    { L"green", L"Green" },
+    { L"blue",  L"Blue"  },
+    { L"red",   L"Red"   },
+    { L"amber", L"Amber" },
+    { L"cycle", L"Cycle" },
+};
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  ColorSchemeKeyToIndex
+//
+////////////////////////////////////////////////////////////////////////////////
+
+static int ColorSchemeKeyToIndex (const std::wstring & key)
+{
+    for (int i = 0; i < static_cast<int> (ARRAYSIZE (s_colorSchemeEntries)); i++)
+    {
+        if (key == s_colorSchemeEntries[i].key)
+            return i;
+    }
+
+    return 0;
+}
+
+
+
+
 ////////////////////////////////////////////////////////////////////////////////
 //
 //  InitializeColorSchemeCombo
@@ -96,21 +140,12 @@ static void InitializeSlider (HWND hDlg, int sliderId, int labelId, int minValue
 
 static void InitializeColorSchemeCombo (HWND hDlg, const std::wstring & currentScheme)
 {
-    SendDlgItemMessageW (hDlg, IDC_COLORSCHEME_COMBO, CB_ADDSTRING, 0, (LPARAM)L"green");
-    SendDlgItemMessageW (hDlg, IDC_COLORSCHEME_COMBO, CB_ADDSTRING, 0, (LPARAM)L"blue");
-    SendDlgItemMessageW (hDlg, IDC_COLORSCHEME_COMBO, CB_ADDSTRING, 0, (LPARAM)L"red");
-    SendDlgItemMessageW (hDlg, IDC_COLORSCHEME_COMBO, CB_ADDSTRING, 0, (LPARAM)L"amber");
-    SendDlgItemMessageW (hDlg, IDC_COLORSCHEME_COMBO, CB_ADDSTRING, 0, (LPARAM)L"cycle");
-    
-    int index = 0;
-    
-    if      (currentScheme == L"green") index = 0;
-    else if (currentScheme == L"blue")  index = 1;
-    else if (currentScheme == L"red")   index = 2;
-    else if (currentScheme == L"amber") index = 3;
-    else if (currentScheme == L"cycle") index = 4;
-    
-    SendDlgItemMessageW (hDlg, IDC_COLORSCHEME_COMBO, CB_SETCURSEL, index, 0);
+    for (const ColorSchemeEntry & entry : s_colorSchemeEntries)
+    {
+        SendDlgItemMessageW (hDlg, IDC_COLORSCHEME_COMBO, CB_ADDSTRING, 0, (LPARAM) entry.label);
+    }
+
+    SendDlgItemMessageW (hDlg, IDC_COLORSCHEME_COMBO, CB_SETCURSEL, ColorSchemeKeyToIndex (currentScheme), 0);
 }
 
 
@@ -312,16 +347,16 @@ static void OnColorSchemeChange (HWND hDlg)
     HRESULT                  hr          = S_OK;
     ConfigDialogController * pController = GetControllerFromDialog (hDlg);
     int                      index       = 0;
-    WCHAR                    scheme[32];
 
 
 
     CBRAEx (pController != nullptr, E_UNEXPECTED);
 
-    index = (int)SendDlgItemMessageW (hDlg, IDC_COLORSCHEME_COMBO, CB_GETCURSEL, 0, 0);
-    
-    SendDlgItemMessageW (hDlg, IDC_COLORSCHEME_COMBO, CB_GETLBTEXT, index, (LPARAM)scheme);
-    pController->UpdateColorScheme (scheme);
+    index = (int) SendDlgItemMessageW (hDlg, IDC_COLORSCHEME_COMBO, CB_GETCURSEL, 0, 0);
+
+    CBRAEx (index >= 0 && index < static_cast<int> (ARRAYSIZE (s_colorSchemeEntries)), E_UNEXPECTED);
+
+    pController->UpdateColorScheme (s_colorSchemeEntries[index].key);
 
 Error:
     return;
@@ -466,11 +501,7 @@ static void OnResetButton (HWND hDlg)
     SetDlgItemTextW     (hDlg, IDC_GLOWSIZE_LABEL, std::format (L"{}%", pDefaults->m_glowSizePercent).c_str());
     
     // Update color scheme combo box
-    if      (pDefaults->m_colorSchemeKey == L"green") schemeIndex = 0;
-    else if (pDefaults->m_colorSchemeKey == L"blue")  schemeIndex = 1;
-    else if (pDefaults->m_colorSchemeKey == L"red")   schemeIndex = 2;
-    else if (pDefaults->m_colorSchemeKey == L"amber") schemeIndex = 3;
-    else if (pDefaults->m_colorSchemeKey == L"cycle") schemeIndex = 4;
+    schemeIndex = ColorSchemeKeyToIndex (pDefaults->m_colorSchemeKey);
     SendDlgItemMessageW (hDlg, IDC_COLORSCHEME_COMBO, CB_SETCURSEL, schemeIndex, 0);
     
     CheckDlgButton (hDlg, IDC_STARTFULLSCREEN_CHECK, pDefaults->m_startFullscreen ? BST_CHECKED : BST_UNCHECKED);

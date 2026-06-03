@@ -183,6 +183,34 @@ Assert::AreEqual (192, controller.GetTargetStreakCount(), L"Target count should 
 			// Max = 3840 / 24 * 2.4 = 384 streaks
 			Assert::AreEqual (384, largeController.GetMaxPossibleStreaks(), L"Max for 3840px should be 384");
 		}
+
+
+
+
+		TEST_METHOD (TestDensityControllerScalesWithDpi)
+		{
+			// Density is seeded with a 16px base spacing and scaled by the
+			// monitor's effective DPI.  At 150% scaling the effective spacing
+			// becomes 16 * 1.5 = 24, matching the renderer's 24px glyph spacing
+			// and reproducing the tuned density on a 4K@150% display.
+
+			Viewport viewport;
+			viewport.Resize (1920.0f, 1080.0f);
+
+			DensityController controller (viewport, 16.0f);
+
+			// 100% scaling: 1920 / 16 * 2.4 = 288 (denser than the legacy 24px seed)
+			controller.SetDpiScale (1.0f);
+			Assert::AreEqual (288, controller.GetMaxPossibleStreaks(), L"16px base at 100% should yield 288");
+
+			// 150% scaling: effective 24px => 1920 / 24 * 2.4 = 192
+			controller.SetDpiScale (1.5f);
+			Assert::AreEqual (192, controller.GetMaxPossibleStreaks(), L"16px base at 150% should match the 24px@100% density");
+
+			// 200% scaling: effective 32px => 1920 / 32 * 2.4 = 144
+			controller.SetDpiScale (2.0f);
+			Assert::AreEqual (144, controller.GetMaxPossibleStreaks(), L"16px base at 200% should yield 144");
+		}
     };
 }  // namespace MatrixRainTests
 

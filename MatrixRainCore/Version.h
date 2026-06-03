@@ -4,8 +4,8 @@
 // The build number and year are automatically updated by the pre-build script
 
 #define VERSION_MAJOR 1
-#define VERSION_MINOR 2
-#define VERSION_BUILD 1983
+#define VERSION_MINOR 3
+#define VERSION_BUILD 1984
 #define VERSION_YEAR 2026
 
 // Helper macros for stringification

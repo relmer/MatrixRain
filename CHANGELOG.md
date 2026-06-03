@@ -4,6 +4,24 @@ All notable changes to MatrixRain are documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Multi-monitor support: in fullscreen and screensaver modes, every connected display now renders its own independent Matrix rain animation. Each monitor runs on a dedicated render thread and is paced by its own VSync, so animation stays smooth across displays.
+- Per-monitor DPI awareness for multi-monitor setups: each display sizes glyphs according to its own DPI/scaling, with the color-cycle clock shared across monitors so they stay in sync.
+
+### Changed
+
+- Default color scheme (and the settings dialog **Reset**) is now **Color Cycle** instead of green.
+- Settings dialog color names are now capitalized (Green, Blue, Red, Amber, Cycle); persisted registry values remain lowercase for compatibility.
+
+### Fixed
+
+- Overlay text (help hint, hotkey reference) now DPI-scales to the primary monitor on multi-monitor setups; previously the shared overlay glyph atlas could be sized to a secondary monitor's DPI, making overlays render too small on a high-DPI primary.
+
+### Known Issues
+
+- On setups that mix display scaling levels (e.g. a 100%-scaled monitor next to a 150%-scaled one), glyph size is derived from each monitor's Windows scaling percentage rather than true physical pixel density, so characters can appear visibly larger on the lower-scaled display. See `specs/002-add-screensaver-support/multimon-architecture.md`.
+
 ## [1.2.1983] - 2026-05-23
 
 ### Fixed

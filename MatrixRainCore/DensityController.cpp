@@ -42,12 +42,23 @@ void DensityController::SetPercentage (int percentage)
 
 
 
+void DensityController::SetDpiScale (float dpiScale)
+{
+    // Effective spacing tracks monitor DPI; guard against a zero/negative
+    // scale so GetMaxPossibleStreaks never divides by zero.
+    m_dpiScale = std::max (dpiScale, 0.01f);
+}
+
+
+
+
+
 int DensityController::GetMaxPossibleStreaks() const
 {
     // Max streaks = viewport width / (character horizontal spacing / 2)
     // At 100%, streaks fill the screen with double density (overlapping allowed)
     float viewportWidth = m_viewport.GetWidth();
-    int maxStreaks      = static_cast<int> (viewportWidth / m_characterWidth * 2.4f);
+    int maxStreaks      = static_cast<int> (viewportWidth / (m_characterWidth * m_dpiScale) * 2.4f);
     
     // Ensure at least minimum
     return std::max (maxStreaks, MIN_STREAKS);

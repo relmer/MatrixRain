@@ -13,6 +13,10 @@
 #include "DensityController.h"
 #include "InputSystem.h"
 #include "FPSCounter.h"
+#include "MonitorRenderContext.h"
+#include "MonitorLayout.h"
+#include "RenderThreadInputs.h"
+#include "WindowsMonitorProvider.h"
 #include "ScreenSaverModeContext.h"
 #include "UnicodeSymbols.h"
 #include "Version.h"
@@ -130,15 +134,10 @@ HRESULT Application::Initialize (HINSTANCE hInstance, int nCmdShow, const Screen
     UNREFERENCED_PARAMETER (nCmdShow);
 
 
-    m_hInstance         = hInstance;
-    m_appState          = std::make_unique<ApplicationState> (m_settingsProvider);
-    m_viewport          = std::make_unique<Viewport>();
-    m_densityController = std::make_unique<DensityController> (*m_viewport, 24.0f);  // Character width matches horizontal spacing
-    m_animationSystem   = std::make_unique<AnimationSystem>();
-    m_renderSystem      = std::make_unique<RenderSystem>();
-    m_inputSystem       = std::make_unique<InputSystem>();
-    m_fpsCounter        = std::make_unique<FPSCounter>();
-    m_timer             = std::make_unique<Timer>();
+    m_hInstance       = hInstance;
+    m_appState        = std::make_unique<ApplicationState> (m_settingsProvider);
+    m_monitorProvider = std::make_unique<WindowsMonitorProvider>();
+    m_inputSystem     = std::make_unique<InputSystem>();
 
     // Overlays are only used in Normal mode
     if (!pScreenSaverContext || pScreenSaverContext->m_mode == ScreenSaverMode::Normal)
@@ -193,16 +192,16 @@ HRESULT Application::Initialize (HINSTANCE hInstance, int nCmdShow, const Screen
 
     InitializeApplicationState (pScreenSaverContext);
     
-    hr = InitializeApplicationWindow();
+    hr = CreateRenderContexts();
     CHR (hr);
+
+    WirePrimaryContext();
     
 
     fInitialized = charSet.Initialize();
     CBR (fInitialized);
 
-    m_animationSystem->Initialize (*m_viewport, *m_densityController);
-
-    hr = charSet.CreateTextureAtlas (m_renderSystem->GetDevice(), m_renderSystem->GetDpiScale());
+    hr = InitializeContextResources();
     CHR (hr);
 
 
@@ -217,15 +216,15 @@ HRESULT Application::Initialize (HINSTANCE hInstance, int nCmdShow, const Screen
     // Start usage overlay in /? mode with background rain
     if (m_overlays.usageOverlay)
     {
-        float dpiScale = m_renderSystem->GetDpiScale();
+        float dpiScale = m_primary->GetDpiScale();
 
         m_overlays.usageOverlay->SetDpiScale (dpiScale);
         m_overlays.usageOverlay->Show();
-        m_densityController->SetPercentage (8);
+        m_primary->Density().SetPercentage (8);
 
         // Full-size rain characters (same physical size as fullscreen)
-        m_renderSystem->SetCharacterScaleOverride (dpiScale);
-        m_animationSystem->SetCharacterSpacingOverride (24.0f * dpiScale);
+        m_primary->Renderer().SetCharacterScaleOverride (dpiScale);
+        m_primary->Animation().SetCharacterSpacingOverride (24.0f * dpiScale);
 
         // Force windowed mode (enables click-to-drag) and suppress stats
         m_appState->SetDisplayMode (DisplayMode::Windowed);
@@ -303,14 +302,8 @@ void Application::InitializeApplicationState (const ScreenSaverModeContext * pSc
         m_sharedState.showDebugFadeTimes    = m_appState->GetShowDebugFadeTimes();
     }
 
-    // Apply settings to subsystems (initial sync before render thread starts)
-    m_densityController->SetPercentage   (m_appState->GetSettings().m_densityPercent);
-    m_animationSystem->SetAnimationSpeed (m_appState->GetSettings().m_animationSpeedPercent);
-    m_renderSystem->SetGlowIntensity     (m_appState->GetSettings().m_glowIntensityPercent);
-    m_renderSystem->SetGlowSize          (m_appState->GetSettings().m_glowSizePercent);
-    
-    // Now initialize input system with both dependencies
-    m_inputSystem->Initialize (*m_densityController, *m_appState);
+    // Apply settings to subsystems and bind input once the primary render
+    // context exists — see Application::WirePrimaryContext.
     
     if (m_pScreenSaverContext)
     {
@@ -334,52 +327,28 @@ void Application::InitializeApplicationState (const ScreenSaverModeContext * pSc
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-//  Application::InitializeApplicationWindow
+//  Application::CreateRenderContexts
+//
+//  Creates the window(s) and render context(s) for the current display mode.
+//  Fullscreen (normal Alt+Enter or /s screensaver, excluding preview and /?)
+//  fans out to one window per monitor; every other mode is a single window.
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-HRESULT Application::InitializeApplicationWindow()
+HRESULT Application::CreateRenderContexts()
 {
-    HRESULT hr       = S_OK;
-    POINT   position = {};
-    SIZE    size     = {};
+    HRESULT hr = S_OK;
 
 
-
-    // For preview mode, get dimensions from parent window
-    if (m_pScreenSaverContext && 
-        m_pScreenSaverContext->m_mode == ScreenSaverMode::ScreenSaverPreview &&
-        m_pScreenSaverContext->m_previewParentHwnd != nullptr)
+    if (ShouldSpanAllMonitors())
     {
-        RECT rcParent { 0 };
-        
-        GetClientRect (m_pScreenSaverContext->m_previewParentHwnd, &rcParent);
-     
-        position.x = 0;
-        position.y = 0;
-        size.cx    = rcParent.right  - rcParent.left;
-        size.cy    = rcParent.bottom - rcParent.top;
+        hr = CreateFullscreenContexts();
+        CHR (hr);
     }
     else
     {
-        GetWindowSizeForCurrentMode (position, size);
-    }
-
-    hr = CreateApplicationWindow (position, size);
-    CHR (hr);
-
-    hr = m_renderSystem->Initialize (m_hwnd, size.cx, size.cy);
-    CHR (hr);
-
-    // Propagate the initial DPI scale to overlay classes so layout
-    // computations use the correct scaling from the very first frame.
-    {
-        float dpiScale = m_renderSystem->GetDpiScale();
-
-        if (m_overlays.helpOverlay)   m_overlays.helpOverlay->SetDpiScale (dpiScale);
-        if (m_overlays.hotkeyOverlay) m_overlays.hotkeyOverlay->SetDpiScale (dpiScale);
-
-        m_animationSystem->SetDpiScale (dpiScale);
+        hr = CreateSingleContext();
+        CHR (hr);
     }
 
 
@@ -394,24 +363,198 @@ Error:
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-//  Application::CreateApplicationWindow
+//  Application::ShouldSpanAllMonitors
+//
+//  Multimon applies only in the Fullscreen display mode.  Preview (/p) is a
+//  single child window and the /? usage screen is a single windowed view, so
+//  both are always forced single regardless of the saved display mode.
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-HRESULT Application::CreateApplicationWindow (POINT & position, SIZE & size)
+bool Application::ShouldSpanAllMonitors() const
 {
-    HRESULT      hr         = S_OK;
-    WNDCLASSEXW  wcex       = { };
-    DWORD        error      = 0;
-    ATOM         classAtom  = 0;
-    BOOL         fSuccess   = FALSE;
-    DWORD        dwStyle    = WS_POPUP | WS_VISIBLE;
-    HWND         hwndParent = nullptr;
+    if (m_pScreenSaverContext)
+    {
+        ScreenSaverMode mode = m_pScreenSaverContext->m_mode;
+
+        if (mode == ScreenSaverMode::ScreenSaverPreview ||
+            mode == ScreenSaverMode::HelpRequested)
+        {
+            return false;
+        }
+    }
+
+    return m_appState && m_appState->GetDisplayMode() == DisplayMode::Fullscreen;
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  Application::CreateSingleContext
+//
+//  Creates a single window + render context: a child window for preview, or a
+//  borderless popup sized by GetWindowSizeForCurrentMode for every other mode.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+HRESULT Application::CreateSingleContext()
+{
+    HRESULT hr         = S_OK;
+    POINT   position   = {};
+    SIZE    size       = {};
+    DWORD   dwStyle    = WS_POPUP | WS_VISIBLE;
+    HWND    hwndParent = nullptr;
+
+
+
+    // For preview mode, create a single child window sized to the parent
+    if (m_pScreenSaverContext && 
+        m_pScreenSaverContext->m_mode == ScreenSaverMode::ScreenSaverPreview &&
+        m_pScreenSaverContext->m_previewParentHwnd != nullptr)
+    {
+        RECT rcParent { 0 };
+        
+        GetClientRect (m_pScreenSaverContext->m_previewParentHwnd, &rcParent);
+     
+        position.x = 0;
+        position.y = 0;
+        size.cx    = rcParent.right  - rcParent.left;
+        size.cy    = rcParent.bottom - rcParent.top;
+
+        dwStyle    = WS_CHILD | WS_VISIBLE;
+        hwndParent = m_pScreenSaverContext->m_previewParentHwnd;
+    }
+    else
+    {
+        GetWindowSizeForCurrentMode (position, size);
+    }
+
+    hr = AddContext (position, size, dwStyle, hwndParent, true);
+    CHR (hr);
+
+
+
+Error:
+    return hr;
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  Application::CreateFullscreenContexts
+//
+//  Creates one borderless popup window + render context per connected monitor,
+//  each placed at the monitor's virtual-screen bounds.  Degenerate monitors are
+//  skipped; the primary is the first monitor flagged primary (else the first).
+//  If no usable monitors are reported, falls back to a single primary window.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+HRESULT Application::CreateFullscreenContexts()
+{
+    HRESULT                       hr         = S_OK;
+    std::vector<MonitorPlacement> placements = PlanFullscreenPlacements (m_monitorProvider->GetMonitors());
+
+
+    if (placements.empty())
+    {
+        // No usable topology reported — degrade gracefully to one window
+        hr = CreateSingleContext();
+        CHR (hr);
+    }
+    else
+    {
+        for (const MonitorPlacement & placement : placements)
+        {
+            hr = AddContext (placement.position, placement.size, WS_POPUP | WS_VISIBLE, nullptr, placement.isPrimary);
+            CHR (hr);
+        }
+    }
+
+
+
+Error:
+    return hr;
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  Application::AddContext
+//
+//  Creates one window, builds the matching render context, initializes its D3D
+//  device/swap chain, and appends it to m_contexts.  The context is pushed only
+//  AFTER it is fully initialized, so a stray early WM_SIZE/WM_DPICHANGED routed
+//  by HWND finds either a ready context or none at all (never a half-built one).
+//
+////////////////////////////////////////////////////////////////////////////////
+
+HRESULT Application::AddContext (const POINT & position, const SIZE & size, DWORD dwStyle, HWND hwndParent, bool isPrimary)
+{
+    HRESULT                               hr   = S_OK;
+    HWND                                  hwnd = nullptr;
+    std::unique_ptr<MonitorRenderContext> context;
+
+
+
+    hr = CreateWindowAtBounds (position, size, dwStyle, hwndParent, hwnd);
+    CHR (hr);
+
+    context = std::make_unique<MonitorRenderContext> (isPrimary);
+
+    hr = context->Initialize (hwnd, static_cast<UINT> (size.cx), static_cast<UINT> (size.cy));
+    CHR (hr);
+
+    if (isPrimary)
+    {
+        m_primary = context.get();
+        m_hwnd    = hwnd;
+    }
+
+    m_contexts.push_back (std::move (context));
+
+
+
+Error:
+    return hr;
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  Application::CreateWindowAtBounds
+//
+//  Registers the (idempotent) window class and creates a single window at the
+//  supplied bounds and style.  Every monitor window shares one WindowProc with
+//  the Application* in GWLP_USERDATA.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+HRESULT Application::CreateWindowAtBounds (const POINT & position, const SIZE & size, DWORD dwStyle, HWND hwndParent, HWND & hwndOut)
+{
+    HRESULT      hr        = S_OK;
+    WNDCLASSEXW  wcex      = { };
+    DWORD        error     = 0;
+    ATOM         classAtom = 0;
+    BOOL         fSuccess  = FALSE;
+    HWND         hwnd      = nullptr;
 
     // Verify HINSTANCE
     CBRA (m_hInstance != nullptr);
 
-    // Register window class
+    // Register window class (idempotent — shared by every monitor window)
     wcex.cbSize         = sizeof (WNDCLASSEX);
     wcex.style          = CS_HREDRAW | CS_VREDRAW;
     wcex.lpfnWndProc    = Application::WindowProc;
@@ -434,40 +577,191 @@ HRESULT Application::CreateApplicationWindow (POINT & position, SIZE & size)
         // Class already registered - continue
     }
 
-    // For preview mode, create as child window; otherwise create borderless popup
-    if ((m_pScreenSaverContext && m_pScreenSaverContext->m_mode == ScreenSaverMode::ScreenSaverPreview))
-    {
-        dwStyle    = WS_CHILD | WS_VISIBLE;
-        hwndParent = m_pScreenSaverContext->m_previewParentHwnd;
-    }
+    hwnd = CreateWindowExW (0,
+                            L"MatrixRainWindowClass",
+                            WINDOW_TITLE,
+                            dwStyle,
+                            position.x, 
+                            position.y,
+                            size.cx,
+                            size.cy,
+                            hwndParent,
+                            nullptr,
+                            m_hInstance,
+                            this);  // Pass 'this' pointer for retrieval in WindowProc
     
-    m_hwnd = CreateWindowExW (0,
-                              L"MatrixRainWindowClass",
-                              WINDOW_TITLE,
-                              dwStyle,
-                              position.x, 
-                              position.y,
-                              size.cx,
-                              size.cy,
-                              hwndParent,
-                              nullptr,
-                              m_hInstance,
-                              this);  // Pass 'this' pointer for retrieval in WindowProc
-    
-    CWRA (m_hwnd != nullptr);
+    CWRA (hwnd != nullptr);
 
     // ShowWindow returns the previous visibility state (not success/failure).
     // A return of FALSE simply means the window was previously hidden, which is
     // expected for a newly created window.  Do not check with CWRA.
-    ShowWindow (m_hwnd, SW_SHOW);
+    ShowWindow (hwnd, SW_SHOW);
     
-    fSuccess = UpdateWindow (m_hwnd);
+    fSuccess = UpdateWindow (hwnd);
     CWRA (fSuccess);
+
+    hwndOut = hwnd;
 
     
 
 Error:
     return hr;
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  Application::WirePrimaryContext
+//
+//  Seeds the primary context's subsystems from saved settings, propagates the
+//  primary monitor's DPI scale to the overlays, and binds the input system to
+//  the primary context's density controller.  Must run after the contexts are
+//  created and before any render thread starts (the subsystem accessors assert
+//  the render thread is not yet running).
+//
+////////////////////////////////////////////////////////////////////////////////
+
+void Application::WirePrimaryContext()
+{
+    const auto & settings = m_appState->GetSettings();
+
+
+    m_primary->Density().SetPercentage       (settings.m_densityPercent);
+    m_primary->Animation().SetAnimationSpeed (settings.m_animationSpeedPercent);
+    m_primary->Renderer().SetGlowIntensity   (settings.m_glowIntensityPercent);
+    m_primary->Renderer().SetGlowSize        (settings.m_glowSizePercent);
+
+    // Propagate the initial DPI scale to overlay classes so layout computations
+    // use the correct scaling from the very first frame.
+    {
+        float dpiScale = m_primary->GetDpiScale();
+
+        if (m_overlays.helpOverlay)   m_overlays.helpOverlay->SetDpiScale (dpiScale);
+        if (m_overlays.hotkeyOverlay) m_overlays.hotkeyOverlay->SetDpiScale (dpiScale);
+    }
+
+    m_inputSystem->Initialize (m_primary->Density(), *m_appState);
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  Application::InitializeContextResources
+//
+//  Builds the CharacterSet-dependent per-context resources (animation wiring +
+//  per-device glyph atlas).  Must run after CharacterSet::Initialize.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+HRESULT Application::InitializeContextResources()
+{
+    HRESULT hr = S_OK;
+
+
+    for (auto & context : m_contexts)
+    {
+        context->InitializeAnimation();
+
+        hr = context->BuildGlyphAtlas();
+        CHR (hr);
+    }
+
+    // Each device above rebuilt the shared CharacterSet overlay metrics (last
+    // write wins).  Overlays render on the primary only, so rebuild the primary's
+    // overlay atlas last to pin those shared metrics to the primary's DPI.
+    if (m_primary != nullptr)
+    {
+        hr = m_primary->Renderer().RebuildOverlayAtlas();
+        CHR (hr);
+    }
+
+
+
+Error:
+    return hr;
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  Application::ContextForHwnd
+//
+////////////////////////////////////////////////////////////////////////////////
+
+MonitorRenderContext * Application::ContextForHwnd (HWND hwnd) const
+{
+    for (const auto & context : m_contexts)
+    {
+        if (context->Hwnd() == hwnd)
+        {
+            return context.get();
+        }
+    }
+
+    return nullptr;
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  Application::StartRenderThreads
+//
+//  Starts one render thread per context.  Only the primary context renders
+//  overlays/statistics and advances the shared color-cycle clock; secondaries
+//  receive a null OverlayState and a null primary-clock pointer.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+void Application::StartRenderThreads()
+{
+    for (auto & context : m_contexts)
+    {
+        RenderThreadInputs inputs = MakeRenderThreadInputs (context->IsPrimary(),
+                                                            &m_sharedState,
+                                                            &m_overlays,
+                                                            m_appState.get(),
+                                                            &m_inDisplayModeTransition);
+
+        context->StartRenderThread (*inputs.sharedState, inputs.overlays, inputs.primaryClock, *inputs.inTransition);
+    }
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  Application::StopRenderThreads
+//
+//  Signals every render thread to stop, then joins them.  Stopping all before
+//  joining lets the threads quiesce in parallel.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+void Application::StopRenderThreads()
+{
+    for (auto & context : m_contexts)
+    {
+        context->RequestStop();
+    }
+
+    for (auto & context : m_contexts)
+    {
+        context->Join();
+    }
 }
 
 
@@ -484,8 +778,8 @@ int Application::Run()
 {
     MSG msg = {};
 
-    // Start the render thread
-    m_renderThread = std::thread (&Application::RenderThreadProc, this);
+    // Start one render thread per monitor context
+    StartRenderThreads();
 
     // Main thread only processes messages
     while (m_isRunning)
@@ -515,51 +809,6 @@ int Application::Run()
     }
 
     return static_cast<int> (msg.wParam);
-}
-
-
-
-
-
-////////////////////////////////////////////////////////////////////////////////
-//
-//  Application::Update
-//
-////////////////////////////////////////////////////////////////////////////////
-
-void Application::Update (float deltaTime)
-{
-    if (m_appState)
-    {
-        m_appState->Update (deltaTime);
-    }
-    
-    if (m_animationSystem && !m_isPaused)
-    {
-        m_animationSystem->Update (deltaTime);
-    }
-
-    if ((m_overlays.helpOverlay && m_overlays.helpOverlay->IsActive()) ||
-        (m_overlays.hotkeyOverlay  && m_overlays.hotkeyOverlay->IsActive())  ||
-        (m_overlays.usageOverlay   && m_overlays.usageOverlay->IsActive()))
-    {
-        Color4 scheme = GetColorRGB (m_appState->GetColorScheme(), m_appState->GetElapsedTime());
-
-        if (m_overlays.helpOverlay && m_overlays.helpOverlay->IsActive())
-        {
-            m_overlays.helpOverlay->Update (deltaTime, scheme.r, scheme.g, scheme.b);
-        }
-
-        if (m_overlays.hotkeyOverlay && m_overlays.hotkeyOverlay->IsActive())
-        {
-            m_overlays.hotkeyOverlay->Update (deltaTime, scheme.r, scheme.g, scheme.b);
-        }
-
-        if (m_overlays.usageOverlay && m_overlays.usageOverlay->IsActive())
-        {
-            m_overlays.usageOverlay->Update (deltaTime, scheme.r, scheme.g, scheme.b);
-        }
-    }
 }
 
 
@@ -621,107 +870,72 @@ Error:
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-//  Application::ResizeWindowForCurrentMode
+//  Application::RebuildContextsForCurrentMode
+//
+//  Barrier transition between windowed and per-monitor fullscreen (and back).
+//  Quiesces every render thread, releases each context's D3D resources, destroys
+//  the old windows, re-enumerates the desktop, recreates the window/context set
+//  for the new mode, rebinds the primary, and restarts the render threads.  A
+//  failed rebuild leaves no usable window, so it fails closed by posting quit.
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void Application::ResizeWindowForCurrentMode()
+void Application::RebuildContextsForCurrentMode()
 {
-    HRESULT hr         = S_OK;
-    float   oldWidth   = { 0 };
-    float   oldHeight  = { 0 };
-    POINT   position   = { 0 };
-    SIZE    windowSize = { 0 };
-    
-
-    
-    CBRAEx (m_appState && m_viewport && m_renderSystem, E_UNEXPECTED);
+    HRESULT           hr = S_OK;
+    std::vector<HWND> hwnds;
 
 
-    oldWidth  = m_viewport->GetWidth();
-    oldHeight = m_viewport->GetHeight();
-
-    GetWindowSizeForCurrentMode (position, windowSize);
-
-    SetWindowLongPtr (m_hwnd, GWL_STYLE, WS_POPUP | WS_VISIBLE);
-
-
-    SetWindowPos (m_hwnd, 
-                  HWND_TOP, 
-                  position.x, 
-                  position.y, 
-                  windowSize.cx, 
-                  windowSize.cy, 
-                  SWP_FRAMECHANGED | SWP_SHOWWINDOW);
-    
-    m_viewport->Resize     (static_cast<float> (windowSize.cx), static_cast<float> (windowSize.cy));
-    m_renderSystem->Resize (windowSize.cx, windowSize.cy);
-                    
-    // Rescale existing streaks to fill new viewport dimensions
-    if (oldWidth > 0 && oldHeight > 0)
+    // Close any live config dialog first — the rebuild destroys the primary
+    // window that owns it, which would otherwise orphan the dialog.
+    if (m_hConfigDialog)
     {
-        m_animationSystem->RescaleStreaksForViewport (oldWidth, 
-                                                      oldHeight, 
-                                                      static_cast<float> (windowSize.cx), 
-                                                      static_cast<float> (windowSize.cy));
+        DestroyWindow (m_hConfigDialog);
+        m_hConfigDialog = nullptr;
     }
 
 
-    // Reset timer to prevent accumulated deltaTime from causing animation jump
-    if (m_timer)
+    m_inDisplayModeTransition = true;
+
+    StopRenderThreads();
+
+    for (auto & context : m_contexts)
     {
-        m_timer->Reset();
+        hwnds.push_back (context->Hwnd());
     }
 
+    m_contexts.clear();
+    m_primary = nullptr;
+    m_hwnd    = nullptr;
 
-
-Error:
-    return;
-}
-
-
-
-
-
-////////////////////////////////////////////////////////////////////////////////
-//
-//  Application::Render
-//
-////////////////////////////////////////////////////////////////////////////////
-
-void Application::Render (const SharedState::Snapshot & snapshot)
-{
-    if (m_renderSystem && m_animationSystem && m_viewport && m_appState)
+    for (HWND hwnd : hwnds)
     {
-        // Only pass fps value if statistics are enabled
-        float       fps                = (snapshot.showStatistics && m_fpsCounter) ? m_fpsCounter->GetFPS() : 0.0f;
-        ColorScheme scheme             = snapshot.colorScheme;
-        int         rainPercentage     = snapshot.densityPercent;
-        int         streakCount        = static_cast<int> (m_animationSystem->GetActiveStreakCount());
-        int         activeHeadCount    = static_cast<int> (m_animationSystem->GetActiveHeadCount());
-        bool        showDebugFadeTimes = snapshot.showDebugFadeTimes;
-        float       elapsedTime        = m_appState->GetElapsedTime();
-        
-        // Pass overlay pointers to render system for rendering
-        const Overlay * pHelpOverlay    = (m_overlays.helpOverlay && m_overlays.helpOverlay->IsActive())       ? m_overlays.helpOverlay.get()    : nullptr;
-        const Overlay * pHotkeyOverlay  = (m_overlays.hotkeyOverlay && m_overlays.hotkeyOverlay->IsActive())   ? m_overlays.hotkeyOverlay.get()  : nullptr;
-        const Overlay * pUsageOverlay   = (m_overlays.usageOverlay && m_overlays.usageOverlay->IsActive())     ? m_overlays.usageOverlay.get()   : nullptr;
-
-        RenderSystem::RenderParams renderParams =
+        if (hwnd)
         {
-            .colorScheme        = scheme,
-            .fps                = fps,
-            .rainPercentage     = rainPercentage,
-            .streakCount        = streakCount,
-            .activeHeadCount    = activeHeadCount,
-            .showDebugFadeTimes = showDebugFadeTimes,
-            .elapsedTime        = elapsedTime,
-            .pHelpOverlay       = pHelpOverlay,
-            .pHotkeyOverlay     = pHotkeyOverlay,
-            .pUsageOverlay      = pUsageOverlay
-        };
+            DestroyWindow (hwnd);
+        }
+    }
 
-        m_renderSystem->Render (*m_animationSystem, *m_viewport, renderParams);
+
+    hr = CreateRenderContexts();
+
+    if (SUCCEEDED (hr))
+    {
+        WirePrimaryContext();
+
+        hr = InitializeContextResources();
+    }
+
+    if (SUCCEEDED (hr))
+    {
+        StartRenderThreads();
+    }
+
+    m_inDisplayModeTransition = false;
+
+    if (FAILED (hr))
+    {
+        PostQuitMessage (1);
     }
 }
 
@@ -768,25 +982,30 @@ Error:
 
 void Application::Shutdown()
 {
-    // Signal render thread to stop and wait for it
-    if (m_renderThread.joinable())
+    // Stop and join every render thread, then release each context's D3D
+    // resources BEFORE destroying the windows they observe.
+    StopRenderThreads();
+
+    std::vector<HWND> hwnds;
+
+    for (auto & context : m_contexts)
     {
-        m_renderThreadShouldStop = true;
-        m_renderThread.join();
+        hwnds.push_back (context->Hwnd());
     }
 
-    m_timer.reset();
-    m_renderSystem.reset();
-    m_animationSystem.reset();
-    m_viewport.reset();
     m_inputSystem.reset();
-    m_densityController.reset();
+    m_contexts.clear();
+    m_primary = nullptr;
 
-    if (m_hwnd)
+    for (HWND hwnd : hwnds)
     {
-        DestroyWindow (m_hwnd);
-        m_hwnd = nullptr;
+        if (hwnd)
+        {
+            DestroyWindow (hwnd);
+        }
     }
+
+    m_hwnd = nullptr;
 
     if (m_hInstance)
     {
@@ -826,7 +1045,7 @@ LRESULT CALLBACK Application::WindowProc (HWND hwnd, UINT uMsg, WPARAM wParam, L
 
         if (pApp)
         {
-            return pApp->HandleMessage (uMsg, wParam, lParam);
+            return pApp->HandleMessage (hwnd, uMsg, wParam, lParam);
         }
     }
 
@@ -843,7 +1062,7 @@ LRESULT CALLBACK Application::WindowProc (HWND hwnd, UINT uMsg, WPARAM wParam, L
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-LRESULT Application::HandleMessage (UINT uMsg, WPARAM wParam, LPARAM lParam)
+LRESULT Application::HandleMessage (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
     switch (uMsg)
     {
@@ -860,26 +1079,35 @@ LRESULT Application::HandleMessage (UINT uMsg, WPARAM wParam, LPARAM lParam)
             return 0;
 
         case WM_SIZE:
-            OnSize (lParam);
+            OnSize (hwnd, lParam);
             return 0;
 
         case WM_DPICHANGED:
-            OnDpiChanged (wParam, lParam);
+            OnDpiChanged (hwnd, wParam, lParam);
             return 0;
 
         case WM_NCHITTEST:
         {
-            LRESULT result = DefWindowProc (m_hwnd, uMsg, wParam, lParam);
+            LRESULT result = DefWindowProc (hwnd, uMsg, wParam, lParam);
             OnNcHitTest (result);
             return result;
         }
 
         case WM_DESTROY:
-            PostQuitMessage (0);
+            // During a display-mode transition windows are destroyed and
+            // rebuilt; only a genuine shutdown (outside a transition) quits.
+            if (!m_inDisplayModeTransition)
+            {
+                PostQuitMessage (0);
+            }
+            return 0;
+
+        case WM_APP_REBUILD_CONTEXTS:
+            RebuildContextsForCurrentMode();
             return 0;
 
         default:
-            return DefWindowProc (m_hwnd, uMsg, wParam, lParam);
+            return DefWindowProc (hwnd, uMsg, wParam, lParam);
     }
 }
 
@@ -939,8 +1167,11 @@ void Application::OnKeyDown (WPARAM wParam)
             return;
 
         case VK_SPACE:
-            // Spacebar pressed - toggle pause
-            m_isPaused = !m_isPaused;
+            // Spacebar pressed — toggle pause for every monitor via shared state
+            {
+                std::lock_guard<std::mutex> lock (m_sharedState.mutex);
+                m_sharedState.isPaused = !m_sharedState.isPaused;
+            }
             isRecognized = true;
             break;
 
@@ -1061,12 +1292,10 @@ void Application::OnSysKeyDown (WPARAM wParam)
     if (wParam == VK_RETURN)
     {
         // Alt+Enter pressed - toggle display mode
-        if (m_appState && m_renderSystem && m_viewport && m_animationSystem)
+        if (m_appState && m_primary)
         {
-            m_inDisplayModeTransition = true;
             m_appState->ToggleDisplayMode();
-            ResizeWindowForCurrentMode();
-            m_inDisplayModeTransition = false;
+            RebuildContextsForCurrentMode();
         }
 
         // Immediately hide overlays on Alt+Enter (no fade — viewport is changing)
@@ -1133,7 +1362,7 @@ Error:
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void Application::OnSize (LPARAM lParam)
+void Application::OnSize (HWND hwnd, LPARAM lParam)
 {
     // Skip redundant resize if we're in the middle of a display mode transition
     if (m_inDisplayModeTransition)
@@ -1141,15 +1370,13 @@ void Application::OnSize (LPARAM lParam)
         return;
     }
 
-    UINT width  = LOWORD (lParam);
-    UINT height = HIWORD (lParam);
+    UINT                   width   = LOWORD (lParam);
+    UINT                   height  = HIWORD (lParam);
+    MonitorRenderContext * context = ContextForHwnd (hwnd);
 
-    if (width > 0 && height > 0 && m_renderSystem && m_viewport)
+    if (width > 0 && height > 0 && context)
     {
-        m_renderSystem->Resize (width, height);
-        m_viewport->Resize (static_cast<float> (width), static_cast<float> (height));
-
-
+        context->Resize (width, height, false);
     }
 }
 
@@ -1167,18 +1394,20 @@ void Application::OnSize (LPARAM lParam)
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void Application::OnDpiChanged (WPARAM wParam, LPARAM lParam)
+void Application::OnDpiChanged (HWND hwnd, WPARAM wParam, LPARAM lParam)
 {
-    UINT         newDpi   = HIWORD (wParam);
-    float        dpiScale = static_cast<float> (newDpi) / 96.0f;
-    const RECT * pRect    = reinterpret_cast<const RECT *> (lParam);
+    UINT                   newDpi   = HIWORD (wParam);
+    float                  dpiScale = static_cast<float> (newDpi) / 96.0f;
+    const RECT *           pRect    = reinterpret_cast<const RECT *> (lParam);
+    MonitorRenderContext * context  = ContextForHwnd (hwnd);
 
 
 
-    // Resize window to the rect Windows suggests for the new DPI
-    if (pRect)
+    // Resize window to the rect Windows suggests for the new DPI.  Only honored
+    // in windowed mode — fullscreen windows stay pinned to their monitor bounds.
+    if (pRect && m_appState && m_appState->GetDisplayMode() == DisplayMode::Windowed)
     {
-        SetWindowPos (m_hwnd,
+        SetWindowPos (hwnd,
                       nullptr,
                       pRect->left,
                       pRect->top,
@@ -1187,27 +1416,25 @@ void Application::OnDpiChanged (WPARAM wParam, LPARAM lParam)
                       SWP_NOZORDER | SWP_NOACTIVATE);
     }
 
-    // Propagate new DPI scale to the render system
-    if (m_renderSystem)
+    // Propagate the new DPI to this monitor's render pipeline (render system,
+    // animation system, and density controller) under its render lock.
+    if (context)
     {
-        m_renderSystem->OnDpiChanged (newDpi);
+        context->OnDpiChanged (newDpi);
     }
 
-    // Propagate new DPI scale to overlays
-    if (m_overlays.helpOverlay)
+    // Overlays live only on the primary window
+    if (hwnd == m_hwnd)
     {
-        m_overlays.helpOverlay->SetDpiScale (dpiScale);
-    }
+        if (m_overlays.helpOverlay)
+        {
+            m_overlays.helpOverlay->SetDpiScale (dpiScale);
+        }
 
-    if (m_overlays.hotkeyOverlay)
-    {
-        m_overlays.hotkeyOverlay->SetDpiScale (dpiScale);
-    }
-
-    // Propagate new DPI scale to animation system for character spacing
-    if (m_animationSystem)
-    {
-        m_animationSystem->SetDpiScale (dpiScale);
+        if (m_overlays.hotkeyOverlay)
+        {
+            m_overlays.hotkeyOverlay->SetDpiScale (dpiScale);
+        }
     }
 }
 
@@ -1228,82 +1455,5 @@ void Application::OnNcHitTest (LRESULT & result)
     if (result == HTCLIENT && m_appState && m_appState->GetDisplayMode() == DisplayMode::Windowed)
     {
         result = HTCAPTION;  // Treat client area as title bar for dragging
-    }
-}
-
-
-
-
-
-////////////////////////////////////////////////////////////////////////////////
-//
-//  Application::RenderThreadProc
-//
-//  Dedicated render thread that runs independently of the message loop.
-//  Maintains fixed 60 FPS animation even during modal operations (dialog drag,
-//  resize, menus, etc.).
-//
-////////////////////////////////////////////////////////////////////////////////
-
-void Application::RenderThreadProc()
-{
-    using namespace std::chrono;
-    
-    auto                  lastFrameTime = steady_clock::now();
-    SharedState::Snapshot snapshot;
-    
-
-
-    while (!m_renderThreadShouldStop)
-    {
-        auto currentTime = steady_clock::now();
-        auto deltaTime   = duration_cast<duration<float>> (currentTime - lastFrameTime).count();
-        lastFrameTime    = currentTime;
-        
-        // Skip updates/rendering during display mode transitions
-        if (!m_inDisplayModeTransition)
-        {
-            // Update FPS counter
-            if (m_fpsCounter)
-            {
-                m_fpsCounter->Update (deltaTime);
-            }
-            
-            // Snapshot shared state under lock, then push to subsystems.
-            // This keeps the lock hold time minimal (just a memcpy) while
-            // ensuring all subsystem writes happen on the render thread.
-            {
-                std::lock_guard<std::mutex> lock (m_sharedState.mutex);
-                snapshot = m_sharedState.GetSnapshot();
-            }
-
-            // Push shared state to subsystems (single-threaded on render thread)
-            m_densityController->SetPercentage   (snapshot.densityPercent);
-            m_animationSystem->SetAnimationSpeed (snapshot.animationSpeedPercent);
-            m_renderSystem->SetGlowIntensity     (snapshot.glowIntensityPercent);
-            m_renderSystem->SetGlowSize          (snapshot.glowSizePercent);
-
-            // Update and render (no additional lock needed — subsystems are
-            // only accessed from the render thread after the snapshot push)
-            {
-                std::lock_guard<std::mutex> lock (m_overlays.mutex);
-                Update (deltaTime);
-                Render (snapshot);
-            }
-
-            // Present OUTSIDE the overlay lock — VSync blocks for up to 16ms
-            // and holding the lock during that wait causes input lag (the UI
-            // thread's OnKeyDown needs the overlay lock to call Show/Dismiss).
-            if (m_renderSystem)
-            {
-                m_renderSystem->Present();
-            }
-        }
-        else
-        {
-            // Yield CPU while display mode transition is in progress —
-            // Present() is not called so VSync cannot pace the loop.
-            std::this_thread::sleep_for (std::chrono::milliseconds (1));
-        }
     }
 }

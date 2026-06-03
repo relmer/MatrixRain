@@ -17,6 +17,8 @@ class InputSystem;
 class ApplicationState;
 class FPSCounter;
 class Overlay;
+class MonitorRenderContext;
+class IMonitorProvider;
 
 
 
@@ -63,31 +65,30 @@ public:
     
     void                SetOpenConfigDialogCallback (std::function<void()> callback) { m_openConfigDialogCallback = callback; }
     void                SetShowUsageDialogCallback  (std::function<void()> callback) { m_showUsageDialogCallback  = callback; }
-    void                ApplyDisplayModeChange()                   { ResizeWindowForCurrentMode();    }
+    void                ApplyDisplayModeChange()                   { PostMessageW (m_hwnd, WM_APP_REBUILD_CONTEXTS, 0, 0); }
 
     // Window dimensions
     static constexpr UINT            DEFAULT_WIDTH  = 1280;
     static constexpr UINT            DEFAULT_HEIGHT = 720;
     static constexpr const wchar_t * WINDOW_TITLE   = L"Matrix Rain";
 
+    // Posted to the primary window to rebuild contexts outside any dialog proc
+    static constexpr UINT            WM_APP_REBUILD_CONTEXTS = WM_APP + 1;
+
 private:
     // Core systems
-    RegistrySettingsProvider           m_settingsProvider;
-    std::unique_ptr<Viewport>          m_viewport;
-    std::unique_ptr<AnimationSystem>   m_animationSystem;
-    std::unique_ptr<RenderSystem>      m_renderSystem;
-    std::unique_ptr<Timer>             m_timer;
-    std::unique_ptr<DensityController> m_densityController;
-    std::unique_ptr<InputSystem>       m_inputSystem;
-    std::unique_ptr<ApplicationState>  m_appState;
-    std::unique_ptr<FPSCounter>        m_fpsCounter;
-    OverlayState                       m_overlays;
+    RegistrySettingsProvider                           m_settingsProvider;
+    std::unique_ptr<IMonitorProvider>                  m_monitorProvider;
+    std::vector<std::unique_ptr<MonitorRenderContext>> m_contexts;
+    MonitorRenderContext *                             m_primary { nullptr };
+    std::unique_ptr<InputSystem>                       m_inputSystem;
+    std::unique_ptr<ApplicationState>                  m_appState;
+    OverlayState                                       m_overlays;
 
     // Win32 window`
     HWND              m_hwnd                    { nullptr };
     HINSTANCE         m_hInstance               { nullptr };
     bool              m_isRunning               { false   };
-    std::atomic<bool> m_isPaused                { false   };
     std::atomic<bool> m_inDisplayModeTransition { false   };
     
     HWND              m_hConfigDialog           { nullptr };
@@ -97,34 +98,36 @@ private:
     
     const ScreenSaverModeContext * m_pScreenSaverContext { nullptr };
     
-    // Render thread — frame pacing is driven by VSync (Present(1, 0))
-    std::thread       m_renderThread;
-    std::atomic<bool> m_renderThreadShouldStop { false };
     SharedState       m_sharedState;
 
     // Internal methods
     void    InitializeApplicationState    (const ScreenSaverModeContext * pScreenSaverContext);
-    HRESULT InitializeApplicationWindow();
-    HRESULT CreateApplicationWindow       (POINT & position, SIZE & size);
-    void    Update                        (float deltaTime);
-    void    Render                        (const SharedState::Snapshot & snapshot);
+    HRESULT CreateRenderContexts();
+    HRESULT CreateSingleContext();
+    HRESULT CreateFullscreenContexts();
+    bool    ShouldSpanAllMonitors()       const;
+    HRESULT AddContext                    (const POINT & position, const SIZE & size, DWORD dwStyle, HWND hwndParent, bool isPrimary);
+    HRESULT CreateWindowAtBounds          (const POINT & position, const SIZE & size, DWORD dwStyle, HWND hwndParent, HWND & hwndOut);
+    void    WirePrimaryContext();
+    HRESULT InitializeContextResources();
+    void    RebuildContextsForCurrentMode();
+    void    StartRenderThreads();
+    void    StopRenderThreads();
+    MonitorRenderContext * ContextForHwnd (HWND hwnd) const;
     void    GetWindowSizeForCurrentMode   (POINT & position, SIZE & size);
-    void    ResizeWindowForCurrentMode();
     bool    ShouldExitScreenSaverOnKey    (WPARAM wParam);
-    
-    void    RenderThreadProc();
     
     // Message handlers
     void OnKeyDown                  (WPARAM wParam);
     void OnSysKeyDown               (WPARAM wParam);
     void OnMouseMove                (LPARAM lParam);
-    void OnSize                     (LPARAM lParam);
-    void OnDpiChanged               (WPARAM wParam, LPARAM lParam);
+    void OnSize                     (HWND hwnd, LPARAM lParam);
+    void OnDpiChanged               (HWND hwnd, WPARAM wParam, LPARAM lParam);
     void OnNcHitTest                (LRESULT & result);
     
     // Window procedure
     static LRESULT CALLBACK WindowProc    (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
-    LRESULT                 HandleMessage (UINT uMsg, WPARAM wParam, LPARAM lParam);
+    LRESULT                 HandleMessage (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 };
 
 

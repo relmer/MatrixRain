@@ -164,13 +164,13 @@ namespace MatrixRainTests
             InputSystem inputSystem;
             inputSystem.Initialize (densityController, appState);
 
-            // Default color scheme is Green; cycling goes to Blue
-            Assert::AreEqual (static_cast<int> (ColorScheme::Green), static_cast<int> (appState.GetColorScheme()), L"Initial scheme should be Green");
+            // Default color scheme is ColorCycle; cycling wraps to Green
+            Assert::AreEqual (static_cast<int> (ColorScheme::ColorCycle), static_cast<int> (appState.GetColorScheme()), L"Initial scheme should be ColorCycle");
 
             bool handled = inputSystem.ProcessKeyDown ('C');
 
             Assert::IsTrue (handled, L"'C' key should be recognized");
-            Assert::AreEqual (static_cast<int> (ColorScheme::Blue), static_cast<int> (appState.GetColorScheme()), L"Color scheme should cycle to Blue");
+            Assert::AreEqual (static_cast<int> (ColorScheme::Green), static_cast<int> (appState.GetColorScheme()), L"Color scheme should cycle to Green");
         }
 
 
