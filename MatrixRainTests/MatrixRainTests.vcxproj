@@ -319,6 +319,7 @@
     <ClCompile Include="unit\OverlayHotkeyTests.cpp" />
     <ClCompile Include="unit\DeviceLostTests.cpp" />
     <ClCompile Include="unit\AdapterSelectionTests.cpp" />
+    <ClCompile Include="unit\FrameLimiterTests.cpp" />
     <ClCompile Include="unit\MultiMonitorGateTests.cpp" />
     <ClCompile Include="unit\RebuildCoalescerTests.cpp" />
     <ClCompile Include="integration\AnimationLoopTests.cpp" />

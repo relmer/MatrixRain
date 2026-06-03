@@ -84,6 +84,31 @@ HRESULT MonitorRenderContext::Initialize (HWND hwnd, UINT width, UINT height, st
         m_densityController->SetDpiScale (dpiScale);
     }
 
+    // Engage the frame limiter when this monitor's native refresh exceeds
+    // 60 Hz so we do not pay the full bloom pipeline cost 144 times per
+    // second on a high-refresh display.  At <=60 Hz the limiter is left
+    // unconstructed and the render loop pays zero per-frame overhead for
+    // the cap check (FR-018).
+    {
+        HMONITOR        hMon = MonitorFromWindow (hwnd, MONITOR_DEFAULTTONEAREST);
+        MONITORINFOEXW  mi   = {};
+        DEVMODEW        dm   = {};
+
+        mi.cbSize = sizeof (mi);
+        dm.dmSize = sizeof (dm);
+
+        if (hMon && GetMonitorInfoW (hMon, &mi) &&
+            EnumDisplaySettingsW (mi.szDevice, ENUM_CURRENT_SETTINGS, &dm))
+        {
+            unsigned refreshHz = static_cast<unsigned> (dm.dmDisplayFrequency);
+
+            if (ShouldEngageFrameLimiter (refreshHz))
+            {
+                m_frameLimiter.emplace (60);
+            }
+        }
+    }
+
 
 Error:
     return hr;
@@ -335,6 +360,14 @@ void MonitorRenderContext::RenderThreadProc()
 
     while (!m_shouldStop)
     {
+        // High-refresh frame cap: when this monitor's native refresh is
+        // > 60 Hz the limiter throttles the loop to 60 fps.  At <=60 Hz
+        // m_frameLimiter is empty and this is a single nullopt check.
+        if (m_frameLimiter)
+        {
+            m_frameLimiter->WaitForNextFrame();
+        }
+
         auto  currentTime = steady_clock::now();
         float deltaTime   = duration_cast<duration<float>> (currentTime - lastFrameTime).count();
         lastFrameTime     = currentTime;

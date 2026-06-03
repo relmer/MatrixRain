@@ -1,5 +1,6 @@
 #pragma once
 
+#include "FrameLimiter.h"
 #include "SharedState.h"
 
 
@@ -78,6 +79,7 @@ private:
     std::unique_ptr<RenderSystem>      m_renderSystem;
     std::unique_ptr<DensityController> m_densityController;
     std::unique_ptr<FPSCounter>        m_fpsCounter;
+    std::optional<FrameLimiter>        m_frameLimiter;
 
     std::mutex        m_renderMutex;
     std::thread       m_renderThread;

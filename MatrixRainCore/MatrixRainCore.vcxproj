@@ -291,6 +291,7 @@
     <ClInclude Include="OverlayColor.h" />
     <ClInclude Include="AdapterSelection.h" />
     <ClInclude Include="DeviceLost.h" />
+    <ClInclude Include="FrameLimiter.h" />
     <ClInclude Include="IAdapterProvider.h" />
     <ClInclude Include="InMemoryAdapterProvider.h" />
     <ClInclude Include="MultiMonitorGate.h" />
@@ -352,6 +353,7 @@
     <ClCompile Include="WindowsAdapterProvider.cpp" />
     <ClCompile Include="AdapterSelection.cpp" />
     <ClCompile Include="DeviceLost.cpp" />
+    <ClCompile Include="FrameLimiter.cpp" />
     <ClCompile Include="MultiMonitorGate.cpp" />
     <ClCompile Include="RebuildCoalescer.cpp" />
     <ClCompile Include="CommandLine.cpp" />
