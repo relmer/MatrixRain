@@ -54,6 +54,11 @@ struct SharedState
     bool        showStatistics        = false;
     bool        showDebugFadeTimes    = false;
 
+    // Pause state (spacebar) — broadcast to every monitor so all displays
+    // freeze and resume their rain together.  Does not freeze elapsedTime, so
+    // color cycling continues while paused.
+    bool        isPaused              = false;
+
     // Monotonic seconds since start, used to cycle colors.  Advanced by the
     // owning (primary) render thread and read by every monitor so all displays
     // cycle color in sync.
@@ -75,6 +80,7 @@ struct SharedState
         int         glowSizePercent       = ScreenSaverSettings::DEFAULT_GLOW_SIZE_PERCENT;
         bool        showStatistics        = false;
         bool        showDebugFadeTimes    = false;
+        bool        isPaused              = false;
         float       elapsedTime           = 0.0f;
     };
 
@@ -91,6 +97,7 @@ struct SharedState
             .glowSizePercent       = glowSizePercent,
             .showStatistics        = showStatistics,
             .showDebugFadeTimes    = showDebugFadeTimes,
+            .isPaused              = isPaused,
             .elapsedTime           = elapsedTime,
         };
     }

@@ -17,6 +17,7 @@ class InputSystem;
 class ApplicationState;
 class FPSCounter;
 class Overlay;
+class MonitorRenderContext;
 
 
 
@@ -72,22 +73,16 @@ public:
 
 private:
     // Core systems
-    RegistrySettingsProvider           m_settingsProvider;
-    std::unique_ptr<Viewport>          m_viewport;
-    std::unique_ptr<AnimationSystem>   m_animationSystem;
-    std::unique_ptr<RenderSystem>      m_renderSystem;
-    std::unique_ptr<Timer>             m_timer;
-    std::unique_ptr<DensityController> m_densityController;
-    std::unique_ptr<InputSystem>       m_inputSystem;
-    std::unique_ptr<ApplicationState>  m_appState;
-    std::unique_ptr<FPSCounter>        m_fpsCounter;
-    OverlayState                       m_overlays;
+    RegistrySettingsProvider              m_settingsProvider;
+    std::unique_ptr<MonitorRenderContext> m_primaryContext;
+    std::unique_ptr<InputSystem>          m_inputSystem;
+    std::unique_ptr<ApplicationState>     m_appState;
+    OverlayState                          m_overlays;
 
     // Win32 window`
     HWND              m_hwnd                    { nullptr };
     HINSTANCE         m_hInstance               { nullptr };
     bool              m_isRunning               { false   };
-    std::atomic<bool> m_isPaused                { false   };
     std::atomic<bool> m_inDisplayModeTransition { false   };
     
     HWND              m_hConfigDialog           { nullptr };
@@ -97,22 +92,15 @@ private:
     
     const ScreenSaverModeContext * m_pScreenSaverContext { nullptr };
     
-    // Render thread — frame pacing is driven by VSync (Present(1, 0))
-    std::thread       m_renderThread;
-    std::atomic<bool> m_renderThreadShouldStop { false };
     SharedState       m_sharedState;
 
     // Internal methods
     void    InitializeApplicationState    (const ScreenSaverModeContext * pScreenSaverContext);
     HRESULT InitializeApplicationWindow();
     HRESULT CreateApplicationWindow       (POINT & position, SIZE & size);
-    void    Update                        (const SharedState::Snapshot & snapshot, float deltaTime);
-    void    Render                        (const SharedState::Snapshot & snapshot);
     void    GetWindowSizeForCurrentMode   (POINT & position, SIZE & size);
     void    ResizeWindowForCurrentMode();
     bool    ShouldExitScreenSaverOnKey    (WPARAM wParam);
-    
-    void    RenderThreadProc();
     
     // Message handlers
     void OnKeyDown                  (WPARAM wParam);

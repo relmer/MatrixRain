@@ -13,6 +13,7 @@
 #include "DensityController.h"
 #include "InputSystem.h"
 #include "FPSCounter.h"
+#include "MonitorRenderContext.h"
 #include "ScreenSaverModeContext.h"
 #include "UnicodeSymbols.h"
 #include "Version.h"
@@ -132,13 +133,8 @@ HRESULT Application::Initialize (HINSTANCE hInstance, int nCmdShow, const Screen
 
     m_hInstance         = hInstance;
     m_appState          = std::make_unique<ApplicationState> (m_settingsProvider);
-    m_viewport          = std::make_unique<Viewport>();
-    m_densityController = std::make_unique<DensityController> (*m_viewport, 16.0f);  // Base spacing; scaled by monitor DPI
-    m_animationSystem   = std::make_unique<AnimationSystem>();
-    m_renderSystem      = std::make_unique<RenderSystem>();
+    m_primaryContext    = std::make_unique<MonitorRenderContext> (true);
     m_inputSystem       = std::make_unique<InputSystem>();
-    m_fpsCounter        = std::make_unique<FPSCounter>();
-    m_timer             = std::make_unique<Timer>();
 
     // Overlays are only used in Normal mode
     if (!pScreenSaverContext || pScreenSaverContext->m_mode == ScreenSaverMode::Normal)
@@ -200,9 +196,9 @@ HRESULT Application::Initialize (HINSTANCE hInstance, int nCmdShow, const Screen
     fInitialized = charSet.Initialize();
     CBR (fInitialized);
 
-    m_animationSystem->Initialize (*m_viewport, *m_densityController);
+    m_primaryContext->InitializeAnimation();
 
-    hr = m_renderSystem->BuildGlyphAtlas();
+    hr = m_primaryContext->BuildGlyphAtlas();
     CHR (hr);
 
 
@@ -217,15 +213,15 @@ HRESULT Application::Initialize (HINSTANCE hInstance, int nCmdShow, const Screen
     // Start usage overlay in /? mode with background rain
     if (m_overlays.usageOverlay)
     {
-        float dpiScale = m_renderSystem->GetDpiScale();
+        float dpiScale = m_primaryContext->GetDpiScale();
 
         m_overlays.usageOverlay->SetDpiScale (dpiScale);
         m_overlays.usageOverlay->Show();
-        m_densityController->SetPercentage (8);
+        m_primaryContext->Density().SetPercentage (8);
 
         // Full-size rain characters (same physical size as fullscreen)
-        m_renderSystem->SetCharacterScaleOverride (dpiScale);
-        m_animationSystem->SetCharacterSpacingOverride (24.0f * dpiScale);
+        m_primaryContext->Renderer().SetCharacterScaleOverride (dpiScale);
+        m_primaryContext->Animation().SetCharacterSpacingOverride (24.0f * dpiScale);
 
         // Force windowed mode (enables click-to-drag) and suppress stats
         m_appState->SetDisplayMode (DisplayMode::Windowed);
@@ -304,13 +300,13 @@ void Application::InitializeApplicationState (const ScreenSaverModeContext * pSc
     }
 
     // Apply settings to subsystems (initial sync before render thread starts)
-    m_densityController->SetPercentage   (m_appState->GetSettings().m_densityPercent);
-    m_animationSystem->SetAnimationSpeed (m_appState->GetSettings().m_animationSpeedPercent);
-    m_renderSystem->SetGlowIntensity     (m_appState->GetSettings().m_glowIntensityPercent);
-    m_renderSystem->SetGlowSize          (m_appState->GetSettings().m_glowSizePercent);
+    m_primaryContext->Density().SetPercentage       (m_appState->GetSettings().m_densityPercent);
+    m_primaryContext->Animation().SetAnimationSpeed (m_appState->GetSettings().m_animationSpeedPercent);
+    m_primaryContext->Renderer().SetGlowIntensity   (m_appState->GetSettings().m_glowIntensityPercent);
+    m_primaryContext->Renderer().SetGlowSize        (m_appState->GetSettings().m_glowSizePercent);
     
     // Now initialize input system with both dependencies
-    m_inputSystem->Initialize (*m_densityController, *m_appState);
+    m_inputSystem->Initialize (m_primaryContext->Density(), *m_appState);
     
     if (m_pScreenSaverContext)
     {
@@ -368,19 +364,16 @@ HRESULT Application::InitializeApplicationWindow()
     hr = CreateApplicationWindow (position, size);
     CHR (hr);
 
-    hr = m_renderSystem->Initialize (m_hwnd, size.cx, size.cy);
+    hr = m_primaryContext->Initialize (m_hwnd, size.cx, size.cy);
     CHR (hr);
 
     // Propagate the initial DPI scale to overlay classes so layout
     // computations use the correct scaling from the very first frame.
     {
-        float dpiScale = m_renderSystem->GetDpiScale();
+        float dpiScale = m_primaryContext->GetDpiScale();
 
         if (m_overlays.helpOverlay)   m_overlays.helpOverlay->SetDpiScale (dpiScale);
         if (m_overlays.hotkeyOverlay) m_overlays.hotkeyOverlay->SetDpiScale (dpiScale);
-
-        m_animationSystem->SetDpiScale (dpiScale);
-        m_densityController->SetDpiScale (dpiScale);
     }
 
 
@@ -486,7 +479,10 @@ int Application::Run()
     MSG msg = {};
 
     // Start the render thread
-    m_renderThread = std::thread (&Application::RenderThreadProc, this);
+    m_primaryContext->StartRenderThread (m_sharedState,
+                                         &m_overlays,
+                                         m_appState.get(),
+                                         m_inDisplayModeTransition);
 
     // Main thread only processes messages
     while (m_isRunning)
@@ -516,46 +512,6 @@ int Application::Run()
     }
 
     return static_cast<int> (msg.wParam);
-}
-
-
-
-
-
-////////////////////////////////////////////////////////////////////////////////
-//
-//  Application::Update
-//
-////////////////////////////////////////////////////////////////////////////////
-
-void Application::Update (const SharedState::Snapshot & snapshot, float deltaTime)
-{
-    if (m_animationSystem && !m_isPaused)
-    {
-        m_animationSystem->Update (deltaTime);
-    }
-
-    if ((m_overlays.helpOverlay && m_overlays.helpOverlay->IsActive()) ||
-        (m_overlays.hotkeyOverlay  && m_overlays.hotkeyOverlay->IsActive())  ||
-        (m_overlays.usageOverlay   && m_overlays.usageOverlay->IsActive()))
-    {
-        Color4 scheme = GetColorRGB (snapshot.colorScheme, snapshot.elapsedTime);
-
-        if (m_overlays.helpOverlay && m_overlays.helpOverlay->IsActive())
-        {
-            m_overlays.helpOverlay->Update (deltaTime, scheme.r, scheme.g, scheme.b);
-        }
-
-        if (m_overlays.hotkeyOverlay && m_overlays.hotkeyOverlay->IsActive())
-        {
-            m_overlays.hotkeyOverlay->Update (deltaTime, scheme.r, scheme.g, scheme.b);
-        }
-
-        if (m_overlays.usageOverlay && m_overlays.usageOverlay->IsActive())
-        {
-            m_overlays.usageOverlay->Update (deltaTime, scheme.r, scheme.g, scheme.b);
-        }
-    }
 }
 
 
@@ -624,18 +580,13 @@ Error:
 void Application::ResizeWindowForCurrentMode()
 {
     HRESULT hr         = S_OK;
-    float   oldWidth   = { 0 };
-    float   oldHeight  = { 0 };
     POINT   position   = { 0 };
     SIZE    windowSize = { 0 };
     
 
     
-    CBRAEx (m_appState && m_viewport && m_renderSystem, E_UNEXPECTED);
+    CBRAEx (m_appState && m_primaryContext, E_UNEXPECTED);
 
-
-    oldWidth  = m_viewport->GetWidth();
-    oldHeight = m_viewport->GetHeight();
 
     GetWindowSizeForCurrentMode (position, windowSize);
 
@@ -649,76 +600,15 @@ void Application::ResizeWindowForCurrentMode()
                   windowSize.cx, 
                   windowSize.cy, 
                   SWP_FRAMECHANGED | SWP_SHOWWINDOW);
-    
-    m_viewport->Resize     (static_cast<float> (windowSize.cx), static_cast<float> (windowSize.cy));
-    m_renderSystem->Resize (windowSize.cx, windowSize.cy);
-                    
-    // Rescale existing streaks to fill new viewport dimensions
-    if (oldWidth > 0 && oldHeight > 0)
-    {
-        m_animationSystem->RescaleStreaksForViewport (oldWidth, 
-                                                      oldHeight, 
-                                                      static_cast<float> (windowSize.cx), 
-                                                      static_cast<float> (windowSize.cy));
-    }
 
-
-    // Reset timer to prevent accumulated deltaTime from causing animation jump
-    if (m_timer)
-    {
-        m_timer->Reset();
-    }
+    // Resize the render pipeline and rescale existing streaks to fill the new
+    // viewport.  The render thread is quiesced via m_inDisplayModeTransition.
+    m_primaryContext->Resize (windowSize.cx, windowSize.cy, true);
 
 
 
 Error:
     return;
-}
-
-
-
-
-
-////////////////////////////////////////////////////////////////////////////////
-//
-//  Application::Render
-//
-////////////////////////////////////////////////////////////////////////////////
-
-void Application::Render (const SharedState::Snapshot & snapshot)
-{
-    if (m_renderSystem && m_animationSystem && m_viewport)
-    {
-        // Only pass fps value if statistics are enabled
-        float       fps                = (snapshot.showStatistics && m_fpsCounter) ? m_fpsCounter->GetFPS() : 0.0f;
-        ColorScheme scheme             = snapshot.colorScheme;
-        int         rainPercentage     = snapshot.densityPercent;
-        int         streakCount        = static_cast<int> (m_animationSystem->GetActiveStreakCount());
-        int         activeHeadCount    = static_cast<int> (m_animationSystem->GetActiveHeadCount());
-        bool        showDebugFadeTimes = snapshot.showDebugFadeTimes;
-        float       elapsedTime        = snapshot.elapsedTime;
-        
-        // Pass overlay pointers to render system for rendering
-        const Overlay * pHelpOverlay    = (m_overlays.helpOverlay && m_overlays.helpOverlay->IsActive())       ? m_overlays.helpOverlay.get()    : nullptr;
-        const Overlay * pHotkeyOverlay  = (m_overlays.hotkeyOverlay && m_overlays.hotkeyOverlay->IsActive())   ? m_overlays.hotkeyOverlay.get()  : nullptr;
-        const Overlay * pUsageOverlay   = (m_overlays.usageOverlay && m_overlays.usageOverlay->IsActive())     ? m_overlays.usageOverlay.get()   : nullptr;
-
-        RenderParams renderParams =
-        {
-            .colorScheme        = scheme,
-            .fps                = fps,
-            .rainPercentage     = rainPercentage,
-            .streakCount        = streakCount,
-            .activeHeadCount    = activeHeadCount,
-            .showDebugFadeTimes = showDebugFadeTimes,
-            .elapsedTime        = elapsedTime,
-            .pHelpOverlay       = pHelpOverlay,
-            .pHotkeyOverlay     = pHotkeyOverlay,
-            .pUsageOverlay      = pUsageOverlay
-        };
-
-        m_renderSystem->Render (*m_animationSystem, *m_viewport, renderParams);
-    }
 }
 
 
@@ -764,19 +654,16 @@ Error:
 
 void Application::Shutdown()
 {
-    // Signal render thread to stop and wait for it
-    if (m_renderThread.joinable())
+    // Signal the render thread to stop and wait for it, then release the
+    // render context BEFORE destroying the window it observes.
+    if (m_primaryContext)
     {
-        m_renderThreadShouldStop = true;
-        m_renderThread.join();
+        m_primaryContext->RequestStop();
+        m_primaryContext->Join();
     }
 
-    m_timer.reset();
-    m_renderSystem.reset();
-    m_animationSystem.reset();
-    m_viewport.reset();
     m_inputSystem.reset();
-    m_densityController.reset();
+    m_primaryContext.reset();
 
     if (m_hwnd)
     {
@@ -940,8 +827,11 @@ void Application::OnKeyDown (WPARAM wParam)
             return;
 
         case VK_SPACE:
-            // Spacebar pressed - toggle pause
-            m_isPaused = !m_isPaused;
+            // Spacebar pressed — toggle pause for every monitor via shared state
+            {
+                std::lock_guard<std::mutex> lock (m_sharedState.mutex);
+                m_sharedState.isPaused = !m_sharedState.isPaused;
+            }
             isRecognized = true;
             break;
 
@@ -1062,7 +952,7 @@ void Application::OnSysKeyDown (WPARAM wParam)
     if (wParam == VK_RETURN)
     {
         // Alt+Enter pressed - toggle display mode
-        if (m_appState && m_renderSystem && m_viewport && m_animationSystem)
+        if (m_appState && m_primaryContext)
         {
             m_inDisplayModeTransition = true;
             m_appState->ToggleDisplayMode();
@@ -1145,12 +1035,9 @@ void Application::OnSize (LPARAM lParam)
     UINT width  = LOWORD (lParam);
     UINT height = HIWORD (lParam);
 
-    if (width > 0 && height > 0 && m_renderSystem && m_viewport)
+    if (width > 0 && height > 0 && m_primaryContext)
     {
-        m_renderSystem->Resize (width, height);
-        m_viewport->Resize (static_cast<float> (width), static_cast<float> (height));
-
-
+        m_primaryContext->Resize (width, height, false);
     }
 }
 
@@ -1188,10 +1075,11 @@ void Application::OnDpiChanged (WPARAM wParam, LPARAM lParam)
                       SWP_NOZORDER | SWP_NOACTIVATE);
     }
 
-    // Propagate new DPI scale to the render system
-    if (m_renderSystem)
+    // Propagate the new DPI to this monitor's render pipeline (render system,
+    // animation system, and density controller) under its render lock.
+    if (m_primaryContext)
     {
-        m_renderSystem->OnDpiChanged (newDpi);
+        m_primaryContext->OnDpiChanged (newDpi);
     }
 
     // Propagate new DPI scale to overlays
@@ -1203,18 +1091,6 @@ void Application::OnDpiChanged (WPARAM wParam, LPARAM lParam)
     if (m_overlays.hotkeyOverlay)
     {
         m_overlays.hotkeyOverlay->SetDpiScale (dpiScale);
-    }
-
-    // Propagate new DPI scale to animation system for character spacing
-    if (m_animationSystem)
-    {
-        m_animationSystem->SetDpiScale (dpiScale);
-    }
-
-    // Propagate new DPI scale to density so column count tracks the new spacing
-    if (m_densityController)
-    {
-        m_densityController->SetDpiScale (dpiScale);
     }
 }
 
@@ -1235,93 +1111,5 @@ void Application::OnNcHitTest (LRESULT & result)
     if (result == HTCLIENT && m_appState && m_appState->GetDisplayMode() == DisplayMode::Windowed)
     {
         result = HTCAPTION;  // Treat client area as title bar for dragging
-    }
-}
-
-
-
-
-
-////////////////////////////////////////////////////////////////////////////////
-//
-//  Application::RenderThreadProc
-//
-//  Dedicated render thread that runs independently of the message loop.
-//  Maintains fixed 60 FPS animation even during modal operations (dialog drag,
-//  resize, menus, etc.).
-//
-////////////////////////////////////////////////////////////////////////////////
-
-void Application::RenderThreadProc()
-{
-    using namespace std::chrono;
-    
-    auto                  lastFrameTime = steady_clock::now();
-    SharedState::Snapshot snapshot;
-    
-
-
-    while (!m_renderThreadShouldStop)
-    {
-        auto currentTime = steady_clock::now();
-        auto deltaTime   = duration_cast<duration<float>> (currentTime - lastFrameTime).count();
-        lastFrameTime    = currentTime;
-        
-        // Skip updates/rendering during display mode transitions
-        if (!m_inDisplayModeTransition)
-        {
-            // Update FPS counter
-            if (m_fpsCounter)
-            {
-                m_fpsCounter->Update (deltaTime);
-            }
-
-            // Advance the shared color-cycle clock (the owning/primary thread's
-            // job) and publish it BEFORE snapshotting so this frame — and, in
-            // multimon, every monitor — renders with the same elapsed time.
-            if (m_appState)
-            {
-                m_appState->Update (deltaTime);
-
-                std::lock_guard<std::mutex> lock (m_sharedState.mutex);
-                m_sharedState.elapsedTime = m_appState->GetElapsedTime();
-            }
-
-            // Snapshot shared state under lock, then push to subsystems.
-            // This keeps the lock hold time minimal (just a memcpy) while
-            // ensuring all subsystem writes happen on the render thread.
-            {
-                std::lock_guard<std::mutex> lock (m_sharedState.mutex);
-                snapshot = m_sharedState.GetSnapshot();
-            }
-
-            // Push shared state to subsystems (single-threaded on render thread)
-            m_densityController->SetPercentage   (snapshot.densityPercent);
-            m_animationSystem->SetAnimationSpeed (snapshot.animationSpeedPercent);
-            m_renderSystem->SetGlowIntensity     (snapshot.glowIntensityPercent);
-            m_renderSystem->SetGlowSize          (snapshot.glowSizePercent);
-
-            // Update and render (no additional lock needed — subsystems are
-            // only accessed from the render thread after the snapshot push)
-            {
-                std::lock_guard<std::mutex> lock (m_overlays.mutex);
-                Update (snapshot, deltaTime);
-                Render (snapshot);
-            }
-
-            // Present OUTSIDE the overlay lock — VSync blocks for up to 16ms
-            // and holding the lock during that wait causes input lag (the UI
-            // thread's OnKeyDown needs the overlay lock to call Show/Dismiss).
-            if (m_renderSystem)
-            {
-                m_renderSystem->Present();
-            }
-        }
-        else
-        {
-            // Yield CPU while display mode transition is in progress —
-            // Present() is not called so VSync cannot pace the loop.
-            std::this_thread::sleep_for (std::chrono::milliseconds (1));
-        }
     }
 }

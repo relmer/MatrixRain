@@ -298,6 +298,7 @@
     <ClInclude Include="ISettingsProvider.h" />
     <ClInclude Include="Math.h" />
     <ClInclude Include="MonitorInfo.h" />
+    <ClInclude Include="MonitorRenderContext.h" />
     <ClInclude Include="RegistrySettingsProvider.h" />
     <ClInclude Include="RenderParams.h" />
     <ClInclude Include="RenderSystem.h" />
@@ -335,6 +336,7 @@
     <ClCompile Include="Math.cpp" />
     <ClCompile Include="RegistrySettingsProvider.cpp" />
     <ClCompile Include="RenderSystem.cpp" />
+    <ClCompile Include="MonitorRenderContext.cpp" />
     <ClCompile Include="WindowsMonitorProvider.cpp" />
     <ClCompile Include="CommandLine.cpp" />
     <ClCompile Include="ScreenSaverInstaller.cpp" />
