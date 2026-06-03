@@ -417,6 +417,9 @@ void MonitorRenderContext::RenderThreadProc()
         m_animationSystem->SetAnimationSpeed (snapshot.animationSpeedPercent);
         m_renderSystem->SetGlowIntensity     (snapshot.glowIntensityPercent);
         m_renderSystem->SetGlowSize          (snapshot.glowSizePercent);
+        m_renderSystem->SetBlurPasses        (snapshot.blurPasses);
+        m_renderSystem->SetBloomResolution   (static_cast<int> (snapshot.bloomResolutionDivisor));
+        m_renderSystem->SetBlurTaps          (static_cast<int> (snapshot.blurTaps));
 
         // Update/Render hold the overlay lock (primary only); Present is kept
         // OUTSIDE it so the UI thread's Show/Dismiss is never blocked by VSync.

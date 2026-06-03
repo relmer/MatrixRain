@@ -29,9 +29,15 @@ private:
     static constexpr LPCWSTR VALUE_GLOW_SIZE              = L"GlowSize";
     static constexpr LPCWSTR VALUE_START_FULLSCREEN       = L"StartFullscreen";
     static constexpr LPCWSTR VALUE_SHOW_DEBUG_STATS       = L"ShowDebugStats";
-    static constexpr LPCWSTR VALUE_MULTIMONITOR           = L"MultiMonitor";
-    static constexpr LPCWSTR VALUE_GPU_ADAPTER            = L"GpuAdapter";
-    static constexpr LPCWSTR VALUE_LAST_SAVED             = L"LastSaved";
+    static constexpr LPCWSTR VALUE_MULTIMONITOR              = L"MultiMonitor";
+    static constexpr LPCWSTR VALUE_GPU_ADAPTER               = L"GpuAdapter";
+    static constexpr LPCWSTR VALUE_QUALITY_PRESET            = L"QualityPreset";
+    static constexpr LPCWSTR VALUE_LASTCUSTOM_GLOW_INTENSITY = L"LastCustom_GlowIntensity";
+    static constexpr LPCWSTR VALUE_LASTCUSTOM_PASSES         = L"LastCustom_Passes";
+    static constexpr LPCWSTR VALUE_LASTCUSTOM_RESOLUTION     = L"LastCustom_Resolution";
+    static constexpr LPCWSTR VALUE_LASTCUSTOM_SMOOTHNESS     = L"LastCustom_Smoothness";
+    static constexpr LPCWSTR VALUE_SHOW_ADVANCED_GRAPHICS    = L"ShowAdvancedGraphics";
+    static constexpr LPCWSTR VALUE_LAST_SAVED                = L"LastSaved";
     
     static HRESULT ReadInt    (HKEY hKey, LPCWSTR valueName, int & outValue);
     static HRESULT ReadBool   (HKEY hKey, LPCWSTR valueName, bool & outValue);

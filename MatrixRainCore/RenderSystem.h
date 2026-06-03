@@ -9,6 +9,7 @@
 #include "GlyphAtlas.h"
 #include "IRenderSystem.h"
 #include "Overlay.h"
+#include "QualityPresets.h"
 #include "RenderParams.h"
 #include "Viewport.h"
 #include "ColorScheme.h"
@@ -63,6 +64,10 @@ public:
     void SetGlowIntensity (int intensityPercent) override;
 
     void SetGlowSize (int sizePercent) override;
+
+    void SetBlurPasses     (int passes)  override;
+    void SetBloomResolution (int divisor) override;
+    void SetBlurTaps       (int taps)    override;
 
     void SetCharacterScaleOverride (float scale) override;
 
@@ -192,7 +197,11 @@ private:
     ComPtr<ID3D11ShaderResourceView>  m_blurTempSRV;
     ComPtr<ID3D11PixelShader>         m_bloomExtractPS;
     ComPtr<ID3D11PixelShader>         m_blurHorizontalPS;
+    ComPtr<ID3D11PixelShader>         m_blurHorizontalPS9;
+    ComPtr<ID3D11PixelShader>         m_blurHorizontalPS5;
     ComPtr<ID3D11PixelShader>         m_blurVerticalPS;
+    ComPtr<ID3D11PixelShader>         m_blurVerticalPS9;
+    ComPtr<ID3D11PixelShader>         m_blurVerticalPS5;
     ComPtr<ID3D11PixelShader>         m_compositePS;
     ComPtr<ID3D11PixelShader>         m_haloPS;
     ComPtr<ID3D11Buffer>              m_fullscreenQuadVB;
@@ -256,6 +265,12 @@ private:
     // Glow effect parameters
     float m_glowIntensity { 2.5f };  // Bloom intensity multiplier (100% = 2.5)
     float m_glowSize      { 1.0f };  // Blur radius multiplier (100% = 1.0)
+
+    // User Story 5 - graphics quality runtime parameters.  Driven by the
+    // settings snapshot path the same way m_glowIntensity is.
+    int               m_blurPasses              { 3 };
+    ResolutionDivisor m_bloomResolutionDivisor  { ResolutionDivisor::Half };
+    BlurTaps          m_blurTaps                { BlurTaps::High };
 
     // Character scale override (bypasses viewport-based scaling when set)
     std::optional<float> m_characterScaleOverride;

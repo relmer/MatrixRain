@@ -50,6 +50,11 @@ public:
     virtual void SetGlowIntensity (int intensityPercent) = 0;
     virtual void SetGlowSize      (int sizePercent)      = 0;
 
+    // User Story 5 - advanced graphics quality knobs from shared state.
+    virtual void SetBlurPasses    (int passes)                  = 0;
+    virtual void SetBloomResolution (int divisor)               = 0;
+    virtual void SetBlurTaps      (int taps)                    = 0;
+
     // Fixed character scale that bypasses viewport-based scaling.
     virtual void SetCharacterScaleOverride (float scale) = 0;
 

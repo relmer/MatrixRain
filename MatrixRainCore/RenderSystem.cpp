@@ -905,7 +905,9 @@ static const char * s_kszBlurHorizontalShaderSource = R"(
             
             float4 color = float4(0, 0, 0, 0);
             
-            // 13-tap Gaussian blur (horizontal), spread scaled by glowSize
+            // 13-tap Gaussian blur (horizontal), spread scaled by glowSize.
+            // High-smoothness variant; see ..._Tap5 / ..._Tap9 below for the
+            // cheaper Low/Medium quality variants selected at bind time.
             float weights[13] = { 0.02, 0.04, 0.06, 0.08, 0.10, 0.12, 0.16, 0.12, 0.10, 0.08, 0.06, 0.04, 0.02 };
             for (int i = -6; i <= 6; i++)
             {
@@ -913,6 +915,86 @@ static const char * s_kszBlurHorizontalShaderSource = R"(
                 color += inputTexture.Sample(samplerState, input.uv + offset) * weights[i + 6];
             }
             
+            return color;
+        }
+    )";
+
+
+
+
+static const char * s_kszBlurHorizontalShader9TapSource = R"(
+        cbuffer BloomConstants : register(b0)
+        {
+            float bloomIntensity;
+            float glowSize;
+            float2 padding;
+        };
+
+        Texture2D inputTexture : register(t0);
+        SamplerState samplerState : register(s0);
+
+        struct PSInput
+        {
+            float4 position : SV_POSITION;
+            float2 uv : TEXCOORD;
+        };
+
+        float4 main(PSInput input) : SV_TARGET
+        {
+            uint width, height;
+            inputTexture.GetDimensions(width, height);
+            float texelX = glowSize / width;
+
+            float4 color = float4(0, 0, 0, 0);
+
+            // 9-tap Gaussian blur (horizontal) - Medium quality variant.
+            float weights[9] = { 0.05, 0.09, 0.12, 0.15, 0.18, 0.15, 0.12, 0.09, 0.05 };
+            for (int i = -4; i <= 4; i++)
+            {
+                float2 offset = float2(i * texelX, 0);
+                color += inputTexture.Sample(samplerState, input.uv + offset) * weights[i + 4];
+            }
+
+            return color;
+        }
+    )";
+
+
+
+
+static const char * s_kszBlurHorizontalShader5TapSource = R"(
+        cbuffer BloomConstants : register(b0)
+        {
+            float bloomIntensity;
+            float glowSize;
+            float2 padding;
+        };
+
+        Texture2D inputTexture : register(t0);
+        SamplerState samplerState : register(s0);
+
+        struct PSInput
+        {
+            float4 position : SV_POSITION;
+            float2 uv : TEXCOORD;
+        };
+
+        float4 main(PSInput input) : SV_TARGET
+        {
+            uint width, height;
+            inputTexture.GetDimensions(width, height);
+            float texelX = glowSize / width;
+
+            float4 color = float4(0, 0, 0, 0);
+
+            // 5-tap Gaussian blur (horizontal) - Low quality variant.
+            float weights[5] = { 0.10, 0.24, 0.32, 0.24, 0.10 };
+            for (int i = -2; i <= 2; i++)
+            {
+                float2 offset = float2(i * texelX, 0);
+                color += inputTexture.Sample(samplerState, input.uv + offset) * weights[i + 2];
+            }
+
             return color;
         }
     )";
@@ -942,7 +1024,8 @@ static const char * s_kszBlurVerticalShaderSource = R"(
             
             float4 color = float4(0, 0, 0, 0);
             
-            // 13-tap Gaussian blur (vertical), spread scaled by glowSize
+            // 13-tap Gaussian blur (vertical), spread scaled by glowSize.
+            // High-smoothness variant; see ..._Tap5 / ..._Tap9 below.
             float weights[13] = { 0.02, 0.04, 0.06, 0.08, 0.10, 0.12, 0.16, 0.12, 0.10, 0.08, 0.06, 0.04, 0.02 };
             for (int i = -6; i <= 6; i++)
             {
@@ -950,6 +1033,84 @@ static const char * s_kszBlurVerticalShaderSource = R"(
                 color += inputTexture.Sample(samplerState, input.uv + offset) * weights[i + 6];
             }
             
+            return color;
+        }
+    )";
+
+
+
+
+static const char * s_kszBlurVerticalShader9TapSource = R"(
+        cbuffer BloomConstants : register(b0)
+        {
+            float bloomIntensity;
+            float glowSize;
+            float2 padding;
+        };
+
+        Texture2D inputTexture : register(t0);
+        SamplerState samplerState : register(s0);
+
+        struct PSInput
+        {
+            float4 position : SV_POSITION;
+            float2 uv : TEXCOORD;
+        };
+
+        float4 main(PSInput input) : SV_TARGET
+        {
+            uint width, height;
+            inputTexture.GetDimensions(width, height);
+            float texelY = glowSize / height;
+
+            float4 color = float4(0, 0, 0, 0);
+
+            float weights[9] = { 0.05, 0.09, 0.12, 0.15, 0.18, 0.15, 0.12, 0.09, 0.05 };
+            for (int i = -4; i <= 4; i++)
+            {
+                float2 offset = float2(0, i * texelY);
+                color += inputTexture.Sample(samplerState, input.uv + offset) * weights[i + 4];
+            }
+
+            return color;
+        }
+    )";
+
+
+
+
+static const char * s_kszBlurVerticalShader5TapSource = R"(
+        cbuffer BloomConstants : register(b0)
+        {
+            float bloomIntensity;
+            float glowSize;
+            float2 padding;
+        };
+
+        Texture2D inputTexture : register(t0);
+        SamplerState samplerState : register(s0);
+
+        struct PSInput
+        {
+            float4 position : SV_POSITION;
+            float2 uv : TEXCOORD;
+        };
+
+        float4 main(PSInput input) : SV_TARGET
+        {
+            uint width, height;
+            inputTexture.GetDimensions(width, height);
+            float texelY = glowSize / height;
+
+            float4 color = float4(0, 0, 0, 0);
+
+            float weights[5] = { 0.10, 0.24, 0.32, 0.24, 0.10 };
+            for (int i = -2; i <= 2; i++)
+            {
+                float2 offset = float2(0, i * texelY);
+                color += inputTexture.Sample(samplerState, input.uv + offset) * weights[i + 2];
+            }
+
             return color;
         }
     )";
@@ -1102,7 +1263,11 @@ HRESULT RenderSystem::CompileBloomShaders()
     ComPtr<ID3DBlob>       quadVSBlob;
     ComPtr<ID3DBlob>       extractPSBlob;
     ComPtr<ID3DBlob>       blurHPSBlob;
+    ComPtr<ID3DBlob>       blurH9PSBlob;
+    ComPtr<ID3DBlob>       blurH5PSBlob;
     ComPtr<ID3DBlob>       blurVPSBlob;
+    ComPtr<ID3DBlob>       blurV9PSBlob;
+    ComPtr<ID3DBlob>       blurV5PSBlob;
     ComPtr<ID3DBlob>       compositePSBlob;
     ComPtr<ID3DBlob>       haloPSBlob;
     QuadVertex             quadVertices[]     = {
@@ -1116,12 +1281,16 @@ HRESULT RenderSystem::CompileBloomShaders()
     D3D11_BUFFER_DESC      vbDesc             = { };
     D3D11_SUBRESOURCE_DATA vbData             = { };
     ShaderCompileEntry     bloomShaderTable[] = {
-        { s_kszQuadVertexShaderSource,         "QuadVS",    "main", "vs_5_0", L"D3DCompile failed for quad vertex shader",     quadVSBlob.GetAddressOf(),      nullptr              },
-        { s_kszBloomExtractShaderSource,       "Extract",   "main", "ps_5_0", L"D3DCompile failed for bloom extract shader",   extractPSBlob.GetAddressOf(),   &m_bloomExtractPS    },
-        { s_kszBlurHorizontalShaderSource,     "BlurH",     "main", "ps_5_0", L"D3DCompile failed for horizontal blur shader", blurHPSBlob.GetAddressOf(),     &m_blurHorizontalPS  },
-        { s_kszBlurVerticalShaderSource,       "BlurV",     "main", "ps_5_0", L"D3DCompile failed for vertical blur shader",   blurVPSBlob.GetAddressOf(),     &m_blurVerticalPS    },
-        { s_kszBloomCompositeShaderSource,     "Composite", "main", "ps_5_0", L"D3DCompile failed for composite shader",       compositePSBlob.GetAddressOf(), &m_compositePS       },
-        { s_kszHaloShaderSource,               "Halo",      "main", "ps_5_0", L"D3DCompile failed for halo shader",            haloPSBlob.GetAddressOf(),      &m_haloPS            }
+        { s_kszQuadVertexShaderSource,             "QuadVS",    "main", "vs_5_0", L"D3DCompile failed for quad vertex shader",         quadVSBlob.GetAddressOf(),      nullptr                },
+        { s_kszBloomExtractShaderSource,           "Extract",   "main", "ps_5_0", L"D3DCompile failed for bloom extract shader",       extractPSBlob.GetAddressOf(),   &m_bloomExtractPS      },
+        { s_kszBlurHorizontalShaderSource,         "BlurH13",   "main", "ps_5_0", L"D3DCompile failed for horizontal blur 13-tap",     blurHPSBlob.GetAddressOf(),     &m_blurHorizontalPS    },
+        { s_kszBlurHorizontalShader9TapSource,     "BlurH9",    "main", "ps_5_0", L"D3DCompile failed for horizontal blur 9-tap",      blurH9PSBlob.GetAddressOf(),    &m_blurHorizontalPS9   },
+        { s_kszBlurHorizontalShader5TapSource,     "BlurH5",    "main", "ps_5_0", L"D3DCompile failed for horizontal blur 5-tap",      blurH5PSBlob.GetAddressOf(),    &m_blurHorizontalPS5   },
+        { s_kszBlurVerticalShaderSource,           "BlurV13",   "main", "ps_5_0", L"D3DCompile failed for vertical blur 13-tap",       blurVPSBlob.GetAddressOf(),     &m_blurVerticalPS      },
+        { s_kszBlurVerticalShader9TapSource,       "BlurV9",    "main", "ps_5_0", L"D3DCompile failed for vertical blur 9-tap",        blurV9PSBlob.GetAddressOf(),    &m_blurVerticalPS9     },
+        { s_kszBlurVerticalShader5TapSource,       "BlurV5",    "main", "ps_5_0", L"D3DCompile failed for vertical blur 5-tap",        blurV5PSBlob.GetAddressOf(),    &m_blurVerticalPS5     },
+        { s_kszBloomCompositeShaderSource,         "Composite", "main", "ps_5_0", L"D3DCompile failed for composite shader",           compositePSBlob.GetAddressOf(), &m_compositePS         },
+        { s_kszHaloShaderSource,                   "Halo",      "main", "ps_5_0", L"D3DCompile failed for halo shader",                haloPSBlob.GetAddressOf(),      &m_haloPS              }
     };
 
 
@@ -1173,6 +1342,7 @@ HRESULT RenderSystem::CreateBloomResources (UINT width, UINT height)
     HRESULT              hr           = S_OK;
     UINT                 bloomWidth;
     UINT                 bloomHeight;
+    int                  divisor      = 0;
     D3D11_TEXTURE2D_DESC sceneTexDesc = { };
     D3D11_TEXTURE2D_DESC texDesc      = { };
 
@@ -1200,9 +1370,12 @@ HRESULT RenderSystem::CreateBloomResources (UINT width, UINT height)
     hr = m_device->CreateShaderResourceView (m_sceneTexture.Get(), nullptr, &m_sceneSRV);
     CHRA (hr);
 
-    // Create bloom extraction texture (half resolution for performance)
-    bloomWidth  = width / 2;
-    bloomHeight = height / 2;
+    // Create bloom extraction texture (size driven by the Resolution slider:
+    // Full/Half/Quarter/Eighth map to integer divisors 1/2/4/8).
+    divisor = std::clamp (static_cast<int> (m_bloomResolutionDivisor), 1, 8);
+
+    bloomWidth  = std::max (1u, width  / static_cast<UINT> (divisor));
+    bloomHeight = std::max (1u, height / static_cast<UINT> (divisor));
 
     texDesc.Width            = bloomWidth;
     texDesc.Height           = bloomHeight;
@@ -1350,20 +1523,24 @@ void RenderSystem::SetViewport(UINT width, UINT height)
 
 HRESULT RenderSystem::ApplyBloom()
 {
-    HRESULT                    hr            = S_OK;
+    HRESULT                    hr              = S_OK;
     ID3D11ShaderResourceView * srvs[2];
-    ID3D11Buffer             * nullCB        = nullptr;
+    ID3D11Buffer             * nullCB          = nullptr;
     D3D11_MAPPED_SUBRESOURCE   mappedBloomCB;
+    int                        viewportDivisor = 0;
+    ID3D11PixelShader        * blurH           = nullptr;
+    ID3D11PixelShader        * blurV           = nullptr;
+    int                        passCount       = 0;
 
 
 
     // Safety check - if render target or bloom resources are being recreated during resize, skip
     CBREx (m_renderTargetView && m_sceneTexture && m_bloomTexture && m_bloomExtractPS && m_compositePS, E_UNEXPECTED);
     
-    // Scene texture already has the rendered characters - no need to copy from backbuffer
-    
-    // Set viewport for half-resolution processing
-    SetViewport (m_renderWidth / 2, m_renderHeight / 2);
+    // Bloom viewport matches the bloom buffer size (resolution-divisor scaled).
+    viewportDivisor = std::clamp (static_cast<int> (m_bloomResolutionDivisor), 1, 8);
+    SetViewport (std::max (1u, m_renderWidth  / static_cast<UINT> (viewportDivisor)),
+                 std::max (1u, m_renderHeight / static_cast<UINT> (viewportDivisor)));
     
     // EXTRACTION PASS: Extract only bright pixels from scene to bloom texture
     SetRenderPipelineState (m_fullscreenQuadInputLayout.Get(),
@@ -1395,16 +1572,35 @@ HRESULT RenderSystem::ApplyBloom()
     // Bind constant buffer for blur shaders (glowSize controls spread)
     m_context->PSSetConstantBuffers (0, 1, m_bloomConstantBuffer.GetAddressOf());
 
+    // Select the blur shader variant matching the user's current smoothness
+    // setting.  Low/Medium variants use cheaper 5-tap / 9-tap kernels; High
+    // uses the canonical 13-tap kernel.
+    blurH = m_blurHorizontalPS.Get();
+    blurV = m_blurVerticalPS.Get();
+
+    if (m_blurTaps == BlurTaps::Low && m_blurHorizontalPS5 && m_blurVerticalPS5)
+    {
+        blurH = m_blurHorizontalPS5.Get();
+        blurV = m_blurVerticalPS5.Get();
+    }
+    else if (m_blurTaps == BlurTaps::Medium && m_blurHorizontalPS9 && m_blurVerticalPS9)
+    {
+        blurH = m_blurHorizontalPS9.Get();
+        blurV = m_blurVerticalPS9.Get();
+    }
+
     // Multiple blur passes: each H+V pass blurs the previous result,
-    // creating an exponentially wider and softer glow.  Three passes with
-    // a 13-tap kernel produce a very wide, cinematic bloom falloff.
-    for (int pass = 0; pass < 3; ++pass)
+    // creating an exponentially wider and softer glow.  Pass count and
+    // smoothness are both runtime-configurable via the Quality preset.
+    passCount = std::clamp (m_blurPasses, 1, 4);
+
+    for (int pass = 0; pass < passCount; ++pass)
     {
         // Horizontal blur pass (bloom → temp)
-        RenderFullscreenPass (m_blurTempRTV.Get(), m_blurHorizontalPS.Get(), m_bloomSRV.GetAddressOf(), 1);
+        RenderFullscreenPass (m_blurTempRTV.Get(), blurH, m_bloomSRV.GetAddressOf(), 1);
 
         // Vertical blur pass (temp → bloom)
-        RenderFullscreenPass (m_bloomRTV.Get(), m_blurVerticalPS.Get(), m_blurTempSRV.GetAddressOf(), 1);
+        RenderFullscreenPass (m_bloomRTV.Get(), blurV, m_blurTempSRV.GetAddressOf(), 1);
     }
     
     // Restore full viewport
@@ -1752,8 +1948,33 @@ void RenderSystem::Render (const AnimationSystem & animationSystem, const Viewpo
         renderOverlay (params.pHotkeyOverlay);
         renderOverlay (params.pUsageOverlay);
 
-        // Apply bloom (extracts bright pixels including overlay text, composites to backbuffer)
-        (void)ApplyBloom();
+        // Apply bloom (extracts bright pixels including overlay text, composites
+        // to backbuffer).  When the user has dialed Glow Intensity to 0% the
+        // entire bloom pipeline is bypassed and the scene texture is composited
+        // directly to the backbuffer (FR-031: "glow disabled" = true off, not
+        // just darker).
+        if (m_glowIntensity > 0.0f)
+        {
+            (void)ApplyBloom();
+        }
+        else
+        {
+            // Direct scene-to-backbuffer copy: render the scene texture without
+            // the bloom extract/blur/composite passes.
+            m_context->OMSetRenderTargets (1, m_renderTargetView.GetAddressOf(), nullptr);
+            m_context->OMSetBlendState (nullptr, nullptr, 0xffffffff);
+
+            ID3D11ShaderResourceView * sceneSrv[] = { m_sceneSRV.Get() };
+            SetRenderPipelineState (m_fullscreenQuadInputLayout.Get(),
+                                    D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST,
+                                    m_fullscreenQuadVB.Get(),
+                                    sizeof (float) * 5,
+                                    m_fullscreenQuadVS.Get(),
+                                    nullptr,
+                                    nullptr);
+            m_context->PSSetSamplers (0, 1, m_samplerState.GetAddressOf());
+            RenderFullscreenPass (m_renderTargetView.Get(), m_compositePS.Get(), sceneSrv, 1);
+        }
     }
     else
     {
@@ -2910,6 +3131,64 @@ void RenderSystem::SetGlowSize (int sizePercent)
     // Convert percentage (50-200) to multiplier (0.5-2.0)
     // Default is 100% = 1.0 multiplier
     m_glowSize = sizePercent / 100.0f;
+}
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  RenderSystem::SetBlurPasses / SetBloomResolution / SetBlurTaps
+//
+////////////////////////////////////////////////////////////////////////////////
+
+void RenderSystem::SetBlurPasses (int passes)
+{
+    m_blurPasses = passes;
+}
+
+
+void RenderSystem::SetBloomResolution (int divisor)
+{
+    // Stored as the divisor integer (1/2/4/8); a bloom-buffer recreate is
+    // required when this changes.  The viewport divisor in ApplyBloom uses
+    // the same enum value to keep the half/quarter/eighth render consistent.
+    ResolutionDivisor newDiv;
+
+    switch (divisor)
+    {
+        case 1: newDiv = ResolutionDivisor::Full;    break;
+        case 4: newDiv = ResolutionDivisor::Quarter; break;
+        case 8: newDiv = ResolutionDivisor::Eighth;  break;
+        case 2:
+        default:
+            newDiv = ResolutionDivisor::Half;
+            break;
+    }
+
+    if (newDiv != m_bloomResolutionDivisor)
+    {
+        m_bloomResolutionDivisor = newDiv;
+
+        // Recreate the bloom textures at the new resolution.  Recreate is
+        // a no-op if the device is not yet initialized.
+        if (m_device && m_renderWidth > 0 && m_renderHeight > 0)
+        {
+            (void)CreateBloomResources (m_renderWidth, m_renderHeight);
+        }
+    }
+}
+
+
+void RenderSystem::SetBlurTaps (int taps)
+{
+    switch (taps)
+    {
+        case 5:  m_blurTaps = BlurTaps::Low;    break;
+        case 9:  m_blurTaps = BlurTaps::Medium; break;
+        case 13:
+        default: m_blurTaps = BlurTaps::High;   break;
+    }
 }
 
 
