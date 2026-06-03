@@ -295,6 +295,7 @@
     <ClInclude Include="IAdapterProvider.h" />
     <ClInclude Include="InMemoryAdapterProvider.h" />
     <ClInclude Include="MultiMonitorGate.h" />
+    <ClInclude Include="QualityPresets.h" />
     <ClInclude Include="RebuildCoalescer.h" />
     <ClInclude Include="InMemorySettingsProvider.h" />
     <ClInclude Include="InputSystem.h" />
@@ -355,6 +356,7 @@
     <ClCompile Include="DeviceLost.cpp" />
     <ClCompile Include="FrameLimiter.cpp" />
     <ClCompile Include="MultiMonitorGate.cpp" />
+    <ClCompile Include="QualityPresets.cpp" />
     <ClCompile Include="RebuildCoalescer.cpp" />
     <ClCompile Include="CommandLine.cpp" />
     <ClCompile Include="ScreenSaverInstaller.cpp" />
