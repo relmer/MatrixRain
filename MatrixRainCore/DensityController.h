@@ -33,6 +33,9 @@ public:
     /// <param name="percentage">Desired percentage (0-100)</param>
     void SetPercentage (int percentage);
 
+    // Update the effective character spacing for the current monitor DPI.
+    void SetDpiScale (float dpiScale);
+
     /// <summary>
     /// Get target number of streaks based on current percentage and viewport width.
     /// Formula: max(1, (viewportWidth / characterWidth / 2) * percentage / 100)
@@ -56,6 +59,7 @@ private:
     int              m_percentage      { DEFAULT_PERCENTAGE};    // Current density percentage (0-100)
     const Viewport & m_viewport;                                 // Reference to viewport for width calculations
     float            m_characterWidth;                           // Width of one character in pixels (horizontal spacing)
+    float            m_dpiScale        { 1.0f };                 // Effective spacing = m_characterWidth * m_dpiScale
     
     static constexpr int MIN_PERCENTAGE     = 0;
     static constexpr int MAX_PERCENTAGE     = 100;

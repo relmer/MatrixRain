@@ -133,7 +133,7 @@ HRESULT Application::Initialize (HINSTANCE hInstance, int nCmdShow, const Screen
     m_hInstance         = hInstance;
     m_appState          = std::make_unique<ApplicationState> (m_settingsProvider);
     m_viewport          = std::make_unique<Viewport>();
-    m_densityController = std::make_unique<DensityController> (*m_viewport, 24.0f);  // Character width matches horizontal spacing
+    m_densityController = std::make_unique<DensityController> (*m_viewport, 16.0f);  // Base spacing; scaled by monitor DPI
     m_animationSystem   = std::make_unique<AnimationSystem>();
     m_renderSystem      = std::make_unique<RenderSystem>();
     m_inputSystem       = std::make_unique<InputSystem>();
@@ -380,6 +380,7 @@ HRESULT Application::InitializeApplicationWindow()
         if (m_overlays.hotkeyOverlay) m_overlays.hotkeyOverlay->SetDpiScale (dpiScale);
 
         m_animationSystem->SetDpiScale (dpiScale);
+        m_densityController->SetDpiScale (dpiScale);
     }
 
 
@@ -1208,6 +1209,12 @@ void Application::OnDpiChanged (WPARAM wParam, LPARAM lParam)
     if (m_animationSystem)
     {
         m_animationSystem->SetDpiScale (dpiScale);
+    }
+
+    // Propagate new DPI scale to density so column count tracks the new spacing
+    if (m_densityController)
+    {
+        m_densityController->SetDpiScale (dpiScale);
     }
 }
 
