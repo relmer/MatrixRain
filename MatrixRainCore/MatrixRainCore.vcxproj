@@ -293,10 +293,12 @@
     <ClInclude Include="InputSystem.h" />
     <ClInclude Include="IMonitorProvider.h" />
     <ClInclude Include="InMemoryMonitorProvider.h" />
+    <ClInclude Include="IRenderSystem.h" />
     <ClInclude Include="ISettingsProvider.h" />
     <ClInclude Include="Math.h" />
     <ClInclude Include="MonitorInfo.h" />
     <ClInclude Include="RegistrySettingsProvider.h" />
+    <ClInclude Include="RenderParams.h" />
     <ClInclude Include="RenderSystem.h" />
     <ClInclude Include="CommandLine.h" />
     <ClInclude Include="FileSystemProvider.h" />

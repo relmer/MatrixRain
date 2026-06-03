@@ -6,7 +6,9 @@
 
 #include "AnimationSystem.h"
 #include "CharacterInstance.h"
+#include "IRenderSystem.h"
 #include "Overlay.h"
+#include "RenderParams.h"
 #include "Viewport.h"
 #include "ColorScheme.h"
 
@@ -27,7 +29,7 @@ class CharacterStreak;
 /// Manages DirectX 11 rendering pipeline for Matrix Rain effect.
 /// Handles device creation, shader compilation, instanced rendering, and presentation.
 /// </summary>
-class RenderSystem
+class RenderSystem : public IRenderSystem
 {
 public:
     ~RenderSystem();
@@ -42,38 +44,21 @@ public:
     HRESULT Initialize (HWND hwnd, UINT width, UINT height);
 
     /// <summary>
-    /// Parameters for rendering a single frame.
-    /// </summary>
-    struct RenderParams
-    {
-        ColorScheme             colorScheme        = ColorScheme::Green;
-        float                   fps                = 0.0f;
-        int                     rainPercentage     = 0;
-        int                     streakCount        = 0;
-        int                     activeHeadCount    = 0;
-        bool                    showDebugFadeTimes = false;
-        float                   elapsedTime        = 0.0f;
-        const Overlay         * pHelpOverlay       = nullptr;
-        const Overlay         * pHotkeyOverlay     = nullptr;
-        const Overlay         * pUsageOverlay      = nullptr;
-    };
-
-    /// <summary>
     /// Render all character streaks from the animation system.
     /// </summary>
-    void Render (const AnimationSystem & animationSystem, const Viewport & viewport, const RenderParams & params);
+    void Render (const AnimationSystem & animationSystem, const Viewport & viewport, const RenderParams & params) override;
 
     /// <summary>
     /// Present the rendered frame to the screen.
     /// </summary>
-    void Present();
+    void Present() override;
 
     /// <summary>
     /// Handle window resize by recreating swap chain buffers.
     /// </summary>
     /// <param name="width">New viewport width</param>
     /// <param name="height">New viewport height</param>
-    void Resize (UINT width, UINT height);
+    void Resize (UINT width, UINT height) override;
 
     /// <summary>
     /// Recreate swap chain for display mode transitions (windowed ↔ fullscreen).
@@ -106,13 +91,13 @@ public:
     /// Set glow intensity multiplier from percentage (0-200).
     /// </summary>
     /// <param name="intensityPercent">Glow intensity percentage (100 = default)</param>
-    void SetGlowIntensity (int intensityPercent);
+    void SetGlowIntensity (int intensityPercent) override;
 
     /// <summary>
     /// Set glow blur size from percentage (50-200).
     /// </summary>
     /// <param name="sizePercent">Glow size percentage (100 = default)</param>
-    void SetGlowSize (int sizePercent);
+    void SetGlowSize (int sizePercent) override;
 
     /// <summary>
     /// Override character scale to prevent viewport-based scaling.
@@ -120,7 +105,7 @@ public:
     /// instead of computing from viewport height.
     /// </summary>
     /// <param name="scale">Fixed character scale (1.0 = full size)</param>
-    void SetCharacterScaleOverride (float scale);
+    void SetCharacterScaleOverride (float scale) override;
 
     /// <summary>
     /// Notify the render system of a DPI change.  Recreates DPI-sensitive
@@ -128,12 +113,12 @@ public:
     /// by the character-scale constant buffer and overlay layout.
     /// </summary>
     /// <param name="dpi">New dots-per-inch value from GetDpiForWindow</param>
-    void OnDpiChanged (UINT dpi);
+    void OnDpiChanged (UINT dpi) override;
 
     /// <summary>
     /// Returns the current DPI scale factor (1.0 at 96 DPI / 100%).
     /// </summary>
-    float GetDpiScale() const { return m_dpiScale; }
+    float GetDpiScale() const override { return m_dpiScale; }
 
     // Accessors
     ID3D11Device        * GetDevice()        const { return m_device.Get();        }

@@ -707,7 +707,7 @@ void Application::Render (const SharedState::Snapshot & snapshot)
         const Overlay * pHotkeyOverlay  = (m_overlays.hotkeyOverlay && m_overlays.hotkeyOverlay->IsActive())   ? m_overlays.hotkeyOverlay.get()  : nullptr;
         const Overlay * pUsageOverlay   = (m_overlays.usageOverlay && m_overlays.usageOverlay->IsActive())     ? m_overlays.usageOverlay.get()   : nullptr;
 
-        RenderSystem::RenderParams renderParams =
+        RenderParams renderParams =
         {
             .colorScheme        = scheme,
             .fps                = fps,
