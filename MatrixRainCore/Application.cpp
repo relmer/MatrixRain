@@ -528,13 +528,8 @@ int Application::Run()
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void Application::Update (float deltaTime)
+void Application::Update (const SharedState::Snapshot & snapshot, float deltaTime)
 {
-    if (m_appState)
-    {
-        m_appState->Update (deltaTime);
-    }
-    
     if (m_animationSystem && !m_isPaused)
     {
         m_animationSystem->Update (deltaTime);
@@ -544,7 +539,7 @@ void Application::Update (float deltaTime)
         (m_overlays.hotkeyOverlay  && m_overlays.hotkeyOverlay->IsActive())  ||
         (m_overlays.usageOverlay   && m_overlays.usageOverlay->IsActive()))
     {
-        Color4 scheme = GetColorRGB (m_appState->GetColorScheme(), m_appState->GetElapsedTime());
+        Color4 scheme = GetColorRGB (snapshot.colorScheme, snapshot.elapsedTime);
 
         if (m_overlays.helpOverlay && m_overlays.helpOverlay->IsActive())
         {
@@ -692,7 +687,7 @@ Error:
 
 void Application::Render (const SharedState::Snapshot & snapshot)
 {
-    if (m_renderSystem && m_animationSystem && m_viewport && m_appState)
+    if (m_renderSystem && m_animationSystem && m_viewport)
     {
         // Only pass fps value if statistics are enabled
         float       fps                = (snapshot.showStatistics && m_fpsCounter) ? m_fpsCounter->GetFPS() : 0.0f;
@@ -1275,7 +1270,18 @@ void Application::RenderThreadProc()
             {
                 m_fpsCounter->Update (deltaTime);
             }
-            
+
+            // Advance the shared color-cycle clock (the owning/primary thread's
+            // job) and publish it BEFORE snapshotting so this frame — and, in
+            // multimon, every monitor — renders with the same elapsed time.
+            if (m_appState)
+            {
+                m_appState->Update (deltaTime);
+
+                std::lock_guard<std::mutex> lock (m_sharedState.mutex);
+                m_sharedState.elapsedTime = m_appState->GetElapsedTime();
+            }
+
             // Snapshot shared state under lock, then push to subsystems.
             // This keeps the lock hold time minimal (just a memcpy) while
             // ensuring all subsystem writes happen on the render thread.
@@ -1294,16 +1300,8 @@ void Application::RenderThreadProc()
             // only accessed from the render thread after the snapshot push)
             {
                 std::lock_guard<std::mutex> lock (m_overlays.mutex);
-                Update (deltaTime);
+                Update (snapshot, deltaTime);
                 Render (snapshot);
-            }
-
-            // Publish the advanced color-cycle clock so the next snapshot — and,
-            // in multimon, every secondary monitor — sees synchronized time.
-            if (m_appState)
-            {
-                std::lock_guard<std::mutex> lock (m_sharedState.mutex);
-                m_sharedState.elapsedTime = m_appState->GetElapsedTime();
             }
 
             // Present OUTSIDE the overlay lock — VSync blocks for up to 16ms

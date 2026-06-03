@@ -106,7 +106,7 @@ private:
     void    InitializeApplicationState    (const ScreenSaverModeContext * pScreenSaverContext);
     HRESULT InitializeApplicationWindow();
     HRESULT CreateApplicationWindow       (POINT & position, SIZE & size);
-    void    Update                        (float deltaTime);
+    void    Update                        (const SharedState::Snapshot & snapshot, float deltaTime);
     void    Render                        (const SharedState::Snapshot & snapshot);
     void    GetWindowSizeForCurrentMode   (POINT & position, SIZE & size);
     void    ResizeWindowForCurrentMode();
