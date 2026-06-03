@@ -315,6 +315,7 @@
     <ClInclude Include="RegistryProvider.h" />
     <ClInclude Include="ScreenSaverInstaller.h" />
     <ClInclude Include="WindowsFileSystemProvider.h" />
+    <ClInclude Include="WindowsAdapterProvider.h" />
     <ClInclude Include="WindowsMonitorProvider.h" />
     <ClInclude Include="WindowsRegistryProvider.h" />
     <ClInclude Include="Timer.h" />
@@ -348,6 +349,7 @@
     <ClCompile Include="MonitorLayout.cpp" />
     <ClCompile Include="RenderThreadInputs.cpp" />
     <ClCompile Include="WindowsMonitorProvider.cpp" />
+    <ClCompile Include="WindowsAdapterProvider.cpp" />
     <ClCompile Include="AdapterSelection.cpp" />
     <ClCompile Include="DeviceLost.cpp" />
     <ClCompile Include="MultiMonitorGate.cpp" />
