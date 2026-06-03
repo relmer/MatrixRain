@@ -124,7 +124,7 @@ private:
     
     // Window procedure
     static LRESULT CALLBACK WindowProc    (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
-    LRESULT                 HandleMessage (UINT uMsg, WPARAM wParam, LPARAM lParam);
+    LRESULT                 HandleMessage (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 };
 
 

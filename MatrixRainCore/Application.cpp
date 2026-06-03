@@ -822,7 +822,7 @@ LRESULT CALLBACK Application::WindowProc (HWND hwnd, UINT uMsg, WPARAM wParam, L
 
         if (pApp)
         {
-            return pApp->HandleMessage (uMsg, wParam, lParam);
+            return pApp->HandleMessage (hwnd, uMsg, wParam, lParam);
         }
     }
 
@@ -839,7 +839,7 @@ LRESULT CALLBACK Application::WindowProc (HWND hwnd, UINT uMsg, WPARAM wParam, L
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-LRESULT Application::HandleMessage (UINT uMsg, WPARAM wParam, LPARAM lParam)
+LRESULT Application::HandleMessage (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
     switch (uMsg)
     {
@@ -865,17 +865,22 @@ LRESULT Application::HandleMessage (UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         case WM_NCHITTEST:
         {
-            LRESULT result = DefWindowProc (m_hwnd, uMsg, wParam, lParam);
+            LRESULT result = DefWindowProc (hwnd, uMsg, wParam, lParam);
             OnNcHitTest (result);
             return result;
         }
 
         case WM_DESTROY:
-            PostQuitMessage (0);
+            // During a display-mode transition windows are destroyed and
+            // rebuilt; only a genuine shutdown (outside a transition) quits.
+            if (!m_inDisplayModeTransition)
+            {
+                PostQuitMessage (0);
+            }
             return 0;
 
         default:
-            return DefWindowProc (m_hwnd, uMsg, wParam, lParam);
+            return DefWindowProc (hwnd, uMsg, wParam, lParam);
     }
 }
 
