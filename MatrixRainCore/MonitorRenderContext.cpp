@@ -7,6 +7,7 @@
 #include "ApplicationState.h"
 #include "ColorScheme.h"
 #include "DensityController.h"
+#include "DeviceLost.h"
 #include "FPSCounter.h"
 #include "Overlay.h"
 #include "RenderParams.h"
@@ -398,7 +399,23 @@ void MonitorRenderContext::RenderThreadProc()
             Render (snapshot);
         }
 
-        m_renderSystem->Present();
+        HRESULT presentHr = m_renderSystem->Present();
+
+        if (IsDeviceLost (presentHr))
+        {
+            // GPU is gone (driver reset, removal, sleep/resume).  Stop this
+            // render thread immediately and ask the UI thread to rebuild
+            // every context on whatever adapter is currently available.
+            // Application::WindowProc handles WM_APP_REBUILD_CONTEXTS for
+            // every monitor window we create, so posting to our own HWND
+            // routes correctly.
+            if (m_hwnd)
+            {
+                PostMessageW (m_hwnd, Application::WM_APP_REBUILD_CONTEXTS, 0, 0);
+            }
+
+            break;
+        }
     }
 }
 

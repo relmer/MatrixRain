@@ -48,7 +48,7 @@ public:
 
     void Render (const AnimationSystem & animationSystem, const Viewport & viewport, const RenderParams & params) override;
 
-    void Present() override;
+    HRESULT Present() override;
 
     void Resize (UINT width, UINT height) override;
 

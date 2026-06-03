@@ -45,10 +45,18 @@ public:
     }
 
 
-    void Present() override
+    HRESULT Present() override
     {
         m_presentCount++;
+
+        return m_presentReturnHr;
     }
+
+
+    // Test seam: setting this lets a test simulate Present returning a
+    // device-lost HRESULT (e.g., DXGI_ERROR_DEVICE_REMOVED) so callers
+    // can exercise their recovery paths without a real D3D device.
+    HRESULT m_presentReturnHr = S_OK;
 
 
     void Resize (UINT width, UINT height) override

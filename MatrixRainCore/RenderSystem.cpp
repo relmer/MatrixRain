@@ -1750,12 +1750,14 @@ void RenderSystem::Render (const AnimationSystem & animationSystem, const Viewpo
 
 
 
-void RenderSystem::Present()
+HRESULT RenderSystem::Present()
 {
-    if (m_swapChain)
+    if (!m_swapChain)
     {
-        m_swapChain->Present (1, 0); // VSync enabled
+        return S_OK;
     }
+
+    return m_swapChain->Present (1, 0); // VSync enabled
 }
 
 

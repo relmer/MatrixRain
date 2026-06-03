@@ -35,8 +35,10 @@ public:
     // synchronously and must not be retained past the call.
     virtual void Render (const AnimationSystem & animationSystem, const Viewport & viewport, const RenderParams & params) = 0;
 
-    // Present the rendered frame; blocks on this monitor's VBlank.
-    virtual void Present() = 0;
+    // Present the rendered frame; blocks on this monitor's VBlank.  Returns
+    // the HRESULT from the underlying swap-chain Present so callers can
+    // detect device-lost (see DeviceLost.h / IsDeviceLost).
+    virtual HRESULT Present() = 0;
 
     // Recreate swap-chain buffers for a new client size.
     virtual void Resize (UINT width, UINT height) = 0;
