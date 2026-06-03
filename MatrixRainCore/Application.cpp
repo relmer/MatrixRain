@@ -1103,7 +1103,23 @@ LRESULT Application::HandleMessage (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM 
             return 0;
 
         case WM_APP_REBUILD_CONTEXTS:
+            // Coalesced burst handler — clear the latch so any further
+            // topology / device-loss notifications that arrive while we
+            // are rebuilding can request a follow-up rebuild.
+            m_rebuildCoalescer.Consume();
             RebuildContextsForCurrentMode();
+            return 0;
+
+        case WM_DISPLAYCHANGE:
+            // Monitor topology changed (add, remove, resolution, primary
+            // reassignment).  Windows broadcasts WM_DISPLAYCHANGE to every
+            // top-level window we own, so coalesce to a single rebuild via
+            // the latch; the rebuild itself is then driven by the
+            // WM_APP_REBUILD_CONTEXTS case above.
+            if (m_rebuildCoalescer.RequestRebuild() && m_hwnd)
+            {
+                PostMessageW (m_hwnd, WM_APP_REBUILD_CONTEXTS, 0, 0);
+            }
             return 0;
 
         default:

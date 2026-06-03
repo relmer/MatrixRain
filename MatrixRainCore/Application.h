@@ -1,5 +1,6 @@
 #pragma once
 
+#include "RebuildCoalescer.h"
 #include "RegistrySettingsProvider.h"
 #include "ScreenSaverModeContext.h"
 #include "SharedState.h"
@@ -84,6 +85,7 @@ private:
     std::unique_ptr<InputSystem>                       m_inputSystem;
     std::unique_ptr<ApplicationState>                  m_appState;
     OverlayState                                       m_overlays;
+    RebuildCoalescer                                   m_rebuildCoalescer;
 
     // Win32 window`
     HWND              m_hwnd                    { nullptr };
