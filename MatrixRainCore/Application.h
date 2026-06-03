@@ -65,12 +65,15 @@ public:
     
     void                SetOpenConfigDialogCallback (std::function<void()> callback) { m_openConfigDialogCallback = callback; }
     void                SetShowUsageDialogCallback  (std::function<void()> callback) { m_showUsageDialogCallback  = callback; }
-    void                ApplyDisplayModeChange()                   { ResizeWindowForCurrentMode();    }
+    void                ApplyDisplayModeChange()                   { PostMessageW (m_hwnd, WM_APP_REBUILD_CONTEXTS, 0, 0); }
 
     // Window dimensions
     static constexpr UINT            DEFAULT_WIDTH  = 1280;
     static constexpr UINT            DEFAULT_HEIGHT = 720;
     static constexpr const wchar_t * WINDOW_TITLE   = L"Matrix Rain";
+
+    // Posted to the primary window to rebuild contexts outside any dialog proc
+    static constexpr UINT            WM_APP_REBUILD_CONTEXTS = WM_APP + 1;
 
 private:
     // Core systems
@@ -100,15 +103,18 @@ private:
     // Internal methods
     void    InitializeApplicationState    (const ScreenSaverModeContext * pScreenSaverContext);
     HRESULT CreateRenderContexts();
+    HRESULT CreateSingleContext();
+    HRESULT CreateFullscreenContexts();
+    bool    ShouldSpanAllMonitors()       const;
     HRESULT AddContext                    (const POINT & position, const SIZE & size, DWORD dwStyle, HWND hwndParent, bool isPrimary);
     HRESULT CreateWindowAtBounds          (const POINT & position, const SIZE & size, DWORD dwStyle, HWND hwndParent, HWND & hwndOut);
     void    WirePrimaryContext();
     HRESULT InitializeContextResources();
+    void    RebuildContextsForCurrentMode();
     void    StartRenderThreads();
     void    StopRenderThreads();
     MonitorRenderContext * ContextForHwnd (HWND hwnd) const;
     void    GetWindowSizeForCurrentMode   (POINT & position, SIZE & size);
-    void    ResizeWindowForCurrentMode();
     bool    ShouldExitScreenSaverOnKey    (WPARAM wParam);
     
     // Message handlers

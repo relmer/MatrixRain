@@ -328,13 +328,77 @@ void Application::InitializeApplicationState (const ScreenSaverModeContext * pSc
 //  Application::CreateRenderContexts
 //
 //  Creates the window(s) and render context(s) for the current display mode.
-//  Preview is a single child window; every other mode is a single primary
-//  window here (the per-monitor fullscreen fan-out is layered on in a later
-//  step).  Each context observes a UI-thread-owned HWND.
+//  Fullscreen (normal Alt+Enter or /s screensaver, excluding preview and /?)
+//  fans out to one window per monitor; every other mode is a single window.
 //
 ////////////////////////////////////////////////////////////////////////////////
 
 HRESULT Application::CreateRenderContexts()
+{
+    HRESULT hr = S_OK;
+
+
+    if (ShouldSpanAllMonitors())
+    {
+        hr = CreateFullscreenContexts();
+        CHR (hr);
+    }
+    else
+    {
+        hr = CreateSingleContext();
+        CHR (hr);
+    }
+
+
+
+Error:
+    return hr;
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  Application::ShouldSpanAllMonitors
+//
+//  Multimon applies only in the Fullscreen display mode.  Preview (/p) is a
+//  single child window and the /? usage screen is a single windowed view, so
+//  both are always forced single regardless of the saved display mode.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+bool Application::ShouldSpanAllMonitors() const
+{
+    if (m_pScreenSaverContext)
+    {
+        ScreenSaverMode mode = m_pScreenSaverContext->m_mode;
+
+        if (mode == ScreenSaverMode::ScreenSaverPreview ||
+            mode == ScreenSaverMode::HelpRequested)
+        {
+            return false;
+        }
+    }
+
+    return m_appState && m_appState->GetDisplayMode() == DisplayMode::Fullscreen;
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  Application::CreateSingleContext
+//
+//  Creates a single window + render context: a child window for preview, or a
+//  borderless popup sized by GetWindowSizeForCurrentMode for every other mode.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+HRESULT Application::CreateSingleContext()
 {
     HRESULT hr         = S_OK;
     POINT   position   = {};
@@ -368,6 +432,72 @@ HRESULT Application::CreateRenderContexts()
 
     hr = AddContext (position, size, dwStyle, hwndParent, true);
     CHR (hr);
+
+
+
+Error:
+    return hr;
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  Application::CreateFullscreenContexts
+//
+//  Creates one borderless popup window + render context per connected monitor,
+//  each placed at the monitor's virtual-screen bounds.  Degenerate monitors are
+//  skipped; the primary is the first monitor flagged primary (else the first).
+//  If no usable monitors are reported, falls back to a single primary window.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+HRESULT Application::CreateFullscreenContexts()
+{
+    HRESULT                  hr           = S_OK;
+    std::vector<MonitorInfo> monitors     = m_monitorProvider->GetMonitors();
+    std::vector<MonitorInfo> valid;
+    size_t                   primaryIndex = 0;
+
+
+    for (const MonitorInfo & monitor : monitors)
+    {
+        if (monitor.Width() > 0 && monitor.Height() > 0)
+        {
+            valid.push_back (monitor);
+        }
+    }
+
+    if (valid.empty())
+    {
+        // No usable topology reported — degrade gracefully to one window
+        hr = CreateSingleContext();
+        CHR (hr);
+    }
+    else
+    {
+        for (size_t i = 0; i < valid.size(); ++i)
+        {
+            if (valid[i].m_isPrimary)
+            {
+                primaryIndex = i;
+                break;
+            }
+        }
+
+        for (size_t i = 0; i < valid.size(); ++i)
+        {
+            const MonitorInfo & monitor = valid[i];
+
+            POINT position = { monitor.m_bounds.left, monitor.m_bounds.top };
+            SIZE  size     = { monitor.Width(), monitor.Height() };
+
+            hr = AddContext (position, size, WS_POPUP | WS_VISIBLE, nullptr, i == primaryIndex);
+            CHR (hr);
+        }
+    }
 
 
 
@@ -750,42 +880,73 @@ Error:
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-//  Application::ResizeWindowForCurrentMode
+//  Application::RebuildContextsForCurrentMode
+//
+//  Barrier transition between windowed and per-monitor fullscreen (and back).
+//  Quiesces every render thread, releases each context's D3D resources, destroys
+//  the old windows, re-enumerates the desktop, recreates the window/context set
+//  for the new mode, rebinds the primary, and restarts the render threads.  A
+//  failed rebuild leaves no usable window, so it fails closed by posting quit.
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void Application::ResizeWindowForCurrentMode()
+void Application::RebuildContextsForCurrentMode()
 {
-    HRESULT hr         = S_OK;
-    POINT   position   = { 0 };
-    SIZE    windowSize = { 0 };
-    
-
-    
-    CBRAEx (m_appState && m_primary, E_UNEXPECTED);
+    HRESULT           hr = S_OK;
+    std::vector<HWND> hwnds;
 
 
-    GetWindowSizeForCurrentMode (position, windowSize);
-
-    SetWindowLongPtr (m_hwnd, GWL_STYLE, WS_POPUP | WS_VISIBLE);
-
-
-    SetWindowPos (m_hwnd, 
-                  HWND_TOP, 
-                  position.x, 
-                  position.y, 
-                  windowSize.cx, 
-                  windowSize.cy, 
-                  SWP_FRAMECHANGED | SWP_SHOWWINDOW);
-
-    // Resize the render pipeline and rescale existing streaks to fill the new
-    // viewport.  The render thread is quiesced via m_inDisplayModeTransition.
-    m_primary->Resize (windowSize.cx, windowSize.cy, true);
+    // Close any live config dialog first — the rebuild destroys the primary
+    // window that owns it, which would otherwise orphan the dialog.
+    if (m_hConfigDialog)
+    {
+        DestroyWindow (m_hConfigDialog);
+        m_hConfigDialog = nullptr;
+    }
 
 
+    m_inDisplayModeTransition = true;
 
-Error:
-    return;
+    StopRenderThreads();
+
+    for (auto & context : m_contexts)
+    {
+        hwnds.push_back (context->Hwnd());
+    }
+
+    m_contexts.clear();
+    m_primary = nullptr;
+    m_hwnd    = nullptr;
+
+    for (HWND hwnd : hwnds)
+    {
+        if (hwnd)
+        {
+            DestroyWindow (hwnd);
+        }
+    }
+
+
+    hr = CreateRenderContexts();
+
+    if (SUCCEEDED (hr))
+    {
+        WirePrimaryContext();
+
+        hr = InitializeContextResources();
+    }
+
+    if (SUCCEEDED (hr))
+    {
+        StartRenderThreads();
+    }
+
+    m_inDisplayModeTransition = false;
+
+    if (FAILED (hr))
+    {
+        PostQuitMessage (1);
+    }
 }
 
 
@@ -949,6 +1110,10 @@ LRESULT Application::HandleMessage (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM 
             {
                 PostQuitMessage (0);
             }
+            return 0;
+
+        case WM_APP_REBUILD_CONTEXTS:
+            RebuildContextsForCurrentMode();
             return 0;
 
         default:
@@ -1139,10 +1304,8 @@ void Application::OnSysKeyDown (WPARAM wParam)
         // Alt+Enter pressed - toggle display mode
         if (m_appState && m_primary)
         {
-            m_inDisplayModeTransition = true;
             m_appState->ToggleDisplayMode();
-            ResizeWindowForCurrentMode();
-            m_inDisplayModeTransition = false;
+            RebuildContextsForCurrentMode();
         }
 
         // Immediately hide overlays on Alt+Enter (no fade — viewport is changing)
@@ -1250,8 +1413,9 @@ void Application::OnDpiChanged (HWND hwnd, WPARAM wParam, LPARAM lParam)
 
 
 
-    // Resize window to the rect Windows suggests for the new DPI
-    if (pRect)
+    // Resize window to the rect Windows suggests for the new DPI.  Only honored
+    // in windowed mode — fullscreen windows stay pinned to their monitor bounds.
+    if (pRect && m_appState && m_appState->GetDisplayMode() == DisplayMode::Windowed)
     {
         SetWindowPos (hwnd,
                       nullptr,
