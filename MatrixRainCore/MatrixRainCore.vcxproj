@@ -289,6 +289,8 @@
     <ClInclude Include="ScrambleRevealEffect.h" />
     <ClInclude Include="SharedState.h" />
     <ClInclude Include="OverlayColor.h" />
+    <ClInclude Include="DeviceLost.h" />
+    <ClInclude Include="RebuildCoalescer.h" />
     <ClInclude Include="InMemorySettingsProvider.h" />
     <ClInclude Include="InputSystem.h" />
     <ClInclude Include="GlyphAtlas.h" />
@@ -342,6 +344,8 @@
     <ClCompile Include="MonitorLayout.cpp" />
     <ClCompile Include="RenderThreadInputs.cpp" />
     <ClCompile Include="WindowsMonitorProvider.cpp" />
+    <ClCompile Include="DeviceLost.cpp" />
+    <ClCompile Include="RebuildCoalescer.cpp" />
     <ClCompile Include="CommandLine.cpp" />
     <ClCompile Include="ScreenSaverInstaller.cpp" />
     <ClCompile Include="ApplicationState.cpp" />

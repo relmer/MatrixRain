@@ -317,6 +317,8 @@
     <ClCompile Include="unit\UsageTextTests.cpp" />
     <ClCompile Include="unit\OverlayHelpHintTests.cpp" />
     <ClCompile Include="unit\OverlayHotkeyTests.cpp" />
+    <ClCompile Include="unit\DeviceLostTests.cpp" />
+    <ClCompile Include="unit\RebuildCoalescerTests.cpp" />
     <ClCompile Include="integration\AnimationLoopTests.cpp" />
     <ClCompile Include="integration\DensityControlTests.cpp" />
     <ClCompile Include="integration\DisplayModeTests.cpp" />
