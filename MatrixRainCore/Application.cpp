@@ -14,8 +14,10 @@
 #include "InputSystem.h"
 #include "FPSCounter.h"
 #include "MonitorRenderContext.h"
+#include "MonitorInfo.h"
 #include "MonitorLayout.h"
 #include "MultiMonitorGate.h"
+#include "QualityPresets.h"
 #include "RenderThreadInputs.h"
 #include "WindowsAdapterProvider.h"
 #include "WindowsMonitorProvider.h"
@@ -255,6 +257,52 @@ void Application::InitializeApplicationState (const ScreenSaverModeContext * pSc
     m_pScreenSaverContext = pScreenSaverContext;
 
     m_appState->Initialize (m_pScreenSaverContext);
+
+    // First-run quality preset heuristic (FR-037).  Runs only on a truly
+    // fresh install (no registry key existed); upgrades from earlier
+    // versions keep the High preset's defaults so the visual output is
+    // identical to what they saw before (FR-022).
+    if (m_appState->IsFirstRun())
+    {
+        std::vector<AdapterInfo>  adapters    = WindowsAdapterProvider{}.EnumerateAdapters();
+        uint64_t                  totalPixels = 0;
+
+        if (m_monitorProvider)
+        {
+            for (const MonitorInfo & monitor : m_monitorProvider->GetMonitors())
+            {
+                totalPixels += static_cast<uint64_t> (monitor.Width()) *
+                               static_cast<uint64_t> (monitor.Height());
+            }
+        }
+
+        QualityPreset firstRunPreset = PickDefaultQualityPreset (adapters, totalPixels);
+        (void) m_appState->ApplyFirstRunQualityPreset (firstRunPreset);
+
+        // Also seed SharedState so the first frame renders at the chosen
+        // preset's values (the snapshot path picks up subsequent changes).
+        {
+            std::lock_guard<std::mutex> lock (m_sharedState.mutex);
+            const ScreenSaverSettings & s = m_appState->GetSettings();
+
+            m_sharedState.glowIntensityPercent   = s.m_advancedValues.m_glowIntensityPercent;
+            m_sharedState.blurPasses             = s.m_advancedValues.m_blurPasses;
+            m_sharedState.bloomResolutionDivisor = s.m_advancedValues.m_bloomResolutionDivisor;
+            m_sharedState.blurTaps               = s.m_advancedValues.m_blurTaps;
+        }
+    }
+    else
+    {
+        // Existing install: seed SharedState from the loaded advanced
+        // values so the render thread renders at whatever preset/custom
+        // values the user previously saved.
+        std::lock_guard<std::mutex> lock (m_sharedState.mutex);
+        const ScreenSaverSettings & s = m_appState->GetSettings();
+
+        m_sharedState.blurPasses             = s.m_advancedValues.m_blurPasses;
+        m_sharedState.bloomResolutionDivisor = s.m_advancedValues.m_bloomResolutionDivisor;
+        m_sharedState.blurTaps               = s.m_advancedValues.m_blurTaps;
+    }
     
     // Register for settings change notifications — write to SharedState
     m_appState->RegisterDensityChangeCallback ([this](int densityPercent) {

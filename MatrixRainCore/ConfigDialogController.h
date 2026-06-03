@@ -94,6 +94,29 @@ public:
     void UpdateGpuAdapter (const std::wstring & description);
 
     /// <summary>
+    /// Update the current quality preset.  When set to a named preset,
+    /// also snaps m_advancedValues to that preset's lookup row (so the
+    /// dialog can reflect them back into the advanced sliders).  When
+    /// set to Custom, restores LastCustom if saved, else leaves the
+    /// advanced values at their current state.  Cancel-revert is
+    /// automatic via the snapshot.
+    /// </summary>
+    void UpdateQualityPreset (QualityPreset preset);
+
+    /// <summary>
+    /// Update the four advanced graphics control values as a unit.  Always
+    /// updates LastCustom (FR-023) AND recomputes m_qualityPreset via
+    /// DetectActivePreset so the dialog can refresh the preset combo
+    /// (typically flipping it to Custom when knobs drift off the table).
+    /// </summary>
+    void UpdateAdvancedGraphicsValues (const AdvancedGraphicsValues & values);
+
+    /// <summary>
+    /// Update the "show advanced graphics settings" disclosure toggle.
+    /// </summary>
+    void UpdateShowAdvancedGraphics (bool show);
+
+    /// <summary>
     /// Update show debug stats flag.
     /// </summary>
     /// <param name="showDebugStats">True to show debug statistics</param>

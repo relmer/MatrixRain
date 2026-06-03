@@ -23,9 +23,9 @@ void ApplicationState::Initialize (const ScreenSaverModeContext * pScreenSaverCo
     // Load settings from provider (falls back to defaults if no data exists)
     HRESULT hr = m_settingsProvider.Load (m_settings);
     
-    // hr == S_FALSE means key didn't exist, used defaults (not an error)
-    // hr == S_OK means loaded from registry successfully
-    // Any other HRESULT is an actual error, but we continue with defaults
+    // hr == S_FALSE means key didn't exist, used defaults (not an error).
+    // Capture this for first-run heuristics (e.g., FR-037 quality preset).
+    m_isFirstRun = (hr == S_FALSE);
     UNREFERENCED_PARAMETER (hr);
     
     // Apply settings to runtime state
@@ -397,5 +397,25 @@ HRESULT
 ApplicationState::SaveSettings()
 {
     return m_settingsProvider.Save (m_settings);
+}
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  ApplicationState::ApplyFirstRunQualityPreset
+//
+////////////////////////////////////////////////////////////////////////////////
+
+HRESULT ApplicationState::ApplyFirstRunQualityPreset (QualityPreset preset)
+{
+    if (preset != QualityPreset::Custom)
+    {
+        m_settings.m_qualityPreset = preset;
+        m_settings.m_advancedValues = LookupPresetValues (preset);
+    }
+
+    return SaveSettings();
 }
 

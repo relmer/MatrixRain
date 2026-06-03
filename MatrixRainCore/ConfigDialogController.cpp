@@ -159,6 +159,55 @@ void ConfigDialogController::UpdateGpuAdapter (const std::wstring & description)
 
 
 
+void ConfigDialogController::UpdateQualityPreset (QualityPreset preset)
+{
+    m_settings.m_qualityPreset  = preset;
+    m_settings.m_advancedValues = ApplyPresetSnap (preset, m_settings.m_advancedValues, m_settings.m_lastCustom);
+
+    // Live mode: push the new advanced values to ApplicationState so the
+    // render thread picks them up via the snapshot path on the next frame.
+    if (m_snapshot.isLiveMode && m_snapshot.applicationStateRef)
+    {
+        m_snapshot.applicationStateRef->SetGlowIntensity (m_settings.m_advancedValues.m_glowIntensityPercent);
+    }
+}
+
+
+
+
+
+void ConfigDialogController::UpdateAdvancedGraphicsValues (const AdvancedGraphicsValues & values)
+{
+    m_settings.m_advancedValues = values;
+
+    // Per the locked custom-drift behavior: any direct advanced edit
+    // updates LastCustom (always - even if the values happen to coincide
+    // with a named preset row, the fact that the user touched a knob
+    // makes their current state the canonical "last custom" set).
+    m_settings.m_lastCustom = values;
+
+    // Recompute the displayed preset selection (typically flips to Custom).
+    m_settings.m_qualityPreset = DetectActivePreset (values);
+
+    if (m_snapshot.isLiveMode && m_snapshot.applicationStateRef)
+    {
+        m_snapshot.applicationStateRef->SetGlowIntensity (values.m_glowIntensityPercent);
+    }
+}
+
+
+
+
+
+void ConfigDialogController::UpdateShowAdvancedGraphics (bool show)
+{
+    m_settings.m_showAdvancedGraphics = show;
+}
+
+
+
+
+
 void ConfigDialogController::UpdateShowDebugStats (bool showDebugStats)
 {
     m_settings.m_showDebugStats = showDebugStats;

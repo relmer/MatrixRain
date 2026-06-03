@@ -40,6 +40,11 @@ public:
     /// <param name="pScreenSaverContext">Screensaver mode context for runtime behavior (nullptr for normal mode)</param>
     void Initialize (const ScreenSaverModeContext * pScreenSaverContext);
 
+    /// Was the most recent settings Load() a brand-new install (no
+    /// registry key existed)?  Used by Application to decide whether to
+    /// run the first-run quality-preset heuristic (FR-037).
+    bool IsFirstRun () const { return m_isFirstRun; }
+
     /// <summary>
     /// Toggle between Windowed and Fullscreen display modes.
     /// </summary>
@@ -146,6 +151,12 @@ public:
     bool                      GetShowStatistics()      const { return m_showStatistics;      }
     const ScreenSaverSettings GetSettings()            const { return m_settings;            }
 
+    /// First-run convenience: apply a heuristically-chosen quality preset
+    /// to the in-memory settings, populate the advanced values from its
+    /// lookup row, and persist.  Called once at startup by Application
+    /// when IsFirstRun() is true (FR-037).
+    HRESULT ApplyFirstRunQualityPreset (QualityPreset preset);
+
     void    SetDisplayMode        (DisplayMode mode)   { m_displayMode = mode;                 }
     void    SetColorScheme        (ColorScheme scheme);
     void    SetShowStatistics     (bool show);
@@ -161,6 +172,7 @@ private:
     bool                             m_showStatistics                   = false;                   // Show FPS and density statistics
     float                            m_elapsedTime                      = 0.0f;                    // Elapsed time for color cycling animation
     ScreenSaverSettings              m_settings;                                                   // User-configurable settings
+    bool                             m_isFirstRun                       = false;                   // True iff Load() found no registry key
     const ScreenSaverModeContext   * m_pScreenSaverContext              = nullptr;                 // Screensaver mode context (nullptr = normal mode)
     std::function<void(int)>         m_densityChangeCallback            = nullptr;                 // Callback for density changes
     std::function<void(int)>         m_animationSpeedChangeCallback     = nullptr;                 // Callback for animation speed changes
