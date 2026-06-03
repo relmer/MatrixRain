@@ -71,6 +71,11 @@ HRESULT MonitorRenderContext::Initialize (HWND hwnd, UINT width, UINT height)
     hr = m_renderSystem->Initialize (hwnd, width, height);
     CHR (hr);
 
+    // Size the viewport to match the swap chain.  The WM_SIZE fired during
+    // window creation is dropped (this context isn't registered yet), so the
+    // initial dimensions must be seeded here or the animation spawns no streaks.
+    m_viewport->Resize (static_cast<float> (width), static_cast<float> (height));
+
     {
         float dpiScale = m_renderSystem->GetDpiScale();
 
