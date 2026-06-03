@@ -82,6 +82,18 @@ public:
     void UpdateMultiMonitorEnabled (bool multiMonitorEnabled);
 
     /// <summary>
+    /// Update the user-selected GPU adapter (by DXGI description string).
+    /// Empty string means "use the system default adapter".  The dialog
+    /// handler is expected to post WM_APP_REBUILD_CONTEXTS after calling
+    /// this so the running app rebuilds its contexts on the new device
+    /// (FR-015).  Cancel-revert is automatic via the snapshot, but the
+    /// dialog handler must post a rebuild on Cancel for the reverted
+    /// adapter selection to take visual effect (FR-031b).
+    /// </summary>
+    /// <param name="description">DXGI adapter description (Empty for default)</param>
+    void UpdateGpuAdapter (const std::wstring & description);
+
+    /// <summary>
     /// Update show debug stats flag.
     /// </summary>
     /// <param name="showDebugStats">True to show debug statistics</param>

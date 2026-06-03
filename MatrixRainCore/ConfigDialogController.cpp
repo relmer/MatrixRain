@@ -150,6 +150,15 @@ void ConfigDialogController::UpdateMultiMonitorEnabled (bool multiMonitorEnabled
 
 
 
+void ConfigDialogController::UpdateGpuAdapter (const std::wstring & description)
+{
+    m_settings.m_gpuAdapter = description;
+}
+
+
+
+
+
 void ConfigDialogController::UpdateShowDebugStats (bool showDebugStats)
 {
     m_settings.m_showDebugStats = showDebugStats;

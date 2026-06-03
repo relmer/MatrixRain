@@ -1,10 +1,12 @@
 #include "pch.h"
 
 #include "ConfigDialog.h"
+#include "..\MatrixRainCore\AdapterSelection.h"
 #include "..\MatrixRainCore\Application.h"
 #include "..\MatrixRainCore\ApplicationState.h"
 #include "..\MatrixRainCore\ConfigDialogController.h"
 #include "..\MatrixRainCore\CommandLine.h"
+#include "..\MatrixRainCore\WindowsAdapterProvider.h"
 #include "resource.h"
 
 
@@ -18,6 +20,13 @@ struct DialogContext
     Application                             * m_pApp              = nullptr;
     bool                                      m_ownsContextMemory = false;
     bool                                      m_isScreenSaverCPL  = false;
+
+    // Parallel to IDC_GPU_COMBO entries: each index holds the underlying
+    // DXGI adapter description (NOT the "(default)"-suffixed display label)
+    // so OnGpuChange can map a selection back to the persistence string.
+    // Index 0 is the synthetic "<system default>" sentinel and corresponds
+    // to an empty m_gpuAdapter setting.
+    std::vector<std::wstring>                 m_gpuAdapterDescriptions;
 };
 
 
@@ -154,6 +163,52 @@ static void InitializeColorSchemeCombo (HWND hDlg, const std::wstring & currentS
 
 ////////////////////////////////////////////////////////////////////////////////
 //
+//  InitializeGpuCombo
+//
+//  Enumerate the system's rendering adapters via WindowsAdapterProvider,
+//  prefix a synthetic "<system default>" entry so the user can revert to
+//  the OS-chosen GPU at any time, and select whichever entry corresponds to
+//  the persisted m_gpuAdapter description.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+static void InitializeGpuCombo (HWND hDlg, DialogContext * pContext, const std::wstring & currentDescription)
+{
+    WindowsAdapterProvider   provider;
+    std::vector<AdapterInfo> adapters = provider.EnumerateAdapters();
+    int                      selected = 0;
+
+
+    // Synthetic first entry: "<system default>" maps to an empty
+    // persisted description (= use whatever the OS picks).
+    pContext->m_gpuAdapterDescriptions.clear();
+    pContext->m_gpuAdapterDescriptions.push_back (L"");
+    SendDlgItemMessageW (hDlg, IDC_GPU_COMBO, CB_ADDSTRING, 0, (LPARAM) L"<system default>");
+
+    for (const AdapterInfo & adapter : adapters)
+    {
+        std::wstring label = FormatAdapterLabel (adapter);
+
+        SendDlgItemMessageW (hDlg, IDC_GPU_COMBO, CB_ADDSTRING, 0, (LPARAM) label.c_str());
+
+        pContext->m_gpuAdapterDescriptions.push_back (adapter.m_description);
+
+        if (!currentDescription.empty() && adapter.m_description == currentDescription)
+        {
+            selected = static_cast<int> (pContext->m_gpuAdapterDescriptions.size()) - 1;
+        }
+    }
+
+
+    SendDlgItemMessageW (hDlg, IDC_GPU_COMBO, CB_SETCURSEL, selected, 0);
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
 //  OnInitDialog
 //
 ////////////////////////////////////////////////////////////////////////////////
@@ -255,6 +310,7 @@ static BOOL OnInitDialog (HWND hDlg, LPARAM initParam)
                       pSettings->m_glowSizePercent);
     
     InitializeColorSchemeCombo (hDlg, pSettings->m_colorSchemeKey);
+    InitializeGpuCombo         (hDlg, pContext, pSettings->m_gpuAdapter);
     
     CheckDlgButton (hDlg, IDC_STARTFULLSCREEN_CHECK, pSettings->m_startFullscreen     ? BST_CHECKED : BST_UNCHECKED);
     CheckDlgButton (hDlg, IDC_MULTIMONITOR_CHECK,    pSettings->m_multiMonitorEnabled ? BST_CHECKED : BST_UNCHECKED);
@@ -358,6 +414,46 @@ static void OnColorSchemeChange (HWND hDlg)
     CBRAEx (index >= 0 && index < static_cast<int> (ARRAYSIZE (s_colorSchemeEntries)), E_UNEXPECTED);
 
     pController->UpdateColorScheme (s_colorSchemeEntries[index].key);
+
+Error:
+    return;
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  OnGpuChange
+//
+////////////////////////////////////////////////////////////////////////////////
+
+static void OnGpuChange (HWND hDlg)
+{
+    HRESULT                  hr          = S_OK;
+    DialogContext          * pContext    = GetDialogContext (hDlg);
+    ConfigDialogController * pController = nullptr;
+    int                      index       = 0;
+
+
+
+    CBRAEx (pContext != nullptr && pContext->m_controller != nullptr, E_UNEXPECTED);
+
+    pController = pContext->m_controller.get();
+
+    index = (int) SendDlgItemMessageW (hDlg, IDC_GPU_COMBO, CB_GETCURSEL, 0, 0);
+
+    CBRAEx (index >= 0 && index < static_cast<int> (pContext->m_gpuAdapterDescriptions.size()), E_UNEXPECTED);
+
+    pController->UpdateGpuAdapter (pContext->m_gpuAdapterDescriptions[index]);
+
+    // Live preview: post a rebuild so the running app recreates its
+    // contexts on the newly-chosen GPU within 1 second (FR-015).
+    if (Application * pApp = GetApplicationFromDialog (hDlg))
+    {
+        pApp->ApplyDisplayModeChange();
+    }
 
 Error:
     return;
@@ -682,6 +778,13 @@ static BOOL OnCommand (HWND hDlg, WPARAM wParam)
             if (HIWORD (wParam) == CBN_SELCHANGE)
             {
                 OnColorSchemeChange (hDlg);
+            }
+            break;
+
+        case IDC_GPU_COMBO:
+            if (HIWORD (wParam) == CBN_SELCHANGE)
+            {
+                OnGpuChange (hDlg);
             }
             break;
             
