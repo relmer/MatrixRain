@@ -139,13 +139,13 @@ A user opens MatrixRain's configuration dialog and sees a "Quality" preset selec
 
 #### Frame-rate efficiency
 
-- **FR-017**: For any monitor whose native refresh rate exceeds 60Hz, system MUST limit rendering on that monitor to approximately 60 frames per second.
+- **FR-017**: For any monitor whose native refresh rate exceeds 60Hz, system MUST limit rendering on that monitor to no more than 65 frames per second (target 60).
 - **FR-018**: For any monitor whose native refresh rate is 60Hz or less, system MUST continue to render synchronized to vertical refresh as today, with no measurable per-frame overhead from the limiter.
 - **FR-019**: The frame-rate limit applies independently per monitor; mixed-refresh-rate multi-monitor setups MUST each follow the rule above.
 
 #### Graphics quality presets and advanced controls
 
-- **FR-020**: System MUST provide a Quality preset control with at least the named options "Low", "Medium", and "High", plus a "Custom" option that is selected automatically (never directly by the user) whenever the advanced controls' values do not match any named preset.
+- **FR-020**: System MUST provide a Quality preset control with at least the named options "Low", "Medium", and "High", plus a "Custom" option. "Custom" MAY be selected directly by the user, and MUST also be selected automatically by the system whenever the advanced controls' values do not match any named preset.
 - **FR-021**: Selecting a named Quality preset MUST set all advanced graphics controls to that preset's predefined values within 1 second of the selection.
 - **FR-022**: The "High" preset's values MUST produce the same visual result as the current (pre-feature) default rendering, so existing users who never touch the new controls see no change.
 - **FR-023**: Adjusting any individual advanced graphics control MUST automatically switch the Quality preset to "Custom" and update an in-memory "last custom" snapshot of all advanced control values.
@@ -154,7 +154,7 @@ A user opens MatrixRain's configuration dialog and sees a "Quality" preset selec
 
 #### Advanced graphics controls — visibility and individual controls
 
-- **FR-026**: System MUST provide an "advanced graphics settings" toggle control. When this toggle is off, the advanced graphics controls MUST NOT be visible and the configuration dialog MUST occupy only the space needed for the always-visible controls.
+- **FR-026**: System MUST provide an "advanced graphics settings" toggle control. When this toggle is off, the advanced graphics controls MUST NOT be visible and the configuration dialog MUST occupy only the space needed for the always-visible controls. On first load, the toggle defaults to off, except when the saved Quality preset is "Custom", in which case it defaults to on.
 - **FR-027**: When the advanced toggle is turned on, the configuration dialog MUST dynamically grow to reveal the advanced controls; existing dialog controls below the advanced section (OK, Cancel, Reset) MUST reposition appropriately. Turning the toggle off MUST reverse this.
 - **FR-028**: System MUST provide an advanced control for the number of glow passes (integer, 4 discrete positions from minimum to maximum) with labeled tick positions and a value indicator showing the current value.
 - **FR-029**: System MUST provide an advanced control for the glow buffer resolution with 4 discrete positions labeled "Eighth", "Quarter", "Half", "Full" from minimum to maximum, defaulting to "Half".
@@ -162,6 +162,8 @@ A user opens MatrixRain's configuration dialog and sees a "Quality" preset selec
 - **FR-031**: The existing Glow Intensity slider MUST own the on/off state of the glow effect: when its value is set to 0%, the glow effect MUST be fully disabled (no glow processing performed at all), and the slider's value indicator MUST read "0% (glow disabled)" instead of "0%".
 
 #### Configuration dialog — common conventions
+
+- **FR-031b**: The configuration dialog MUST behave such that all live previews of changes made within the dialog session are reverted if the user dismisses the dialog with Cancel; persisted settings MUST remain unchanged from their pre-dialog values in that case. This applies to every setting introduced by this feature (multi-monitor enabled, GPU adapter, Quality preset, advanced graphics control values, Show advanced graphics setting).
 
 - **FR-032**: All percentage sliders in the configuration dialog MUST display unlabeled tick marks. Tick frequency MUST be chosen so that a tick falls at the midpoint of each slider's range where the range allows an integer midpoint, with a target of approximately 21 ticks across the range.
 - **FR-033**: All discrete-position sliders (the three advanced graphics controls) MUST display a label beneath each tick position indicating the value at that tick.
@@ -202,6 +204,8 @@ A user opens MatrixRain's configuration dialog and sees a "Quality" preset selec
 - **SC-010**: After customizing the advanced graphics controls and selecting a different named preset, the user can return to "Custom" and find their previously-customized values restored exactly.
 
 ## Assumptions
+
+- **Terminology**: this specification uses "multi-monitor spanning", "render on all monitors", and "multimon" interchangeably to mean the same behaviour: MatrixRain creating a render context per connected monitor. The persisted setting that controls this is referred to in implementation contracts as `MultiMonitor` (registry value name) and `m_multiMonitorEnabled` (in-memory field).
 
 - Target operating systems are Windows 10 version 1803 or later, and Windows 11. On these versions, the operating system's modern GPU-preference APIs are sufficient to route MatrixRain's rendering to the user's chosen adapter on NVIDIA Optimus, AMD PowerXpress, and Surface-class hybrid systems. Legacy driver-export mechanisms for forcing the discrete GPU are not employed in this version of the feature; they may be added later if real-world testing on a target hybrid configuration shows the OS-level APIs are insufficient.
 - The DWM compositor runs on the integrated GPU on hybrid laptops, and presenting from the discrete GPU therefore incurs a cross-adapter copy at present time. This is expected, normal, and the discrete GPU's compute headroom is assumed to far exceed that copy cost.

@@ -64,6 +64,8 @@ Start-Process .\x64\Debug\MatrixRain.exe -ArgumentList '/c'
 3. Disconnect the second monitor (physically unplug or disable in Display Settings → "Disconnect this display").
 4. Within 1 second: only the remaining monitor continues rendering; GPU utilization drops to within 10% of "starting MatrixRain fresh with one monitor" (US1 SC-001).
 5. Reconnect the second monitor. Within 1 second: MatrixRain begins rendering to it without restart (US1 SC-002).
+6. Repeat steps 1-5 after launching MatrixRain in screensaver mode (`MatrixRain.exe /s`); verify identical behaviour (FR-006 requires the same response in both display and `/s` modes).
+7. Optional: suspend the laptop, wait a few seconds, resume. MatrixRain must continue running (a sleep/resume often surfaces as a `DXGI_ERROR_DEVICE_REMOVED` and exercises the same device-loss recovery path).
 6. Optional: disable the active GPU's driver via Device Manager. MatrixRain recovers automatically; no error dialog appears.
 
 ### US2 — Multi-monitor optional toggle (P1)
