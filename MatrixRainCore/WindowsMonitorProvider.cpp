@@ -19,14 +19,16 @@
 std::vector<MonitorInfo> WindowsMonitorProvider::GetMonitors() const
 {
     HRESULT                  hr       = S_OK;
+    BOOL                     fSuccess = FALSE;
     std::vector<MonitorInfo> monitors;
 
 
     // EnumDisplayMonitors invokes EnumProc once per connected display.  On
     // failure we return whatever was collected so far; callers fall back to
     // primary-only placement.
-    CWRA (EnumDisplayMonitors (nullptr, nullptr, &WindowsMonitorProvider::EnumProc,
-                               reinterpret_cast<LPARAM> (&monitors)));
+    fSuccess = EnumDisplayMonitors (nullptr, nullptr, &WindowsMonitorProvider::EnumProc,
+                                    reinterpret_cast<LPARAM> (&monitors));
+    CWRA (fSuccess);
 
 Error:
     return monitors;
@@ -49,6 +51,7 @@ Error:
 BOOL CALLBACK WindowsMonitorProvider::EnumProc (HMONITOR hMonitor, HDC hdc, LPRECT lprcMonitor, LPARAM dwData)
 {
     HRESULT                    hr        = S_OK;
+    BOOL                       fSuccess  = FALSE;
     std::vector<MonitorInfo> * pMonitors = reinterpret_cast<std::vector<MonitorInfo> *> (dwData);
     MONITORINFO                info      = { sizeof (MONITORINFO) };
     UINT                       dpiX      = 96;
@@ -71,7 +74,8 @@ BOOL CALLBACK WindowsMonitorProvider::EnumProc (HMONITOR hMonitor, HDC hdc, LPRE
     // Read this monitor's geometry; on failure skip it but keep enumerating.
     // A handle EnumDisplayMonitors just produced should never be unreadable,
     // so assert at the point of failure while still degrading gracefully.
-    CWRA (GetMonitorInfoW (hMonitor, &info));
+    fSuccess = GetMonitorInfoW (hMonitor, &info);
+    CWRA (fSuccess);
 
     // Per-monitor effective DPI is best-effort; fall back to 96 on failure.
     if (FAILED (GetDpiForMonitor (hMonitor, MDT_EFFECTIVE_DPI, &dpiX, &dpiY)))
