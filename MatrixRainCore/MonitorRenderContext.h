@@ -39,7 +39,7 @@ public:
     ~MonitorRenderContext();
 
     // Construction — called on the UI thread before the render thread starts
-    HRESULT Initialize         (HWND hwnd, UINT width, UINT height);
+    HRESULT Initialize         (HWND hwnd, UINT width, UINT height, std::optional<LUID> adapterLuid = std::nullopt);
     void    InitializeAnimation();
     HRESULT BuildGlyphAtlas();
 

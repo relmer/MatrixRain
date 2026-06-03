@@ -86,6 +86,7 @@ private:
     std::unique_ptr<ApplicationState>                  m_appState;
     OverlayState                                       m_overlays;
     RebuildCoalescer                                   m_rebuildCoalescer;
+    std::optional<LUID>                                m_resolvedAdapter;
 
     // Win32 window`
     HWND              m_hwnd                    { nullptr };

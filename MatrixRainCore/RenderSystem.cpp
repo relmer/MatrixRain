@@ -23,7 +23,7 @@ RenderSystem::~RenderSystem()
 
 
 
-HRESULT RenderSystem::Initialize (HWND hwnd, UINT width, UINT height)
+HRESULT RenderSystem::Initialize (HWND hwnd, UINT width, UINT height, std::optional<LUID> adapterLuid)
 {
     HRESULT        hr       = S_OK;
     D3D11_VIEWPORT viewport = {};
@@ -33,6 +33,12 @@ HRESULT RenderSystem::Initialize (HWND hwnd, UINT width, UINT height)
     m_hwnd         = hwnd;
     m_renderWidth  = width;
     m_renderHeight = height;
+
+    // Remember the user's chosen adapter (if any) so CreateDevice can route
+    // device creation to the matching DXGI adapter.  nullopt = use the
+    // system default (preserves the existing behaviour for callers that
+    // do not opt in to GPU selection).
+    m_requestedAdapterLuid = adapterLuid;
     
     hr = CreateDevice();
     CHR (hr);
@@ -145,10 +151,13 @@ Error:
 
 HRESULT RenderSystem::CreateDevice()
 {
-    HRESULT           hr                = S_OK;
-    UINT              createDeviceFlags = D3D11_CREATE_DEVICE_BGRA_SUPPORT; // Required for Direct2D interop
-    D3D_FEATURE_LEVEL featureLevels[]   = { D3D_FEATURE_LEVEL_11_1, D3D_FEATURE_LEVEL_11_0 };
-    D3D_FEATURE_LEVEL featureLevel;
+    HRESULT                              hr                = S_OK;
+    UINT                                 createDeviceFlags = D3D11_CREATE_DEVICE_BGRA_SUPPORT; // Required for Direct2D interop
+    D3D_FEATURE_LEVEL                    featureLevels[]   = { D3D_FEATURE_LEVEL_11_1, D3D_FEATURE_LEVEL_11_0 };
+    D3D_FEATURE_LEVEL                    featureLevel;
+    Microsoft::WRL::ComPtr<IDXGIAdapter1> requestedAdapter;
+    D3D_DRIVER_TYPE                      driverType        = D3D_DRIVER_TYPE_HARDWARE;
+    IDXGIAdapter *                       pAdapterForCreate = nullptr;
 
 
     
@@ -156,8 +165,28 @@ HRESULT RenderSystem::CreateDevice()
     createDeviceFlags |= D3D11_CREATE_DEVICE_DEBUG;
 #endif
 
-    hr = D3D11CreateDevice (nullptr,                   // Default adapter
-                            D3D_DRIVER_TYPE_HARDWARE,  // Hardware acceleration
+    // If the user picked a specific adapter, look it up by LUID and use it
+    // here.  D3D11CreateDevice REQUIRES driver type UNKNOWN when a non-null
+    // adapter is passed.  On any lookup failure we silently fall back to
+    // the default-adapter path so a vanished GPU never blocks startup
+    // (FR-014).
+    if (m_requestedAdapterLuid.has_value())
+    {
+        Microsoft::WRL::ComPtr<IDXGIFactory4> pFactory4;
+
+        if (SUCCEEDED (CreateDXGIFactory1 (IID_PPV_ARGS (&pFactory4))))
+        {
+            if (SUCCEEDED (pFactory4->EnumAdapterByLuid (*m_requestedAdapterLuid,
+                                                          IID_PPV_ARGS (&requestedAdapter))))
+            {
+                pAdapterForCreate = requestedAdapter.Get();
+                driverType        = D3D_DRIVER_TYPE_UNKNOWN;
+            }
+        }
+    }
+
+    hr = D3D11CreateDevice (pAdapterForCreate,         // Explicit adapter or nullptr for default
+                            driverType,                // UNKNOWN if explicit adapter, else HARDWARE
                             nullptr,                   // No software rasterizer
                             createDeviceFlags,
                             featureLevels,

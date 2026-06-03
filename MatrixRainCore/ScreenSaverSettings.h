@@ -33,6 +33,7 @@ struct ScreenSaverSettings
     bool                                m_showDebugStats        { false };
     bool                                m_showFadeTimers        { false };
     bool                                m_multiMonitorEnabled   { true  };
+    std::wstring                        m_gpuAdapter;                          // Empty (default) = system default
     std::optional<SystemClockTimePoint> m_lastSavedTimestamp;
 
     void Clamp();

@@ -30,6 +30,7 @@ private:
     static constexpr LPCWSTR VALUE_START_FULLSCREEN       = L"StartFullscreen";
     static constexpr LPCWSTR VALUE_SHOW_DEBUG_STATS       = L"ShowDebugStats";
     static constexpr LPCWSTR VALUE_MULTIMONITOR           = L"MultiMonitor";
+    static constexpr LPCWSTR VALUE_GPU_ADAPTER            = L"GpuAdapter";
     static constexpr LPCWSTR VALUE_LAST_SAVED             = L"LastSaved";
     
     static HRESULT ReadInt    (HKEY hKey, LPCWSTR valueName, int & outValue);

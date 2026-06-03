@@ -62,14 +62,14 @@ MonitorRenderContext::~MonitorRenderContext()
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-HRESULT MonitorRenderContext::Initialize (HWND hwnd, UINT width, UINT height)
+HRESULT MonitorRenderContext::Initialize (HWND hwnd, UINT width, UINT height, std::optional<LUID> adapterLuid)
 {
     HRESULT hr = S_OK;
 
 
     m_hwnd = hwnd;
 
-    hr = m_renderSystem->Initialize (hwnd, width, height);
+    hr = m_renderSystem->Initialize (hwnd, width, height, adapterLuid);
     CHR (hr);
 
     // Size the viewport to match the swap chain.  The WM_SIZE fired during

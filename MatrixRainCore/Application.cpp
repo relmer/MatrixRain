@@ -17,7 +17,9 @@
 #include "MonitorLayout.h"
 #include "MultiMonitorGate.h"
 #include "RenderThreadInputs.h"
+#include "WindowsAdapterProvider.h"
 #include "WindowsMonitorProvider.h"
+#include "AdapterSelection.h"
 #include "ScreenSaverModeContext.h"
 #include "UnicodeSymbols.h"
 #include "Version.h"
@@ -341,6 +343,20 @@ HRESULT Application::CreateRenderContexts()
     HRESULT hr = S_OK;
 
 
+    // Resolve the user's preferred GPU adapter (description -> LUID) once
+    // per (re)build so every per-monitor context is created on the same
+    // device.  A saved adapter that is no longer present silently falls
+    // back to the system default (FR-014); the resolved value is consumed
+    // by AddContext when it constructs each MonitorRenderContext.
+    {
+        WindowsAdapterProvider   provider;
+        std::vector<AdapterInfo> adapters = provider.EnumerateAdapters();
+        std::wstring             saved    = m_appState ? m_appState->GetSettings().m_gpuAdapter : std::wstring();
+
+        m_resolvedAdapter = ResolveAdapter (adapters, saved);
+    }
+
+
     if (ShouldSpanAllMonitors())
     {
         hr = CreateFullscreenContexts();
@@ -512,7 +528,7 @@ HRESULT Application::AddContext (const POINT & position, const SIZE & size, DWOR
 
     context = std::make_unique<MonitorRenderContext> (isPrimary);
 
-    hr = context->Initialize (hwnd, static_cast<UINT> (size.cx), static_cast<UINT> (size.cy));
+    hr = context->Initialize (hwnd, static_cast<UINT> (size.cx), static_cast<UINT> (size.cy), m_resolvedAdapter);
     CHR (hr);
 
     if (isPrimary)

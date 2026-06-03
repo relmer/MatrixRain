@@ -40,7 +40,7 @@ class RenderSystem : public IRenderSystem
 public:
     ~RenderSystem();
 
-    HRESULT Initialize (HWND hwnd, UINT width, UINT height);
+    HRESULT Initialize (HWND hwnd, UINT width, UINT height, std::optional<LUID> adapterLuid = std::nullopt);
 
     HRESULT BuildGlyphAtlas();
 
@@ -240,6 +240,11 @@ private:
 
     // Window handle (for DPI queries)
     HWND m_hwnd { nullptr };
+
+    // User-selected adapter LUID, or nullopt for system default.  Captured
+    // in Initialize and consumed by CreateDevice to route D3D device
+    // creation to the requested GPU on hybrid laptops.
+    std::optional<LUID> m_requestedAdapterLuid;
 
     // Render target dimensions
     UINT m_renderWidth  { 0 };

@@ -157,7 +157,6 @@ namespace MatrixRainTests
         {
             DeleteTestRegistryKey();
 
-            // Arrange: create the key but without the MultiMonitor value
             HKEY    hKey   = nullptr;
             LSTATUS status = RegCreateKeyExW (HKEY_CURRENT_USER, TEST_REGISTRY_KEY_PATH, 0, nullptr,
                                               REG_OPTION_NON_VOLATILE, KEY_WRITE, nullptr, &hKey, nullptr);
@@ -168,12 +167,10 @@ namespace MatrixRainTests
             RegCloseKey (hKey);
 
 
-            // Act
             ScreenSaverSettings settings;
             HRESULT             hr = m_provider.Load (settings);
 
 
-            // Assert: missing value -> the struct default (true) is preserved
             Assert::AreEqual (S_OK, hr);
             Assert::IsTrue   (settings.m_multiMonitorEnabled, L"Absent MultiMonitor value should leave default (true)");
         }
@@ -223,6 +220,53 @@ namespace MatrixRainTests
 
             Assert::AreEqual (S_OK, hr);
             Assert::IsTrue   (loadSettings.m_multiMonitorEnabled, L"MultiMonitor=true should round-trip");
+        }
+
+
+
+
+        TEST_METHOD (TestSaveLoadRoundTrip_GpuAdapter_PreservesDescription)
+        {
+            DeleteTestRegistryKey();
+
+            ScreenSaverSettings saveSettings;
+            saveSettings.m_gpuAdapter = L"NVIDIA GeForce RTX 3050 Ti Laptop GPU";
+
+
+            HRESULT hr = m_provider.Save (saveSettings);
+            Assert::AreEqual (S_OK, hr);
+
+
+            ScreenSaverSettings loadSettings;
+            hr = m_provider.Load (loadSettings);
+
+
+            Assert::AreEqual (S_OK, hr);
+            Assert::AreEqual (std::wstring (L"NVIDIA GeForce RTX 3050 Ti Laptop GPU"), loadSettings.m_gpuAdapter);
+        }
+
+
+
+
+        TEST_METHOD (TestSaveLoadRoundTrip_GpuAdapter_EmptyDescription)
+        {
+            DeleteTestRegistryKey();
+
+            ScreenSaverSettings saveSettings;
+            saveSettings.m_gpuAdapter = L"";
+
+
+            HRESULT hr = m_provider.Save (saveSettings);
+            Assert::AreEqual (S_OK, hr);
+
+
+            ScreenSaverSettings loadSettings;
+            loadSettings.m_gpuAdapter = L"non-empty";
+            hr = m_provider.Load (loadSettings);
+
+
+            Assert::AreEqual (S_OK, hr);
+            Assert::AreEqual (std::wstring (L""), loadSettings.m_gpuAdapter);
         }
         
         

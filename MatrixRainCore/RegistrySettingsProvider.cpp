@@ -41,6 +41,7 @@ HRESULT RegistrySettingsProvider::Load (ScreenSaverSettings & settings)
     ReadBool   (hKey, VALUE_START_FULLSCREEN, settings.m_startFullscreen);
     ReadBool   (hKey, VALUE_SHOW_DEBUG_STATS, settings.m_showDebugStats);
     ReadBool   (hKey, VALUE_MULTIMONITOR,     settings.m_multiMonitorEnabled);
+    ReadString (hKey, VALUE_GPU_ADAPTER,      settings.m_gpuAdapter);
 
     // Clamp all values to valid ranges
     settings.Clamp();
@@ -111,6 +112,9 @@ HRESULT RegistrySettingsProvider::Save (const ScreenSaverSettings & settings)
     CHR (hr);
 
     hr = WriteBool (hKey, VALUE_MULTIMONITOR, settings.m_multiMonitorEnabled);
+    CHR (hr);
+
+    hr = WriteString (hKey, VALUE_GPU_ADAPTER, settings.m_gpuAdapter);
     CHR (hr);
 
 
