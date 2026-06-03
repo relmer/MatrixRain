@@ -32,6 +32,7 @@ struct ScreenSaverSettings
     bool                                m_startFullscreen       { true  };
     bool                                m_showDebugStats        { false };
     bool                                m_showFadeTimers        { false };
+    bool                                m_multiMonitorEnabled   { true  };
     std::optional<SystemClockTimePoint> m_lastSavedTimestamp;
 
     void Clamp();

@@ -40,6 +40,7 @@ HRESULT RegistrySettingsProvider::Load (ScreenSaverSettings & settings)
     ReadInt    (hKey, VALUE_GLOW_SIZE,        settings.m_glowSizePercent);
     ReadBool   (hKey, VALUE_START_FULLSCREEN, settings.m_startFullscreen);
     ReadBool   (hKey, VALUE_SHOW_DEBUG_STATS, settings.m_showDebugStats);
+    ReadBool   (hKey, VALUE_MULTIMONITOR,     settings.m_multiMonitorEnabled);
 
     // Clamp all values to valid ranges
     settings.Clamp();
@@ -107,6 +108,9 @@ HRESULT RegistrySettingsProvider::Save (const ScreenSaverSettings & settings)
     CHR (hr);
     
     hr = WriteBool (hKey, VALUE_SHOW_DEBUG_STATS, settings.m_showDebugStats);
+    CHR (hr);
+
+    hr = WriteBool (hKey, VALUE_MULTIMONITOR, settings.m_multiMonitorEnabled);
     CHR (hr);
 
 
