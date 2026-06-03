@@ -54,6 +54,11 @@ struct SharedState
     bool        showStatistics        = false;
     bool        showDebugFadeTimes    = false;
 
+    // Monotonic seconds since start, used to cycle colors.  Advanced by the
+    // owning (primary) render thread and read by every monitor so all displays
+    // cycle color in sync.
+    float       elapsedTime           = 0.0f;
+
 
     ////////////////////////////////////////////////////////////////////////////
     //
@@ -70,6 +75,7 @@ struct SharedState
         int         glowSizePercent       = ScreenSaverSettings::DEFAULT_GLOW_SIZE_PERCENT;
         bool        showStatistics        = false;
         bool        showDebugFadeTimes    = false;
+        float       elapsedTime           = 0.0f;
     };
 
 
@@ -85,6 +91,7 @@ struct SharedState
             .glowSizePercent       = glowSizePercent,
             .showStatistics        = showStatistics,
             .showDebugFadeTimes    = showDebugFadeTimes,
+            .elapsedTime           = elapsedTime,
         };
     }
 };

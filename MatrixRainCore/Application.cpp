@@ -701,7 +701,7 @@ void Application::Render (const SharedState::Snapshot & snapshot)
         int         streakCount        = static_cast<int> (m_animationSystem->GetActiveStreakCount());
         int         activeHeadCount    = static_cast<int> (m_animationSystem->GetActiveHeadCount());
         bool        showDebugFadeTimes = snapshot.showDebugFadeTimes;
-        float       elapsedTime        = m_appState->GetElapsedTime();
+        float       elapsedTime        = snapshot.elapsedTime;
         
         // Pass overlay pointers to render system for rendering
         const Overlay * pHelpOverlay    = (m_overlays.helpOverlay && m_overlays.helpOverlay->IsActive())       ? m_overlays.helpOverlay.get()    : nullptr;
@@ -1296,6 +1296,14 @@ void Application::RenderThreadProc()
                 std::lock_guard<std::mutex> lock (m_overlays.mutex);
                 Update (deltaTime);
                 Render (snapshot);
+            }
+
+            // Publish the advanced color-cycle clock so the next snapshot — and,
+            // in multimon, every secondary monitor — sees synchronized time.
+            if (m_appState)
+            {
+                std::lock_guard<std::mutex> lock (m_sharedState.mutex);
+                m_sharedState.elapsedTime = m_appState->GetElapsedTime();
             }
 
             // Present OUTSIDE the overlay lock — VSync blocks for up to 16ms
