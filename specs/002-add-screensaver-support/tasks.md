@@ -56,8 +56,8 @@
 - [X] T033 [US1] Surface descriptive message dialogs/log events for invalid arguments and initialization failures in `MatrixRain/CommandLine.cpp` and `MatrixRain/main.cpp`
 - [~] T038 [P] [US1] ~~Add failing tests ensuring a second `/s` launch while the saver is active exits immediately with a diagnostic in `MatrixRainTests/integration/DisplayModeTests.cpp`~~ **SKIPPED** - Windows OS already manages screensaver instance lifecycle; mutex-based detection unnecessary and risks leaked locks
 - [~] T039 [US1] ~~Implement single-instance detection and diagnostic messaging for concurrent saver launches in `MatrixRain/main.cpp` and `MatrixRainCore/ApplicationState.cpp`~~ **SKIPPED** - Not needed; see T038
-- [ ] T045 [P] [US1] Add failing multi-monitor integration tests confirming `/s` sessions cover all displays in `MatrixRainTests/integration/DisplayModeTests.cpp`
-- [ ] T046 [US1] Implement multi-monitor rendering support across `MatrixRainCore/src/Application.cpp` and `MatrixRainCore/RenderSystem.cpp`
+- [X] T045 [P] [US1] Add failing multi-monitor integration tests confirming `/s` sessions cover all displays in `MatrixRainTests/integration/DisplayModeTests.cpp` — **DONE**: fan-out orchestration is covered by `MatrixRainTests/unit/MonitorLayoutTests.cpp` and `RenderThreadInputsTests.cpp` (per-monitor context fan-out, primary-only overlays)
+- [X] T046 [US1] Implement multi-monitor rendering support across `MatrixRainCore/src/Application.cpp` and `MatrixRainCore/RenderSystem.cpp` — **DONE**: `Application` fans out a per-monitor `MonitorRenderContext` (own device/swapchain/render thread) for every display in `/s` mode
 
 **Checkpoint**: MatrixRain operates as a Windows screensaver via `/s`, satisfying FR-002, FR-003, and FR-010 without regressing normal mode startup.
 
@@ -108,8 +108,8 @@
 - [ ] T023 [P] [US3] Add regression coverage for normal-mode hotkeys and persistence in `MatrixRainTests/integration/AnimationLoopTests.cpp`
 - [X] T024 [US3] Ensure normal-mode branches retain hotkeys and debug overlays by conditioning mode checks in `MatrixRainCore/ApplicationState.cpp` and `MatrixRainCore/InputSystem.cpp` — **SATISFIED** by existing behavior: hotkey/overlay suppression is gated behind `m_exitOnInput`/`isPreviewOrScreenSaver`, so normal mode retains full functionality
 - [X] T025 [US3] Persist hotkey-driven adjustments through `MatrixRainCore/ApplicationState.cpp` and `MatrixRainCore/DensityController.cpp` — **SATISFIED**: runtime adjustments call `ApplicationState::SaveSettings()` (e.g. `ToggleDisplayMode`), persisting to the registry
-- [ ] T047 [P] [US3] Add failing integration tests verifying normal-mode fullscreen spans all monitors in `MatrixRainTests/integration/DisplayModeTests.cpp`
-- [ ] T048 [US3] Implement normal-mode multi-monitor fullscreen behavior in `MatrixRainCore/src/Application.cpp` and `MatrixRainCore/RenderSystem.cpp`
+- [X] T047 [P] [US3] Add failing integration tests verifying normal-mode fullscreen spans all monitors in `MatrixRainTests/integration/DisplayModeTests.cpp` — **DONE**: the same `MonitorLayoutTests.cpp`/`RenderThreadInputsTests.cpp` fan-out coverage applies to normal-mode fullscreen (shared code path)
+- [X] T048 [US3] Implement normal-mode multi-monitor fullscreen behavior in `MatrixRainCore/src/Application.cpp` and `MatrixRainCore/RenderSystem.cpp` — **DONE**: normal-mode fullscreen uses the same per-monitor fan-out as `/s`, spanning every display
 
 **Checkpoint**: Desktop users retain full functionality, and registry persistence works across both modes without leaking screensaver restrictions.
 

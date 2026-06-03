@@ -21,12 +21,25 @@ winget install relmer.MatrixRain
 
 ## About MatrixRain
 
-I built this Win32/DirectX C++ Matrix-rain screensaver/demo as a test project to try out [SpecKit](https://github.com/github/spec-kit), which worked really well. The app supports configurable density, color schemes, and has some snazzy glow effects for that classic CRT vibe.
+I built this Win32/DirectX C++ Matrix-rain screensaver/demo as a test project to try out [SpecKit](https://github.com/github/spec-kit), which worked really well. The app supports configurable density, color schemes, multi-monitor rendering, and has some snazzy glow effects for that classic CRT vibe.
 
 **Status:** Active — complete demo with unit & integration tests. Fully functional as both a standalone desktop app and Windows screensaver.
 
+## What's New
+
+| Version | Highlights |
+| :---: | :--- |
+| **1.3** | Multi-monitor support — independent, DPI-aware Matrix rain on every connected display in fullscreen and screensaver modes |
+| **1.2** | Screensaver install/uninstall (`/install`, `/uninstall`) with UAC elevation and Group Policy detection |
+| **1.1** | In-app overlays — usage dialog (`/?`), startup help hint, and `?` hotkey reference; multi-pass bloom glow with live glow-size control |
+| **1.0** | winget distribution (`winget install relmer.MatrixRain`) and ARM64 native build |
+| **0.9** | Windows screensaver mode (`/s`, `/c`, `/p`) with a live-updating settings dialog and registry-persisted configuration |
+
+See [CHANGELOG.md](CHANGELOG.md) for the full release history.
+
 ## Table of Contents
 
+- [What's New](#whats-new) — Highlights of the most recent significant features.
 - [Overview](#overview) — Quick project summary and screenshot.
 - [Screensaver Installation](#screensaver-installation) — How to install MatrixRain as a Windows screensaver.
 - [Screensaver Usage](#screensaver-usage) — Command-line arguments and Control Panel integration.
@@ -42,7 +55,7 @@ I built this Win32/DirectX C++ Matrix-rain screensaver/demo as a test project to
 
 ## Overview
 
-MatrixRain is a small C++ project that implements the classic "Matrix" falling-character animation using a lightweight animation + rendering architecture. It works as both a standalone desktop application and a fully-featured Windows screensaver with configurable settings. The video above is included as `assets/MatrixRainColors.mp4`.
+MatrixRain is a small C++ project that implements the classic "Matrix" falling-character animation using a lightweight animation + rendering architecture. It works as both a standalone desktop application and a fully-featured Windows screensaver with configurable settings. In fullscreen and screensaver modes it spans every connected display, rendering an independent, DPI-aware rain animation on each monitor. The video above is included as `assets/MatrixRainColors.mp4`.
 
 
 ## Screensaver Installation
