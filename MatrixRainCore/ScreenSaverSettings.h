@@ -25,7 +25,7 @@ struct ScreenSaverSettings
     static constexpr int DEFAULT_GLOW_SIZE_PERCENT   = 100;
 
     int                                 m_densityPercent        { DEFAULT_DENSITY_PERCENT         };
-    std::wstring                        m_colorSchemeKey        { L"green" };
+    std::wstring                        m_colorSchemeKey        { L"cycle" };
     int                                 m_animationSpeedPercent { DEFAULT_ANIMATION_SPEED_PERCENT };
     int                                 m_glowIntensityPercent  { DEFAULT_GLOW_INTENSITY_PERCENT  };
     int                                 m_glowSizePercent       { DEFAULT_GLOW_SIZE_PERCENT       };

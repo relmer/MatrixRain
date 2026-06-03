@@ -672,6 +672,15 @@ HRESULT Application::InitializeContextResources()
         CHR (hr);
     }
 
+    // Each device above rebuilt the shared CharacterSet overlay metrics (last
+    // write wins).  Overlays render on the primary only, so rebuild the primary's
+    // overlay atlas last to pin those shared metrics to the primary's DPI.
+    if (m_primary != nullptr)
+    {
+        hr = m_primary->Renderer().RebuildOverlayAtlas();
+        CHR (hr);
+    }
+
 
 
 Error:

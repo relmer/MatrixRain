@@ -44,6 +44,8 @@ public:
 
     HRESULT BuildGlyphAtlas();
 
+    HRESULT RebuildOverlayAtlas();
+
     void Render (const AnimationSystem & animationSystem, const Viewport & viewport, const RenderParams & params) override;
 
     void Present() override;

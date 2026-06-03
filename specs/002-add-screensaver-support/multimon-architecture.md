@@ -193,6 +193,30 @@ Run each on a 2+ monitor setup; ideally include monitors at DIFFERENT DPI/scalin
 11. Unplug/replug a monitor while running: v1 only guarantees `/s` exits cleanly on
     `WM_DISPLAYCHANGE`; full dynamic hotplug in normal mode is out of scope.
 
+## Known issue: physical glyph size differs across mixed-scaling monitors
+
+The locked decision was "consistent glyph size/spacing on every display" — meaning
+the same PHYSICAL size (mm), not the same pixel count. The v1 implementation sizes
+glyphs by the Windows per-monitor scaling % (`dpiScale = GetDpiForWindow / 96`):
+atlas font `12 * dpiScale`, density spacing `16 * dpiScale`, shader
+`characterScale = … * dpiScale`. That yields LOGICAL/DIP consistency, which only
+equals physical consistency when the user's scaling % tracks the panel's true PPI.
+
+Observed counter-example (2026-06-02): 1440p / 27" / **100%** (~108 PPI, dpiScale
+1.0) next to 4K / 37" / **150%** (~119 PPI, dpiScale 1.5). Real PPI is nearly equal,
+but the 4K glyphs render ~37% physically larger purely from the spurious ×1.5. The
+DPI plumbing works exactly as written — the flaw is the design assumption that
+Windows scaling % is a proxy for physical density.
+
+Fix (deferred — needs multi-monitor experimentation to tune a target size): size
+glyphs from TRUE physical density. EDID is available via WMI
+`WmiMonitorBasicDisplayParams` (`MaxHorizontalImageSize`/`MaxVerticalImageSize` in
+cm; confirmed reporting 60×34 cm and 82×47 cm). Compute monitorPPI = resolution /
+physical size, pick a target physical glyph height, set glyph pixels =
+`target_mm * monitorPPI`. Fall back to the current Windows-DPI path when a display
+reports missing/garbage EDID (projectors, some TVs).
+
+
 ## Deliberate v1 deferrals (not bugs)
 
 - Automated "Render()/Present() once per context per frame" coverage — needs a

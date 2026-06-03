@@ -117,6 +117,32 @@ Error:
 
 
 
+////////////////////////////////////////////////////////////////////////////////
+//
+//  RenderSystem::RebuildOverlayAtlas
+//
+//  Rebuilds only this device's overlay atlas at its own DPI scale.  The overlay
+//  cell metrics and UVs live on the shared CharacterSet singleton, so the last
+//  device to build wins.  Overlays render on the primary only, so the primary
+//  calls this last to pin the shared metrics to its monitor's DPI.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+HRESULT RenderSystem::RebuildOverlayAtlas()
+{
+    HRESULT hr = S_OK;
+
+
+    hr = CharacterSet::GetInstance().RecreateOverlayAtlas (m_device.Get(), m_dpiScale, m_glyphAtlas);
+    CHR (hr);
+
+Error:
+    return hr;
+}
+
+
+
+
 HRESULT RenderSystem::CreateDevice()
 {
     HRESULT           hr                = S_OK;
