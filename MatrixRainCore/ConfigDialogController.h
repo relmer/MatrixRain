@@ -69,6 +69,19 @@ public:
     void UpdateStartFullscreen (bool startFullscreen);
 
     /// <summary>
+    /// Update multi-monitor enabled flag.  When true, MatrixRain creates a
+    /// render context per connected monitor in fullscreen mode; when false,
+    /// it uses a single primary-only window.  The dialog handler is
+    /// expected to post WM_APP_REBUILD_CONTEXTS after calling this so the
+    /// running app picks up the new gate decision (see FR-003).  The
+    /// CancelLiveMode path automatically reverts via the snapshot, but the
+    /// dialog handler must likewise post a rebuild on Cancel for the
+    /// reverted setting to take visual effect (see FR-031b).
+    /// </summary>
+    /// <param name="multiMonitorEnabled">True to span all monitors</param>
+    void UpdateMultiMonitorEnabled (bool multiMonitorEnabled);
+
+    /// <summary>
     /// Update show debug stats flag.
     /// </summary>
     /// <param name="showDebugStats">True to show debug statistics</param>

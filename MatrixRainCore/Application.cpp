@@ -15,6 +15,7 @@
 #include "FPSCounter.h"
 #include "MonitorRenderContext.h"
 #include "MonitorLayout.h"
+#include "MultiMonitorGate.h"
 #include "RenderThreadInputs.h"
 #include "WindowsMonitorProvider.h"
 #include "ScreenSaverModeContext.h"
@@ -373,18 +374,18 @@ Error:
 
 bool Application::ShouldSpanAllMonitors() const
 {
+    std::optional<ScreenSaverMode> saverMode;
+
     if (m_pScreenSaverContext)
     {
-        ScreenSaverMode mode = m_pScreenSaverContext->m_mode;
-
-        if (mode == ScreenSaverMode::ScreenSaverPreview ||
-            mode == ScreenSaverMode::HelpRequested)
-        {
-            return false;
-        }
+        saverMode = m_pScreenSaverContext->m_mode;
     }
 
-    return m_appState && m_appState->GetDisplayMode() == DisplayMode::Fullscreen;
+
+    bool         multiMonEnabled = m_appState && m_appState->GetSettings().m_multiMonitorEnabled;
+    DisplayMode  displayMode     = m_appState ? m_appState->GetDisplayMode() : DisplayMode::Windowed;
+
+    return ::ShouldSpanAllMonitors (multiMonEnabled, displayMode, saverMode);
 }
 
 

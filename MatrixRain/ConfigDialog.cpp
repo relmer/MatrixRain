@@ -256,8 +256,9 @@ static BOOL OnInitDialog (HWND hDlg, LPARAM initParam)
     
     InitializeColorSchemeCombo (hDlg, pSettings->m_colorSchemeKey);
     
-    CheckDlgButton (hDlg, IDC_STARTFULLSCREEN_CHECK, pSettings->m_startFullscreen ? BST_CHECKED : BST_UNCHECKED);
-    CheckDlgButton (hDlg, IDC_SHOWDEBUG_CHECK,       pSettings->m_showDebugStats  ? BST_CHECKED : BST_UNCHECKED);
+    CheckDlgButton (hDlg, IDC_STARTFULLSCREEN_CHECK, pSettings->m_startFullscreen     ? BST_CHECKED : BST_UNCHECKED);
+    CheckDlgButton (hDlg, IDC_MULTIMONITOR_CHECK,    pSettings->m_multiMonitorEnabled ? BST_CHECKED : BST_UNCHECKED);
+    CheckDlgButton (hDlg, IDC_SHOWDEBUG_CHECK,       pSettings->m_showDebugStats      ? BST_CHECKED : BST_UNCHECKED);
 
     // Hide fullscreen checkbox in screensaver CPL mode — screensaver always forces fullscreen
     if (pContext->m_isScreenSaverCPL)
@@ -389,6 +390,40 @@ static void OnStartFullscreenCheck (HWND hDlg)
     {
         DisplayMode newMode = checked ? DisplayMode::Fullscreen : DisplayMode::Windowed;
         pApp->GetApplicationState()->SetDisplayMode (newMode);
+        pApp->ApplyDisplayModeChange();
+    }
+
+Error:
+    return;
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  OnMultiMonitorCheck
+//
+////////////////////////////////////////////////////////////////////////////////
+
+static void OnMultiMonitorCheck (HWND hDlg)
+{
+    HRESULT                  hr          = S_OK;
+    ConfigDialogController * pController = GetControllerFromDialog (hDlg);
+    bool                     checked     = IsDlgButtonChecked (hDlg, IDC_MULTIMONITOR_CHECK) == BST_CHECKED;
+
+
+
+    CBRAEx (pController != nullptr, E_UNEXPECTED);
+
+    pController->UpdateMultiMonitorEnabled (checked);
+
+    // Live preview: post a rebuild so the running app applies the new
+    // multimon gate within the next message-loop tick.  Reuses the same
+    // message handler the display-mode toggle relies on.
+    if (Application * pApp = GetApplicationFromDialog (hDlg))
+    {
         pApp->ApplyDisplayModeChange();
     }
 
@@ -592,6 +627,15 @@ static BOOL OnCancel (HWND hDlg)
 
         pController->CancelLiveMode();
 
+        // The snapshot restore in CancelLiveMode reverts settings fields
+        // (including m_multiMonitorEnabled) but does not by itself trigger
+        // a context rebuild.  Post one explicitly so the live multimon /
+        // display-mode preview reverts visually (FR-031b).
+        if (pApp)
+        {
+            pApp->ApplyDisplayModeChange();
+        }
+
         // Clear the dialog handle before destroying so input handling resumes
         if (pApp)
         {
@@ -643,6 +687,10 @@ static BOOL OnCommand (HWND hDlg, WPARAM wParam)
             
         case IDC_STARTFULLSCREEN_CHECK:
             OnStartFullscreenCheck (hDlg);
+            break;
+
+        case IDC_MULTIMONITOR_CHECK:
+            OnMultiMonitorCheck (hDlg);
             break;
             
         case IDC_SHOWDEBUG_CHECK:

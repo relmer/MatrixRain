@@ -141,6 +141,15 @@ void ConfigDialogController::UpdateStartFullscreen (bool startFullscreen)
 
 
 
+void ConfigDialogController::UpdateMultiMonitorEnabled (bool multiMonitorEnabled)
+{
+    m_settings.m_multiMonitorEnabled = multiMonitorEnabled;
+}
+
+
+
+
+
 void ConfigDialogController::UpdateShowDebugStats (bool showDebugStats)
 {
     m_settings.m_showDebugStats = showDebugStats;
