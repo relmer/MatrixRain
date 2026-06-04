@@ -92,6 +92,14 @@ public:
     void RegisterGlowSizeCallback (std::function<void(int)> callback);
 
     /// <summary>
+    /// Register a callback to be notified when the advanced graphics
+    /// values (preset-driven or custom) change.  Used by Application to
+    /// push the new values into SharedState so the render thread picks
+    /// them up via the snapshot path on the next frame (US5 live preview).
+    /// </summary>
+    void RegisterAdvancedGraphicsCallback (std::function<void(const AdvancedGraphicsValues &)> callback);
+
+    /// <summary>
     /// Register a callback to be notified when the color scheme changes
     /// (via dialog, hotkey, or full settings apply).
     /// </summary>
@@ -129,6 +137,13 @@ public:
     /// </summary>
     /// <param name="sizePercent">Glow size percentage (50-200)</param>
     void SetGlowSize (int sizePercent);
+
+    /// <summary>
+    /// Update the advanced graphics values (passes / resolution / smoothness
+    /// + glow intensity as a unit).  Fires the advanced-graphics callback
+    /// so SharedState picks up the new values for the render thread.
+    /// </summary>
+    void SetAdvancedGraphics (const AdvancedGraphicsValues & values);
 
     /// <summary>
     /// Apply full settings to application state (for live dialog revert).
@@ -181,6 +196,7 @@ private:
     std::function<void(ColorScheme)> m_colorSchemeChangeCallback        = nullptr;                 // Callback for color scheme changes
     std::function<void(bool)>        m_showStatisticsChangeCallback     = nullptr;                 // Callback for show-statistics changes
     std::function<void(bool)>        m_showDebugFadeTimesChangeCallback = nullptr;                 // Callback for show-debug-fade-times changes
+    std::function<void(const AdvancedGraphicsValues &)> m_advancedGraphicsChangeCallback = nullptr; // Callback for US5 advanced graphics changes
 };
 
 

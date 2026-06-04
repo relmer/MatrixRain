@@ -325,6 +325,14 @@ void Application::InitializeApplicationState (const ScreenSaverModeContext * pSc
         m_sharedState.glowSizePercent = sizePercent;
     });
 
+    m_appState->RegisterAdvancedGraphicsCallback ([this](const AdvancedGraphicsValues & values) {
+        std::lock_guard<std::mutex> lock (m_sharedState.mutex);
+        m_sharedState.glowIntensityPercent   = values.m_glowIntensityPercent;
+        m_sharedState.blurPasses             = values.m_blurPasses;
+        m_sharedState.bloomResolutionDivisor = values.m_bloomResolutionDivisor;
+        m_sharedState.blurTaps               = values.m_blurTaps;
+    });
+
     m_appState->RegisterColorSchemeCallback ([this](ColorScheme scheme) {
         std::lock_guard<std::mutex> lock (m_sharedState.mutex);
         m_sharedState.colorScheme = scheme;

@@ -185,6 +185,15 @@ void ApplicationState::RegisterGlowSizeCallback (std::function<void(int)> callba
 
 
 
+void ApplicationState::RegisterAdvancedGraphicsCallback (std::function<void(const AdvancedGraphicsValues &)> callback)
+{
+    m_advancedGraphicsChangeCallback = callback;
+}
+
+
+
+
+
 void ApplicationState::RegisterColorSchemeCallback (std::function<void(ColorScheme)> callback)
 {
     m_colorSchemeChangeCallback = callback;
@@ -258,6 +267,24 @@ void ApplicationState::SetGlowSize (int sizePercent)
 
     HRESULT hr = SaveSettings();
     IGNORE_RETURN_VALUE (hr, S_OK);
+}
+
+
+
+
+
+void ApplicationState::SetAdvancedGraphics (const AdvancedGraphicsValues & values)
+{
+    m_settings.m_advancedValues = values;
+
+    if (m_advancedGraphicsChangeCallback)
+    {
+        m_advancedGraphicsChangeCallback (values);
+    }
+
+    // Note: we DON'T SaveSettings() here - the controller already owns
+    // the persistence path on dialog OK / live cancel.  This setter is
+    // purely the live-preview pump.
 }
 
 

@@ -164,11 +164,12 @@ void ConfigDialogController::UpdateQualityPreset (QualityPreset preset)
     m_settings.m_qualityPreset  = preset;
     m_settings.m_advancedValues = ApplyPresetSnap (preset, m_settings.m_advancedValues, m_settings.m_lastCustom);
 
-    // Live mode: push the new advanced values to ApplicationState so the
-    // render thread picks them up via the snapshot path on the next frame.
+    // Live mode: push the snapped advanced values to ApplicationState so
+    // SharedState picks them up via the registered callback and the render
+    // thread renders the new preset on the next frame (US5 live preview).
     if (m_snapshot.isLiveMode && m_snapshot.applicationStateRef)
     {
-        m_snapshot.applicationStateRef->SetGlowIntensity (m_settings.m_advancedValues.m_glowIntensityPercent);
+        m_snapshot.applicationStateRef->SetAdvancedGraphics (m_settings.m_advancedValues);
     }
 }
 
@@ -191,7 +192,7 @@ void ConfigDialogController::UpdateAdvancedGraphicsValues (const AdvancedGraphic
 
     if (m_snapshot.isLiveMode && m_snapshot.applicationStateRef)
     {
-        m_snapshot.applicationStateRef->SetGlowIntensity (values.m_glowIntensityPercent);
+        m_snapshot.applicationStateRef->SetAdvancedGraphics (values);
     }
 }
 
