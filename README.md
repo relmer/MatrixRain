@@ -146,10 +146,6 @@ Press S to toggle the statistics display for nerdy debugging information:
 - Number of rain streaks (including partials still fading off) on screen
 - FPS
 
-Press ` (backtick) to toggle the per-character fade timer. This gets pretty cluttered with more than just a few streaks, so you probably want to dial down the density first.
-
-![Fade Timers](assets/FadeTimers.png)
-
 ## Specs & SpecKit
 
 - My main goal with this project was to learn about spec-driven development with [SpecKit](https://github.com/github/spec-kit). Starting with a short description of the app's purpose and behavior, SpecKit generated a detailed [spec](specs/001-matrix-rain/spec.md) with five user stories, assigned priorities to them, and generated acceptance criteria for each. It came up with a set of edge cases to be clarified and tested, and 27 functional requirements.

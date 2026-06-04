@@ -111,8 +111,6 @@ HRESULT RegistrySettingsProvider::Load (ScreenSaverSettings & settings)
         settings.m_advancedValues = LookupPresetValues (settings.m_qualityPreset);
     }
 
-    ReadBool (hKey, VALUE_SHOW_ADVANCED_GRAPHICS, settings.m_showAdvancedGraphics);
-
     // Clamp all values to valid ranges
     settings.Clamp();
 
@@ -221,9 +219,6 @@ HRESULT RegistrySettingsProvider::Save (const ScreenSaverSettings & settings)
         hr = WriteInt (hKey, VALUE_LASTCUSTOM_SMOOTHNESS,     static_cast<int> (settings.m_lastCustom->m_blurTaps));
         CHR (hr);
     }
-
-    hr = WriteBool (hKey, VALUE_SHOW_ADVANCED_GRAPHICS, settings.m_showAdvancedGraphics);
-    CHR (hr);
 
 
 Error:

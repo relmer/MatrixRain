@@ -112,11 +112,6 @@ public:
     void UpdateAdvancedGraphicsValues (const AdvancedGraphicsValues & values);
 
     /// <summary>
-    /// Update the "show advanced graphics settings" disclosure toggle.
-    /// </summary>
-    void UpdateShowAdvancedGraphics (bool show);
-
-    /// <summary>
     /// Update show debug stats flag.
     /// </summary>
     /// <param name="showDebugStats">True to show debug statistics</param>

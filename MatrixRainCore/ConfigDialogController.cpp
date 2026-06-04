@@ -199,16 +199,6 @@ void ConfigDialogController::UpdateAdvancedGraphicsValues (const AdvancedGraphic
 
 
 
-
-void ConfigDialogController::UpdateShowAdvancedGraphics (bool show)
-{
-    m_settings.m_showAdvancedGraphics = show;
-}
-
-
-
-
-
 void ConfigDialogController::UpdateShowDebugStats (bool showDebugStats)
 {
     m_settings.m_showDebugStats = showDebugStats;

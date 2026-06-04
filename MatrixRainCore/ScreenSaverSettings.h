@@ -43,7 +43,6 @@ struct ScreenSaverSettings
     QualityPreset                          m_qualityPreset         { QualityPreset::High };
     AdvancedGraphicsValues                 m_advancedValues;                          // Defaults to High row
     std::optional<AdvancedGraphicsValues>  m_lastCustom;                              // Last user-customized set
-    bool                                   m_showAdvancedGraphics  { false };          // Disclosure toggle state
 
     std::optional<SystemClockTimePoint> m_lastSavedTimestamp;
 

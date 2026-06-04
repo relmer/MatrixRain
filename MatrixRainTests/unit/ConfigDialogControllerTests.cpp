@@ -386,20 +386,6 @@ namespace MatrixRainTests
 
 
 
-        TEST_METHOD (TestUpdateShowAdvancedGraphics_PersistsInMemory)
-        {
-            ConfigDialogController controller (m_settingsProvider);
-            controller.Initialize();
-
-            controller.UpdateShowAdvancedGraphics (true);
-            Assert::IsTrue (controller.GetSettings().m_showAdvancedGraphics);
-
-            controller.UpdateShowAdvancedGraphics (false);
-            Assert::IsFalse (controller.GetSettings().m_showAdvancedGraphics);
-        }
-
-
-
 
 
         // T019.10: Test ConfigDialogController saves settings on ApplyChanges

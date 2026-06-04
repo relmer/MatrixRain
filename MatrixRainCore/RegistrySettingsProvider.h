@@ -36,7 +36,6 @@ private:
     static constexpr LPCWSTR VALUE_LASTCUSTOM_PASSES         = L"LastCustom_Passes";
     static constexpr LPCWSTR VALUE_LASTCUSTOM_RESOLUTION     = L"LastCustom_Resolution";
     static constexpr LPCWSTR VALUE_LASTCUSTOM_SMOOTHNESS     = L"LastCustom_Smoothness";
-    static constexpr LPCWSTR VALUE_SHOW_ADVANCED_GRAPHICS    = L"ShowAdvancedGraphics";
     static constexpr LPCWSTR VALUE_LAST_SAVED                = L"LastSaved";
     
     static HRESULT ReadInt    (HKEY hKey, LPCWSTR valueName, int & outValue);
