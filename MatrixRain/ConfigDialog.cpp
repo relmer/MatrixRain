@@ -32,7 +32,15 @@ struct DialogContext
     // OnInitDialog, used by OnGraphicsAdvancedCheck to grow/shrink.
     int                                       m_advancedBlockHeight = 0;
     bool                                      m_advancedExpanded    = true;
+
+    // T058/T059 - shared tooltip control + the keyboard-activation TTF_TRACK
+    // tool whose text we update on each info-button BN_CLICKED.
+    HWND                                      m_hTooltip            = nullptr;
 };
+
+
+// Sentinel uId for the single TTF_TRACK tool used by keyboard activation.
+static constexpr UINT_PTR kTrackTipUId = 0xC0C00C0Cu;
 
 
 
@@ -379,7 +387,91 @@ static HWND CreateAndRegisterTooltip (HWND hDlg)
         SendMessageW (hTooltip, TTM_ADDTOOLW, 0, (LPARAM) &ti);
     }
 
+
+    // Single TTF_TRACK tool used for keyboard-activated tips (T059).  Its
+    // text is updated on each info-button BN_CLICKED before we call
+    // TTM_TRACKPOSITION + TTM_TRACKACTIVATE.
+    TOOLINFOW trackTool = { sizeof (TOOLINFOW) };
+    trackTool.uFlags    = TTF_TRACK | TTF_ABSOLUTE;
+    trackTool.hwnd      = hDlg;
+    trackTool.uId       = kTrackTipUId;
+    trackTool.lpszText  = const_cast<LPWSTR> (L"");
+
+    SendMessageW (hTooltip, TTM_ADDTOOLW, 0, (LPARAM) &trackTool);
+
     return hTooltip;
+}
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  OnInfoButtonClick — keyboard-activated tooltip for an IDC_*_INFO button
+//  (T059).  Updates the shared TTF_TRACK tool's text to the matching infotip
+//  string, positions it just below/right of the button, and activates it.
+//  Auto-dismisses on a 5-second timer (handled in ConfigDialogProc).
+//
+////////////////////////////////////////////////////////////////////////////////
+
+static constexpr UINT_PTR kInfoTipDismissTimerId = 0xC0C0C0DEu;
+
+static void OnInfoButtonClick (HWND hDlg, int infoId)
+{
+    DialogContext * pContext = GetDialogContext (hDlg);
+
+    if (!pContext || !pContext->m_hTooltip)
+    {
+        return;
+    }
+
+    HWND hButton = GetDlgItem (hDlg, infoId);
+
+    if (!hButton)
+    {
+        return;
+    }
+
+    RECT btnRect;
+    GetWindowRect (hButton, &btnRect);
+
+
+    // Update the TTF_TRACK tool's text and position.
+    TOOLINFOW ti = { sizeof (TOOLINFOW) };
+    ti.hwnd      = hDlg;
+    ti.uId       = kTrackTipUId;
+    ti.lpszText  = const_cast<LPWSTR> (GetInfoTipText (infoId));
+
+    SendMessageW (pContext->m_hTooltip, TTM_UPDATETIPTEXTW, 0, (LPARAM) &ti);
+
+    SendMessageW (pContext->m_hTooltip,
+                  TTM_TRACKPOSITION,
+                  0,
+                  MAKELPARAM (btnRect.right + 4, btnRect.bottom + 2));
+
+    SendMessageW (pContext->m_hTooltip, TTM_TRACKACTIVATE, TRUE, (LPARAM) &ti);
+
+    SetTimer (hDlg, kInfoTipDismissTimerId, 5000, nullptr);
+}
+
+
+
+
+static void DismissInfoTip (HWND hDlg)
+{
+    DialogContext * pContext = GetDialogContext (hDlg);
+
+    if (!pContext || !pContext->m_hTooltip)
+    {
+        return;
+    }
+
+    TOOLINFOW ti = { sizeof (TOOLINFOW) };
+    ti.hwnd      = hDlg;
+    ti.uId       = kTrackTipUId;
+
+    SendMessageW (pContext->m_hTooltip, TTM_TRACKACTIVATE, FALSE, (LPARAM) &ti);
+    KillTimer (hDlg, kInfoTipDismissTimerId);
 }
 
 
@@ -796,7 +888,7 @@ static BOOL OnInitDialog (HWND hDlg, LPARAM initParam)
 
     // Tooltip surface for the IDC_*_INFO indicators (FR-034/FR-035/FR-036).
     // The TTN_GETDISPINFO notification is handled in ConfigDialogProc.
-    (void) CreateAndRegisterTooltip (hDlg);
+    pContext->m_hTooltip = CreateAndRegisterTooltip (hDlg);
     
     CheckDlgButton (hDlg, IDC_STARTFULLSCREEN_CHECK, pSettings->m_startFullscreen     ? BST_CHECKED : BST_UNCHECKED);
     CheckDlgButton (hDlg, IDC_MULTIMONITOR_CHECK,    pSettings->m_multiMonitorEnabled ? BST_CHECKED : BST_UNCHECKED);
@@ -1402,6 +1494,19 @@ static BOOL OnCommand (HWND hDlg, WPARAM wParam)
         case IDC_GRAPHICS_ADVANCED_CHECK:
             OnGraphicsAdvancedCheck (hDlg);
             break;
+
+        case IDC_QUALITY_PRESET_INFO:
+        case IDC_GRAPHICS_ADVANCED_INFO:
+        case IDC_GLOWINTENSITY_INFO:
+        case IDC_GLOWSIZE_INFO:
+        case IDC_GLOWPASSES_INFO:
+        case IDC_GLOWRES_INFO:
+        case IDC_GLOWSMOOTH_INFO:
+            // BN_CLICKED on any info button (mouse click OR Space/Enter on
+            // a keyboard-focused button) pops the matching infotip via
+            // TTM_TRACKACTIVATE.  Auto-dismisses after 5s.
+            OnInfoButtonClick (hDlg, LOWORD (wParam));
+            break;
             
         case IDC_STARTFULLSCREEN_CHECK:
             OnStartFullscreenCheck (hDlg);
@@ -1541,6 +1646,22 @@ static INT_PTR CALLBACK ConfigDialogProc (HWND   hDlg,
             }
             break;
         }
+
+        case WM_TIMER:
+            if (wParam == kInfoTipDismissTimerId)
+            {
+                DismissInfoTip (hDlg);
+                result = TRUE;
+            }
+            break;
+
+        case WM_ACTIVATE:
+            // Lose-focus on the dialog dismisses any active TTF_TRACK tip.
+            if (LOWORD (wParam) == WA_INACTIVE)
+            {
+                DismissInfoTip (hDlg);
+            }
+            break;
         
         case WM_DESTROY:
             OnDestroy (hDlg);
