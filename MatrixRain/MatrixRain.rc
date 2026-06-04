@@ -85,10 +85,24 @@ END
 //
 // Dialog
 //
+// Layout column conventions (all DLU, used consistently for every row):
+//
+//   Left margin           x =  15
+//   Prompt label          x =  15  w =  58            (fits "Glow smoothness:")
+//   Infotip (ⓘ button)   x =  74  w =  14  h =  14
+//   Slider / combo        x =  90  w = 102 (slider)  /  w = 135 (combo)
+//   Value label           x = 197  w =  28
+//   Right margin          ends at x = 225  (= 240 - 15, mirrors left margin)
+//
+// Sliders use msctls_trackbar32 (the standard modern themed trackbar; visual
+// styles + DPI scaling are inherited automatically via DS_SETFONT and the
+// app manifest).  Slider height is 20 DLU to leave room for the tick row
+// beneath the channel.
+//
 
 IDD_MATRIXRAIN_SAVER_CONFIG DIALOGEX 0, 0, 240, 340
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
-CAPTION "MatrixRain Screensaver Configuration"
+CAPTION "MatrixRain configuration"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     LTEXT           "Density:",IDC_STATIC,15,18,58,8
@@ -115,7 +129,7 @@ BEGIN
     LTEXT           "GPU:",IDC_STATIC,15,125,58,8
     COMBOBOX        IDC_GPU_COMBO,90,122,135,120,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
     
-    GROUPBOX        "Graphics quality",IDC_QUALITY_GROUPBOX,7,144,218,100
+    GROUPBOX        "Graphics performance and quality",IDC_QUALITY_GROUPBOX,7,144,233,100
     LTEXT           "Quality:",IDC_STATIC,15,160,58,8
     CONTROL         "ⓘ",IDC_QUALITY_PRESET_INFO,"Button",BS_OWNERDRAW | WS_TABSTOP,74,157,14,14
     CONTROL         "",IDC_QUALITY_PRESET_SLIDER,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,90,154,102,20

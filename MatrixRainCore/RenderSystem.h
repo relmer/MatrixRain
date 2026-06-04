@@ -148,7 +148,7 @@ private:
     void    SortStreaksByDepth       (std::vector<const CharacterStreak *> & streaks);
     HRESULT UpdateInstanceBuffer     (const AnimationSystem & animationSystem, ColorScheme colorScheme, float elapsedTime);
     void    ClearRenderTarget();
-    void    RenderFPSCounter         (float fps, int rainPercentage, int streakCount, int activeHeadCount, double gpuLoadPercent);
+    void    RenderFPSCounter         (float fps, int rainPercentage, int streakCount, int activeHeadCount, double gpuLoadPercent, bool gpuLoadValid);
     void    DrawFeatheredGlow        (const wchar_t * fpsText, UINT32 textLength, const D2D1_RECT_F & textRect);
     void    DrawFeatheredBackground  (std::span<const HintCharacter> chars, std::span<const float> xPositions, float advanceScale, float baseY, float cellHeight, int numRows, float padding, float opacityScale);
     void    ComputeRowRects          (std::span<const HintCharacter> chars, std::span<const float> xPositions, float advanceScale, float baseY, float cellHeight, int numRows, float hPad, float vPad);
@@ -279,15 +279,23 @@ private:
     std::vector<CharacterInstanceData>   m_instanceData;
     std::vector<const CharacterStreak *> m_streakPtrs;
 
-    // GPU load measurement via D3D11 TIMESTAMP queries (3-frame pipeline:
-    // issue this frame N's queries, retrieve frame N-2's results).
-    static constexpr UINT GPU_QUERY_FRAMES = 3;
+    // GPU load measurement.  Each frame is bracketed with D3D11 TIMESTAMP
+    // queries; later frames walk back through prior slots to find the most
+    // recent one whose results have flushed.  The denominator is wall-clock
+    // time between Render calls (QueryPerformanceCounter), independent of
+    // any fps counter — this matches Task Manager's "GPU engine % busy"
+    // intuition (gpu_work_time / wall_clock_interval).
+    static constexpr UINT GPU_QUERY_FRAMES = 6;
     Microsoft::WRL::ComPtr<ID3D11Query> m_gpuDisjointQuery[GPU_QUERY_FRAMES];
     Microsoft::WRL::ComPtr<ID3D11Query> m_gpuTimestampBeginQuery[GPU_QUERY_FRAMES];
     Microsoft::WRL::ComPtr<ID3D11Query> m_gpuTimestampEndQuery[GPU_QUERY_FRAMES];
     UINT                                m_gpuQueryFrameIndex     { 0 };
-    double                              m_gpuLastTimeMs          { 0.0 };
+    bool                                m_gpuQuerySlotIssued[GPU_QUERY_FRAMES] = { false, false, false, false, false, false };
+    UINT                                m_gpuQueryNextReadSlot   { 0 };
+    LARGE_INTEGER                       m_gpuQpcFrequency        { 0 };
+    LARGE_INTEGER                       m_gpuLastFrameTick       { 0 };
     double                              m_gpuSmoothedLoadPercent { 0.0 };
+    bool                                m_gpuHaveAnyReading      { false };
 
     static constexpr UINT INITIAL_INSTANCE_CAPACITY = 10000; // Max characters per frame
 };
