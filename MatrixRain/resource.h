@@ -21,7 +21,7 @@
 #define IDC_MULTIMONITOR_INFO           1015
 #define IDC_GPU_COMBO                   1016
 #define IDC_GPU_INFO                    1017
-#define IDC_QUALITY_PRESET_COMBO        1018
+#define IDC_QUALITY_PRESET_SLIDER       1018
 #define IDC_QUALITY_PRESET_INFO         1019
 #define IDC_GRAPHICS_ADVANCED_CHECK     1020
 #define IDC_GRAPHICS_ADVANCED_INFO      1021
@@ -40,6 +40,7 @@
 #define IDC_GLOWPASSES_PROMPT           1034
 #define IDC_GLOWRES_PROMPT              1035
 #define IDC_GLOWSMOOTH_PROMPT           1036
+#define IDC_QUALITY_PRESET_LABEL        1037
 
 // Next default values for new objects
 // 
@@ -47,7 +48,7 @@
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        103
 #define _APS_NEXT_COMMAND_VALUE         40001
-#define _APS_NEXT_CONTROL_VALUE         1037
+#define _APS_NEXT_CONTROL_VALUE         1038
 #define _APS_NEXT_SYMED_VALUE           101
 #endif
 #endif

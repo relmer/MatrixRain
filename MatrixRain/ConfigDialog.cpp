@@ -557,6 +557,21 @@ static const wchar_t * FormatSmoothnessLabel (int taps)
 
 
 
+static const wchar_t * FormatQualityPresetLabel (QualityPreset preset)
+{
+    switch (preset)
+    {
+        case QualityPreset::Low:    return L"Low";
+        case QualityPreset::Medium: return L"Medium";
+        case QualityPreset::High:   return L"High";
+        case QualityPreset::Custom: return L"Custom";
+        default:                    return L"Custom";
+    }
+}
+
+
+
+
 ////////////////////////////////////////////////////////////////////////////////
 //
 //  Tick-frequency conventions for percentage sliders (research R-011).
@@ -921,11 +936,13 @@ static BOOL OnInitDialog (HWND hDlg, LPARAM initParam)
     // Quality preset combo + advanced disclosure.  Three named presets +
     // Custom; the dialog code selects whichever matches the loaded
     // settings.
-    SendDlgItemMessageW (hDlg, IDC_QUALITY_PRESET_COMBO, CB_ADDSTRING, 0, (LPARAM) L"Low");
-    SendDlgItemMessageW (hDlg, IDC_QUALITY_PRESET_COMBO, CB_ADDSTRING, 0, (LPARAM) L"Medium");
-    SendDlgItemMessageW (hDlg, IDC_QUALITY_PRESET_COMBO, CB_ADDSTRING, 0, (LPARAM) L"High");
-    SendDlgItemMessageW (hDlg, IDC_QUALITY_PRESET_COMBO, CB_ADDSTRING, 0, (LPARAM) L"Custom");
-    SendDlgItemMessageW (hDlg, IDC_QUALITY_PRESET_COMBO, CB_SETCURSEL, static_cast<int> (pSettings->m_qualityPreset), 0);
+    // Quality preset slider (0=Low, 1=Medium, 2=High, 3=Custom).  Replaces
+     // the v1.4 combobox per UX feedback — discrete trackbar with named
+     // value label matches the rest of the dialog's slider+label pattern.
+    SendDlgItemMessageW (hDlg, IDC_QUALITY_PRESET_SLIDER, TBM_SETRANGE,   TRUE, MAKELPARAM (0, 3));
+    SendDlgItemMessageW (hDlg, IDC_QUALITY_PRESET_SLIDER, TBM_SETTICFREQ, 1, 0);
+    SendDlgItemMessageW (hDlg, IDC_QUALITY_PRESET_SLIDER, TBM_SETPOS,     TRUE, static_cast<int> (pSettings->m_qualityPreset));
+    SetDlgItemTextW     (hDlg, IDC_QUALITY_PRESET_LABEL,  FormatQualityPresetLabel (pSettings->m_qualityPreset));
 
     InitializePassesSlider      (hDlg, pSettings->m_advancedValues.m_blurPasses);
     InitializeResolutionSlider  (hDlg, static_cast<int> (pSettings->m_advancedValues.m_bloomResolutionDivisor));
@@ -992,6 +1009,8 @@ Error:
 //
 ////////////////////////////////////////////////////////////////////////////////
 
+static void OnQualityPresetChange (HWND hDlg);
+
 static BOOL OnHScroll (HWND hDlg, LPARAM lParam)
 {
     HRESULT                  hr          = S_OK;
@@ -1032,8 +1051,11 @@ static BOOL OnHScroll (HWND hDlg, LPARAM lParam)
             AdvancedGraphicsValues v = pController->GetSettings().m_advancedValues;
             v.m_glowIntensityPercent = pos;
             pController->UpdateAdvancedGraphicsValues (v);
-            SendDlgItemMessageW (hDlg, IDC_QUALITY_PRESET_COMBO, CB_SETCURSEL,
-                                 static_cast<int> (pController->GetSettings().m_qualityPreset), 0);
+            {
+                QualityPreset p = pController->GetSettings().m_qualityPreset;
+                SendDlgItemMessageW (hDlg, IDC_QUALITY_PRESET_SLIDER, TBM_SETPOS, TRUE, static_cast<int> (p));
+                SetDlgItemTextW     (hDlg, IDC_QUALITY_PRESET_LABEL,  FormatQualityPresetLabel (p));
+            }
             break;
         }
             
@@ -1048,8 +1070,11 @@ static BOOL OnHScroll (HWND hDlg, LPARAM lParam)
             v.m_blurPasses = pos;
             pController->UpdateAdvancedGraphicsValues (v);
             SetDlgItemTextW (hDlg, IDC_GLOWPASSES_LABEL, std::format (L"{}", pos).c_str());
-            SendDlgItemMessageW (hDlg, IDC_QUALITY_PRESET_COMBO, CB_SETCURSEL,
-                                 static_cast<int> (pController->GetSettings().m_qualityPreset), 0);
+            {
+                QualityPreset p = pController->GetSettings().m_qualityPreset;
+                SendDlgItemMessageW (hDlg, IDC_QUALITY_PRESET_SLIDER, TBM_SETPOS, TRUE, static_cast<int> (p));
+                SetDlgItemTextW     (hDlg, IDC_QUALITY_PRESET_LABEL,  FormatQualityPresetLabel (p));
+            }
             break;
         }
 
@@ -1060,8 +1085,11 @@ static BOOL OnHScroll (HWND hDlg, LPARAM lParam)
             v.m_bloomResolutionDivisor = static_cast<ResolutionDivisor> (divisor);
             pController->UpdateAdvancedGraphicsValues (v);
             SetDlgItemTextW (hDlg, IDC_GLOWRES_LABEL, FormatResolutionLabel (divisor));
-            SendDlgItemMessageW (hDlg, IDC_QUALITY_PRESET_COMBO, CB_SETCURSEL,
-                                 static_cast<int> (pController->GetSettings().m_qualityPreset), 0);
+            {
+                QualityPreset p = pController->GetSettings().m_qualityPreset;
+                SendDlgItemMessageW (hDlg, IDC_QUALITY_PRESET_SLIDER, TBM_SETPOS, TRUE, static_cast<int> (p));
+                SetDlgItemTextW     (hDlg, IDC_QUALITY_PRESET_LABEL,  FormatQualityPresetLabel (p));
+            }
             break;
         }
 
@@ -1072,10 +1100,17 @@ static BOOL OnHScroll (HWND hDlg, LPARAM lParam)
             v.m_blurTaps = static_cast<BlurTaps> (taps);
             pController->UpdateAdvancedGraphicsValues (v);
             SetDlgItemTextW (hDlg, IDC_GLOWSMOOTH_LABEL, FormatSmoothnessLabel (taps));
-            SendDlgItemMessageW (hDlg, IDC_QUALITY_PRESET_COMBO, CB_SETCURSEL,
-                                 static_cast<int> (pController->GetSettings().m_qualityPreset), 0);
+            {
+                QualityPreset p = pController->GetSettings().m_qualityPreset;
+                SendDlgItemMessageW (hDlg, IDC_QUALITY_PRESET_SLIDER, TBM_SETPOS, TRUE, static_cast<int> (p));
+                SetDlgItemTextW     (hDlg, IDC_QUALITY_PRESET_LABEL,  FormatQualityPresetLabel (p));
+            }
             break;
         }
+
+        case IDC_QUALITY_PRESET_SLIDER:
+            OnQualityPresetChange (hDlg);
+            break;
     }
     
     fSuccess = TRUE;
@@ -1174,7 +1209,7 @@ static void OnQualityPresetChange (HWND hDlg)
 
     CBRAEx (pController != nullptr, E_UNEXPECTED);
 
-    index = (int) SendDlgItemMessageW (hDlg, IDC_QUALITY_PRESET_COMBO, CB_GETCURSEL, 0, 0);
+    index = (int) SendDlgItemMessageW (hDlg, IDC_QUALITY_PRESET_SLIDER, TBM_GETPOS, 0, 0);
 
     CBRAEx (index >= 0 && index <= 3, E_UNEXPECTED);
 
@@ -1184,6 +1219,8 @@ static void OnQualityPresetChange (HWND hDlg)
         // Reflect the snapped advanced values back into the three sliders and
         // the Glow Intensity slider; the controller already updated them.
         const ScreenSaverSettings & s = pController->GetSettings();
+
+        SetDlgItemTextW (hDlg, IDC_QUALITY_PRESET_LABEL, FormatQualityPresetLabel (s.m_qualityPreset));
 
         SendDlgItemMessageW (hDlg, IDC_GLOWINTENSITY_SLIDER, TBM_SETPOS, TRUE, s.m_advancedValues.m_glowIntensityPercent);
         SetDlgItemTextW     (hDlg, IDC_GLOWINTENSITY_LABEL,
@@ -1552,13 +1589,6 @@ static BOOL OnCommand (HWND hDlg, WPARAM wParam)
             if (HIWORD (wParam) == CBN_SELCHANGE)
             {
                 OnGpuChange (hDlg);
-            }
-            break;
-
-        case IDC_QUALITY_PRESET_COMBO:
-            if (HIWORD (wParam) == CBN_SELCHANGE)
-            {
-                OnQualityPresetChange (hDlg);
             }
             break;
 
