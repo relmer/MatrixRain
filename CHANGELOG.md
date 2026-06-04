@@ -4,6 +4,23 @@ All notable changes to MatrixRain are documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **User Story 1 (P1) — Runtime topology and device-loss recovery.** MatrixRain now responds to monitors being added or removed while running (WM_DISPLAYCHANGE, coalesced across windows) and to the active GPU becoming unavailable (driver reset, sleep/resume, eGPU unplugged - detected via Present HRESULT). The render context is rebuilt automatically; this fixes the previously-reported "GPU stuck at ~90% after undocking a Surface Book 3" defect where the ghost monitor's render thread continued processing forever.
+- **User Story 2 (P1) — Optional multi-monitor spanning.** New "Render on all monitors" checkbox in the configuration dialog (default on). Toggling it live applies within 1 second; Cancel reverts.
+- **User Story 3 (P2) — GPU adapter selection.** New "GPU" dropdown in the configuration dialog listing each real adapter name (with "(default)" appended to the system default) plus a `<system default>` sentinel entry. Software/WARP adapters are excluded. Selection persists by description string; if the saved adapter is missing at startup, the application silently falls back to the system default. Live device-switch takes effect within 1 second.
+- **User Story 4 (P2) — Frame cap on high-refresh monitors.** Per-monitor `FrameLimiter` engages only when the monitor's native refresh exceeds 60 Hz, capping that monitor's rendering to 60 FPS. At ≤60 Hz the existing vsync path is preserved with no measurable per-frame overhead. Substantially reduces GPU work on 144Hz / 165Hz laptop displays.
+- **User Story 5 (P3) — Graphics quality preset spectrum.** New "Quality" dropdown (Low / Medium / High / Custom) in a "Graphics quality" group box. Advanced disclosure toggle reveals three discrete sliders — Passes (1-4), Resolution (Eighth / Quarter / Half / Full), Smoothness (Low / Medium / High) — and the dialog dynamically grows/shrinks when toggled. Each quality-related control has an "i" infotip indicator; hovering or tabbing-then-pressing-Space/Enter reveals a tooltip with a description and standardized GPU-performance-impact phrase. Glow Intensity at 0% now disables the entire bloom pipeline (true off, not just darker). First-run heuristic picks a starting preset based on detected GPU class and total monitor pixel count (discrete → High; integrated + modest load → Medium; integrated + heavy load → Low). Custom-drift behaviour: any direct edit of an advanced control auto-flips the preset to Custom and saves the resulting values for restoration when the user later re-selects Custom.
+
+### Changed
+
+- Bloom pipeline is now runtime-parametric: blur passes (1-4), bloom buffer resolution (full/half/quarter/eighth), and blur kernel taps (5 / 9 / 13) are all selectable per-frame from the quality preset / advanced sliders. Three blur shader variants are compiled at startup so the tap-count switch is free at draw time.
+- Default settings on a fresh install now pick a quality preset matched to detected hardware rather than always using the maximum.
+
+### Known Issues
+
+- Infotip indicators are real focusable BUTTON controls rendering "i" text rather than the spec'd owner-drawn "i-in-a-circle" glyph. The accessibility surface (focus, hover tooltip, keyboard tooltip activation) is complete; only the cosmetic appearance is a follow-up.
+
 ## [1.3.1984] - 2026-06-03
 
 ### Added

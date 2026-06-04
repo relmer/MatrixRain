@@ -2,7 +2,7 @@
 
 **Feature Branch**: `006-multimon-gpu-efficiency`  
 **Created**: 2026-06-03  
-**Status**: Draft  
+**Status**: Implemented (60/63 tasks committed; T060/T061/T063 polish documented in tasks.md)  
 **Input**: User description: "Improve MatrixRain v1.4: make multi-monitor rendering optional (default on); add a GPU adapter selection so users on hybrid laptops can pick integrated vs discrete; respond appropriately to monitors and GPUs being added or removed while running (current behavior leaves a 90% GPU load after undocking a Surface Book 3); and reduce overall GPU usage on hybrid hardware through a frame-rate cap on high-refresh monitors and a graphics quality preset spectrum (Low / Medium / High / Custom) with advanced controls behind a disclosure toggle and accessible information tips."
 
 ## User Scenarios & Testing *(mandatory)*
