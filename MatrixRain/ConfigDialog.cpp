@@ -251,6 +251,140 @@ static int CaptureAdvancedBlockHeight (HWND hDlg)
 
 
 
+////////////////////////////////////////////////////////////////////////////////
+//
+//  GetInfoTipText — locked infotip strings (per the spec contract,
+//  FR-036: descriptive sentence + standardized perf-impact sentence).
+//
+////////////////////////////////////////////////////////////////////////////////
+
+static const wchar_t * GetInfoTipText (int infoId)
+{
+    switch (infoId)
+    {
+        case IDC_QUALITY_PRESET_INFO:
+            return L"Picks a graphics quality preset. Higher presets look richer but "
+                   L"use more GPU. Custom lets you tune the individual settings below. "
+                   L"Significant GPU performance impact.";
+
+        case IDC_GRAPHICS_ADVANCED_INFO:
+            return L"Reveals individual tuning controls so you can build your own "
+                   L"quality preset. Small GPU performance impact.";
+
+        case IDC_GLOWINTENSITY_INFO:
+            return L"Brightness of the glow effect around bright characters. Setting "
+                   L"this to 0% disables the glow effect entirely. Significant GPU "
+                   L"performance impact.";
+
+        case IDC_GLOWSIZE_INFO:
+            return L"Width of the glow halo around bright characters. Small GPU "
+                   L"performance impact.";
+
+        case IDC_GLOWPASSES_INFO:
+            return L"How many times the glow is blurred. Each pass roughly doubles the "
+                   L"glow's width. Significant GPU performance impact.";
+
+        case IDC_GLOWRES_INFO:
+            return L"Resolution the glow is computed at. Lower is much cheaper and only "
+                   L"slightly softer; Eighth is about 16x cheaper than Full. Significant "
+                   L"GPU performance impact.";
+
+        case IDC_GLOWSMOOTH_INFO:
+            return L"Number of samples per blur step. Higher gives smoother gradients "
+                   L"with no banding. Moderate GPU performance impact.";
+
+        default:
+            return L"";
+    }
+}
+
+
+
+
+static bool IsInfoTipControlId (int id)
+{
+    switch (id)
+    {
+        case IDC_QUALITY_PRESET_INFO:
+        case IDC_GRAPHICS_ADVANCED_INFO:
+        case IDC_GLOWINTENSITY_INFO:
+        case IDC_GLOWSIZE_INFO:
+        case IDC_GLOWPASSES_INFO:
+        case IDC_GLOWRES_INFO:
+        case IDC_GLOWSMOOTH_INFO:
+            return true;
+        default:
+            return false;
+    }
+}
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  CreateAndRegisterTooltip
+//
+//  Creates a shared WC_TOOLTIPS window for the config dialog and registers
+//  every IDC_*_INFO button as a tool with TTF_IDISHWND | TTF_SUBCLASS, with
+//  per-tool text supplied via TTN_GETDISPINFO (handled in ConfigDialogProc).
+//
+////////////////////////////////////////////////////////////////////////////////
+
+static HWND CreateAndRegisterTooltip (HWND hDlg)
+{
+    static const int kInfoIds[] =
+    {
+        IDC_QUALITY_PRESET_INFO,
+        IDC_GRAPHICS_ADVANCED_INFO,
+        IDC_GLOWINTENSITY_INFO,
+        IDC_GLOWSIZE_INFO,
+        IDC_GLOWPASSES_INFO,
+        IDC_GLOWRES_INFO,
+        IDC_GLOWSMOOTH_INFO,
+    };
+
+
+    HWND hTooltip = CreateWindowExW (WS_EX_TOPMOST,
+                                     TOOLTIPS_CLASS,
+                                     nullptr,
+                                     WS_POPUP | TTS_ALWAYSTIP | TTS_NOPREFIX,
+                                     CW_USEDEFAULT, CW_USEDEFAULT,
+                                     CW_USEDEFAULT, CW_USEDEFAULT,
+                                     hDlg, nullptr, nullptr, nullptr);
+
+    if (!hTooltip)
+    {
+        return nullptr;
+    }
+
+    SendMessageW (hTooltip, TTM_SETMAXTIPWIDTH, 0, 300);
+
+
+    for (int infoId : kInfoIds)
+    {
+        HWND hCtrl = GetDlgItem (hDlg, infoId);
+
+        if (!hCtrl)
+        {
+            continue;
+        }
+
+        TOOLINFOW ti = { sizeof (TOOLINFOW) };
+        ti.uFlags    = TTF_IDISHWND | TTF_SUBCLASS;
+        ti.hwnd      = hDlg;
+        ti.uId       = (UINT_PTR) hCtrl;
+        ti.lpszText  = LPSTR_TEXTCALLBACKW;
+
+        SendMessageW (hTooltip, TTM_ADDTOOLW, 0, (LPARAM) &ti);
+    }
+
+    return hTooltip;
+}
+
+
+
+
 static std::wstring FormatPercentLabel (int sliderId, int value)
 {
     // Glow Intensity reads "0% (glow disabled)" at 0 (FR-031).
@@ -659,6 +793,10 @@ static BOOL OnInitDialog (HWND hDlg, LPARAM initParam)
     pContext->m_advancedExpanded    = true;
     pContext->m_advancedBlockHeight = CaptureAdvancedBlockHeight (hDlg);
     ApplyAdvancedGraphicsVisibility (hDlg, pContext, pSettings->m_showAdvancedGraphics);
+
+    // Tooltip surface for the IDC_*_INFO indicators (FR-034/FR-035/FR-036).
+    // The TTN_GETDISPINFO notification is handled in ConfigDialogProc.
+    (void) CreateAndRegisterTooltip (hDlg);
     
     CheckDlgButton (hDlg, IDC_STARTFULLSCREEN_CHECK, pSettings->m_startFullscreen     ? BST_CHECKED : BST_UNCHECKED);
     CheckDlgButton (hDlg, IDC_MULTIMONITOR_CHECK,    pSettings->m_multiMonitorEnabled ? BST_CHECKED : BST_UNCHECKED);
@@ -1382,6 +1520,27 @@ static INT_PTR CALLBACK ConfigDialogProc (HWND   hDlg,
         case WM_COMMAND:
             result = OnCommand (hDlg, wParam);
             break;
+
+        case WM_NOTIFY:
+        {
+            LPNMHDR pnmhdr = reinterpret_cast<LPNMHDR> (lParam);
+
+            if (pnmhdr && (pnmhdr->code == TTN_GETDISPINFOW || pnmhdr->code == TTN_NEEDTEXTW))
+            {
+                // Resolve the tool's hwnd back to an IDC_*_INFO control id
+                // and supply the locked infotip text via LPSTR_TEXTCALLBACK.
+                NMTTDISPINFOW * pdi = reinterpret_cast<NMTTDISPINFOW *> (lParam);
+                HWND            hToolHwnd = reinterpret_cast<HWND> (pdi->hdr.idFrom);
+                int             toolId    = GetDlgCtrlID (hToolHwnd);
+
+                if (IsInfoTipControlId (toolId))
+                {
+                    pdi->lpszText = const_cast<LPWSTR> (GetInfoTipText (toolId));
+                    result        = TRUE;
+                }
+            }
+            break;
+        }
         
         case WM_DESTROY:
             OnDestroy (hDlg);
