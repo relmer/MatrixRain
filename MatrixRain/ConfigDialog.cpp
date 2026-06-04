@@ -312,10 +312,6 @@ static const wchar_t * GetInfoTipText (int infoId)
                    L"use more GPU. Custom lets you tune the individual settings below. "
                    L"Significant GPU performance impact.";
 
-        case IDC_GRAPHICS_ADVANCED_INFO:
-            return L"Reveals individual tuning controls so you can build your own "
-                   L"quality preset. Small GPU performance impact.";
-
         case IDC_GLOWINTENSITY_INFO:
             return L"Brightness of the glow effect around bright characters. Setting "
                    L"this to 0% disables the glow effect entirely. Significant GPU "
@@ -351,7 +347,6 @@ static bool IsInfoTipControlId (int id)
     switch (id)
     {
         case IDC_QUALITY_PRESET_INFO:
-        case IDC_GRAPHICS_ADVANCED_INFO:
         case IDC_GLOWINTENSITY_INFO:
         case IDC_GLOWSIZE_INFO:
         case IDC_GLOWPASSES_INFO:
@@ -387,48 +382,88 @@ static bool IsTrackbarSliderId (UINT_PTR id)
 
 
 
+static int TickFrequencyForSliderId (int id)
+{
+    switch (id)
+    {
+        case IDC_DENSITY_SLIDER:        return 5;
+        case IDC_ANIMSPEED_SLIDER:      return 5;
+        case IDC_GLOWINTENSITY_SLIDER:  return 10;
+        case IDC_GLOWSIZE_SLIDER:       return 5;
+        case IDC_QUALITY_PRESET_SLIDER: return 1;
+        case IDC_GLOWPASSES_SLIDER:     return 1;
+        case IDC_GLOWRES_SLIDER:        return 1;
+        case IDC_GLOWSMOOTH_SLIDER:     return 1;
+        default:                        return 1;
+    }
+}
+
+
+
+
 ////////////////////////////////////////////////////////////////////////////////
 //
 //  DrawTrackbarDarkTicks
 //
 //  NM_CUSTOMDRAW handler for trackbar tick marks.  Visual-styles renders
 //  default ticks very faintly; we replace them with crisp 1-pixel COLOR_
-//  WINDOWTEXT lines so the discrete positions are actually readable.
+//  WINDOWTEXT lines computed from the slider's range + per-id frequency
+//  (TBM_GETTICPOS proved unreliable across visual-styles versions).
 //
 ////////////////////////////////////////////////////////////////////////////////
 
 static void DrawTrackbarDarkTicks (LPNMCUSTOMDRAW pcd, HWND hSlider)
 {
-    RECT channel  = {};
-    int  tickTop  = 0;
-    int  tickBot  = 0;
-    HPEN hPen     = nullptr;
-    HGDIOBJ hOld  = nullptr;
+    RECT     channel  = {};
+    int      tickTop  = 0;
+    int      tickBot  = 0;
+    HPEN     hPen     = nullptr;
+    HGDIOBJ  hOld     = nullptr;
+    int      minVal   = 0;
+    int      maxVal   = 0;
+    int      freq     = 1;
+    int      range    = 0;
+    int      chanLeft = 0;
+    int      chanW    = 0;
+    int      sliderId = GetDlgCtrlID (hSlider);
 
 
     SendMessageW (hSlider, TBM_GETCHANNELRECT, 0, (LPARAM) &channel);
 
-    tickTop = channel.bottom + 2;
-    tickBot = tickTop + 4;
+    minVal   = (int) SendMessageW (hSlider, TBM_GETRANGEMIN, 0, 0);
+    maxVal   = (int) SendMessageW (hSlider, TBM_GETRANGEMAX, 0, 0);
+    freq     = TickFrequencyForSliderId (sliderId);
+    range    = maxVal - minVal;
+    chanLeft = channel.left;
+    chanW    = channel.right - channel.left - 1;
+    tickTop  = channel.bottom + 2;
+    tickBot  = tickTop + 4;
+
+    if (range <= 0 || freq <= 0)
+    {
+        return;
+    }
 
     hPen = CreatePen (PS_SOLID, 1, GetSysColor (COLOR_WINDOWTEXT));
     hOld = SelectObject (pcd->hdc, hPen);
 
-    for (int i = 0;; i++)
+    for (int v = minVal; v <= maxVal; v += freq)
     {
-        LRESULT pos = SendMessageW (hSlider, TBM_GETTICPOS, i, 0);
+        int x = chanLeft + MulDiv (v - minVal, chanW, range);
 
-        if (pos == -1) break;
-
-        MoveToEx (pcd->hdc, (int) pos, tickTop, nullptr);
-        LineTo   (pcd->hdc, (int) pos, tickBot);
+        MoveToEx (pcd->hdc, x, tickTop, nullptr);
+        LineTo   (pcd->hdc, x, tickBot);
     }
 
-    // Edge ticks at min/max (TBM_GETTICPOS skips the range endpoints).
-    MoveToEx (pcd->hdc, channel.left,      tickTop, nullptr);
-    LineTo   (pcd->hdc, channel.left,      tickBot);
-    MoveToEx (pcd->hdc, channel.right - 1, tickTop, nullptr);
-    LineTo   (pcd->hdc, channel.right - 1, tickBot);
+    // Speed (1..100 freq=5) lands the last tick at 96; add an explicit
+    // tick at 100 to match the documented contract.
+    if (sliderId == IDC_ANIMSPEED_SLIDER)
+    {
+        int x = chanLeft + MulDiv (100 - minVal, chanW, range);
+
+        MoveToEx (pcd->hdc, x, tickTop, nullptr);
+        LineTo   (pcd->hdc, x, tickBot);
+    }
 
     SelectObject (pcd->hdc, hOld);
     DeleteObject (hPen);
@@ -452,7 +487,6 @@ static HWND CreateAndRegisterTooltip (HWND hDlg)
     static const int kInfoIds[] =
     {
         IDC_QUALITY_PRESET_INFO,
-        IDC_GRAPHICS_ADVANCED_INFO,
         IDC_GLOWINTENSITY_INFO,
         IDC_GLOWSIZE_INFO,
         IDC_GLOWPASSES_INFO,
@@ -475,6 +509,7 @@ static HWND CreateAndRegisterTooltip (HWND hDlg)
     }
 
     SendMessageW (hTooltip, TTM_SETMAXTIPWIDTH, 0, 300);
+    SendMessageW (hTooltip, TTM_ACTIVATE,       TRUE, 0);
 
 
     for (int infoId : kInfoIds)
@@ -645,28 +680,6 @@ static const wchar_t * FormatQualityPresetLabel (QualityPreset preset)
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-//  Tick-frequency conventions for percentage sliders (research R-011).
-//  Returns the TBM_SETTICFREQ value for the given slider id.
-//
-////////////////////////////////////////////////////////////////////////////////
-
-static int TickFrequencyForSlider (int sliderId)
-{
-    switch (sliderId)
-    {
-        case IDC_DENSITY_SLIDER:        return 5;   // 0..100 -> 21 ticks
-        case IDC_ANIMSPEED_SLIDER:      return 5;   // 1..100 -> 20 ticks + explicit at 100
-        case IDC_GLOWINTENSITY_SLIDER:  return 10;  // 0..200 -> 21 ticks
-        case IDC_GLOWSIZE_SLIDER:       return 5;   // 50..200 -> 31 ticks (midpoint at 125)
-        default:                        return 1;
-    }
-}
-
-
-
-
-////////////////////////////////////////////////////////////////////////////////
-//
 //  InitializeSlider
 //
 ////////////////////////////////////////////////////////////////////////////////
@@ -674,7 +687,7 @@ static int TickFrequencyForSlider (int sliderId)
 static void InitializeSlider (HWND hDlg, int sliderId, int labelId, int minValue, int maxValue, int currentValue)
 {
     SendDlgItemMessageW (hDlg, sliderId, TBM_SETRANGE,    TRUE, MAKELPARAM (minValue, maxValue));
-    SendDlgItemMessageW (hDlg, sliderId, TBM_SETTICFREQ,  TickFrequencyForSlider (sliderId), 0);
+    SendDlgItemMessageW (hDlg, sliderId, TBM_SETTICFREQ,  TickFrequencyForSliderId (sliderId), 0);
 
     // Speed (1..100) at freq=5 lands the last tick at 96; add an explicit
     // tick at 100 for the documented 21-tick total.
@@ -1668,7 +1681,6 @@ static BOOL OnCommand (HWND hDlg, WPARAM wParam)
             break;
 
         case IDC_QUALITY_PRESET_INFO:
-        case IDC_GRAPHICS_ADVANCED_INFO:
         case IDC_GLOWINTENSITY_INFO:
         case IDC_GLOWSIZE_INFO:
         case IDC_GLOWPASSES_INFO:
