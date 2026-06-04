@@ -366,6 +366,77 @@ static bool IsInfoTipControlId (int id)
 
 
 
+static bool IsTrackbarSliderId (UINT_PTR id)
+{
+    switch (id)
+    {
+        case IDC_DENSITY_SLIDER:
+        case IDC_ANIMSPEED_SLIDER:
+        case IDC_GLOWINTENSITY_SLIDER:
+        case IDC_GLOWSIZE_SLIDER:
+        case IDC_QUALITY_PRESET_SLIDER:
+        case IDC_GLOWPASSES_SLIDER:
+        case IDC_GLOWRES_SLIDER:
+        case IDC_GLOWSMOOTH_SLIDER:
+            return true;
+        default:
+            return false;
+    }
+}
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  DrawTrackbarDarkTicks
+//
+//  NM_CUSTOMDRAW handler for trackbar tick marks.  Visual-styles renders
+//  default ticks very faintly; we replace them with crisp 1-pixel COLOR_
+//  WINDOWTEXT lines so the discrete positions are actually readable.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+static void DrawTrackbarDarkTicks (LPNMCUSTOMDRAW pcd, HWND hSlider)
+{
+    RECT channel  = {};
+    int  tickTop  = 0;
+    int  tickBot  = 0;
+    HPEN hPen     = nullptr;
+    HGDIOBJ hOld  = nullptr;
+
+
+    SendMessageW (hSlider, TBM_GETCHANNELRECT, 0, (LPARAM) &channel);
+
+    tickTop = channel.bottom + 2;
+    tickBot = tickTop + 4;
+
+    hPen = CreatePen (PS_SOLID, 1, GetSysColor (COLOR_WINDOWTEXT));
+    hOld = SelectObject (pcd->hdc, hPen);
+
+    for (int i = 0;; i++)
+    {
+        LRESULT pos = SendMessageW (hSlider, TBM_GETTICPOS, i, 0);
+
+        if (pos == -1) break;
+
+        MoveToEx (pcd->hdc, (int) pos, tickTop, nullptr);
+        LineTo   (pcd->hdc, (int) pos, tickBot);
+    }
+
+    // Edge ticks at min/max (TBM_GETTICPOS skips the range endpoints).
+    MoveToEx (pcd->hdc, channel.left,      tickTop, nullptr);
+    LineTo   (pcd->hdc, channel.left,      tickBot);
+    MoveToEx (pcd->hdc, channel.right - 1, tickTop, nullptr);
+    LineTo   (pcd->hdc, channel.right - 1, tickBot);
+
+    SelectObject (pcd->hdc, hOld);
+    DeleteObject (hPen);
+}
+
+
+
+
 ////////////////////////////////////////////////////////////////////////////////
 //
 //  CreateAndRegisterTooltip
@@ -1782,6 +1853,24 @@ static INT_PTR CALLBACK ConfigDialogProc (HWND   hDlg,
         case WM_NOTIFY:
         {
             LPNMHDR pnmhdr = reinterpret_cast<LPNMHDR> (lParam);
+
+            if (pnmhdr && pnmhdr->code == NM_CUSTOMDRAW && IsTrackbarSliderId (pnmhdr->idFrom))
+            {
+                LPNMCUSTOMDRAW pcd = reinterpret_cast<LPNMCUSTOMDRAW> (lParam);
+
+                if (pcd->dwDrawStage == CDDS_PREPAINT)
+                {
+                    SetWindowLongPtrW (hDlg, DWLP_MSGRESULT, CDRF_NOTIFYITEMDRAW);
+                    result = TRUE;
+                }
+                else if (pcd->dwDrawStage == CDDS_ITEMPREPAINT && pcd->dwItemSpec == TBCD_TICS)
+                {
+                    DrawTrackbarDarkTicks (pcd, pcd->hdr.hwndFrom);
+                    SetWindowLongPtrW (hDlg, DWLP_MSGRESULT, CDRF_SKIPDEFAULT);
+                    result = TRUE;
+                }
+                break;
+            }
 
             if (pnmhdr && (pnmhdr->code == TTN_GETDISPINFOW || pnmhdr->code == TTN_NEEDTEXTW))
             {
