@@ -19,7 +19,7 @@ All notable changes to MatrixRain are documented in this file.
 
 ### Known Issues
 
-- Infotip indicators are real focusable BUTTON controls rendering "i" text rather than the spec'd owner-drawn "i-in-a-circle" glyph. The accessibility surface (focus, hover tooltip, keyboard tooltip activation) is complete; only the cosmetic appearance is a follow-up.
+- None known for v1.4 functionality.
 
 ## [1.3.1984] - 2026-06-03
 
