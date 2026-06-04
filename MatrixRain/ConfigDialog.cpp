@@ -1,5 +1,8 @@
 #include "pch.h"
 
+#include <commctrl.h>
+#pragma comment(lib, "comctl32.lib")
+
 #include "ConfigDialog.h"
 #include "..\MatrixRainCore\AdapterSelection.h"
 #include "..\MatrixRainCore\Application.h"
@@ -41,6 +44,55 @@ struct DialogContext
 
 // Sentinel uId for the single TTF_TRACK tool used by keyboard activation.
 static constexpr UINT_PTR kTrackTipUId = 0xC0C00C0Cu;
+
+// Subclass id for the info-button mouse-event relay (TTF_SUBCLASS proved
+// unreliable on BS_OWNERDRAW buttons; we explicitly forward mouse events
+// to the tooltip via TTM_RELAYEVENT instead).
+static constexpr UINT_PTR kInfoButtonSubclassId = 0xC0C00C1Bu;
+
+
+
+
+static LRESULT CALLBACK InfoButtonSubclassProc (HWND     hWnd,
+                                                 UINT     msg,
+                                                 WPARAM   wParam,
+                                                 LPARAM   lParam,
+                                                 UINT_PTR uIdSubclass,
+                                                 DWORD_PTR dwRefData)
+{
+    HWND hTooltip = reinterpret_cast<HWND> (dwRefData);
+
+
+    if (hTooltip)
+    {
+        switch (msg)
+        {
+            case WM_MOUSEMOVE:
+            case WM_LBUTTONDOWN:
+            case WM_LBUTTONUP:
+            case WM_RBUTTONDOWN:
+            case WM_RBUTTONUP:
+            case WM_MBUTTONDOWN:
+            case WM_MBUTTONUP:
+            {
+                MSG ttMsg = {};
+                ttMsg.hwnd    = hWnd;
+                ttMsg.message = msg;
+                ttMsg.wParam  = wParam;
+                ttMsg.lParam  = lParam;
+                SendMessageW (hTooltip, TTM_RELAYEVENT, 0, reinterpret_cast<LPARAM> (&ttMsg));
+                break;
+            }
+        }
+    }
+
+    if (msg == WM_NCDESTROY)
+    {
+        RemoveWindowSubclass (hWnd, InfoButtonSubclassProc, uIdSubclass);
+    }
+
+    return DefSubclassProc (hWnd, msg, wParam, lParam);
+}
 
 
 
@@ -124,7 +176,7 @@ static const wchar_t * GetInfoTipText (int infoId)
 
         case IDC_GLOWRES_INFO:
             return L"Resolution the glow is computed at. Lower is much cheaper and only "
-                   L"slightly softer; Eighth is about 16x cheaper than Full. Significant "
+                   L"slightly softer; Quarter is about 4x cheaper than Full. Significant "
                    L"GPU performance impact.";
 
         case IDC_GLOWSMOOTH_INFO:
@@ -319,12 +371,19 @@ static HWND CreateAndRegisterTooltip (HWND hDlg)
         }
 
         TOOLINFOW ti = { sizeof (TOOLINFOW) };
-        ti.uFlags    = TTF_IDISHWND | TTF_SUBCLASS;
+        ti.uFlags    = TTF_IDISHWND;
         ti.hwnd      = hDlg;
         ti.uId       = (UINT_PTR) hCtrl;
         ti.lpszText  = LPSTR_TEXTCALLBACKW;
 
         SendMessageW (hTooltip, TTM_ADDTOOLW, 0, (LPARAM) &ti);
+
+        // Manually subclass the button to forward mouse events to the
+        // tooltip — TTF_SUBCLASS proved unreliable on BS_OWNERDRAW buttons.
+        SetWindowSubclass (hCtrl,
+                           InfoButtonSubclassProc,
+                           kInfoButtonSubclassId,
+                           reinterpret_cast<DWORD_PTR> (hTooltip));
     }
 
 
@@ -519,18 +578,20 @@ static void InitializePassesSlider (HWND hDlg, int currentPasses)
 
 static void InitializeResolutionSlider (HWND hDlg, int currentDivisor)
 {
-    // Slider position 0..3 maps to divisor 8/4/2/1 (Eighth/Quarter/Half/Full)
-    int pos = 2;  // default Half
+    // Slider position 0..2 maps to divisor 4/2/1 (Quarter/Half/Full).
+    // Eighth (divisor 8) is no longer offered through the UI; if a saved
+    // configuration still has it, fall back to Quarter on display.
+    int pos = 1;  // default Half
 
     switch (currentDivisor)
     {
-        case 8: pos = 0; break;
-        case 4: pos = 1; break;
-        case 2: pos = 2; break;
-        case 1: pos = 3; break;
+        case 8: pos = 0; break;   // Eighth folds onto Quarter for display
+        case 4: pos = 0; break;
+        case 2: pos = 1; break;
+        case 1: pos = 2; break;
     }
 
-    SendDlgItemMessageW (hDlg, IDC_GLOWRES_SLIDER, TBM_SETRANGE, TRUE, MAKELPARAM (0, 3));
+    SendDlgItemMessageW (hDlg, IDC_GLOWRES_SLIDER, TBM_SETRANGE, TRUE, MAKELPARAM (0, 2));
     SendDlgItemMessageW (hDlg, IDC_GLOWRES_SLIDER, TBM_SETTICFREQ, 1, 0);
     SendDlgItemMessageW (hDlg, IDC_GLOWRES_SLIDER, TBM_SETPOS,   TRUE, pos);
     SetDlgItemTextW     (hDlg, IDC_GLOWRES_LABEL, FormatResolutionLabel (currentDivisor));
@@ -559,10 +620,9 @@ static int ResolutionSliderPosToDivisor (int pos)
 {
     switch (pos)
     {
-        case 0: return 8;
-        case 1: return 4;
-        case 2: return 2;
-        case 3: return 1;
+        case 0: return 4;
+        case 1: return 2;
+        case 2: return 1;
         default: return 2;
     }
 }
@@ -1617,6 +1677,11 @@ static INT_PTR CALLBACK ConfigDialogProc (HWND   hDlg,
                 int             oldBkMode;
                 COLORREF        oldTextColor;
                 wchar_t         glyph[]  = L"\u24D8";
+
+                // Erase the entire rect with the dialog's face color so any
+                // previous focus rect (XOR-drawn by the system) is cleared
+                // before we redraw the glyph + optional new focus rect.
+                FillRect (pdis->hDC, &pdis->rcItem, GetSysColorBrush (COLOR_3DFACE));
 
                 if (pContext && pContext->m_hInfoTipFont)
                 {

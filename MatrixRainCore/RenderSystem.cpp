@@ -255,6 +255,21 @@ HRESULT RenderSystem::CreateSwapChain (HWND hwnd, UINT width, UINT height)
     hr = dxgiFactory->MakeWindowAssociation (hwnd, DXGI_MWA_NO_ALT_ENTER);
     CHRA (hr);
 
+    // Create GPU timing queries (TIMESTAMP_DISJOINT + 2 TIMESTAMP per frame
+    // slot) used to populate the "GPU N%" stats line.  Failures are not fatal
+    // — the stats just render "GPU --%" if queries don't initialize.
+    {
+        D3D11_QUERY_DESC disjointDesc  = { D3D11_QUERY_TIMESTAMP_DISJOINT, 0 };
+        D3D11_QUERY_DESC timestampDesc = { D3D11_QUERY_TIMESTAMP,          0 };
+
+        for (UINT i = 0; i < GPU_QUERY_FRAMES; i++)
+        {
+            m_device->CreateQuery (&disjointDesc,  &m_gpuDisjointQuery[i]);
+            m_device->CreateQuery (&timestampDesc, &m_gpuTimestampBeginQuery[i]);
+            m_device->CreateQuery (&timestampDesc, &m_gpuTimestampEndQuery[i]);
+        }
+    }
+
 Error:
     return hr;
 }
@@ -1818,6 +1833,53 @@ void RenderSystem::Render (const AnimationSystem & animationSystem, const Viewpo
         return;
     }
 
+    // GPU timing — retrieve frame N-2 results (if available) and update the
+    // smoothed load percentage we display in the stats overlay.
+    if (m_gpuQueryFrameIndex >= GPU_QUERY_FRAMES)
+    {
+        UINT                                prevSlot      = (m_gpuQueryFrameIndex - (GPU_QUERY_FRAMES - 1)) % GPU_QUERY_FRAMES;
+        D3D11_QUERY_DATA_TIMESTAMP_DISJOINT disjointData  = {};
+        UINT64                              tsBegin       = 0;
+        UINT64                              tsEnd         = 0;
+        HRESULT                             hrD           = E_FAIL;
+        HRESULT                             hrB           = E_FAIL;
+        HRESULT                             hrE           = E_FAIL;
+
+        if (m_gpuDisjointQuery[prevSlot] && m_gpuTimestampBeginQuery[prevSlot] && m_gpuTimestampEndQuery[prevSlot])
+        {
+            hrD = m_context->GetData (m_gpuDisjointQuery[prevSlot].Get(),       &disjointData, sizeof (disjointData), 0);
+            hrB = m_context->GetData (m_gpuTimestampBeginQuery[prevSlot].Get(), &tsBegin,      sizeof (tsBegin),      0);
+            hrE = m_context->GetData (m_gpuTimestampEndQuery[prevSlot].Get(),   &tsEnd,        sizeof (tsEnd),        0);
+        }
+
+        if (hrD == S_OK && hrB == S_OK && hrE == S_OK && !disjointData.Disjoint && disjointData.Frequency > 0)
+        {
+            UINT64 ticks = (tsEnd > tsBegin) ? (tsEnd - tsBegin) : 0;
+            m_gpuLastTimeMs = static_cast<double> (ticks) * 1000.0 / static_cast<double> (disjointData.Frequency);
+
+            if (params.fps > 0.0f)
+            {
+                double frameTimeMs = 1000.0 / static_cast<double> (params.fps);
+                double load        = (frameTimeMs > 0.0) ? (m_gpuLastTimeMs / frameTimeMs * 100.0) : 0.0;
+
+                // Exponential moving average for stable display.
+                m_gpuSmoothedLoadPercent = m_gpuSmoothedLoadPercent * 0.9 + load * 0.1;
+            }
+        }
+    }
+
+    // Bracket this frame's GPU work with TIMESTAMP queries.
+    UINT thisSlot = m_gpuQueryFrameIndex % GPU_QUERY_FRAMES;
+
+    if (m_gpuDisjointQuery[thisSlot])
+    {
+        m_context->Begin (m_gpuDisjointQuery[thisSlot].Get());
+    }
+    if (m_gpuTimestampBeginQuery[thisSlot])
+    {
+        m_context->End (m_gpuTimestampBeginQuery[thisSlot].Get());
+    }
+
     // Clear render target
     ClearRenderTarget();
 
@@ -1986,7 +2048,7 @@ void RenderSystem::Render (const AnimationSystem & animationSystem, const Viewpo
     // Render FPS counter overlay if fps > 0
     if (params.fps > 0.0f)
     {
-        RenderFPSCounter (params.fps, params.rainPercentage, params.streakCount, params.activeHeadCount);
+        RenderFPSCounter (params.fps, params.rainPercentage, params.streakCount, params.activeHeadCount, m_gpuSmoothedLoadPercent);
     }
 
     // Debug: Render fade times when enabled and only one streak is visible
@@ -1994,6 +2056,18 @@ void RenderSystem::Render (const AnimationSystem & animationSystem, const Viewpo
     {
         RenderDebugFadeTimes (animationSystem);
     }
+
+    // Close this frame's GPU timing bracket and advance the query slot.
+    if (m_gpuTimestampEndQuery[thisSlot])
+    {
+        m_context->End (m_gpuTimestampEndQuery[thisSlot].Get());
+    }
+    if (m_gpuDisjointQuery[thisSlot])
+    {
+        m_context->End (m_gpuDisjointQuery[thisSlot].Get());
+    }
+
+    m_gpuQueryFrameIndex++;
 }
 
 
@@ -2014,7 +2088,7 @@ HRESULT RenderSystem::Present()
 
 
 
-void RenderSystem::RenderFPSCounter (float fps, int rainPercentage, int streakCount, int activeHeadCount)
+void RenderSystem::RenderFPSCounter (float fps, int rainPercentage, int streakCount, int activeHeadCount, double gpuLoadPercent)
 {
     HRESULT                   hr           = S_OK;
     bool                      drawing      = false;
@@ -2033,8 +2107,10 @@ void RenderSystem::RenderFPSCounter (float fps, int rainPercentage, int streakCo
     m_d2dContext->BeginDraw();
     drawing = true;
 
-    // Format FPS text with rain density info: "Rain xxx% (yyy heads / zzz total), ww FPS"
-    swprintf_s (fpsText, L"Rain %d%% (%d heads / %d total), %.0f FPS", rainPercentage, activeHeadCount, streakCount, fps);
+    // Format FPS text with rain density info and GPU load:
+    //   "Rain xxx% (yyy heads / zzz total), ww FPS, GPU vv%"
+    swprintf_s (fpsText, L"Rain %d%% (%d heads / %d total), %.0f FPS, GPU %.0f%%",
+                rainPercentage, activeHeadCount, streakCount, fps, gpuLoadPercent);
 
     // Get render target size for positioning
     size = m_d2dContext->GetSize();
