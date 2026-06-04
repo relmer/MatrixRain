@@ -215,7 +215,7 @@ description: "Task list for feature implementation"
 
 ## Phase 8: Polish & Cross-Cutting Concerns
 
-- [X] T060 [P] Run end-to-end quickstart validation (build → test → manual QA per `specs\006-multimon-gpu-efficiency\quickstart.md` Section 4 for all 5 user stories on a single development workstation).
+- [ ] T060 [P] Run end-to-end quickstart validation (build → test → manual QA per `specs\006-multimon-gpu-efficiency\quickstart.md` Section 4 for all 5 user stories on a single development workstation).
 - [ ] T061 Manual QA on a real hybrid laptop (Surface Book 3 / Surface Laptop Studio 2 / Optimus laptop) covering: undock/redock GPU%, GPU dropdown switch + Task Manager verification, multimon-off GPU%, high-refresh display 60 FPS confirmation, pre/post v1.3-baseline GPU% comparison per SC-001/SC-003/SC-004/SC-005, AND a suspend/resume cycle (close lid or `Start → Sleep`, wait ≥10s, resume) verifying MatrixRain continues running and that the device-loss recovery path tolerates the resulting `DXGI_ERROR_DEVICE_REMOVED`. Capture before/after GPU% screenshots and append to `specs\006-multimon-gpu-efficiency\quickstart.md` or a sibling QA notes file.
 - [X] T062 [P] Update `CHANGELOG.md` with the v1.4 release section summarizing the five user-visible improvements and citing this feature spec.
 - [X] T063 Update `specs\006-multimon-gpu-efficiency\spec.md` "Status" field from `Draft` to `Implemented`; mark the requirements checklist as fully complete.
