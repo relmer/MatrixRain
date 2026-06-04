@@ -317,3 +317,4 @@ Merge conflicts will be concentrated on `RenderSystem.{h,cpp}` (US3 + US5), `Mon
 - `MSBuild` invocation MUST NOT use `/m` (transient PCH `C3859`/`C1076` failures).
 - Each "Checkpoint" line ends a deployable increment.
 
+
