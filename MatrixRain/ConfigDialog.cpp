@@ -27,6 +27,11 @@ struct DialogContext
     // Index 0 is the synthetic "<system default>" sentinel and corresponds
     // to an empty m_gpuAdapter setting.
     std::vector<std::wstring>                 m_gpuAdapterDescriptions;
+
+    // T055 - dynamic dialog resize on advanced toggle.  Captured once in
+    // OnInitDialog, used by OnGraphicsAdvancedCheck to grow/shrink.
+    int                                       m_advancedBlockHeight = 0;
+    bool                                      m_advancedExpanded    = true;
 };
 
 
@@ -82,9 +87,169 @@ static Application * GetApplicationFromDialog (HWND hDlg)
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-//  Slider value-label helpers
+//  Advanced graphics control ids — kept in one list so the disclosure
+//  show/hide and the height-delta computation stay in sync.
 //
 ////////////////////////////////////////////////////////////////////////////////
+
+static const int kAdvancedGraphicsControlIds[] =
+{
+    IDC_GLOWPASSES_SLIDER,
+    IDC_GLOWPASSES_LABEL,
+    IDC_GLOWRES_SLIDER,
+    IDC_GLOWRES_LABEL,
+    IDC_GLOWSMOOTH_SLIDER,
+    IDC_GLOWSMOOTH_LABEL,
+};
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  ApplyAdvancedGraphicsVisibility
+//
+//  Show/hide the advanced graphics controls and grow/shrink the dialog by
+//  the captured advanced-block height.  Also moves every control whose top
+//  is below the advanced block up or down by the delta.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+static void ApplyAdvancedGraphicsVisibility (HWND hDlg, DialogContext * pContext, bool show)
+{
+    RECT dlgRect;
+    int  delta;
+    HWND hPassesSlider;
+    RECT passesRect;
+    int  advancedTopClient;
+
+
+    if (pContext->m_advancedExpanded == show)
+    {
+        return;
+    }
+
+    hPassesSlider = GetDlgItem (hDlg, IDC_GLOWPASSES_SLIDER);
+
+    if (!hPassesSlider || pContext->m_advancedBlockHeight <= 0)
+    {
+        pContext->m_advancedExpanded = show;
+        return;
+    }
+
+    GetWindowRect (hPassesSlider, &passesRect);
+
+    {
+        POINT pt = { passesRect.left, passesRect.top };
+        ScreenToClient (hDlg, &pt);
+        advancedTopClient = pt.y;
+    }
+
+
+    delta = show ? pContext->m_advancedBlockHeight : -pContext->m_advancedBlockHeight;
+
+    // Move every child control whose top is at or below the advanced block.
+    // Skip the advanced controls themselves (they are show/hidden in place).
+    HWND hChild = GetWindow (hDlg, GW_CHILD);
+
+    while (hChild)
+    {
+        int  childId  = GetDlgCtrlID (hChild);
+        bool isAdvanced = false;
+
+        for (int advancedId : kAdvancedGraphicsControlIds)
+        {
+            if (childId == advancedId)
+            {
+                isAdvanced = true;
+                break;
+            }
+        }
+
+        if (!isAdvanced)
+        {
+            RECT  cr;
+            POINT topLeft;
+
+            GetWindowRect (hChild, &cr);
+            topLeft = { cr.left, cr.top };
+            ScreenToClient (hDlg, &topLeft);
+
+            if (topLeft.y > advancedTopClient)
+            {
+                SetWindowPos (hChild, nullptr,
+                              topLeft.x, topLeft.y + delta,
+                              0, 0,
+                              SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+            }
+        }
+
+        hChild = GetWindow (hChild, GW_HWNDNEXT);
+    }
+
+    // Resize the dialog itself.
+    GetWindowRect (hDlg, &dlgRect);
+    SetWindowPos (hDlg, nullptr,
+                  0, 0,
+                  dlgRect.right - dlgRect.left,
+                  (dlgRect.bottom - dlgRect.top) + delta,
+                  SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
+
+    // Show/hide the advanced controls.
+    for (int advancedId : kAdvancedGraphicsControlIds)
+    {
+        ShowWindow (GetDlgItem (hDlg, advancedId), show ? SW_SHOW : SW_HIDE);
+    }
+
+    pContext->m_advancedExpanded = show;
+}
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  CaptureAdvancedBlockHeight — call once in OnInitDialog while the dialog
+//  is laid out at the expanded size.  The block height is the bottom of the
+//  lowest advanced control minus the top of the highest advanced control,
+//  plus one row of spacing to give the layout a bit of breathing room.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+static int CaptureAdvancedBlockHeight (HWND hDlg)
+{
+    int   highestTop    = INT_MAX;
+    int   lowestBottom  = INT_MIN;
+
+
+    for (int advancedId : kAdvancedGraphicsControlIds)
+    {
+        HWND hCtrl = GetDlgItem (hDlg, advancedId);
+        RECT cr;
+
+        if (hCtrl && GetWindowRect (hCtrl, &cr))
+        {
+            POINT topLeft     = { cr.left, cr.top };
+            POINT bottomRight = { cr.right, cr.bottom };
+
+            ScreenToClient (hDlg, &topLeft);
+            ScreenToClient (hDlg, &bottomRight);
+
+            if (topLeft.y     < highestTop)   highestTop   = topLeft.y;
+            if (bottomRight.y > lowestBottom) lowestBottom = bottomRight.y;
+        }
+    }
+
+    if (highestTop == INT_MAX || lowestBottom == INT_MIN)
+    {
+        return 0;
+    }
+
+    return (lowestBottom - highestTop) + 8;  // +8 for one row of spacing
+}
+
+
+
 
 static std::wstring FormatPercentLabel (int sliderId, int value)
 {
@@ -488,6 +653,12 @@ static BOOL OnInitDialog (HWND hDlg, LPARAM initParam)
     InitializeSmoothnessSlider  (hDlg, static_cast<int> (pSettings->m_advancedValues.m_blurTaps));
 
     CheckDlgButton (hDlg, IDC_GRAPHICS_ADVANCED_CHECK, pSettings->m_showAdvancedGraphics ? BST_CHECKED : BST_UNCHECKED);
+
+    // Capture the advanced block height while the dialog is laid out at its
+    // expanded size, then collapse to the user's saved disclosure state.
+    pContext->m_advancedExpanded    = true;
+    pContext->m_advancedBlockHeight = CaptureAdvancedBlockHeight (hDlg);
+    ApplyAdvancedGraphicsVisibility (hDlg, pContext, pSettings->m_showAdvancedGraphics);
     
     CheckDlgButton (hDlg, IDC_STARTFULLSCREEN_CHECK, pSettings->m_startFullscreen     ? BST_CHECKED : BST_UNCHECKED);
     CheckDlgButton (hDlg, IDC_MULTIMONITOR_CHECK,    pSettings->m_multiMonitorEnabled ? BST_CHECKED : BST_UNCHECKED);
@@ -738,14 +909,18 @@ Error:
 static void OnGraphicsAdvancedCheck (HWND hDlg)
 {
     HRESULT                  hr          = S_OK;
-    ConfigDialogController * pController = GetControllerFromDialog (hDlg);
+    DialogContext          * pContext    = GetDialogContext (hDlg);
+    ConfigDialogController * pController = nullptr;
     bool                     checked     = IsDlgButtonChecked (hDlg, IDC_GRAPHICS_ADVANCED_CHECK) == BST_CHECKED;
 
 
 
-    CBRAEx (pController != nullptr, E_UNEXPECTED);
+    CBRAEx (pContext != nullptr && pContext->m_controller != nullptr, E_UNEXPECTED);
 
+    pController = pContext->m_controller.get();
     pController->UpdateShowAdvancedGraphics (checked);
+
+    ApplyAdvancedGraphicsVisibility (hDlg, pContext, checked);
 
 Error:
     return;
