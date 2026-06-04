@@ -329,6 +329,78 @@ namespace MatrixRainTests
 
 
 
+        // T044 - new US5 controller methods
+
+        TEST_METHOD (TestUpdateQualityPreset_SnapsAdvancedValues)
+        {
+            ConfigDialogController controller (m_settingsProvider);
+            controller.Initialize();
+
+            controller.UpdateQualityPreset (QualityPreset::Low);
+
+            Assert::IsTrue (controller.GetSettings().m_qualityPreset == QualityPreset::Low);
+            Assert::IsTrue (controller.GetSettings().m_advancedValues == LookupPresetValues (QualityPreset::Low));
+        }
+
+
+
+
+        TEST_METHOD (TestUpdateAdvancedGraphicsValues_DriftsToCustom)
+        {
+            ConfigDialogController controller (m_settingsProvider);
+            controller.Initialize();
+
+            // Pick values that don't match any named preset.
+            AdvancedGraphicsValues custom { 137, 4, ResolutionDivisor::Eighth, BlurTaps::Low };
+            controller.UpdateAdvancedGraphicsValues (custom);
+
+            Assert::IsTrue (controller.GetSettings().m_qualityPreset == QualityPreset::Custom,
+                            L"Off-table values should auto-flip preset to Custom");
+            Assert::IsTrue (controller.GetSettings().m_advancedValues == custom);
+            Assert::IsTrue (controller.GetSettings().m_lastCustom.has_value());
+            Assert::IsTrue (*controller.GetSettings().m_lastCustom == custom,
+                            L"LastCustom should always capture the latest advanced edit");
+        }
+
+
+
+
+        TEST_METHOD (TestUpdateQualityPreset_Custom_WithSavedLastCustom_RestoresIt)
+        {
+            ConfigDialogController controller (m_settingsProvider);
+            controller.Initialize();
+
+            // Save a custom set by editing first.
+            AdvancedGraphicsValues custom { 50, 2, ResolutionDivisor::Quarter, BlurTaps::Medium };
+            controller.UpdateAdvancedGraphicsValues (custom);
+
+            // Navigate to a named preset (snaps advanced away from custom).
+            controller.UpdateQualityPreset (QualityPreset::High);
+            Assert::IsTrue (controller.GetSettings().m_advancedValues == LookupPresetValues (QualityPreset::High));
+
+            // Switch back to Custom -> should restore the saved set.
+            controller.UpdateQualityPreset (QualityPreset::Custom);
+            Assert::IsTrue (controller.GetSettings().m_advancedValues == custom);
+        }
+
+
+
+
+        TEST_METHOD (TestUpdateShowAdvancedGraphics_PersistsInMemory)
+        {
+            ConfigDialogController controller (m_settingsProvider);
+            controller.Initialize();
+
+            controller.UpdateShowAdvancedGraphics (true);
+            Assert::IsTrue (controller.GetSettings().m_showAdvancedGraphics);
+
+            controller.UpdateShowAdvancedGraphics (false);
+            Assert::IsFalse (controller.GetSettings().m_showAdvancedGraphics);
+        }
+
+
+
+
 
         // T019.10: Test ConfigDialogController saves settings on ApplyChanges
         TEST_METHOD (TestConfigDialogControllerSavesOnApply)
