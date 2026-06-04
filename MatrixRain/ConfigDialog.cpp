@@ -22,10 +22,10 @@ struct DialogContext
     bool                                      m_isScreenSaverCPL  = false;
 
     // Parallel to IDC_GPU_COMBO entries: each index holds the underlying
-    // DXGI adapter description (NOT the "(default)"-suffixed display label)
-    // so OnGpuChange can map a selection back to the persistence string.
-    // Index 0 is the synthetic "<system default>" sentinel and corresponds
-    // to an empty m_gpuAdapter setting.
+    // DXGI adapter description so OnGpuChange can map a selection back to
+    // the persistence string.  The OS default adapter is annotated with
+    // " (default)" in its display label; no synthetic <system default>
+    // entry is added (the user picks the default adapter by name directly).
     std::vector<std::wstring>                 m_gpuAdapterDescriptions;
 
     // T055 - dynamic dialog resize on advanced toggle.  Captured once in
@@ -36,6 +36,11 @@ struct DialogContext
     // T058/T059 - shared tooltip control + the keyboard-activation TTF_TRACK
     // tool whose text we update on each info-button BN_CLICKED.
     HWND                                      m_hTooltip            = nullptr;
+
+    // Larger font used to render the info-tip ⓘ glyph at 1.5x the dialog's
+    // default font size in the BS_OWNERDRAW button paint path.  Created in
+    // OnInitDialog from the dialog's WM_GETFONT; destroyed in OnDestroy.
+    HFONT                                     m_hInfoTipFont        = nullptr;
 };
 
 
@@ -750,25 +755,27 @@ static void InitializeColorSchemeCombo (HWND hDlg, const std::wstring & currentS
 //
 //  InitializeGpuCombo
 //
-//  Enumerate the system's rendering adapters via WindowsAdapterProvider,
-//  prefix a synthetic "<system default>" entry so the user can revert to
-//  the OS-chosen GPU at any time, and select whichever entry corresponds to
-//  the persisted m_gpuAdapter description.
+//  Enumerate the system's rendering adapters via WindowsAdapterProvider and
+//  populate IDC_GPU_COMBO with their real names; the OS default adapter is
+//  annotated with " (default)" via FormatAdapterLabel.  The user picks the
+//  default adapter by name directly (no synthetic <system default> entry).
+//
+//  Selection logic:
+//   - currentDescription matches an enumerated adapter -> select that entry.
+//   - currentDescription is empty or doesn't match -> select the (default)
+//     adapter so the UI still highlights what is actually running.
 //
 ////////////////////////////////////////////////////////////////////////////////
 
 static void InitializeGpuCombo (HWND hDlg, DialogContext * pContext, const std::wstring & currentDescription)
 {
     WindowsAdapterProvider   provider;
-    std::vector<AdapterInfo> adapters = provider.EnumerateAdapters();
-    int                      selected = 0;
+    std::vector<AdapterInfo> adapters       = provider.EnumerateAdapters();
+    int                      selected       = -1;
+    int                      defaultIndex   = -1;
 
 
-    // Synthetic first entry: "<system default>" maps to an empty
-    // persisted description (= use whatever the OS picks).
     pContext->m_gpuAdapterDescriptions.clear();
-    pContext->m_gpuAdapterDescriptions.push_back (L"");
-    SendDlgItemMessageW (hDlg, IDC_GPU_COMBO, CB_ADDSTRING, 0, (LPARAM) L"<system default>");
 
     for (const AdapterInfo & adapter : adapters)
     {
@@ -778,14 +785,28 @@ static void InitializeGpuCombo (HWND hDlg, DialogContext * pContext, const std::
 
         pContext->m_gpuAdapterDescriptions.push_back (adapter.m_description);
 
+        int idx = static_cast<int> (pContext->m_gpuAdapterDescriptions.size()) - 1;
+
+        if (adapter.m_isDefault)
+        {
+            defaultIndex = idx;
+        }
+
         if (!currentDescription.empty() && adapter.m_description == currentDescription)
         {
-            selected = static_cast<int> (pContext->m_gpuAdapterDescriptions.size()) - 1;
+            selected = idx;
         }
     }
 
+    if (selected < 0)
+    {
+        selected = defaultIndex;
+    }
 
-    SendDlgItemMessageW (hDlg, IDC_GPU_COMBO, CB_SETCURSEL, selected, 0);
+    if (selected >= 0)
+    {
+        SendDlgItemMessageW (hDlg, IDC_GPU_COMBO, CB_SETCURSEL, selected, 0);
+    }
 }
 
 
@@ -921,6 +942,24 @@ static BOOL OnInitDialog (HWND hDlg, LPARAM initParam)
     // Tooltip surface for the IDC_*_INFO indicators (FR-034/FR-035/FR-036).
     // The TTN_GETDISPINFO notification is handled in ConfigDialogProc.
     pContext->m_hTooltip = CreateAndRegisterTooltip (hDlg);
+
+    // Create the 1.5x-size font used by the owner-drawn ⓘ glyphs.  The
+    // base font comes from the dialog itself (WM_GETFONT).
+    {
+        HFONT hDialogFont = reinterpret_cast<HFONT> (SendMessageW (hDlg, WM_GETFONT, 0, 0));
+        LOGFONTW lf       = {};
+
+        if (hDialogFont && GetObjectW (hDialogFont, sizeof (lf), &lf))
+        {
+            // lfHeight is negative for character-cell heights; multiply
+            // absolute value by 1.5 and preserve sign.
+            lf.lfHeight = (lf.lfHeight < 0)
+                            ? -static_cast<LONG> ((-lf.lfHeight) * 3 / 2)
+                            :  static_cast<LONG> ( lf.lfHeight * 3 / 2);
+
+            pContext->m_hInfoTipFont = CreateFontIndirectW (&lf);
+        }
+    }
     
     CheckDlgButton (hDlg, IDC_STARTFULLSCREEN_CHECK, pSettings->m_startFullscreen     ? BST_CHECKED : BST_UNCHECKED);
     CheckDlgButton (hDlg, IDC_MULTIMONITOR_CHECK,    pSettings->m_multiMonitorEnabled ? BST_CHECKED : BST_UNCHECKED);
@@ -1615,6 +1654,12 @@ static void OnDestroy (HWND hDlg)
     if (pContext)
     {
         SetWindowLongPtr (hDlg, DWLP_USER, 0);
+
+        if (pContext->m_hInfoTipFont)
+        {
+            DeleteObject (pContext->m_hInfoTipFont);
+            pContext->m_hInfoTipFont = nullptr;
+        }
         
         if (pContext->m_ownsContextMemory)
         {
@@ -1657,6 +1702,52 @@ static INT_PTR CALLBACK ConfigDialogProc (HWND   hDlg,
         case WM_COMMAND:
             result = OnCommand (hDlg, wParam);
             break;
+
+        case WM_DRAWITEM:
+        {
+            // Owner-draw paint for the ⓘ info indicators.  No button frame:
+            // we draw only the glyph (transparent background, 1.5x font).
+            LPDRAWITEMSTRUCT pdis = reinterpret_cast<LPDRAWITEMSTRUCT> (lParam);
+
+            if (pdis && pdis->CtlType == ODT_BUTTON && IsInfoTipControlId (pdis->CtlID))
+            {
+                DialogContext * pContext = GetDialogContext (hDlg);
+                HFONT           hOldFont = nullptr;
+                int             oldBkMode;
+                COLORREF        oldTextColor;
+                wchar_t         glyph[]  = L"\u24D8";
+
+                if (pContext && pContext->m_hInfoTipFont)
+                {
+                    hOldFont = static_cast<HFONT> (SelectObject (pdis->hDC, pContext->m_hInfoTipFont));
+                }
+
+                oldBkMode    = SetBkMode    (pdis->hDC, TRANSPARENT);
+                oldTextColor = SetTextColor (pdis->hDC, GetSysColor (COLOR_WINDOWTEXT));
+
+                DrawTextW (pdis->hDC,
+                           glyph,
+                           1,
+                           &pdis->rcItem,
+                           DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOCLIP);
+
+                SetTextColor (pdis->hDC, oldTextColor);
+                SetBkMode    (pdis->hDC, oldBkMode);
+
+                if (hOldFont)
+                {
+                    SelectObject (pdis->hDC, hOldFont);
+                }
+
+                if (pdis->itemState & ODS_FOCUS)
+                {
+                    DrawFocusRect (pdis->hDC, &pdis->rcItem);
+                }
+
+                result = TRUE;
+            }
+            break;
+        }
 
         case WM_NOTIFY:
         {
