@@ -96,18 +96,27 @@ static Application * GetApplicationFromDialog (HWND hDlg)
 ////////////////////////////////////////////////////////////////////////////////
 //
 //  Advanced graphics control ids — kept in one list so the disclosure
-//  show/hide and the height-delta computation stay in sync.
+//  show/hide and the height-delta computation stay in sync.  Includes
+//  the prompt LTEXTs, the sliders, the value LTEXTs, AND the infotip
+//  buttons; missing any of these leaves orphan controls visible when
+//  the disclosure is collapsed.
 //
 ////////////////////////////////////////////////////////////////////////////////
 
 static const int kAdvancedGraphicsControlIds[] =
 {
+    IDC_GLOWPASSES_PROMPT,
     IDC_GLOWPASSES_SLIDER,
     IDC_GLOWPASSES_LABEL,
+    IDC_GLOWPASSES_INFO,
+    IDC_GLOWRES_PROMPT,
     IDC_GLOWRES_SLIDER,
     IDC_GLOWRES_LABEL,
+    IDC_GLOWRES_INFO,
+    IDC_GLOWSMOOTH_PROMPT,
     IDC_GLOWSMOOTH_SLIDER,
     IDC_GLOWSMOOTH_LABEL,
+    IDC_GLOWSMOOTH_INFO,
 };
 
 
@@ -202,6 +211,29 @@ static void ApplyAdvancedGraphicsVisibility (HWND hDlg, DialogContext * pContext
                   dlgRect.right - dlgRect.left,
                   (dlgRect.bottom - dlgRect.top) + delta,
                   SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
+
+    // Shrink/grow the "Graphics quality" groupbox so its bottom border
+    // tracks the visible content instead of enclosing empty space when
+    // the advanced controls are hidden.
+    {
+        HWND hGroupBox = GetDlgItem (hDlg, IDC_QUALITY_GROUPBOX);
+
+        if (hGroupBox)
+        {
+            RECT  gr;
+            POINT gpos;
+
+            GetWindowRect (hGroupBox, &gr);
+            gpos = { gr.left, gr.top };
+            ScreenToClient (hDlg, &gpos);
+
+            SetWindowPos (hGroupBox, nullptr,
+                          gpos.x, gpos.y,
+                          gr.right - gr.left,
+                          (gr.bottom - gr.top) + delta,
+                          SWP_NOZORDER | SWP_NOACTIVATE);
+        }
+    }
 
     // Show/hide the advanced controls.
     for (int advancedId : kAdvancedGraphicsControlIds)
