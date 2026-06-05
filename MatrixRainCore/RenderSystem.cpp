@@ -116,13 +116,38 @@ public:
             return m_cachedLoad;
         }
 
-        double maxLoad = 0.0;
+        // Task Manager's per-process "GPU" column computes:
+        //   for each engine type (3D / Compute / Copy / Video* / ...):
+        //     sum utilization across every instance of that engine type
+        //   take MAX across engine types
+        //
+        // Instance names look like
+        //   "pid_NNNN_luid_HEX_HEX_phys_N_eng_N_engtype_3D"
+        // so we extract the substring after "engtype_" as the grouping key.
+        std::map<std::wstring, double> sumPerEngineType;
+
         for (DWORD i = 0; i < itemCount; i++)
         {
-            if (items[i].FmtValue.CStatus == ERROR_SUCCESS)
+            if (items[i].FmtValue.CStatus != ERROR_SUCCESS || !items[i].szName)
             {
-                maxLoad = (std::max) (maxLoad, items[i].FmtValue.doubleValue);
+                continue;
             }
+
+            std::wstring_view name (items[i].szName);
+            constexpr std::wstring_view kEngTypeMarker = L"engtype_";
+            size_t pos = name.find (kEngTypeMarker);
+
+            std::wstring engineType = (pos != std::wstring_view::npos)
+                                        ? std::wstring (name.substr (pos + kEngTypeMarker.size()))
+                                        : std::wstring (L"<unknown>");
+
+            sumPerEngineType[engineType] += items[i].FmtValue.doubleValue;
+        }
+
+        double maxLoad = 0.0;
+        for (const auto & [type, sum] : sumPerEngineType)
+        {
+            maxLoad = (std::max) (maxLoad, sum);
         }
 
         m_cachedLoad = (std::min) (maxLoad, 100.0);
