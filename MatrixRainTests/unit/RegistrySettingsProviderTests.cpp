@@ -484,6 +484,67 @@ namespace MatrixRainTests
             // Assert: Load completes successfully; nothing to read into.
             Assert::AreEqual (S_OK, hr, L"Load should succeed in presence of legacy ShowFadeTimers value");
         }
+
+
+
+
+
+        // T035 (US2, FR-020, FR-038, contracts/registry-schema.md):
+        // GlowEnabled persists as a REG_DWORD, defaults to 1 (ON) when
+        // absent, and round-trips both states accurately.
+        TEST_METHOD (GlowEnabledRoundTrip)
+        {
+            DeleteTestRegistryKey();
+
+            ScreenSaverSettings saveOff;
+            saveOff.m_glowEnabled = false;
+
+
+            HRESULT hr = m_provider.Save (saveOff);
+            Assert::AreEqual (S_OK, hr);
+
+
+            ScreenSaverSettings loadOff;
+            hr = m_provider.Load (loadOff);
+            Assert::AreEqual (S_OK, hr);
+            Assert::IsFalse  (loadOff.m_glowEnabled, L"GlowEnabled=false should round-trip");
+
+
+            ScreenSaverSettings saveOn;
+            saveOn.m_glowEnabled = true;
+
+            hr = m_provider.Save (saveOn);
+            Assert::AreEqual (S_OK, hr);
+
+            ScreenSaverSettings loadOn;
+            hr = m_provider.Load (loadOn);
+            Assert::AreEqual (S_OK, hr);
+            Assert::IsTrue   (loadOn.m_glowEnabled, L"GlowEnabled=true should round-trip");
+        }
+
+
+        TEST_METHOD (MissingGlowEnabledDefaultsToOne)
+        {
+            DeleteTestRegistryKey();
+
+            // Create the key WITHOUT GlowEnabled so the read path falls
+            // through to the in-class default.
+            HKEY    hKey   = nullptr;
+            LSTATUS status = RegCreateKeyExW (HKEY_CURRENT_USER, TEST_REGISTRY_KEY_PATH, 0, nullptr,
+                                              REG_OPTION_NON_VOLATILE, KEY_WRITE, nullptr, &hKey, nullptr);
+            Assert::AreEqual ((LONG)ERROR_SUCCESS, (LONG)status);
+
+            DWORD density = 50;
+            RegSetValueExW (hKey, L"Density", 0, REG_DWORD, (const BYTE *)&density, sizeof (DWORD));
+            RegCloseKey (hKey);
+
+
+            ScreenSaverSettings settings;
+            HRESULT             hr = m_provider.Load (settings);
+
+            Assert::AreEqual (S_OK, hr);
+            Assert::IsTrue   (settings.m_glowEnabled, L"Absent GlowEnabled value should leave default (true) per FR-038");
+        }
     };
 }
 

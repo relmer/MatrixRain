@@ -27,6 +27,12 @@ namespace MatrixRainTests
                 Assert::IsFalse  (settings.m_showDebugStats, L"showDebugStats default");
                 Assert::IsTrue   (settings.m_multiMonitorEnabled, L"multiMonitorEnabled default");
                 Assert::IsFalse  (settings.m_lastSavedTimestamp.has_value(), L"lastSavedTimestamp default");
+
+                // T034 (US2, FR-038, data-model.md §1): the v1.5 Glow Enabled
+                // toggle defaults ON so users who upgrade and never open the
+                // dialog see no visible change (bloom continues at the same
+                // intensity it had pre-upgrade).
+                Assert::IsTrue   (settings.m_glowEnabled, L"glowEnabled default is true");
             }
 
 
