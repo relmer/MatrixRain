@@ -38,6 +38,7 @@ HRESULT RegistrySettingsProvider::Load (ScreenSaverSettings & settings)
     ReadInt    (hKey, VALUE_ANIMATION_SPEED,  settings.m_animationSpeedPercent);
     ReadInt    (hKey, VALUE_GLOW_INTENSITY,   settings.m_glowIntensityPercent);
     ReadInt    (hKey, VALUE_GLOW_SIZE,        settings.m_glowSizePercent);
+    ReadBool   (hKey, VALUE_GLOW_ENABLED,     settings.m_glowEnabled);                // v1.5 T038 (FR-020, FR-038)
     ReadBool   (hKey, VALUE_START_FULLSCREEN, settings.m_startFullscreen);
     ReadBool   (hKey, VALUE_SHOW_DEBUG_STATS, settings.m_showDebugStats);
     ReadBool   (hKey, VALUE_MULTIMONITOR,     settings.m_multiMonitorEnabled);
@@ -171,6 +172,10 @@ HRESULT RegistrySettingsProvider::Save (const ScreenSaverSettings & settings)
     CHR (hr);
     
     hr = WriteInt (hKey, VALUE_GLOW_SIZE, settings.m_glowSizePercent);
+    CHR (hr);
+
+    // v1.5 T038 (FR-020, FR-038): persist GlowEnabled as REG_DWORD.
+    hr = WriteBool (hKey, VALUE_GLOW_ENABLED, settings.m_glowEnabled);
     CHR (hr);
     
     hr = WriteBool (hKey, VALUE_START_FULLSCREEN, settings.m_startFullscreen);

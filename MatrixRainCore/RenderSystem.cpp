@@ -2156,12 +2156,12 @@ void RenderSystem::Render (const AnimationSystem & animationSystem, const Viewpo
         renderOverlay (params.pHotkeyOverlay);
         renderOverlay (params.pUsageOverlay);
 
-        // Apply bloom (extracts bright pixels including overlay text, composites
-        // to backbuffer).  When the user has dialed Glow Intensity to 0% the
-        // entire bloom pipeline is bypassed and the scene texture is composited
-        // directly to the backbuffer (FR-031: "glow disabled" = true off, not
-        // just darker).
-        if (m_glowIntensity > 0.0f)
+        // v1.5 (T039, FR-015): bypass the entire bloom pipeline when the
+        // user has toggled Glow Enabled OFF.  The scene texture is composited
+        // straight to the backbuffer; bloom resources stay allocated so
+        // re-enabling is instant.  See ShouldRunBloomPass in RenderSystem.h
+        // for the unit-tested decision predicate.
+        if (ShouldRunBloomPass (params))
         {
             (void)ApplyBloom();
         }

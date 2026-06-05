@@ -44,6 +44,24 @@ class CharacterStreak;
 
 double QueryProcessGpuLoadPercent();
 
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  ShouldRunBloomPass — pure helper consulted by RenderSystem::Render and
+//  unit-tested in RenderSystemBloomBypassTests.cpp.  Returns false when
+//  the user has toggled Glow Enabled OFF (FR-015), in which case the
+//  bloom extract/blur/composite passes are skipped and the scene texture
+//  is copied straight to the backbuffer.  Bloom GPU resources stay
+//  allocated so re-enabling is instant.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+inline bool ShouldRunBloomPass (const RenderParams & params) noexcept
+{
+    return params.glowEnabled;
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 //
 //  RenderSystem

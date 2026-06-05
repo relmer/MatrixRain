@@ -140,15 +140,15 @@ controls across both tabs with tooltips.
 
 ### Tests for User Story 2 ⚠️
 
-- [ ] T034 [P] [US2] Extend `MatrixRainTests\ScreenSaverSettingsTests.cpp`: `Defaults_GlowEnabledIsTrue` (Red) (FR-038, data-model.md §1)
-- [ ] T035 [P] [US2] Extend `MatrixRainTests\RegistrySettingsProviderTests.cpp`: `GlowEnabledRoundTrip` writes 0 then 1 and reads back; `MissingGlowEnabledDefaultsToOne` (Red) (FR-020, FR-038)
-- [ ] T036 [P] [US2] Extend `MatrixRainTests\RenderSystemTests.cpp` (or create `RenderSystemBloomBypassTests.cpp` if no existing fixture): assert that when `RenderParams::glowEnabled == false`, the bloom pipeline branch is not entered (test via observable side effect — bloom RTV not bound, or via injected mock). If `RenderSystem` is not currently unit-testable at that level, fall back to a logic-only helper `ShouldRunBloomPass(const RenderParams &)` and test that (Red) (FR-015)
+- [X] T034 [P] [US2] Extend `MatrixRainTests\ScreenSaverSettingsTests.cpp`: `Defaults_GlowEnabledIsTrue` (Red) (FR-038, data-model.md §1)
+- [X] T035 [P] [US2] Extend `MatrixRainTests\RegistrySettingsProviderTests.cpp`: `GlowEnabledRoundTrip` writes 0 then 1 and reads back; `MissingGlowEnabledDefaultsToOne` (Red) (FR-020, FR-038)
+- [X] T036 [P] [US2] Extend `MatrixRainTests\RenderSystemTests.cpp` (or create `RenderSystemBloomBypassTests.cpp` if no existing fixture): assert that when `RenderParams::glowEnabled == false`, the bloom pipeline branch is not entered (test via observable side effect — bloom RTV not bound, or via injected mock). If `RenderSystem` is not currently unit-testable at that level, fall back to a logic-only helper `ShouldRunBloomPass(const RenderParams &)` and test that (Red) (FR-015)
 
 ### Implementation for User Story 2
 
-- [ ] T037 [P] [US2] `MatrixRainCore\ScreenSaverSettings.h`: add `bool m_glowEnabled = true;` (default per FR-038); add accessor (Green for T034) (data-model.md §1)
-- [ ] T038 [US2] `MatrixRainCore\RegistrySettingsProvider.{h,cpp}`: add `VALUE_GLOW_ENABLED = L"GlowEnabled"`; read as DWORD with default 1; write on commit (Green for T035) (FR-020, FR-038, contracts/registry-schema.md)
-- [ ] T039 [US2] `MatrixRainCore\RenderSystem.{h,cpp}`: replace existing "if (intensity == 0) bypass bloom" code path with "if (!renderParams.glowEnabled) bypass bloom"; bloom resources stay allocated so re-enabling is instant (Green for T036) (FR-015)
+- [X] T037 [P] [US2] `MatrixRainCore\ScreenSaverSettings.h`: add `bool m_glowEnabled = true;` (landed earlier in T024)
+- [X] T038 [US2] `MatrixRainCore\RegistrySettingsProvider.{h,cpp}`: add `VALUE_GLOW_ENABLED = L"GlowEnabled"`; read as DWORD with default 1; write on commit (Green for T035) (FR-020, FR-038, contracts/registry-schema.md)
+- [X] T039 [US2] `MatrixRainCore\RenderSystem.{h,cpp}`: replace existing "if (intensity == 0) bypass bloom" code path with "if (!renderParams.glowEnabled) bypass bloom"; bloom resources stay allocated so re-enabling is instant (Green for T036) (FR-015)
 - [ ] T040 [US2] `MatrixRain\MatrixRain.rc`: revert Glow Intensity slider min from 0 to 1 in `IDD_VISUALS_PAGE`; remove the legacy "0% (glow disabled)" special-case label control; add `IDC_GLOW_ENABLED_CHECK` `BS_AUTOCHECKBOX` to `IDD_PERFORMANCE_PAGE` between GPU Adapter combo and Quality Preset slider per FR-008 (FR-007, FR-014, FR-028a)
 - [ ] T041 [US2] `MatrixRain\ConfigDialog.cpp`: remove the intensity-value handler's "value == 0 ? render 'disabled' label : render value" branch; intensity now plain integer 1..200 (FR-007)
 - [ ] T042 [US2] `MatrixRain\ConfigDialog.cpp`: add `ApplyGlowEnabledUI(HWND hSheet, bool enabled)` helper per research.md R7 — `PropSheet_IndexToHwnd(hSheet, 0)` Visuals page: `EnableWindow` Glow Intensity slider + prompt label + value label + info button + Glow Size trio; `PropSheet_IndexToHwnd(hSheet, 1)` Performance page: `EnableWindow` Quality Preset / Glow Passes / Glow Resolution / Glow Smoothness trios + their info buttons (FR-016, FR-017, research.md R7)
