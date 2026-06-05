@@ -171,6 +171,22 @@ public:
     /// <returns>True if live mode active, false for modal mode</returns>
     bool IsLiveMode() const { return m_snapshot.isLiveMode; }
 
+    /// <summary>
+    /// True if the currently-pending settings differ from the live-mode
+    /// snapshot in any field that requires the monitor render contexts to
+    /// be torn down and rebuilt (multi-monitor span, or selected GPU
+    /// adapter).  Used by the dialog to suppress an unnecessary
+    /// destroy/recreate flicker on OK / Cancel when nothing rebuild-worthy
+    /// has changed.
+    /// </summary>
+    bool LiveModeRebuildRequired() const
+    {
+        if (!m_snapshot.isLiveMode) return false;
+        if (m_settings.m_multiMonitorEnabled != m_snapshot.snapshotSettings.m_multiMonitorEnabled) return true;
+        if (m_settings.m_gpuAdapter          != m_snapshot.snapshotSettings.m_gpuAdapter)          return true;
+        return false;
+    }
+
 private:
     ISettingsProvider   & m_settingsProvider;            // Settings provider (not owned)
     ScreenSaverSettings  m_settings;                    // Current settings (may include pending changes)

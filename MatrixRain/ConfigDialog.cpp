@@ -1459,15 +1459,15 @@ static BOOL OnCancel (HWND hDlg)
     // For modeless dialogs, revert live preview changes back to snapshot
     if (pController->IsLiveMode())
     {
-        Application * pApp = GetApplicationFromDialog (hDlg);
+        Application * pApp           = GetApplicationFromDialog (hDlg);
+        bool          needsRebuild   = pController->LiveModeRebuildRequired();
 
         pController->CancelLiveMode();
 
-        // The snapshot restore in CancelLiveMode reverts settings fields
-        // (including m_multiMonitorEnabled) but does not by itself trigger
-        // a context rebuild.  Post one explicitly so the live multimon /
-        // display-mode preview reverts visually (FR-031b).
-        if (pApp)
+        // Only rebuild contexts when a field that requires destroy/recreate
+        // (multimon span, GPU adapter) actually changed — otherwise the
+        // user sees an ugly flicker on every dialog close.
+        if (pApp && needsRebuild)
         {
             pApp->ApplyDisplayModeChange();
         }
