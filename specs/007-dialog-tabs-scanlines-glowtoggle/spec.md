@@ -78,7 +78,7 @@ A user nostalgic for CRT monitors gets CRT-style scanlines **on by default** in 
 
 ### User Story 4 - Custom Color Picker (Priority: P2)
 
-The user is not satisfied with Green, Amber, White, or Cycle. They pick a new entry — **Custom…** — from the Color dropdown, which opens the standard Windows color-chooser dialog. The selected RGB drives the rain streak color and is persisted along with the 16 custom-palette slots from the chooser dialog so subsequent invocations remember both the chosen color and the user's palette.
+The user is not satisfied with Green, Blue, Red, Amber, or Cycle. They pick a new entry — **Custom…** — from the Color dropdown, which opens the standard Windows color-chooser dialog. The selected RGB drives the rain streak color and is persisted along with the 16 custom-palette slots from the chooser dialog so subsequent invocations remember both the chosen color and the user's palette.
 
 **Why this priority**: A frequently-requested customization that is genuinely small in scope: one enum variant, one combo entry, one platform call, and one registry value (plus the palette blob). Independent of dialog redesign in concept, but lives most naturally inside the new Visuals tab.
 
@@ -86,7 +86,7 @@ The user is not satisfied with Green, Amber, White, or Cycle. They pick a new en
 
 **Acceptance Scenarios**:
 
-1. **Given** the Color dropdown is open, **When** the user inspects the list, **Then** the entries are Green, Amber, White, Cycle, Custom… (in that order). The selected-item display text is the same `Custom…` string used in the drop-list — there is no string mutation on selection (the ellipsis stays).
+1. **Given** the Color dropdown is open, **When** the user inspects the list, **Then** the entries are Green, Blue, Red, Amber, Cycle, Custom… (in that order — Custom is appended at ordinal 5; the existing v1.4 ordinals 0..4 are preserved per FR-039 / SC-007). The selected-item display text is the same `Custom…` string used in the drop-list — there is no string mutation on selection (the ellipsis stays).
 2. **Given** the user picks "Custom…", **When** the selection is committed, **Then** the standard Win32 color-chooser dialog opens pre-populated with the previously saved custom color (or bright green `RGB(0, 255, 0)` on first use).
 3. **Given** the user picks a color in the chooser and clicks OK, **When** the chooser closes, **Then** the preview rain immediately renders in the chosen RGB and the Color combo shows "Custom" as the active selection.
 4. **Given** the user picks a color in the chooser and clicks Cancel, **When** the chooser closes, **Then** the previous color scheme remains active and the combo selection reverts.
@@ -158,7 +158,7 @@ Users upgrading from v1.3 or v1.4 will see CRT scanlines appear on first launch 
 
 #### Visuals Tab Contents (in order)
 - **FR-005**: The Visuals tab MUST contain, in this top-to-bottom order: Density slider (0..100%), Speed slider (1..100%), Glow Intensity slider (1..200%), Glow Size slider (50..200%), Color combo box, Scanlines Enabled checkbox (standard `BS_AUTOCHECKBOX`, default checked), Scanlines Intensity slider (1..100%, default 30), Scanlines Style slider (1..100, default 50), Start In Fullscreen checkbox.
-- **FR-006**: The Color combo box entries MUST be, in order: Green, Amber, White, Cycle, Custom….
+- **FR-006**: The Color combo box entries MUST be, in order: Green, Blue, Red, Amber, Cycle, Custom…. The first five preserve their v1.4 ordinals (0..4); `Custom` is appended at ordinal 5. Per FR-039 / SC-007 the existing five ordinals MUST remain byte-identical to the v1.4 baseline so existing registry hives reload to the same color.
 - **FR-007**: The Glow Intensity slider's minimum value MUST be 1 (changed from 0); the legacy "0% (glow disabled)" special-case label MUST be removed.
 
 #### Performance Tab Contents (in order)

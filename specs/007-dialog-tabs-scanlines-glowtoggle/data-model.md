@@ -45,22 +45,31 @@ State transitions:
 ## 2. `ColorScheme` enum — added variant
 
 ```cpp
-enum class ColorScheme : int
+enum class ColorScheme
 {
-    Green   = 0,
-    Amber   = 1,
-    White   = 2,
-    Cycle   = 3,
-    Custom  = 4,   // NEW (FR-033) — RGB from ScreenSaverSettings::m_customColor
+    Green                   = 0,
+    Blue                    = 1,
+    Red                     = 2,
+    Amber                   = 3,
+    __StaticColorCount,
+    ColorCycle              = __StaticColorCount,    // = 4
+    Custom                  = 5,   // NEW (FR-033) — RGB from ScreenSaverSettings::m_customColor
 };
 ```
 
-- The numeric ordinals of Green/Amber/White/Cycle MUST remain stable
-  (existing registry hives store the scheme as its integer ordinal; the
+- The numeric ordinals of every pre-existing variant (Green=0, Blue=1,
+  Red=2, Amber=3, ColorCycle=4) MUST remain stable — existing v1.4
+  registry hives store the scheme as its integer ordinal, and the
   `006` plan's `ColorSchemeRegistryRoundTrip` test asserts these
-  positions).
-- `Custom` is appended at the end so its ordinal `4` is new and cannot
-  collide with any prior value.
+  positions. Per FR-039 / SC-007 the v1.4 → v1.5 upgrade MUST be
+  byte-identical for every v1.4 setting.
+- `Custom` is appended at ordinal `5` so it cannot collide with any
+  prior value. Do NOT introduce a `White` variant — it doesn't exist
+  on the v1.4 baseline.
+- The `__StaticColorCount` sentinel is the existing v1.4 convention
+  for distinguishing "static palette entries" from `ColorCycle`; leave
+  it where it is. `Custom` sits past it because Custom isn't a static
+  palette entry either — it sources its RGB from settings.
 
 ---
 
