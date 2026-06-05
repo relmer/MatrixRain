@@ -4,6 +4,17 @@
 //
 #define IDI_MATRIXRAIN                  101
 #define IDD_MATRIXRAIN_SAVER_CONFIG     102
+#define IDD_VISUALS_PAGE                103
+#define IDD_PERFORMANCE_PAGE            104
+
+// v1.5 timer IDs
+#define IDT_PERF_TITLE_TIMER            5001
+
+// v1.5 string resources
+#define IDS_VISUALS_TAB_TITLE           40001
+#define IDS_PERFORMANCE_TAB_TITLE_INITIAL 40002
+#define IDS_PERFTAB_TITLE_FORMAT        40003
+
 #define IDC_DENSITY_SLIDER              1001
 #define IDC_DENSITY_LABEL               1002
 #define IDC_ANIMSPEED_SLIDER            1003
@@ -42,13 +53,31 @@
 #define IDC_GLOWSMOOTH_PROMPT           1036
 #define IDC_QUALITY_PRESET_LABEL        1037
 
+// v1.5 new control IDs.
+// Note: existing v1.4 colour combo is IDC_COLORSCHEME_COMBO (1009) — DO NOT
+// introduce a new IDC_COLOR_COMBO; the Custom… item is appended to the
+// existing combo per Phase 6.
+#define IDC_GLOW_ENABLED_CHECK              1038
+#define IDC_SCANLINES_GROUPBOX              1039
+#define IDC_SCANLINES_ENABLED_CHECK         1040
+#define IDC_SCANLINES_INTENSITY_SLIDER      1041
+#define IDC_SCANLINES_INTENSITY_LABEL       1042
+#define IDC_SCANLINES_INTENSITY_VALUE       1043
+#define IDC_SCANLINES_INTENSITY_INFO        1044
+#define IDC_SCANLINES_INTENSITY_PROMPT      1045
+#define IDC_SCANLINES_STYLE_SLIDER          1046
+#define IDC_SCANLINES_STYLE_LABEL           1047
+#define IDC_SCANLINES_STYLE_VALUE           1048
+#define IDC_SCANLINES_STYLE_INFO            1049
+#define IDC_SCANLINES_STYLE_PROMPT          1050
+
 // Next default values for new objects
 // 
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
-#define _APS_NEXT_RESOURCE_VALUE        103
-#define _APS_NEXT_COMMAND_VALUE         40001
-#define _APS_NEXT_CONTROL_VALUE         1038
+#define _APS_NEXT_RESOURCE_VALUE        105
+#define _APS_NEXT_COMMAND_VALUE         40004
+#define _APS_NEXT_CONTROL_VALUE         1051
 #define _APS_NEXT_SYMED_VALUE           101
 #endif
 #endif
