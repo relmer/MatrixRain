@@ -218,6 +218,18 @@ static const wchar_t * GetInfoTipText (int infoId)
                    L"\r\n"
                    L"Moderate GPU performance impact.";
 
+        case IDC_SCANLINES_INTENSITY_INFO:
+            return L"How dark the scanline gaps are between bright lines. 0% disables "
+                   L"the effect; 100% makes the gaps fully black.\r\n"
+                   L"\r\n"
+                   L"Small GPU performance impact.";
+
+        case IDC_SCANLINES_STYLE_INFO:
+            return L"Spacing of the scanlines. Low values produce many fine lines "
+                   L"(modern displays); high values produce a coarse retro-CRT look.\r\n"
+                   L"\r\n"
+                   L"No additional GPU impact.";
+
         default:
             return L"";
     }
@@ -236,6 +248,8 @@ static bool IsInfoTipControlId (int id)
         case IDC_GLOWPASSES_INFO:
         case IDC_GLOWRES_INFO:
         case IDC_GLOWSMOOTH_INFO:
+        case IDC_SCANLINES_INTENSITY_INFO:
+        case IDC_SCANLINES_STYLE_INFO:
             return true;
         default:
             return false;
@@ -284,6 +298,8 @@ static HWND CreateAndRegisterTooltip (HWND hDlg)
         IDC_GLOWPASSES_INFO,
         IDC_GLOWRES_INFO,
         IDC_GLOWSMOOTH_INFO,
+        IDC_SCANLINES_INTENSITY_INFO,
+        IDC_SCANLINES_STYLE_INFO,
     };
 
 
@@ -504,6 +520,48 @@ static void ApplyGlowEnabledUI (HWND hSheet, bool enabled)
     enableIfPresent (hPerf,    IDC_GLOWSMOOTH_LABEL);
     enableIfPresent (hPerf,    IDC_GLOWSMOOTH_INFO);
     enableIfPresent (hPerf,    IDC_GLOWSMOOTH_PROMPT);
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  ApplyScanlinesEnabledUI (T054, FR-028b) — mirror the Scanlines Enabled
+//  checkbox state into EnableWindow on the two scanline sliders + their
+//  labels + info buttons on the Visuals page.  Same shape as the glow
+//  helper above, scoped to one tab.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+static void ApplyScanlinesEnabledUI (HWND hPage, bool enabled)
+{
+    if (!hPage)
+    {
+        return;
+    }
+
+
+    auto enableIfPresent = [hPage, enabled] (int id)
+    {
+        HWND hCtrl = GetDlgItem (hPage, id);
+
+        if (hCtrl)
+        {
+            EnableWindow (hCtrl, enabled);
+        }
+    };
+
+
+    enableIfPresent (IDC_SCANLINES_INTENSITY_SLIDER);
+    enableIfPresent (IDC_SCANLINES_INTENSITY_VALUE);
+    enableIfPresent (IDC_SCANLINES_INTENSITY_INFO);
+    enableIfPresent (IDC_SCANLINES_INTENSITY_PROMPT);
+    enableIfPresent (IDC_SCANLINES_STYLE_SLIDER);
+    enableIfPresent (IDC_SCANLINES_STYLE_VALUE);
+    enableIfPresent (IDC_SCANLINES_STYLE_INFO);
+    enableIfPresent (IDC_SCANLINES_STYLE_PROMPT);
 }
 
 
@@ -848,6 +906,25 @@ static BOOL OnInitDialog (HWND hDlg, LPARAM initParam)
     InitializeResolutionSlider  (hDlg, static_cast<int> (pSettings->m_advancedValues.m_bloomResolutionDivisor));
     InitializeSmoothnessSlider  (hDlg, static_cast<int> (pSettings->m_advancedValues.m_blurTaps));
 
+    // v1.5 (T054, US3): scanline controls.  Intensity/Style are 1..100
+    // sliders matching the v1.4 percentage-slider pattern.  Tick freq 5
+    // on both so the 100-step range lands 21 visible ticks.
+    SendDlgItemMessageW (hDlg, IDC_SCANLINES_INTENSITY_SLIDER, TBM_SETRANGE,    TRUE, MAKELPARAM (ScreenSaverSettings::MIN_SCANLINES_INTENSITY_PERCENT, ScreenSaverSettings::MAX_SCANLINES_INTENSITY_PERCENT));
+    SendDlgItemMessageW (hDlg, IDC_SCANLINES_INTENSITY_SLIDER, TBM_SETTICFREQ,  5, 0);
+    SendDlgItemMessageW (hDlg, IDC_SCANLINES_INTENSITY_SLIDER, TBM_SETPOS,      TRUE, pSettings->m_scanlinesIntensity);
+    SetDlgItemTextW     (hDlg, IDC_SCANLINES_INTENSITY_VALUE,  std::format (L"{}%", pSettings->m_scanlinesIntensity).c_str());
+
+    SendDlgItemMessageW (hDlg, IDC_SCANLINES_STYLE_SLIDER,     TBM_SETRANGE,    TRUE, MAKELPARAM (ScreenSaverSettings::MIN_SCANLINES_STYLE, ScreenSaverSettings::MAX_SCANLINES_STYLE));
+    SendDlgItemMessageW (hDlg, IDC_SCANLINES_STYLE_SLIDER,     TBM_SETTICFREQ,  5, 0);
+    SendDlgItemMessageW (hDlg, IDC_SCANLINES_STYLE_SLIDER,     TBM_SETPOS,      TRUE, pSettings->m_scanlinesStyle);
+    SetDlgItemTextW     (hDlg, IDC_SCANLINES_STYLE_VALUE,      std::format (L"{}", pSettings->m_scanlinesStyle).c_str());
+
+    CheckDlgButton      (hDlg, IDC_SCANLINES_ENABLED_CHECK,
+                         pSettings->m_scanlinesEnabled ? BST_CHECKED : BST_UNCHECKED);
+
+    // Mirror initial scanlines-enabled state into the slider/info enable flags.
+    ApplyScanlinesEnabledUI (hDlg, pSettings->m_scanlinesEnabled);
+
     // Per-page tooltip surface for the IDC_*_INFO indicators (only the
     // info buttons actually present on this page get registered tools).
     {
@@ -971,6 +1048,16 @@ static BOOL OnHScroll (HWND hDlg, LPARAM lParam)
         case IDC_GLOWSIZE_SLIDER:
             pController->UpdateGlowSize (pos);
             SetDlgItemTextW (hDlg, IDC_GLOWSIZE_LABEL, FormatPercentLabel (ctrlId, pos).c_str());
+            break;
+
+        case IDC_SCANLINES_INTENSITY_SLIDER:
+            pController->UpdateScanlinesIntensity (pos);
+            SetDlgItemTextW (hDlg, IDC_SCANLINES_INTENSITY_VALUE, std::format (L"{}%", pos).c_str());
+            break;
+
+        case IDC_SCANLINES_STYLE_SLIDER:
+            pController->UpdateScanlinesStyle (pos);
+            SetDlgItemTextW (hDlg, IDC_SCANLINES_STYLE_VALUE, std::format (L"{}", pos).c_str());
             break;
 
         case IDC_GLOWPASSES_SLIDER:
@@ -1422,6 +1509,23 @@ static BOOL OnCommand (HWND hDlg, WPARAM wParam)
             }
 
             ApplyGlowEnabledUI (hSheet, enabled);
+            break;
+        }
+
+        case IDC_SCANLINES_ENABLED_CHECK:
+        {
+            // T054 (US3, FR-028b): toggle Scanlines Enabled, mirror into
+            // controller, and grey/enable the two scanline sliders + their
+            // info buttons on the same (Visuals) page.
+            bool                     enabled = (IsDlgButtonChecked (hDlg, IDC_SCANLINES_ENABLED_CHECK) == BST_CHECKED);
+            ConfigDialogController * pCtrl   = GetControllerFromDialog (hDlg);
+
+            if (pCtrl)
+            {
+                pCtrl->UpdateScanlinesEnabled (enabled);
+            }
+
+            ApplyScanlinesEnabledUI (hDlg, enabled);
             break;
         }
             
