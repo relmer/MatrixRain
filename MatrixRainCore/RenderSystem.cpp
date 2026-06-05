@@ -113,16 +113,19 @@ public:
             return m_cachedLoad;
         }
 
-        // Task Manager's Performance tab per-engine graph (e.g. "Engine 3D")
-        // shows TOTAL wall-clock utilization of that engine across every
-        // process — not just the foreground app.  For a debug overlay
-        // that's the natural number to display (it includes the DWM
-        // compositor work being done for our window, which is part of the
-        // cost of rendering us).  Algorithm:
+        // Task Manager's per-process "GPU" column for our process:
         //   for each engine type (3D / Compute / Copy / Video* / ...):
         //     sum utilization across every instance of that engine type
-        //     (across every process)
+        //     for OUR PID only
         //   take MAX across engine types
+        //
+        // We keep the wildcard counter "\GPU Engine(*)" so PDH discovers
+        // every engine instance system-wide, and filter to our PID in the
+        // result loop by matching the "pid_NNNN_" substring of each
+        // instance name.
+        wchar_t pidMarker[32];
+        StringCchPrintfW (pidMarker, ARRAYSIZE (pidMarker), L"pid_%lu_", m_ownPid);
+
         std::map<std::wstring, double> sumPerEngineType;
 
         for (DWORD i = 0; i < itemCount; i++)
@@ -133,6 +136,11 @@ public:
             }
 
             std::wstring_view name (items[i].szName);
+
+            if (name.find (pidMarker) == std::wstring_view::npos)
+            {
+                continue;       // different process
+            }
 
             constexpr std::wstring_view kEngTypeMarker = L"engtype_";
             size_t pos = name.find (kEngTypeMarker);
@@ -163,12 +171,13 @@ private:
             return false;
         }
 
-        // Wildcard across EVERY engine instance system-wide (all processes,
-        // all engines).  We display TOTAL system GPU utilization (matching
-        // Task Manager's Performance-tab per-engine graph), not a single-
-        // process figure — for a debug overlay on a rendering app that's
-        // the meaningful number since DWM does compositing work on our
-        // behalf, which is properly part of the cost of rendering us.
+        m_ownPid = GetCurrentProcessId();
+
+        // System-wide wildcard so PDH discovers every engine instance.
+        // We filter to our PID in the result-processing loop by matching
+        // the "pid_NNNN_" substring of each instance name — embedding the
+        // PID in the counter path itself would expand the wildcard once
+        // at add time and miss instances that become active later.
         if (PdhAddEnglishCounterW (m_query,
                                    L"\\GPU Engine(*)\\Utilization Percentage",
                                    0,
@@ -187,6 +196,7 @@ private:
     PDH_HQUERY            m_query        { nullptr };
     PDH_HCOUNTER          m_counter      { nullptr };
     ULONGLONG             m_lastPollTick { 0 };
+    DWORD                 m_ownPid       { 0 };
     double                m_cachedLoad   { -1.0 };
     bool                  m_initFailed   { false };
     std::vector<uint8_t>  m_arrayBuf;
