@@ -163,6 +163,18 @@ public:
     HRESULT ApplyLiveMode();
 
     /// <summary>
+    /// T033a (US1, FR-004a, SC-011): commit live-mode changes from the
+    /// property-sheet `PSN_APPLY` path.  Persists every rollback-eligible
+    /// field (the 5 new v1.5 fields PLUS the v1.4 fields that participate
+    /// in live-mode rollback) to the registry via
+    /// `m_settingsProvider.Save(m_settings)` and clears the snapshot.
+    /// Functionally identical to `ApplyLiveMode()`; named to match the
+    /// dismissal-semantics contract in `contracts/propertysheet.md` so the
+    /// dialog code reads cleanly.
+    /// </summary>
+    HRESULT CommitLiveMode() { return ApplyLiveMode(); }
+
+    /// <summary>
     /// Cancel live mode changes (revert ApplicationState to snapshot and clear).
     /// </summary>
     /// <returns>S_OK on success, E_FAIL if not in live mode</returns>
