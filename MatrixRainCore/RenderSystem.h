@@ -279,24 +279,6 @@ private:
     std::vector<CharacterInstanceData>   m_instanceData;
     std::vector<const CharacterStreak *> m_streakPtrs;
 
-    // GPU load measurement.  Each frame is bracketed with D3D11 TIMESTAMP
-    // queries; later frames walk back through prior slots to find the most
-    // recent one whose results have flushed.  The denominator is wall-clock
-    // time between Render calls (QueryPerformanceCounter), independent of
-    // any fps counter — this matches Task Manager's "GPU engine % busy"
-    // intuition (gpu_work_time / wall_clock_interval).
-    static constexpr UINT GPU_QUERY_FRAMES = 6;
-    Microsoft::WRL::ComPtr<ID3D11Query> m_gpuDisjointQuery[GPU_QUERY_FRAMES];
-    Microsoft::WRL::ComPtr<ID3D11Query> m_gpuTimestampBeginQuery[GPU_QUERY_FRAMES];
-    Microsoft::WRL::ComPtr<ID3D11Query> m_gpuTimestampEndQuery[GPU_QUERY_FRAMES];
-    UINT                                m_gpuQueryFrameIndex     { 0 };
-    bool                                m_gpuQuerySlotIssued[GPU_QUERY_FRAMES] = { false, false, false, false, false, false };
-    UINT                                m_gpuQueryNextReadSlot   { 0 };
-    LARGE_INTEGER                       m_gpuQpcFrequency        { 0 };
-    LARGE_INTEGER                       m_gpuLastFrameTick       { 0 };
-    double                              m_gpuSmoothedLoadPercent { 0.0 };
-    bool                                m_gpuHaveAnyReading      { false };
-
     static constexpr UINT INITIAL_INSTANCE_CAPACITY = 10000; // Max characters per frame
 };
 

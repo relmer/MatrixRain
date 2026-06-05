@@ -8,7 +8,175 @@
 #include "Overlay.h"
 #include "OverlayColor.h"
 
+#pragma comment(lib, "pdh.lib")
+
 using Microsoft::WRL::ComPtr;
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  GPU load via PDH (matches Task Manager's per-process "GPU" column).
+//
+//  Singleton inside this translation unit — one PDH query for the whole
+//  process, polled at most every 500 ms (Task Manager itself samples at
+//  ~1 Hz).  Returns -1.0 until at least one collection has succeeded
+//  (PDH counters return no data on the very first collection call).
+//
+//  The counter path is "\GPU Engine(*pid_NNNN*engtype_3D)\Utilization
+//  Percentage", expanded by PDH wildcard support to one instance per
+//  physical GPU / engine our process is rendering on.  We MAX across
+//  the resulting array because that's what Task Manager's per-process
+//  GPU column shows; summing tends to over-count when the GPU exposes
+//  multiple instances of the same engine type.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+namespace {
+
+class GpuLoadMonitor
+{
+public:
+    GpuLoadMonitor() = default;
+
+    ~GpuLoadMonitor()
+    {
+        if (m_query)
+        {
+            PdhCloseQuery (m_query);
+            m_query   = nullptr;
+            m_counter = nullptr;
+        }
+    }
+
+    GpuLoadMonitor (const GpuLoadMonitor &) = delete;
+    GpuLoadMonitor & operator= (const GpuLoadMonitor &) = delete;
+
+
+    // Returns most-recent load percentage in [0, 100], or -1.0 when not
+    // yet ready (initialization failed, or first collection has not yet
+    // produced data).  Thread-safe.
+    double GetLoadPercent()
+    {
+        std::lock_guard<std::mutex> lock (m_mutex);
+
+        if (m_initFailed)
+        {
+            return -1.0;
+        }
+
+        ULONGLONG nowTick = GetTickCount64();
+
+        // Throttle PDH polling to ~2 Hz (Task Manager itself updates at 1 Hz).
+        // Between polls just return the cached value.
+        if (m_lastPollTick != 0 && (nowTick - m_lastPollTick) < 500)
+        {
+            return m_cachedLoad;
+        }
+
+        if (!m_query)
+        {
+            if (!Initialize())
+            {
+                m_initFailed = true;
+                return -1.0;
+            }
+
+            // First Collect produces no data; bail out and let the next
+            // GetLoadPercent call do a real read.
+            PdhCollectQueryData (m_query);
+            m_lastPollTick = nowTick;
+            return -1.0;
+        }
+
+        if (PdhCollectQueryData (m_query) != ERROR_SUCCESS)
+        {
+            m_lastPollTick = nowTick;
+            return m_cachedLoad;
+        }
+        m_lastPollTick = nowTick;
+
+        DWORD bufferBytes = 0;
+        DWORD itemCount   = 0;
+        PDH_STATUS s      = PdhGetFormattedCounterArrayW (m_counter, PDH_FMT_DOUBLE, &bufferBytes, &itemCount, nullptr);
+
+        if (s != PDH_MORE_DATA || itemCount == 0)
+        {
+            // PDH_INVALID_DATA is normal between samples on idle counters.
+            // Keep the cached value; don't churn it to 0.
+            return m_cachedLoad;
+        }
+
+        m_arrayBuf.resize (bufferBytes);
+        auto * items = reinterpret_cast<PDH_FMT_COUNTERVALUE_ITEM_W *> (m_arrayBuf.data());
+
+        if (PdhGetFormattedCounterArrayW (m_counter, PDH_FMT_DOUBLE, &bufferBytes, &itemCount, items) != ERROR_SUCCESS)
+        {
+            return m_cachedLoad;
+        }
+
+        double maxLoad = 0.0;
+        for (DWORD i = 0; i < itemCount; i++)
+        {
+            if (items[i].FmtValue.CStatus == ERROR_SUCCESS)
+            {
+                maxLoad = (std::max) (maxLoad, items[i].FmtValue.doubleValue);
+            }
+        }
+
+        m_cachedLoad = (std::min) (maxLoad, 100.0);
+        return m_cachedLoad;
+    }
+
+private:
+    bool Initialize()
+    {
+        if (PdhOpenQueryW (nullptr, 0, &m_query) != ERROR_SUCCESS)
+        {
+            m_query = nullptr;
+            return false;
+        }
+
+        wchar_t counterPath[256];
+        DWORD   pid = GetCurrentProcessId();
+
+        // Filter to 3D engine only (what MatrixRain actually uses for its
+        // draw calls).  Wildcards expand to one instance per (LUID, engine
+        // instance).  Task Manager's Processes-tab GPU column reports the
+        // MAX across these.
+        StringCchPrintfW (counterPath, ARRAYSIZE (counterPath),
+                          L"\\GPU Engine(*pid_%lu*engtype_3D)\\Utilization Percentage",
+                          pid);
+
+        if (PdhAddEnglishCounterW (m_query, counterPath, 0, &m_counter) != ERROR_SUCCESS)
+        {
+            PdhCloseQuery (m_query);
+            m_query   = nullptr;
+            m_counter = nullptr;
+            return false;
+        }
+        return true;
+    }
+
+
+    std::mutex            m_mutex;
+    PDH_HQUERY            m_query        { nullptr };
+    PDH_HCOUNTER          m_counter      { nullptr };
+    ULONGLONG             m_lastPollTick { 0 };
+    double                m_cachedLoad   { -1.0 };
+    bool                  m_initFailed   { false };
+    std::vector<uint8_t>  m_arrayBuf;
+};
+
+
+GpuLoadMonitor & SharedGpuLoadMonitor()
+{
+    static GpuLoadMonitor s_monitor;
+    return s_monitor;
+}
+
+}  // namespace
 
 
 
@@ -254,21 +422,6 @@ HRESULT RenderSystem::CreateSwapChain (HWND hwnd, UINT width, UINT height)
     // We handle fullscreen transitions manually for borderless windowed mode
     hr = dxgiFactory->MakeWindowAssociation (hwnd, DXGI_MWA_NO_ALT_ENTER);
     CHRA (hr);
-
-    // Create GPU timing queries (TIMESTAMP_DISJOINT + 2 TIMESTAMP per frame
-    // slot) used to populate the "GPU N%" stats line.  Failures are not fatal
-    // — the stats just render "GPU --%" if queries don't initialize.
-    {
-        D3D11_QUERY_DESC disjointDesc  = { D3D11_QUERY_TIMESTAMP_DISJOINT, 0 };
-        D3D11_QUERY_DESC timestampDesc = { D3D11_QUERY_TIMESTAMP,          0 };
-
-        for (UINT i = 0; i < GPU_QUERY_FRAMES; i++)
-        {
-            m_device->CreateQuery (&disjointDesc,  &m_gpuDisjointQuery[i]);
-            m_device->CreateQuery (&timestampDesc, &m_gpuTimestampBeginQuery[i]);
-            m_device->CreateQuery (&timestampDesc, &m_gpuTimestampEndQuery[i]);
-        }
-    }
 
 Error:
     return hr;
@@ -1833,88 +1986,6 @@ void RenderSystem::Render (const AnimationSystem & animationSystem, const Viewpo
         return;
     }
 
-    // GPU load measurement.  Wall-clock interval between consecutive Render
-    // calls is the denominator; GPU work time (from the most-recently-ready
-    // TIMESTAMP query slot) is the numerator.  Pipeline is GPU_QUERY_FRAMES
-    // deep with walk-back to find the freshest slot whose data has flushed.
-    {
-        if (m_gpuQpcFrequency.QuadPart == 0)
-        {
-            QueryPerformanceFrequency (&m_gpuQpcFrequency);
-        }
-
-        LARGE_INTEGER nowTick = {};
-        QueryPerformanceCounter (&nowTick);
-
-        double wallClockMs = 0.0;
-        if (m_gpuLastFrameTick.QuadPart != 0 && m_gpuQpcFrequency.QuadPart > 0)
-        {
-            wallClockMs = static_cast<double> (nowTick.QuadPart - m_gpuLastFrameTick.QuadPart) * 1000.0
-                          / static_cast<double> (m_gpuQpcFrequency.QuadPart);
-        }
-        m_gpuLastFrameTick = nowTick;
-
-        // Walk back from oldest-issued slot looking for one whose results
-        // have flushed.  We try up to GPU_QUERY_FRAMES-1 slots; the one we
-        // just issued (current thisSlot) is obviously not yet ready.
-        UINT thisSlot = m_gpuQueryFrameIndex % GPU_QUERY_FRAMES;
-        for (UINT offset = GPU_QUERY_FRAMES - 1; offset >= 1; offset--)
-        {
-            UINT slot = (thisSlot + GPU_QUERY_FRAMES - offset) % GPU_QUERY_FRAMES;
-
-            if (!m_gpuQuerySlotIssued[slot])
-            {
-                continue;
-            }
-            if (!m_gpuDisjointQuery[slot] || !m_gpuTimestampBeginQuery[slot] || !m_gpuTimestampEndQuery[slot])
-            {
-                continue;
-            }
-
-            D3D11_QUERY_DATA_TIMESTAMP_DISJOINT disjoint = {};
-            UINT64 tsBegin = 0;
-            UINT64 tsEnd   = 0;
-
-            HRESULT hrD = m_context->GetData (m_gpuDisjointQuery[slot].Get(),       &disjoint, sizeof (disjoint), 0);
-            HRESULT hrB = m_context->GetData (m_gpuTimestampBeginQuery[slot].Get(), &tsBegin,  sizeof (tsBegin),  0);
-            HRESULT hrE = m_context->GetData (m_gpuTimestampEndQuery[slot].Get(),   &tsEnd,    sizeof (tsEnd),    0);
-
-            if (hrD != S_OK || hrB != S_OK || hrE != S_OK)
-            {
-                continue;
-            }
-
-            m_gpuQuerySlotIssued[slot] = false;     // consumed
-
-            if (disjoint.Disjoint || disjoint.Frequency == 0 || tsEnd <= tsBegin)
-            {
-                continue;
-            }
-
-            UINT64 ticks       = tsEnd - tsBegin;
-            double gpuTimeMs   = static_cast<double> (ticks) * 1000.0 / static_cast<double> (disjoint.Frequency);
-            double denominator = (wallClockMs > 0.01) ? wallClockMs : 16.667;  // fall back to 60Hz vsync interval
-            double load        = std::clamp (gpuTimeMs / denominator * 100.0, 0.0, 100.0);
-
-            m_gpuSmoothedLoadPercent = m_gpuHaveAnyReading
-                                         ? (m_gpuSmoothedLoadPercent * 0.85 + load * 0.15)
-                                         : load;
-            m_gpuHaveAnyReading      = true;
-            break;
-        }
-
-        // Bracket this frame's GPU work with TIMESTAMP queries.
-        if (m_gpuDisjointQuery[thisSlot])
-        {
-            m_context->Begin (m_gpuDisjointQuery[thisSlot].Get());
-        }
-        if (m_gpuTimestampBeginQuery[thisSlot])
-        {
-            m_context->End (m_gpuTimestampBeginQuery[thisSlot].Get());
-        }
-        m_gpuQuerySlotIssued[thisSlot] = true;
-    }
-
     // Clear render target
     ClearRenderTarget();
 
@@ -2083,7 +2154,10 @@ void RenderSystem::Render (const AnimationSystem & animationSystem, const Viewpo
     // Render FPS counter overlay if fps > 0
     if (params.fps > 0.0f)
     {
-        RenderFPSCounter (params.fps, params.rainPercentage, params.streakCount, params.activeHeadCount, m_gpuSmoothedLoadPercent, m_gpuHaveAnyReading);
+        double gpuLoad      = SharedGpuLoadMonitor().GetLoadPercent();
+        bool   gpuLoadValid = gpuLoad >= 0.0;
+
+        RenderFPSCounter (params.fps, params.rainPercentage, params.streakCount, params.activeHeadCount, gpuLoad, gpuLoadValid);
     }
 
     // Debug: Render fade times when enabled and only one streak is visible
@@ -2091,22 +2165,6 @@ void RenderSystem::Render (const AnimationSystem & animationSystem, const Viewpo
     {
         RenderDebugFadeTimes (animationSystem);
     }
-
-    // Close this frame's GPU timing bracket and advance the query slot.
-    {
-        UINT thisSlot = m_gpuQueryFrameIndex % GPU_QUERY_FRAMES;
-
-        if (m_gpuTimestampEndQuery[thisSlot])
-        {
-            m_context->End (m_gpuTimestampEndQuery[thisSlot].Get());
-        }
-        if (m_gpuDisjointQuery[thisSlot])
-        {
-            m_context->End (m_gpuDisjointQuery[thisSlot].Get());
-        }
-    }
-
-    m_gpuQueryFrameIndex++;
 }
 
 

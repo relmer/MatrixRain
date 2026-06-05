@@ -37,6 +37,8 @@
 
 #include <CommCtrl.h>
 #include <PathCch.h>
+#include <Pdh.h>
+#include <PdhMsg.h>
 #include <ShellApi.h>
 #include <ShellScalingApi.h>
 #include <StrSafe.h>

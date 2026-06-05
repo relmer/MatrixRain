@@ -41,7 +41,7 @@ int APIENTRY wWinMain(_In_     HINSTANCE hInstance,
     // comboboxes, etc.) so the config dialog renders with the modern
     // Win11 themed appearance instead of the unthemed XP-classic fallback.
     {
-        INITCOMMONCONTROLSEX iccex = { sizeof (iccex), ICC_WIN95_CLASSES | ICC_STANDARD_CLASSES | ICC_BAR_CLASSES };
+        INITCOMMONCONTROLSEX iccex = { sizeof (iccex), ICC_STANDARD_CLASSES | ICC_BAR_CLASSES };
         InitCommonControlsEx (&iccex);
     }
 
