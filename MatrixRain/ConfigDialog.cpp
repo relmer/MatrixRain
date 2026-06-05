@@ -158,30 +158,36 @@ static const wchar_t * GetInfoTipText (int infoId)
     {
         case IDC_QUALITY_PRESET_INFO:
             return L"Picks a graphics quality preset. Higher presets look richer but "
-                   L"use more GPU. Custom lets you tune the individual settings below. "
+                   L"use more GPU. Custom lets you tune the individual settings below.\r\n"
+                   L"\r\n"
                    L"Significant GPU performance impact.";
 
         case IDC_GLOWINTENSITY_INFO:
             return L"Brightness of the glow effect around bright characters. Setting "
-                   L"this to 0% disables the glow effect entirely. Significant GPU "
-                   L"performance impact.";
+                   L"this to 0% disables the glow effect entirely.\r\n"
+                   L"\r\n"
+                   L"Significant GPU performance impact.";
 
         case IDC_GLOWSIZE_INFO:
-            return L"Width of the glow halo around bright characters. Small GPU "
-                   L"performance impact.";
+            return L"Width of the glow halo around bright characters.";
 
         case IDC_GLOWPASSES_INFO:
             return L"How many times the glow is blurred. Each pass roughly doubles the "
-                   L"glow's width. Significant GPU performance impact.";
+                   L"glow's width.\r\n"
+                   L"\r\n"
+                   L"Significant GPU performance impact.";
 
         case IDC_GLOWRES_INFO:
             return L"Resolution the glow is computed at. Lower is much cheaper and only "
-                   L"slightly softer; Quarter is about 4x cheaper than Full. Significant "
-                   L"GPU performance impact.";
+                   L"slightly softer; Quarter is about 4x cheaper than Full.\r\n"
+                   L"\r\n"
+                   L"Significant GPU performance impact.";
 
         case IDC_GLOWSMOOTH_INFO:
             return L"Number of samples per blur step. Higher gives smoother gradients "
-                   L"with no banding. Moderate GPU performance impact.";
+                   L"with no banding.\r\n"
+                   L"\r\n"
+                   L"Moderate GPU performance impact.";
 
         default:
             return L"";
@@ -217,7 +223,7 @@ static int TickFrequencyForSliderId (int id)
         case IDC_DENSITY_SLIDER:        return 5;
         case IDC_ANIMSPEED_SLIDER:      return 5;
         case IDC_GLOWINTENSITY_SLIDER:  return 10;
-        case IDC_GLOWSIZE_SLIDER:       return 5;
+        case IDC_GLOWSIZE_SLIDER:       return 10;  // 50..200 -> 16 ticks (midpoint at 125)
         case IDC_QUALITY_PRESET_SLIDER: return 1;
         case IDC_GLOWPASSES_SLIDER:     return 1;
         case IDC_GLOWRES_SLIDER:        return 1;
