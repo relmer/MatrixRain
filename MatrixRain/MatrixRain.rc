@@ -44,6 +44,13 @@ IDI_MATRIXRAIN          ICON                    "MatrixRain.ico"
 STRINGTABLE
 BEGIN
     1, "MatrixRain"
+
+    // v1.5 (T028, FR-009, FR-012): property-sheet tab labels.  The
+    // Performance tab is updated once per second to embed live FPS + GPU%
+    // via swprintf_s on IDS_PERFTAB_TITLE_FORMAT.
+    IDS_VISUALS_TAB_TITLE             "Visuals"
+    IDS_PERFORMANCE_TAB_TITLE_INITIAL "Performance"
+    IDS_PERFTAB_TITLE_FORMAT          "Performance (%u fps, %u%% GPU)"
 END
 
 
@@ -105,62 +112,94 @@ STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSM
 CAPTION "MatrixRain configuration"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
+END
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// v1.5 (T028, FR-001, FR-005, FR-008): property-sheet pages.  Visuals on
+// the left tab, Performance (which receives the live "(NN fps, NN%% GPU)"
+// title) on the right.  Pages share the v1.4 control-id space defined in
+// resource.h; controls reserved for later phases (US2 glow checkbox, US3
+// scanline group, US5 colour combo Custom slot) are laid out here as
+// disabled/empty placeholders so the layout doesn't shift as those tasks
+// land.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+IDD_VISUALS_PAGE DIALOGEX 0, 0, 300, 215
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_DISABLED | WS_CAPTION
+CAPTION "Visuals"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
     LTEXT           "Density:",IDC_STATIC,15,14,58,8
     CONTROL         "",IDC_DENSITY_SLIDER,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,90,12,162,20
     LTEXT           "100%",IDC_DENSITY_LABEL,257,14,28,8
-    
+
     LTEXT           "Speed:",IDC_STATIC,15,36,58,8
     CONTROL         "",IDC_ANIMSPEED_SLIDER,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,90,34,162,20
     LTEXT           "75%",IDC_ANIMSPEED_LABEL,257,36,28,8
-    
+
     LTEXT           "Glow intensity:",IDC_STATIC,15,58,58,8
     CONTROL         "ⓘ",IDC_GLOWINTENSITY_INFO,"Button",BS_OWNERDRAW | WS_TABSTOP,74,56,14,14
     CONTROL         "",IDC_GLOWINTENSITY_SLIDER,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,90,56,162,20
     LTEXT           "100%",IDC_GLOWINTENSITY_LABEL,257,58,28,8
-    
+
     LTEXT           "Glow size:",IDC_STATIC,15,80,58,8
     CONTROL         "ⓘ",IDC_GLOWSIZE_INFO,"Button",BS_OWNERDRAW | WS_TABSTOP,74,78,14,14
     CONTROL         "",IDC_GLOWSIZE_SLIDER,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,90,78,162,20
     LTEXT           "100%",IDC_GLOWSIZE_LABEL,257,80,28,8
-    
-    LTEXT           "Color:",IDC_STATIC,15,103,58,8
-    COMBOBOX        IDC_COLORSCHEME_COMBO,90,100,195,60,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    
-    LTEXT           "GPU:",IDC_STATIC,15,125,58,8
-    COMBOBOX        IDC_GPU_COMBO,90,122,195,120,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    
-    GROUPBOX        "Graphics performance and quality",IDC_QUALITY_GROUPBOX,7,144,286,100
-    LTEXT           "Quality:",IDC_STATIC,15,156,58,8
-    CONTROL         "ⓘ",IDC_QUALITY_PRESET_INFO,"Button",BS_OWNERDRAW | WS_TABSTOP,74,154,14,14
-    CONTROL         "",IDC_QUALITY_PRESET_SLIDER,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,90,154,162,20
-    LTEXT           "High",IDC_QUALITY_PRESET_LABEL,257,156,28,8
-    
-    LTEXT           "Glow passes:",IDC_GLOWPASSES_PROMPT,15,178,58,8
-    CONTROL         "ⓘ",IDC_GLOWPASSES_INFO,"Button",BS_OWNERDRAW | WS_TABSTOP,74,176,14,14
-    CONTROL         "",IDC_GLOWPASSES_SLIDER,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,90,176,162,20
-    LTEXT           "3",IDC_GLOWPASSES_LABEL,257,178,28,8
-    
-    LTEXT           "Glow resolution:",IDC_GLOWRES_PROMPT,15,200,58,8
-    CONTROL         "ⓘ",IDC_GLOWRES_INFO,"Button",BS_OWNERDRAW | WS_TABSTOP,74,198,14,14
-    CONTROL         "",IDC_GLOWRES_SLIDER,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,90,198,162,20
-    LTEXT           "Half",IDC_GLOWRES_LABEL,257,200,28,8
-    
-    LTEXT           "Glow smoothness:",IDC_GLOWSMOOTH_PROMPT,15,222,58,8
-    CONTROL         "ⓘ",IDC_GLOWSMOOTH_INFO,"Button",BS_OWNERDRAW | WS_TABSTOP,74,220,14,14
-    CONTROL         "",IDC_GLOWSMOOTH_SLIDER,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,90,220,162,20
-    LTEXT           "High",IDC_GLOWSMOOTH_LABEL,257,222,28,8
 
-    // Bottom checkboxes — two columns.
-    //   Left  column (x =  15, w = 130): debug-app / behavior toggles
-    //   Right column (x = 150, w = 135): debug-overlay toggles
-    CONTROL         "Start in fullscreen",IDC_STARTFULLSCREEN_CHECK,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,255,130,10
-    CONTROL         "Render on all monitors",IDC_MULTIMONITOR_CHECK,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,270,130,10
-    CONTROL         "Show debug statistics",IDC_SHOWDEBUG_CHECK,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,150,255,135,10
-    
-    // Bottom buttons — Reset at the left margin, OK + Cancel at the right.
-    PUSHBUTTON      "Reset",IDC_RESET_BUTTON,15,295,50,14
-    DEFPUSHBUTTON   "OK",IDOK,180,295,50,14
-    PUSHBUTTON      "Cancel",IDCANCEL,235,295,50,14
+    LTEXT           "Color:",IDC_STATIC,15,103,58,8
+    COMBOBOX        IDC_COLORSCHEME_COMBO,90,100,195,80,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+
+    // Scanlines groupbox placeholder — controls land in Phase 5 (US3).
+    GROUPBOX        "Scanlines",IDC_SCANLINES_GROUPBOX,7,122,286,68
+
+    CONTROL         "Start in fullscreen",IDC_STARTFULLSCREEN_CHECK,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,197,130,10
+END
+
+
+
+IDD_PERFORMANCE_PAGE DIALOGEX 0, 0, 300, 215
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_DISABLED | WS_CAPTION
+CAPTION "Performance"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "GPU:",IDC_STATIC,15,14,58,8
+    COMBOBOX        IDC_GPU_COMBO,90,12,195,120,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+
+    // Glow Enabled checkbox placeholder — wired in Phase 4 (US2).
+    CONTROL         "Enable glow",IDC_GLOW_ENABLED_CHECK,"Button",BS_AUTOCHECKBOX | WS_TABSTOP | WS_DISABLED,15,36,130,10
+
+    GROUPBOX        "Graphics performance and quality",IDC_QUALITY_GROUPBOX,7,52,286,118
+    LTEXT           "Quality:",IDC_STATIC,15,64,58,8
+    CONTROL         "ⓘ",IDC_QUALITY_PRESET_INFO,"Button",BS_OWNERDRAW | WS_TABSTOP,74,62,14,14
+    CONTROL         "",IDC_QUALITY_PRESET_SLIDER,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,90,62,162,20
+    LTEXT           "High",IDC_QUALITY_PRESET_LABEL,257,64,28,8
+
+    LTEXT           "Glow passes:",IDC_GLOWPASSES_PROMPT,15,86,58,8
+    CONTROL         "ⓘ",IDC_GLOWPASSES_INFO,"Button",BS_OWNERDRAW | WS_TABSTOP,74,84,14,14
+    CONTROL         "",IDC_GLOWPASSES_SLIDER,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,90,84,162,20
+    LTEXT           "3",IDC_GLOWPASSES_LABEL,257,86,28,8
+
+    LTEXT           "Glow resolution:",IDC_GLOWRES_PROMPT,15,108,58,8
+    CONTROL         "ⓘ",IDC_GLOWRES_INFO,"Button",BS_OWNERDRAW | WS_TABSTOP,74,106,14,14
+    CONTROL         "",IDC_GLOWRES_SLIDER,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,90,106,162,20
+    LTEXT           "Half",IDC_GLOWRES_LABEL,257,108,28,8
+
+    LTEXT           "Glow smoothness:",IDC_GLOWSMOOTH_PROMPT,15,130,58,8
+    CONTROL         "ⓘ",IDC_GLOWSMOOTH_INFO,"Button",BS_OWNERDRAW | WS_TABSTOP,74,128,14,14
+    CONTROL         "",IDC_GLOWSMOOTH_SLIDER,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,90,128,162,20
+    LTEXT           "High",IDC_GLOWSMOOTH_LABEL,257,130,28,8
+
+    CONTROL         "Render on all monitors",IDC_MULTIMONITOR_CHECK,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,180,140,10
+    CONTROL         "Show debug statistics",IDC_SHOWDEBUG_CHECK,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,155,180,135,10
+
+    // Reset to defaults — moved onto the Performance page since OK/Cancel
+    // (and Apply, suppressed by PSH_NOAPPLYNOW) are now frame-owned buttons.
+    PUSHBUTTON      "Reset to defaults",IDC_RESET_BUTTON,15,197,80,14
 END
 
 #endif    // English (United States) resources

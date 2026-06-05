@@ -213,6 +213,13 @@ GpuLoadMonitor & SharedGpuLoadMonitor()
 
 
 
+double QueryProcessGpuLoadPercent()
+{
+    return SharedGpuLoadMonitor().GetLoadPercent();
+}
+
+
+
 
 
 RenderSystem::~RenderSystem()

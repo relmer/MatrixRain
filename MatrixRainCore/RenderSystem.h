@@ -27,6 +27,23 @@ using Microsoft::WRL::ComPtr;
 // Forward declarations
 class CharacterStreak;
 
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  QueryProcessGpuLoadPercent
+//
+//  Returns the throttled (~1 Hz internally) process-scoped GPU load
+//  percentage that matches Task Manager's per-process "GPU" column.
+//  Returns -1.0 until the first PDH collection produces data, or if
+//  PDH initialisation has permanently failed.  Wired into the v1.5
+//  property-sheet 1 Hz title timer (T032) alongside the per-frame
+//  FPS publisher.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+double QueryProcessGpuLoadPercent();
+
 ////////////////////////////////////////////////////////////////////////////////
 //
 //  RenderSystem

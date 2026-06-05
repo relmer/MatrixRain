@@ -1,6 +1,7 @@
 #include "pch.h"
 
 #include <commctrl.h>
+#include <prsht.h>
 #pragma comment(lib, "comctl32.lib")
 
 #include "ConfigDialog.h"
@@ -9,6 +10,8 @@
 #include "..\MatrixRainCore\ApplicationState.h"
 #include "..\MatrixRainCore\ConfigDialogController.h"
 #include "..\MatrixRainCore\CommandLine.h"
+#include "..\MatrixRainCore\MonitorRenderContext.h"
+#include "..\MatrixRainCore\RenderSystem.h"
 #include "..\MatrixRainCore\WindowsAdapterProvider.h"
 #include "resource.h"
 
@@ -31,15 +34,41 @@ struct DialogContext
     // entry is added (the user picks the default adapter by name directly).
     std::vector<std::wstring>                 m_gpuAdapterDescriptions;
 
-    // T058/T059 - shared tooltip control + the keyboard-activation TTF_TRACK
-    // tool whose text we update on each info-button BN_CLICKED.
-    HWND                                      m_hTooltip            = nullptr;
+    // T058/T059 - per-page tooltip control and shared TTF_TRACK tool whose
+    // text is updated on each info-button BN_CLICKED.  Stored on the page
+    // HWND via SetPropW(kPageTooltipProp) so OnInfoButtonClick / DismissInfoTip
+    // can look it up without knowing the page index.
 
     // Larger font used to render the info-tip ⓘ glyph at 1.5x the dialog's
-    // default font size in the BS_OWNERDRAW button paint path.  Created in
-    // OnInitDialog from the dialog's WM_GETFONT; destroyed in OnDestroy.
+    // default font size in the BS_OWNERDRAW button paint path.  Created on
+    // the first page WM_INITDIALOG; destroyed on sheet WM_DESTROY.
     HFONT                                     m_hInfoTipFont        = nullptr;
+
+    // v1.5 (T029, T032, T033, contracts/propertysheet.md): frame state.
+    // m_hSheet is the property-sheet frame HWND (returned by PropertySheetW
+    // in modeless mode); both page procs and the title-timer reach it via
+    // GetParent or via the SetProp/GetProp keyed to kSheetContextProp.
+    // m_applied / m_rolledBack make the per-page PSN_APPLY / PSN_RESET
+    // notifications idempotent — only the first page to see each one
+    // performs the commit/rollback work.
+    HWND                                      m_hSheet              = nullptr;
+    bool                                      m_applied             = false;
+    bool                                      m_rolledBack          = false;
+    WCHAR                                     m_perfTitleFormat[64] = {};
 };
+
+
+// v1.5 (T029): property name used to ferry DialogContext * from the
+// property-sheet PSCB_INITIALIZED callback into the per-tick TimerProc
+// and the page procs.  Stored on the frame HWND.
+static constexpr const wchar_t kSheetContextProp[] = L"MatrixRainSheetCtx";
+
+// v1.5 (T029): per-page tooltip stored on each page HWND so OnInfoButton*
+// helpers can reach it without knowing which page they're running on.
+static constexpr const wchar_t kPageTooltipProp[]  = L"MatrixRainPageToolt";
+
+// v1.5 (T032): 1 Hz title-update timer ID (frame-scoped).
+static constexpr UINT_PTR      kPerfTitleTimerId   = IDT_PERF_TITLE_TIMER;
 
 
 // Sentinel uId for the single TTF_TRACK tool used by keyboard activation.
@@ -331,9 +360,9 @@ static constexpr UINT_PTR kInfoTipDismissTimerId = 0xC0C0C0DEu;
 
 static void OnInfoButtonClick (HWND hDlg, int infoId)
 {
-    DialogContext * pContext = GetDialogContext (hDlg);
+    HWND hTooltip = static_cast<HWND> (GetPropW (hDlg, kPageTooltipProp));
 
-    if (!pContext || !pContext->m_hTooltip)
+    if (!hTooltip)
     {
         return;
     }
@@ -355,14 +384,14 @@ static void OnInfoButtonClick (HWND hDlg, int infoId)
     ti.uId       = kTrackTipUId;
     ti.lpszText  = const_cast<LPWSTR> (GetInfoTipText (infoId));
 
-    SendMessageW (pContext->m_hTooltip, TTM_UPDATETIPTEXTW, 0, (LPARAM) &ti);
+    SendMessageW (hTooltip, TTM_UPDATETIPTEXTW, 0, (LPARAM) &ti);
 
-    SendMessageW (pContext->m_hTooltip,
+    SendMessageW (hTooltip,
                   TTM_TRACKPOSITION,
                   0,
                   MAKELPARAM (btnRect.right + 4, btnRect.bottom + 2));
 
-    SendMessageW (pContext->m_hTooltip, TTM_TRACKACTIVATE, TRUE, (LPARAM) &ti);
+    SendMessageW (hTooltip, TTM_TRACKACTIVATE, TRUE, (LPARAM) &ti);
 
     SetTimer (hDlg, kInfoTipDismissTimerId, 5000, nullptr);
 }
@@ -372,9 +401,9 @@ static void OnInfoButtonClick (HWND hDlg, int infoId)
 
 static void DismissInfoTip (HWND hDlg)
 {
-    DialogContext * pContext = GetDialogContext (hDlg);
+    HWND hTooltip = static_cast<HWND> (GetPropW (hDlg, kPageTooltipProp));
 
-    if (!pContext || !pContext->m_hTooltip)
+    if (!hTooltip)
     {
         return;
     }
@@ -383,7 +412,7 @@ static void DismissInfoTip (HWND hDlg)
     ti.hwnd      = hDlg;
     ti.uId       = kTrackTipUId;
 
-    SendMessageW (pContext->m_hTooltip, TTM_TRACKACTIVATE, FALSE, (LPARAM) &ti);
+    SendMessageW (hTooltip, TTM_TRACKACTIVATE, FALSE, (LPARAM) &ti);
     KillTimer (hDlg, kInfoTipDismissTimerId);
 }
 
@@ -693,79 +722,24 @@ static BOOL OnInitDialog (HWND hDlg, LPARAM initParam)
 {
     HRESULT                     hr           = S_OK;
     BOOL                        fSuccess     = FALSE;
-    HWND                        parentHwnd   = GetParent (hDlg);
-    RECT                        dialogRect   = {};
-    RECT                        centerRect   = {};
-    int                         dialogWidth  = 0;
-    int                         dialogHeight = 0;
-    int                         centerX      = 0;
-    int                         centerY      = 0;
-    POINT                       dialogPos    = {};
-    DialogContext             * pContext     = reinterpret_cast<DialogContext *> (initParam);
+    DialogContext             * pContext     = nullptr;
     const ScreenSaverSettings * pSettings    = nullptr;
-    WINDOWPLACEMENT             wp           = { sizeof (WINDOWPLACEMENT) };
+    PROPSHEETPAGEW            * pPsp         = reinterpret_cast<PROPSHEETPAGEW *> (initParam);
 
 
+    // v1.5 (T029): the page proc receives the PROPSHEETPAGE pointer in
+    // WM_INITDIALOG's lParam.  We tucked the DialogContext * into psp->lParam
+    // at sheet build time (see BuildPropSheetHeader).
+    CBRAEx (pPsp != nullptr, E_UNEXPECTED);
 
+    pContext = reinterpret_cast<DialogContext *> (pPsp->lParam);
     CBRAEx (pContext != nullptr && pContext->m_controller != nullptr, E_UNEXPECTED);
 
     SetWindowLongPtr (hDlg, DWLP_USER, reinterpret_cast<LONG_PTR> (pContext));
 
-    // Center dialog for /c (no HWND) or live overlay modes
-    // Skip centering for /c:<HWND> (Control Panel with parent)
-    if (!parentHwnd || pContext->m_controller->IsLiveMode())
-    {
-        HWND appHwnd = nullptr;
-        
-        
-        
-        // Get window to center on (application window or primary monitor)
-        GetWindowRect (hDlg, &dialogRect);
-        dialogWidth  = dialogRect.right  - dialogRect.left;
-        dialogHeight = dialogRect.bottom - dialogRect.top;
-
-        if (pContext->m_pApp != nullptr)
-        {
-            // Live overlay mode - center on application window
-            appHwnd = pContext->m_pApp->GetMainWindowHwnd();
-        }
-        
-        if (appHwnd)
-        {
-            GetWindowRect (appHwnd, &centerRect);       
-        }
-        else
-        {
-            // No app window - center on primary monitor
-            centerRect.left   = 0;
-            centerRect.top    = 0;
-            centerRect.right  = GetSystemMetrics (SM_CXSCREEN);
-            centerRect.bottom = GetSystemMetrics (SM_CYSCREEN);
-        }
-        
-        // Calculate centered position
-        centerX = (centerRect.left + centerRect.right  - dialogWidth)  / 2;
-        centerY = (centerRect.top  + centerRect.bottom - dialogHeight) / 2;
-        
-        dialogPos.x = centerX;
-        dialogPos.y = centerY;
-        
-        SetWindowPos (hDlg, nullptr, dialogPos.x, dialogPos.y, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
-    }
-    // else: Control Panel mode with parent HWND - let Windows handle positioning
-
-#ifndef _DEBUG
-    if (pContext->m_controller->IsLiveMode())
-    {
-        if (parentHwnd)
-        {
-            if (GetWindowPlacement (parentHwnd, &wp) && wp.showCmd == SW_SHOWMAXIMIZED)
-            {
-                SetWindowPos (hDlg, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
-            }
-        }
-    }
-#endif
+    // v1.5 (T029): centering is owned by the property-sheet frame's
+    // PSCB_INITIALIZED callback (the frame is what the user sees moving),
+    // not by individual pages.
 
     pSettings = &pContext->m_controller->GetSettings();
     
@@ -788,12 +762,7 @@ static BOOL OnInitDialog (HWND hDlg, LPARAM initParam)
     InitializeColorSchemeCombo (hDlg, pSettings->m_colorSchemeKey);
     InitializeGpuCombo         (hDlg, pContext, pSettings->m_gpuAdapter);
 
-    // Quality preset combo + advanced disclosure.  Three named presets +
-    // Custom; the dialog code selects whichever matches the loaded
-    // settings.
-    // Quality preset slider (0=Low, 1=Medium, 2=High, 3=Custom).  Replaces
-     // the v1.4 combobox per UX feedback — discrete trackbar with named
-     // value label matches the rest of the dialog's slider+label pattern.
+    // Quality preset slider (0=Low, 1=Medium, 2=High, 3=Custom).
     SendDlgItemMessageW (hDlg, IDC_QUALITY_PRESET_SLIDER, TBM_SETRANGE,   TRUE, MAKELPARAM (0, 3));
     SendDlgItemMessageW (hDlg, IDC_QUALITY_PRESET_SLIDER, TBM_SETTICFREQ, 1, 0);
     SendDlgItemMessageW (hDlg, IDC_QUALITY_PRESET_SLIDER, TBM_SETPOS,     TRUE, static_cast<int> (pSettings->m_qualityPreset));
@@ -803,20 +772,27 @@ static BOOL OnInitDialog (HWND hDlg, LPARAM initParam)
     InitializeResolutionSlider  (hDlg, static_cast<int> (pSettings->m_advancedValues.m_bloomResolutionDivisor));
     InitializeSmoothnessSlider  (hDlg, static_cast<int> (pSettings->m_advancedValues.m_blurTaps));
 
-    // Tooltip surface for the IDC_*_INFO indicators (FR-034/FR-035/FR-036).
-    // The TTN_GETDISPINFO notification is handled in ConfigDialogProc.
-    pContext->m_hTooltip = CreateAndRegisterTooltip (hDlg);
+    // Per-page tooltip surface for the IDC_*_INFO indicators (only the
+    // info buttons actually present on this page get registered tools).
+    {
+        HWND hTooltip = CreateAndRegisterTooltip (hDlg);
 
-    // Create the 1.5x-size font used by the owner-drawn ⓘ glyphs.  The
-    // base font comes from the dialog itself (WM_GETFONT).
+        if (hTooltip)
+        {
+            SetPropW (hDlg, kPageTooltipProp, hTooltip);
+        }
+    }
+
+    // Create the 1.5x-size font used by the owner-drawn ⓘ glyphs ONCE per
+    // sheet — both pages share the same font.  Created on whichever page
+    // initialises first (typically Visuals due to PSP_PREMATURE order).
+    if (!pContext->m_hInfoTipFont)
     {
         HFONT hDialogFont = reinterpret_cast<HFONT> (SendMessageW (hDlg, WM_GETFONT, 0, 0));
         LOGFONTW lf       = {};
 
         if (hDialogFont && GetObjectW (hDialogFont, sizeof (lf), &lf))
         {
-            // lfHeight is negative for character-cell heights; multiply
-            // absolute value by 1.5 and preserve sign.
             lf.lfHeight = (lf.lfHeight < 0)
                             ? -static_cast<LONG> ((-lf.lfHeight) * 3 / 2)
                             :  static_cast<LONG> ( lf.lfHeight * 3 / 2);
@@ -1276,101 +1252,6 @@ Error:
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-//  OnOK
-//
-////////////////////////////////////////////////////////////////////////////////
-
-static BOOL OnOK (HWND hDlg)
-{
-    HRESULT                  hr          = S_OK;
-    BOOL                     fSuccess    = FALSE;
-    ConfigDialogController * pController = GetControllerFromDialog (hDlg);
-
-
-
-    CBRAEx (pController != nullptr, E_UNEXPECTED);
-
-    hr = pController->ApplyChanges();
-    CHRL (hr, L"Failed to save settings to registry");
-    
-    // For modeless dialogs, use DestroyWindow instead of EndDialog
-    if (pController->IsLiveMode())
-    {
-        DestroyWindow (hDlg);
-    }
-    else
-    {
-        EndDialog (hDlg, IDOK);
-    }
-    
-    fSuccess = TRUE;
-
-Error:
-    return fSuccess;
-}
-
-
-
-
-
-////////////////////////////////////////////////////////////////////////////////
-//
-//  OnCancel
-//
-////////////////////////////////////////////////////////////////////////////////
-
-static BOOL OnCancel (HWND hDlg)
-{
-    HRESULT                  hr          = S_OK;
-    BOOL                     fSuccess    = FALSE;
-    ConfigDialogController * pController = GetControllerFromDialog (hDlg);
-
-
-
-    CBRAEx (pController != nullptr, E_UNEXPECTED);
-
-    // For modeless dialogs, revert live preview changes back to snapshot
-    if (pController->IsLiveMode())
-    {
-        Application * pApp           = GetApplicationFromDialog (hDlg);
-        bool          needsRebuild   = pController->LiveModeRebuildRequired();
-
-        pController->CancelLiveMode();
-
-        // Only rebuild contexts when a field that requires destroy/recreate
-        // (multimon span, GPU adapter) actually changed — otherwise the
-        // user sees an ugly flicker on every dialog close.
-        if (pApp && needsRebuild)
-        {
-            pApp->ApplyDisplayModeChange();
-        }
-
-        // Clear the dialog handle before destroying so input handling resumes
-        if (pApp)
-        {
-            pApp->SetConfigDialog (nullptr);
-        }
-
-        DestroyWindow (hDlg);
-    }
-    else
-    {
-        pController->CancelChanges();
-        EndDialog (hDlg, IDCANCEL);
-    }
-    
-    fSuccess = TRUE;
-
-Error:
-    return fSuccess;
-}
-
-
-
-
-
-////////////////////////////////////////////////////////////////////////////////
-//
 //  OnCommand
 //
 ////////////////////////////////////////////////////////////////////////////////
@@ -1428,14 +1309,6 @@ static BOOL OnCommand (HWND hDlg, WPARAM wParam)
         case IDC_RESET_BUTTON:
             OnResetButton (hDlg);
             break;
-            
-        case IDOK:
-            fSuccess = OnOK (hDlg);
-            break;
-            
-        case IDCANCEL:
-            fSuccess = OnCancel (hDlg);
-            break;
     }
 
 Error:
@@ -1448,52 +1321,24 @@ Error:
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-//  OnDestroy
+//  OnDestroy — per-page cleanup only.  The shared DialogContext (controller,
+//  app pointer, info-tip font) is owned by the property-sheet frame and
+//  freed in PropSheetCallback / DestroySheetContext, not here.
 //
 ////////////////////////////////////////////////////////////////////////////////
 
 static void OnDestroy (HWND hDlg)
 {
-    DialogContext          * pContext    = GetDialogContext (hDlg);
-    ConfigDialogController * pController = pContext ? pContext->m_controller.get() : nullptr;
+    HWND hTooltip = static_cast<HWND> (GetPropW (hDlg, kPageTooltipProp));
 
 
-
-    if (pController && pController->IsLiveMode())
+    if (hTooltip)
     {
-        Application * pApp = GetApplicationFromDialog (hDlg);
-
-
-
-        if (pApp)
-        {
-            pApp->SetConfigDialog (nullptr);
-
-            // Only quit the app if it was launched in /c settings-only mode
-            if (pApp->GetScreenSaverMode() == ScreenSaverMode::SettingsDialog)
-            {
-                PostQuitMessage (0);
-            }
-        }
+        DestroyWindow (hTooltip);
+        RemovePropW   (hDlg, kPageTooltipProp);
     }
 
-
-
-    if (pContext)
-    {
-        SetWindowLongPtr (hDlg, DWLP_USER, 0);
-
-        if (pContext->m_hInfoTipFont)
-        {
-            DeleteObject (pContext->m_hInfoTipFont);
-            pContext->m_hInfoTipFont = nullptr;
-        }
-        
-        if (pContext->m_ownsContextMemory)
-        {
-            delete pContext;
-        }
-    }
+    SetWindowLongPtr (hDlg, DWLP_USER, 0);
 }
 
 
@@ -1504,14 +1349,20 @@ static void OnDestroy (HWND hDlg)
 //
 //  ConfigDialogProc
 //
-//  Dialog procedure for IDD_MATRIXRAIN_SAVER_CONFIG.
+//  Page dialog procedure for IDD_VISUALS_PAGE / IDD_PERFORMANCE_PAGE.
+//  v1.5 (T029, T030): both pages share this proc — control handlers
+//  dispatch by ID, so a page only handles the controls actually present
+//  in its template.  PSN_APPLY / PSN_RESET notifications (frame-owned
+//  OK / Cancel buttons) are translated into CommitLiveMode /
+//  CancelLiveMode here, with idempotency guards on DialogContext so the
+//  second page to see the notification is a no-op.
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-static INT_PTR CALLBACK ConfigDialogProc (HWND   hDlg,
-                                           UINT   message,
-                                           WPARAM wParam,
-                                           LPARAM lParam)
+static INT_PTR CALLBACK PageDlgProc (HWND   hDlg,
+                                      UINT   message,
+                                      WPARAM wParam,
+                                      LPARAM lParam)
 {
     INT_PTR result = FALSE;
 
@@ -1586,11 +1437,15 @@ static INT_PTR CALLBACK ConfigDialogProc (HWND   hDlg,
         {
             LPNMHDR pnmhdr = reinterpret_cast<LPNMHDR> (lParam);
 
-            if (pnmhdr && (pnmhdr->code == TTN_GETDISPINFOW || pnmhdr->code == TTN_NEEDTEXTW))
+            if (!pnmhdr)
             {
-                // Resolve the tool's hwnd back to an IDC_*_INFO control id
-                // and supply the locked infotip text via LPSTR_TEXTCALLBACK.
-                NMTTDISPINFOW * pdi = reinterpret_cast<NMTTDISPINFOW *> (lParam);
+                break;
+            }
+
+            // Tooltip text callback — supplies the locked infotip string.
+            if (pnmhdr->code == TTN_GETDISPINFOW || pnmhdr->code == TTN_NEEDTEXTW)
+            {
+                NMTTDISPINFOW * pdi       = reinterpret_cast<NMTTDISPINFOW *> (lParam);
                 HWND            hToolHwnd = reinterpret_cast<HWND> (pdi->hdr.idFrom);
                 int             toolId    = GetDlgCtrlID (hToolHwnd);
 
@@ -1599,6 +1454,63 @@ static INT_PTR CALLBACK ConfigDialogProc (HWND   hDlg,
                     pdi->lpszText = const_cast<LPWSTR> (GetInfoTipText (toolId));
                     result        = TRUE;
                 }
+                break;
+            }
+
+            // v1.5 (T030, T033, FR-004a, contracts/propertysheet.md):
+            // property-sheet OK / Cancel notifications.
+            DialogContext          * pContext    = GetDialogContext (hDlg);
+            ConfigDialogController * pController = pContext ? pContext->m_controller.get() : nullptr;
+
+            if (!pContext || !pController)
+            {
+                break;
+            }
+
+            switch (pnmhdr->code)
+            {
+                case PSN_APPLY:
+                    if (!pContext->m_applied)
+                    {
+                        pContext->m_applied = true;
+
+                        if (pController->IsLiveMode())
+                        {
+                            pController->CommitLiveMode();
+                        }
+                        else
+                        {
+                            pController->ApplyChanges();
+                        }
+                    }
+                    SetWindowLongPtr (hDlg, DWLP_MSGRESULT, PSNRET_NOERROR);
+                    result = TRUE;
+                    break;
+
+                case PSN_RESET:
+                    if (!pContext->m_rolledBack)
+                    {
+                        pContext->m_rolledBack = true;
+
+                        if (pController->IsLiveMode())
+                        {
+                            bool          needsRebuild = pController->LiveModeRebuildRequired();
+                            Application * pApp         = pContext->m_pApp;
+
+                            pController->CancelLiveMode();
+
+                            if (pApp && needsRebuild)
+                            {
+                                pApp->ApplyDisplayModeChange();
+                            }
+                        }
+                        else
+                        {
+                            pController->CancelChanges();
+                        }
+                    }
+                    result = TRUE;
+                    break;
             }
             break;
         }
@@ -1634,19 +1546,223 @@ static INT_PTR CALLBACK ConfigDialogProc (HWND   hDlg,
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-//  ShowConfigDialog
+//  v1.5 property-sheet host (T029, T031, T032, T033)
 //
-//  Display configuration dialog for screensaver settings.
-//  Modal mode (Control Panel): HWND provided via /c:<HWND>
+//  Builds the PROPSHEETHEADERW + 2 PROPSHEETPAGEW templates, installs the
+//  1 Hz title-update timer in PSCB_INITIALIZED, and tears down the shared
+//  DialogContext after the sheet closes.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+static VOID CALLBACK PerfTitleTimerProc (HWND hSheet, UINT /*msg*/, UINT_PTR /*id*/, DWORD /*time*/)
+{
+    DialogContext * pContext = static_cast<DialogContext *> (GetPropW (hSheet, kSheetContextProp));
+
+
+    if (!pContext)
+    {
+        return;
+    }
+
+    // FPS source — primary monitor's render context (FR-010).
+    unsigned fps = 0;
+
+    if (pContext->m_pApp)
+    {
+        MonitorRenderContext * pPrimary = pContext->m_pApp->GetPrimaryRenderContext();
+        bool                   hasFps   = false;
+        float                  fpsValue = 0.0f;
+
+        if (pPrimary)
+        {
+            fpsValue = pPrimary->GetPublishedFps (hasFps);
+
+            if (hasFps && fpsValue > 0.0f)
+            {
+                fps = static_cast<unsigned> (fpsValue + 0.5f);
+            }
+        }
+    }
+
+    // GPU% source — PDH counter shared with the debug overlay (FR-011).
+    unsigned gpu     = 0;
+    double   gpuLoad = QueryProcessGpuLoadPercent();
+
+    if (gpuLoad >= 0.0)
+    {
+        gpu = static_cast<unsigned> (gpuLoad + 0.5);
+    }
+
+    WCHAR title[64] = {};
+    StringCchPrintfW (title,
+                      ARRAYSIZE (title),
+                      pContext->m_perfTitleFormat,
+                      fps,
+                      gpu);
+
+    HWND hTab = PropSheet_GetTabControl (hSheet);
+
+    if (!hTab)
+    {
+        return;
+    }
+
+    TCITEMW item = {};
+    item.mask    = TCIF_TEXT;
+    item.pszText = title;
+
+    TabCtrl_SetItem (hTab, 1 /* Performance is page index 1 */, &item);
+}
+
+
+
+
+
+static int CALLBACK PropSheetCallback (HWND hSheet, UINT uMsg, LPARAM lParam)
+{
+    UNREFERENCED_PARAMETER (lParam);
+
+
+    switch (uMsg)
+    {
+        case PSCB_INITIALIZED:
+        {
+            DialogContext * pContext = static_cast<DialogContext *> (GetPropW (hSheet, kSheetContextProp));
+
+            if (!pContext)
+            {
+                break;
+            }
+
+            pContext->m_hSheet = hSheet;
+
+            // Update Application's "current dialog" pointer to the sheet
+            // frame so the main message loop's IsDialogMessage branch picks
+            // up Tab/Enter routing correctly (T031, research.md R1).
+            if (pContext->m_pApp)
+            {
+                pContext->m_pApp->SetConfigDialog (hSheet);
+            }
+
+            // Centre the sheet over the application window (live overlay)
+            // or the primary monitor (CPL).  Moved here from the per-page
+            // OnInitDialog — the frame is what the user sees, not the pages.
+            {
+                RECT  sheetRect  = {};
+                RECT  centerRect = {};
+                HWND  appHwnd    = pContext->m_pApp ? pContext->m_pApp->GetMainWindowHwnd() : nullptr;
+
+                GetWindowRect (hSheet, &sheetRect);
+
+                int sheetW = sheetRect.right  - sheetRect.left;
+                int sheetH = sheetRect.bottom - sheetRect.top;
+
+                if (appHwnd)
+                {
+                    GetWindowRect (appHwnd, &centerRect);
+                }
+                else
+                {
+                    centerRect.left   = 0;
+                    centerRect.top    = 0;
+                    centerRect.right  = GetSystemMetrics (SM_CXSCREEN);
+                    centerRect.bottom = GetSystemMetrics (SM_CYSCREEN);
+                }
+
+                int x = (centerRect.left + centerRect.right  - sheetW) / 2;
+                int y = (centerRect.top  + centerRect.bottom - sheetH) / 2;
+
+                SetWindowPos (hSheet, nullptr, x, y, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
+            }
+
+            // Load the format string once and cache on the context.
+            LoadStringW (GetModuleHandleW (nullptr),
+                         IDS_PERFTAB_TITLE_FORMAT,
+                         pContext->m_perfTitleFormat,
+                         ARRAYSIZE (pContext->m_perfTitleFormat));
+
+            // 1 Hz timer; TimerProc form so we don't have to subclass the
+            // comctl32-owned frame to catch WM_TIMER.  KillTimer is implicit
+            // when the frame is destroyed.
+            SetTimer (hSheet, kPerfTitleTimerId, 1000, PerfTitleTimerProc);
+
+            // Fire one immediate tick so the title shows something other
+            // than "Performance" before the first second elapses.
+            PerfTitleTimerProc (hSheet, WM_TIMER, kPerfTitleTimerId, GetTickCount());
+            break;
+        }
+    }
+
+    return 0;
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  BuildPropSheet — populate PROPSHEETPAGEW[2] and PROPSHEETHEADERW pointing
+//  at the Visuals + Performance templates and at PageDlgProc.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+static void BuildPropSheet (HINSTANCE         hInstance,
+                             HWND              parentHwnd,
+                             DialogContext   * pContext,
+                             bool              modeless,
+                             PROPSHEETPAGEW    psPages[2],
+                             PROPSHEETHEADERW & psHeader)
+{
+    psPages[0]              = {};
+    psPages[0].dwSize       = sizeof (PROPSHEETPAGEW);
+    psPages[0].dwFlags      = PSP_USETITLE | PSP_PREMATURE;
+    psPages[0].hInstance    = hInstance;
+    psPages[0].pszTemplate  = MAKEINTRESOURCEW (IDD_VISUALS_PAGE);
+    psPages[0].pszTitle     = MAKEINTRESOURCEW (IDS_VISUALS_TAB_TITLE);
+    psPages[0].pfnDlgProc   = PageDlgProc;
+    psPages[0].lParam       = reinterpret_cast<LPARAM> (pContext);
+
+    psPages[1]              = {};
+    psPages[1].dwSize       = sizeof (PROPSHEETPAGEW);
+    psPages[1].dwFlags      = PSP_USETITLE | PSP_PREMATURE;
+    psPages[1].hInstance    = hInstance;
+    psPages[1].pszTemplate  = MAKEINTRESOURCEW (IDD_PERFORMANCE_PAGE);
+    psPages[1].pszTitle     = MAKEINTRESOURCEW (IDS_PERFORMANCE_TAB_TITLE_INITIAL);
+    psPages[1].pfnDlgProc   = PageDlgProc;
+    psPages[1].lParam       = reinterpret_cast<LPARAM> (pContext);
+
+    psHeader                = {};
+    psHeader.dwSize         = sizeof (PROPSHEETHEADERW);
+    psHeader.dwFlags        = PSH_PROPSHEETPAGE | PSH_NOAPPLYNOW | PSH_PROPTITLE | PSH_USECALLBACK
+                              | (modeless ? PSH_MODELESS : 0u);
+    psHeader.hwndParent     = parentHwnd;
+    psHeader.hInstance      = hInstance;
+    psHeader.pszCaption     = L"MatrixRain configuration";
+    psHeader.nPages         = 2;
+    psHeader.nStartPage     = 0;
+    psHeader.ppsp           = psPages;
+    psHeader.pfnCallback    = PropSheetCallback;
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  ShowConfigDialog (modal, Control Panel /c:<HWND>)
 //
 ////////////////////////////////////////////////////////////////////////////////
 
 int ShowConfigDialog (HINSTANCE hInstance, const ScreenSaverModeContext & context)
 {
-    HRESULT         hr         = S_OK;
-    DialogContext   dlgContext;
-    HWND            parentHwnd = context.m_previewParentHwnd;
-    INT_PTR         result     = -1;
+    HRESULT          hr         = S_OK;
+    DialogContext    dlgContext;
+    PROPSHEETPAGEW   psPages[2] = {};
+    PROPSHEETHEADERW psHeader   = {};
+    HWND             parentHwnd = context.m_previewParentHwnd;
+    INT_PTR          result     = -1;
     
 
 
@@ -1655,11 +1771,34 @@ int ShowConfigDialog (HINSTANCE hInstance, const ScreenSaverModeContext & contex
     hr = dlgContext.m_controller->Initialize();
     CHRA (hr);
 
-    result = DialogBoxParamW (hInstance,
-                               MAKEINTRESOURCEW (IDD_MATRIXRAIN_SAVER_CONFIG),
-                               parentHwnd,
-                               ConfigDialogProc,
-                               reinterpret_cast<LPARAM> (&dlgContext));
+    BuildPropSheet (hInstance, parentHwnd, &dlgContext, /*modeless=*/false, psPages, psHeader);
+
+    // Stash the context on a "hint" property of a temp hidden window?  No —
+    // PSCB_INITIALIZED runs on the sheet hwnd which we don't have ahead of
+    // time.  Workaround: a static thread_local fallback used inside the
+    // callback as a bootstrap (cleared on entry).  Modal path is single-
+    // threaded so this is safe.
+    static thread_local DialogContext * tls_pendingContext = nullptr;
+    tls_pendingContext = &dlgContext;
+
+    // Wrapper callback that installs the SetProp on first call, then
+    // delegates to PropSheetCallback.  We use a lambda-free static here
+    // so it's a plain C callback.
+    struct CbHelper
+    {
+        static int CALLBACK Trampoline (HWND hSheet, UINT uMsg, LPARAM lParam)
+        {
+            if (uMsg == PSCB_INITIALIZED && tls_pendingContext)
+            {
+                SetPropW (hSheet, kSheetContextProp, tls_pendingContext);
+                tls_pendingContext = nullptr;
+            }
+            return PropSheetCallback (hSheet, uMsg, lParam);
+        }
+    };
+    psHeader.pfnCallback = CbHelper::Trampoline;
+
+    result = PropertySheetW (&psHeader);
 
     if (result == -1)
     {
@@ -1673,7 +1812,9 @@ Error:
         return -1;
     }
 
-    return static_cast<int> (result);
+    // PropertySheetW returns ID_PSREBOOT, ID_PSRESTARTWINDOWS, 1 (OK), or 0
+    // (Cancel) in modal mode.  Map to IDOK / IDCANCEL for the caller.
+    return (result > 0) ? IDOK : IDCANCEL;
 }
 
 
@@ -1682,13 +1823,71 @@ Error:
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-//  CreateConfigDialog
+//  CreateConfigDialog (modeless, live overlay)
 //
-//  Create modeless configuration dialog over running application.
-//  Live overlay mode: /c without HWND - dialog shown atop animation
-//  Returns dialog HWND via phDlg out parameter.
+//  Returns the property-sheet frame HWND via phDlg; lifetime of the
+//  DialogContext is managed by DestroySheetContext when the frame's
+//  WM_DESTROY fires (we observe it via a subclass installed in
+//  PSCB_INITIALIZED).
 //
 ////////////////////////////////////////////////////////////////////////////////
+
+namespace
+{
+
+
+LRESULT CALLBACK SheetFrameSubclass (HWND     hSheet,
+                                      UINT     msg,
+                                      WPARAM   wParam,
+                                      LPARAM   lParam,
+                                      UINT_PTR uIdSubclass,
+                                      DWORD_PTR /*dwRefData*/)
+{
+    if (msg == WM_DESTROY)
+    {
+        DialogContext * pContext = static_cast<DialogContext *> (GetPropW (hSheet, kSheetContextProp));
+
+        if (pContext)
+        {
+            // Tear down per-sheet resources before the frame is gone.
+            if (pContext->m_pApp)
+            {
+                pContext->m_pApp->SetConfigDialog (nullptr);
+
+                if (pContext->m_pApp->GetScreenSaverMode() == ScreenSaverMode::SettingsDialog)
+                {
+                    PostQuitMessage (0);
+                }
+            }
+
+            if (pContext->m_hInfoTipFont)
+            {
+                DeleteObject (pContext->m_hInfoTipFont);
+                pContext->m_hInfoTipFont = nullptr;
+            }
+
+            RemovePropW (hSheet, kSheetContextProp);
+
+            if (pContext->m_ownsContextMemory)
+            {
+                delete pContext;
+            }
+        }
+    }
+    else if (msg == WM_NCDESTROY)
+    {
+        RemoveWindowSubclass (hSheet, SheetFrameSubclass, uIdSubclass);
+    }
+
+    return DefSubclassProc (hSheet, msg, wParam, lParam);
+}
+
+
+constexpr UINT_PTR kSheetFrameSubclassId = 0xC0C00C2Du;
+
+
+}  // namespace
+
 
 HRESULT CreateConfigDialog (HINSTANCE          hInstance,
                              HWND               parentHwnd,
@@ -1696,12 +1895,14 @@ HRESULT CreateConfigDialog (HINSTANCE          hInstance,
                              ApplicationState * pAppState,
                              HWND             * phDlg)
 {
-    HRESULT hr      = S_OK;
-    HWND    hDlg    = nullptr;
-    auto    context = std::make_unique<DialogContext>();
+    HRESULT          hr         = S_OK;
+    HWND             hSheet     = nullptr;
+    PROPSHEETPAGEW   psPages[2] = {};
+    PROPSHEETHEADERW psHeader   = {};
+    auto             context    = std::make_unique<DialogContext>();
 
 
-
+    
     context->m_controller = std::make_unique<ConfigDialogController> (pApplication->GetSettingsProvider());
     hr = context->m_controller->Initialize();
     CHRA (hr);
@@ -1712,27 +1913,48 @@ HRESULT CreateConfigDialog (HINSTANCE          hInstance,
     context->m_pApp              = pApplication;
     context->m_ownsContextMemory = true;
 
-    hDlg = CreateDialogParamW (hInstance,
-                               MAKEINTRESOURCEW (IDD_MATRIXRAIN_SAVER_CONFIG),
-                               parentHwnd,
-                               ConfigDialogProc,
-                               reinterpret_cast<LPARAM> (context.get()));
-    
-    CWRA (hDlg);
+    {
+        DialogContext * pCtx = context.get();
 
-    context.release();
+        BuildPropSheet (hInstance, parentHwnd, pCtx, /*modeless=*/true, psPages, psHeader);
 
-    // Show the modeless dialog
-    ShowWindow (hDlg, SW_SHOW);
+        // Modeless trampoline (mirrors the modal version): bootstrap the
+        // SetPropW(kSheetContextProp) on first PSCB_INITIALIZED, install the
+        // frame subclass for WM_DESTROY cleanup, then delegate.
+        static thread_local DialogContext * tls_pendingContext = nullptr;
+        tls_pendingContext = pCtx;
+
+        struct CbHelper
+        {
+            static int CALLBACK Trampoline (HWND hSheet, UINT uMsg, LPARAM lParam)
+            {
+                if (uMsg == PSCB_INITIALIZED && tls_pendingContext)
+                {
+                    SetPropW (hSheet, kSheetContextProp, tls_pendingContext);
+                    SetWindowSubclass (hSheet, SheetFrameSubclass, kSheetFrameSubclassId, 0);
+                    tls_pendingContext = nullptr;
+                }
+                return PropSheetCallback (hSheet, uMsg, lParam);
+            }
+        };
+        psHeader.pfnCallback = CbHelper::Trampoline;
+    }
+
+    hSheet = reinterpret_cast<HWND> (PropertySheetW (&psHeader));
+    CWRA (hSheet);
+
+    context.release();   // ownership transferred to the sheet subclass
+
+    ShowWindow (hSheet, SW_SHOW);
 
 Error:
     if (FAILED (hr))
     {
         MessageBoxW (nullptr, L"Failed to create live overlay configuration dialog.", L"Error", MB_OK | MB_ICONERROR);
-        hDlg = nullptr;
+        hSheet = nullptr;
     }
 
-    *phDlg = hDlg;
+    *phDlg = hSheet;
 
     return hr;
 }
