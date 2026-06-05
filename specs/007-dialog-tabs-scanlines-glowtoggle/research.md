@@ -135,13 +135,10 @@ input path (mouse click, keyboard Enter, accessibility activation) and
 fires reliably regardless of theme.
 
 **Alternatives considered**:
-- *Rely on `CBN_SELENDOK` alone* — rejected: not reliable on same-item commit
+- *Rely on `CBN_SELENDOK`* — rejected: not reliable on same-item commit
   across Win10/11 themes (theme/version-dependent per testing).
 - *Send `CB_SETCURSEL(-1)` immediately after the chooser closes* — rejected:
   visible flicker, and the "Custom" label needs to remain selected.
-
-`CBN_SELENDOK` MAY still be wired as a secondary trigger for belt-and-braces
-coverage, but MUST NOT be the sole signal.
 
 ---
 
