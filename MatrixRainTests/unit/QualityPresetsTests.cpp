@@ -1,6 +1,7 @@
 #include "Pch_MatrixRainTests.h"
 
 #include "..\..\MatrixRainCore\QualityPresets.h"
+#include "..\..\MatrixRainCore\ScreenSaverSettings.h"
 
 
 
@@ -204,6 +205,40 @@ namespace MatrixRainTests
                 // Protect against silent retunes of the heuristic.
                 Assert::AreEqual (256u,             kDiscreteVramThresholdMb);
                 Assert::AreEqual (16'000'000ull,    kHeavyTotalPixelsThreshold);
+            }
+
+
+            // T047 (US3, FR-026, FR-040, data-model.md §5): preset switching
+            // mutates AdvancedGraphicsValues only; scanline settings are
+            // strictly orthogonal and must NOT be touched by any preset
+            // operation.  Structurally guaranteed (scanline fields live on
+            // ScreenSaverSettings, not AdvancedGraphicsValues) but pinned
+            // so a future refactor can't sneak them in.
+            TEST_METHOD (QualityPresetDoesNotMutateScanlineSettings)
+            {
+                ScreenSaverSettings settings;
+                settings.m_scanlinesEnabled   = true;
+                settings.m_scanlinesIntensity = 30;
+                settings.m_scanlinesStyle     = 50;
+
+
+                for (QualityPreset preset : { QualityPreset::Low,
+                                              QualityPreset::Medium,
+                                              QualityPreset::High,
+                                              QualityPreset::Custom })
+                {
+                    AdvancedGraphicsValues snapped =
+                        ApplyPresetSnap (preset, settings.m_advancedValues, settings.m_lastCustom);
+
+                    settings.m_advancedValues = snapped;
+
+                    Assert::IsTrue   (settings.m_scanlinesEnabled,
+                                      L"ApplyPresetSnap must not touch m_scanlinesEnabled");
+                    Assert::AreEqual (30, settings.m_scanlinesIntensity,
+                                      L"ApplyPresetSnap must not touch m_scanlinesIntensity");
+                    Assert::AreEqual (50, settings.m_scanlinesStyle,
+                                      L"ApplyPresetSnap must not touch m_scanlinesStyle");
+                }
             }
     };
 

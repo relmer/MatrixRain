@@ -547,6 +547,147 @@ namespace MatrixRainTests
             Assert::AreEqual (S_OK, hr);
             Assert::IsTrue   (settings.m_glowEnabled, L"Absent GlowEnabled value should leave default (true) per FR-038");
         }
+
+
+
+
+
+        // T046 (US3, FR-027, FR-028, FR-038, contracts/registry-schema.md):
+        // ScanlinesEnabled / ScanlinesIntensity / ScanlinesStyle persist as
+        // REG_DWORDs, default to ON / 30 / 50 when absent, round-trip
+        // intermediate values exactly, and clamp out-of-range integers on
+        // read (defensive against tampered registries).
+        TEST_METHOD (ScanlinesEnabledRoundTrip)
+        {
+            DeleteTestRegistryKey();
+
+            ScreenSaverSettings off;
+            off.m_scanlinesEnabled = false;
+
+            HRESULT hr = m_provider.Save (off);
+            Assert::AreEqual (S_OK, hr);
+
+            ScreenSaverSettings loadOff;
+            hr = m_provider.Load (loadOff);
+            Assert::AreEqual (S_OK, hr);
+            Assert::IsFalse  (loadOff.m_scanlinesEnabled, L"ScanlinesEnabled=false round-trips");
+
+            ScreenSaverSettings on;
+            on.m_scanlinesEnabled = true;
+            m_provider.Save (on);
+
+            ScreenSaverSettings loadOn;
+            m_provider.Load (loadOn);
+            Assert::IsTrue   (loadOn.m_scanlinesEnabled, L"ScanlinesEnabled=true round-trips");
+        }
+
+
+        TEST_METHOD (ScanlinesIntensityRoundTrip)
+        {
+            DeleteTestRegistryKey();
+
+            ScreenSaverSettings save;
+            save.m_scanlinesIntensity = 77;
+
+            m_provider.Save (save);
+
+            ScreenSaverSettings loaded;
+            m_provider.Load (loaded);
+            Assert::AreEqual (77, loaded.m_scanlinesIntensity, L"ScanlinesIntensity round-trips intermediate value");
+        }
+
+
+        TEST_METHOD (ScanlinesStyleRoundTrip)
+        {
+            DeleteTestRegistryKey();
+
+            ScreenSaverSettings save;
+            save.m_scanlinesStyle = 88;
+
+            m_provider.Save (save);
+
+            ScreenSaverSettings loaded;
+            m_provider.Load (loaded);
+            Assert::AreEqual (88, loaded.m_scanlinesStyle, L"ScanlinesStyle round-trips intermediate value");
+        }
+
+
+        TEST_METHOD (ScanlinesIntensityClampedOnRead)
+        {
+            DeleteTestRegistryKey();
+
+            HKEY    hKey   = nullptr;
+            RegCreateKeyExW (HKEY_CURRENT_USER, TEST_REGISTRY_KEY_PATH, 0, nullptr,
+                             REG_OPTION_NON_VOLATILE, KEY_WRITE, nullptr, &hKey, nullptr);
+
+            DWORD lo = 0;
+            DWORD hi = 200;
+            RegSetValueExW (hKey, L"ScanlinesIntensity", 0, REG_DWORD, (const BYTE *)&lo, sizeof (DWORD));
+            RegCloseKey (hKey);
+
+            ScreenSaverSettings loaded;
+            m_provider.Load (loaded);
+            Assert::AreEqual (1, loaded.m_scanlinesIntensity, L"0 clamps up to MIN (1)");
+
+            DeleteTestRegistryKey();
+            RegCreateKeyExW (HKEY_CURRENT_USER, TEST_REGISTRY_KEY_PATH, 0, nullptr,
+                             REG_OPTION_NON_VOLATILE, KEY_WRITE, nullptr, &hKey, nullptr);
+            RegSetValueExW (hKey, L"ScanlinesIntensity", 0, REG_DWORD, (const BYTE *)&hi, sizeof (DWORD));
+            RegCloseKey (hKey);
+
+            ScreenSaverSettings loaded2;
+            m_provider.Load (loaded2);
+            Assert::AreEqual (100, loaded2.m_scanlinesIntensity, L"200 clamps down to MAX (100)");
+        }
+
+
+        TEST_METHOD (ScanlinesStyleClampedOnRead)
+        {
+            DeleteTestRegistryKey();
+
+            HKEY    hKey   = nullptr;
+            RegCreateKeyExW (HKEY_CURRENT_USER, TEST_REGISTRY_KEY_PATH, 0, nullptr,
+                             REG_OPTION_NON_VOLATILE, KEY_WRITE, nullptr, &hKey, nullptr);
+
+            DWORD lo = 0;
+            DWORD hi = 200;
+            RegSetValueExW (hKey, L"ScanlinesStyle", 0, REG_DWORD, (const BYTE *)&lo, sizeof (DWORD));
+            RegCloseKey (hKey);
+
+            ScreenSaverSettings loaded;
+            m_provider.Load (loaded);
+            Assert::AreEqual (1, loaded.m_scanlinesStyle, L"0 clamps up to MIN (1)");
+
+            DeleteTestRegistryKey();
+            RegCreateKeyExW (HKEY_CURRENT_USER, TEST_REGISTRY_KEY_PATH, 0, nullptr,
+                             REG_OPTION_NON_VOLATILE, KEY_WRITE, nullptr, &hKey, nullptr);
+            RegSetValueExW (hKey, L"ScanlinesStyle", 0, REG_DWORD, (const BYTE *)&hi, sizeof (DWORD));
+            RegCloseKey (hKey);
+
+            ScreenSaverSettings loaded2;
+            m_provider.Load (loaded2);
+            Assert::AreEqual (100, loaded2.m_scanlinesStyle, L"200 clamps down to MAX (100)");
+        }
+
+
+        TEST_METHOD (MissingScanlinesValuesDefaultsAreApplied)
+        {
+            DeleteTestRegistryKey();
+
+            HKEY    hKey   = nullptr;
+            RegCreateKeyExW (HKEY_CURRENT_USER, TEST_REGISTRY_KEY_PATH, 0, nullptr,
+                             REG_OPTION_NON_VOLATILE, KEY_WRITE, nullptr, &hKey, nullptr);
+
+            DWORD density = 50;
+            RegSetValueExW (hKey, L"Density", 0, REG_DWORD, (const BYTE *)&density, sizeof (DWORD));
+            RegCloseKey (hKey);
+
+            ScreenSaverSettings settings;
+            m_provider.Load (settings);
+            Assert::IsTrue   (settings.m_scanlinesEnabled,         L"Absent ScanlinesEnabled defaults ON per SC-013");
+            Assert::AreEqual (30, settings.m_scanlinesIntensity,   L"Absent ScanlinesIntensity defaults to 30");
+            Assert::AreEqual (50, settings.m_scanlinesStyle,       L"Absent ScanlinesStyle defaults to 50");
+        }
     };
 }
 

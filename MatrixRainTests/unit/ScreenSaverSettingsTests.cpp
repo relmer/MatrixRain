@@ -33,6 +33,13 @@ namespace MatrixRainTests
                 // dialog see no visible change (bloom continues at the same
                 // intensity it had pre-upgrade).
                 Assert::IsTrue   (settings.m_glowEnabled, L"glowEnabled default is true");
+
+                // T045 (US3, FR-028, FR-038): scanlines defaults — enabled
+                // with 30% intensity and style 50 (~387 lines on a 1080-tall
+                // display via ScanlineLineCount).
+                Assert::IsTrue   (settings.m_scanlinesEnabled,        L"scanlinesEnabled default is true (SC-013)");
+                Assert::AreEqual (30, settings.m_scanlinesIntensity,  L"scanlinesIntensity default is 30");
+                Assert::AreEqual (50, settings.m_scanlinesStyle,      L"scanlinesStyle default is 50");
             }
 
 
