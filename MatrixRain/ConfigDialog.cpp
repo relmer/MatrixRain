@@ -210,27 +210,6 @@ static bool IsInfoTipControlId (int id)
 
 
 
-static bool IsTrackbarSliderId (UINT_PTR id)
-{
-    switch (id)
-    {
-        case IDC_DENSITY_SLIDER:
-        case IDC_ANIMSPEED_SLIDER:
-        case IDC_GLOWINTENSITY_SLIDER:
-        case IDC_GLOWSIZE_SLIDER:
-        case IDC_QUALITY_PRESET_SLIDER:
-        case IDC_GLOWPASSES_SLIDER:
-        case IDC_GLOWRES_SLIDER:
-        case IDC_GLOWSMOOTH_SLIDER:
-            return true;
-        default:
-            return false;
-    }
-}
-
-
-
-
 static int TickFrequencyForSliderId (int id)
 {
     switch (id)
@@ -245,77 +224,6 @@ static int TickFrequencyForSliderId (int id)
         case IDC_GLOWSMOOTH_SLIDER:     return 1;
         default:                        return 1;
     }
-}
-
-
-
-
-////////////////////////////////////////////////////////////////////////////////
-//
-//  DrawTrackbarDarkTicks
-//
-//  NM_CUSTOMDRAW handler for trackbar tick marks.  Visual-styles renders
-//  default ticks very faintly; we replace them with crisp 1-pixel COLOR_
-//  WINDOWTEXT lines computed from the slider's range + per-id frequency
-//  (TBM_GETTICPOS proved unreliable across visual-styles versions).
-//
-////////////////////////////////////////////////////////////////////////////////
-
-static void DrawTrackbarDarkTicks (LPNMCUSTOMDRAW pcd, HWND hSlider)
-{
-    RECT     channel  = {};
-    int      tickTop  = 0;
-    int      tickBot  = 0;
-    HPEN     hPen     = nullptr;
-    HGDIOBJ  hOld     = nullptr;
-    int      minVal   = 0;
-    int      maxVal   = 0;
-    int      freq     = 1;
-    int      range    = 0;
-    int      chanLeft = 0;
-    int      chanW    = 0;
-    int      sliderId = GetDlgCtrlID (hSlider);
-
-
-    SendMessageW (hSlider, TBM_GETCHANNELRECT, 0, (LPARAM) &channel);
-
-    minVal   = (int) SendMessageW (hSlider, TBM_GETRANGEMIN, 0, 0);
-    maxVal   = (int) SendMessageW (hSlider, TBM_GETRANGEMAX, 0, 0);
-    freq     = TickFrequencyForSliderId (sliderId);
-    range    = maxVal - minVal;
-    chanLeft = channel.left;
-    chanW    = channel.right - channel.left - 1;
-    tickTop  = channel.bottom + 2;
-    tickBot  = tickTop + 4;
-
-    if (range <= 0 || freq <= 0)
-    {
-        return;
-    }
-
-    hPen = CreatePen (PS_SOLID, 1, GetSysColor (COLOR_WINDOWTEXT));
-    hOld = SelectObject (pcd->hdc, hPen);
-
-    for (int v = minVal; v <= maxVal; v += freq)
-    {
-        int x = chanLeft + MulDiv (v - minVal, chanW, range);
-
-        MoveToEx (pcd->hdc, x, tickTop, nullptr);
-        LineTo   (pcd->hdc, x, tickBot);
-    }
-
-    // Speed (1..100 freq=5) lands the last tick at 96; add an explicit
-    // tick at 100 to match the documented contract.
-    if (sliderId == IDC_ANIMSPEED_SLIDER)
-    {
-        int x = chanLeft + MulDiv (100 - minVal, chanW, range);
-
-        MoveToEx (pcd->hdc, x, tickTop, nullptr);
-        LineTo   (pcd->hdc, x, tickBot);
-    }
-
-    SelectObject (pcd->hdc, hOld);
-    DeleteObject (hPen);
 }
 
 
@@ -1718,24 +1626,6 @@ static INT_PTR CALLBACK ConfigDialogProc (HWND   hDlg,
         case WM_NOTIFY:
         {
             LPNMHDR pnmhdr = reinterpret_cast<LPNMHDR> (lParam);
-
-            if (pnmhdr && pnmhdr->code == NM_CUSTOMDRAW && IsTrackbarSliderId (pnmhdr->idFrom))
-            {
-                LPNMCUSTOMDRAW pcd = reinterpret_cast<LPNMCUSTOMDRAW> (lParam);
-
-                if (pcd->dwDrawStage == CDDS_PREPAINT)
-                {
-                    SetWindowLongPtrW (hDlg, DWLP_MSGRESULT, CDRF_NOTIFYITEMDRAW);
-                    result = TRUE;
-                }
-                else if (pcd->dwDrawStage == CDDS_ITEMPREPAINT && pcd->dwItemSpec == TBCD_TICS)
-                {
-                    DrawTrackbarDarkTicks (pcd, pcd->hdr.hwndFrom);
-                    SetWindowLongPtrW (hDlg, DWLP_MSGRESULT, CDRF_SKIPDEFAULT);
-                    result = TRUE;
-                }
-                break;
-            }
 
             if (pnmhdr && (pnmhdr->code == TTN_GETDISPINFOW || pnmhdr->code == TTN_NEEDTEXTW))
             {
