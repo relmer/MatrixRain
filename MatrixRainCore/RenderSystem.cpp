@@ -68,9 +68,8 @@ public:
 
         ULONGLONG nowTick = GetTickCount64();
 
-        // Throttle PDH polling to ~2 Hz (Task Manager itself updates at 1 Hz).
-        // Between polls just return the cached value.
-        if (m_lastPollTick != 0 && (nowTick - m_lastPollTick) < 500)
+        // Throttle PDH polling to ~1 Hz (matches Task Manager's update rate).
+        if (m_lastPollTick != 0 && (nowTick - m_lastPollTick) < 1000)
         {
             return m_cachedLoad;
         }
@@ -103,8 +102,6 @@ public:
 
         if (s != PDH_MORE_DATA || itemCount == 0)
         {
-            // PDH_INVALID_DATA is normal between samples on idle counters.
-            // Keep the cached value; don't churn it to 0.
             return m_cachedLoad;
         }
 
@@ -121,9 +118,14 @@ public:
         //     sum utilization across every instance of that engine type
         //   take MAX across engine types
         //
-        // Instance names look like
-        //   "pid_NNNN_luid_HEX_HEX_phys_N_eng_N_engtype_3D"
-        // so we extract the substring after "engtype_" as the grouping key.
+        // We use the wildcard counter "\GPU Engine(*)" (all processes, all
+        // engines) instead of filtering by PID at counter-add time —
+        // wildcard expansion happens once at add time, so a PID-filtered
+        // counter misses engine instances that become active later.  Here
+        // we filter by parsing "pid_NNNN" out of each instance name.
+        wchar_t pidMarker[32];
+        StringCchPrintfW (pidMarker, ARRAYSIZE (pidMarker), L"pid_%lu_", m_ownPid);
+
         std::map<std::wstring, double> sumPerEngineType;
 
         for (DWORD i = 0; i < itemCount; i++)
@@ -134,6 +136,12 @@ public:
             }
 
             std::wstring_view name (items[i].szName);
+
+            if (name.find (pidMarker) == std::wstring_view::npos)
+            {
+                continue;       // different process
+            }
+
             constexpr std::wstring_view kEngTypeMarker = L"engtype_";
             size_t pos = name.find (kEngTypeMarker);
 
@@ -163,18 +171,17 @@ private:
             return false;
         }
 
-        wchar_t counterPath[256];
-        DWORD   pid = GetCurrentProcessId();
+        m_ownPid = GetCurrentProcessId();
 
-        // Match Task Manager's per-process GPU column: wildcard across ALL
-        // engine types and take the MAX of the resulting array.  Filtering
-        // to engtype_3D undercounts because the bloom pipeline also runs
-        // work on the Copy and Compute engines (DXGI blits, present, etc).
-        StringCchPrintfW (counterPath, ARRAYSIZE (counterPath),
-                          L"\\GPU Engine(*pid_%lu*)\\Utilization Percentage",
-                          pid);
-
-        if (PdhAddEnglishCounterW (m_query, counterPath, 0, &m_counter) != ERROR_SUCCESS)
+        // Wildcard across EVERY engine instance system-wide.  Filtering by
+        // PID at counter-add time (e.g. "(*pid_NNNN*)") expands the wildcard
+        // exactly once, missing engine instances that become active after
+        // we initialize.  Filtering by PID in the result-processing loop
+        // (above) is robust against that.
+        if (PdhAddEnglishCounterW (m_query,
+                                   L"\\GPU Engine(*)\\Utilization Percentage",
+                                   0,
+                                   &m_counter) != ERROR_SUCCESS)
         {
             PdhCloseQuery (m_query);
             m_query   = nullptr;
@@ -189,6 +196,7 @@ private:
     PDH_HQUERY            m_query        { nullptr };
     PDH_HCOUNTER          m_counter      { nullptr };
     ULONGLONG             m_lastPollTick { 0 };
+    DWORD                 m_ownPid       { 0 };
     double                m_cachedLoad   { -1.0 };
     bool                  m_initFailed   { false };
     std::vector<uint8_t>  m_arrayBuf;
