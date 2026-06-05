@@ -60,7 +60,6 @@ struct SharedState
 
     // Debug/statistics display
     bool        showStatistics        = false;
-    bool        showDebugFadeTimes    = false;
 
     // Pause state (spacebar) — broadcast to every monitor so all displays
     // freeze and resume their rain together.  Does not freeze elapsedTime, so
@@ -90,7 +89,6 @@ struct SharedState
         ResolutionDivisor bloomResolutionDivisor = ResolutionDivisor::Half;
         BlurTaps          blurTaps               = BlurTaps::High;
         bool              showStatistics         = false;
-        bool              showDebugFadeTimes     = false;
         bool              isPaused               = false;
         float             elapsedTime            = 0.0f;
     };
@@ -110,7 +108,6 @@ struct SharedState
             .bloomResolutionDivisor = bloomResolutionDivisor,
             .blurTaps               = blurTaps,
             .showStatistics         = showStatistics,
-            .showDebugFadeTimes     = showDebugFadeTimes,
             .isPaused               = isPaused,
             .elapsedTime            = elapsedTime,
         };

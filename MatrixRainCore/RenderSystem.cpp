@@ -2192,12 +2192,6 @@ void RenderSystem::Render (const AnimationSystem & animationSystem, const Viewpo
 
         RenderFPSCounter (params.fps, params.rainPercentage, params.streakCount, params.activeHeadCount, gpuLoad, gpuLoadValid);
     }
-
-    // Debug: Render fade times when enabled and only one streak is visible
-    if (params.showDebugFadeTimes)
-    {
-        RenderDebugFadeTimes (animationSystem);
-    }
 }
 
 
@@ -3043,64 +3037,6 @@ void RenderSystem::DrawFeatheredGlow (const wchar_t * fpsText, UINT32 textLength
             }
         }
     }
-}
-
-
-
-
-
-////////////////////////////////////////////////////////////////////////////////
-//
-//  RenderSystem::RenderDebugFadeTimes
-//
-//  Renders fade time remaining to the right of each character for debugging.
-//
-////////////////////////////////////////////////////////////////////////////////
-
-void RenderSystem::RenderDebugFadeTimes (const AnimationSystem& animationSystem)
-{
-    if (!m_d2dContext || !m_fpsBrush || !m_fpsTextFormat)
-    {
-        return;
-    }
-
-    const auto& streaks = animationSystem.GetStreaks();
-
-    m_d2dContext->BeginDraw();
-
-    for (const CharacterStreak& streak : streaks)
-    {
-        const auto& characters = streak.GetCharacters();
-        Vector3     streakPos  = streak.GetPosition();
-
-        for (const auto& character : characters)
-        {
-            // Calculate screen position
-            float screenX = streakPos.x + character.positionOffset.x;
-            float screenY = character.positionOffset.y;
-
-            // Format lifetime text
-            wchar_t fadeText[32];
-            swprintf_s (fadeText, L"%.2f", character.lifetime);
-
-            // Position text to the right of the character
-            D2D1_RECT_F textRect = D2D1::RectF (
-                screenX + 40.0f,    // 40px to the right of character
-                screenY,
-                screenX + 140.0f,
-                screenY + 30.0f
-            );
-
-            // Draw text in white
-            m_d2dContext->DrawText (fadeText,
-                                    static_cast<UINT32> (wcslen (fadeText)),
-                                    m_fpsTextFormat.Get(),
-                                    textRect,
-                                    m_fpsBrush.Get());
-        }
-    }
-
-    m_d2dContext->EndDraw();
 }
 
 

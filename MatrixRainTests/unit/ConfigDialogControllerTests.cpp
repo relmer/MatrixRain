@@ -38,8 +38,7 @@ namespace MatrixRainTests
                 .m_glowIntensityPercent  = 120,
                 .m_glowSizePercent       = 150,
                 .m_startFullscreen       = false,
-                .m_showDebugStats        = true,
-                .m_showFadeTimers        = true
+                .m_showDebugStats        = true
             };
             
             HRESULT                hr         = S_OK; 
@@ -63,7 +62,6 @@ namespace MatrixRainTests
             Assert::AreEqual (150,      loaded.m_glowSizePercent,       L"Glow size should match saved value");
             Assert::IsFalse  (loaded.m_startFullscreen,                 L"Start fullscreen should match saved value");
             Assert::IsTrue   (loaded.m_showDebugStats,                  L"Show debug stats should match saved value");
-            Assert::IsTrue   (loaded.m_showFadeTimers,                  L"Show fade timers should match saved value");
         }
 
 
@@ -93,7 +91,6 @@ namespace MatrixRainTests
             Assert::AreEqual (ScreenSaverSettings::DEFAULT_GLOW_SIZE_PERCENT,       loaded.m_glowSizePercent,       L"Should use default glow size");
             Assert::IsTrue   (loaded.m_startFullscreen,                             L"Should default to fullscreen");
             Assert::IsFalse  (loaded.m_showDebugStats,                              L"Should default to no debug stats");
-            Assert::IsFalse  (loaded.m_showFadeTimers,                              L"Should default to no fade timers");
         }
 
 
@@ -317,13 +314,6 @@ namespace MatrixRainTests
 
             controller.UpdateShowDebugStats (false);
             Assert::IsFalse (controller.GetSettings().m_showDebugStats, L"Should set show debug stats to false");
-
-            // Act & Assert: Test fade timers toggle
-            controller.UpdateShowFadeTimers (true);
-            Assert::IsTrue (controller.GetSettings().m_showFadeTimers, L"Should set show fade timers to true");
-
-            controller.UpdateShowFadeTimers (false);
-            Assert::IsFalse (controller.GetSettings().m_showFadeTimers, L"Should set show fade timers to false");
         }
 
 
@@ -499,7 +489,6 @@ namespace MatrixRainTests
             Assert::AreEqual (ScreenSaverSettings::DEFAULT_GLOW_SIZE_PERCENT,       settings.m_glowSizePercent,       L"Glow size should reset to default");
             Assert::IsTrue   (settings.m_startFullscreen,                           L"Start fullscreen should reset to default");
             Assert::IsFalse  (settings.m_showDebugStats,                            L"Show debug stats should reset to default");
-            Assert::IsFalse  (settings.m_showFadeTimers,                            L"Show fade timers should reset to default");
         }
 
 
@@ -665,8 +654,7 @@ namespace MatrixRainTests
                 .m_glowIntensityPercent  = 150,
                 .m_glowSizePercent       = 175,
                 .m_startFullscreen       = false,
-                .m_showDebugStats        = true,
-                .m_showFadeTimers        = true
+                .m_showDebugStats        = true
             };
             
             HRESULT hr = m_settingsProvider.Save (settings);

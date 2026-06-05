@@ -71,22 +71,22 @@ slate. Per research.md R8, this is purely deletions with one new test
 
 ### Tests for User Story 4 ⚠️
 
-- [ ] T008 [P] [US4] Delete all `FadeTimer` / `UpdateShowFadeTimers` cases from `MatrixRainTests\ConfigDialogControllerTests.cpp` (R8 production+test inventory)
-- [ ] T009 [P] [US4] Delete all `m_showFadeTimers` assertions from `MatrixRainTests\ScreenSaverSettingsTests.cpp` (R8)
-- [ ] T010 [US4] In `MatrixRainTests\RegistrySettingsProviderTests.cpp`: delete `ShowFadeTimers` read/write cases AND add new test `LegacyShowFadeTimersIsSilentlyIgnored` — pre-write a `ShowFadeTimers=1` REG_DWORD into the test hive, call `Load()`, assert success and that the loaded `ScreenSaverSettings` has no surviving fade-timer field (Red until Phase-2 impl tasks remove the read path) (FR-037, R8)
+- [X] T008 [P] [US4] Delete all `FadeTimer` / `UpdateShowFadeTimers` cases from `MatrixRainTests\ConfigDialogControllerTests.cpp` (R8 production+test inventory)
+- [X] T009 [P] [US4] Delete all `m_showFadeTimers` assertions from `MatrixRainTests\ScreenSaverSettingsTests.cpp` (R8)
+- [X] T010 [US4] In `MatrixRainTests\RegistrySettingsProviderTests.cpp`: delete `ShowFadeTimers` read/write cases AND add new test `LegacyShowFadeTimersIsSilentlyIgnored` — pre-write a `ShowFadeTimers=1` REG_DWORD into the test hive, call `Load()`, assert success and that the loaded `ScreenSaverSettings` has no surviving fade-timer field (Red until Phase-2 impl tasks remove the read path) (FR-037, R8)
 
 ### Implementation for User Story 4
 
-- [ ] T011 [US4] `MatrixRainCore\ScreenSaverSettings.h`: remove `m_showFadeTimers` field and any accessor (FR-036, R8)
-- [ ] T012 [US4] `MatrixRainCore\RegistrySettingsProvider.{h,cpp}`: remove `VALUE_SHOW_FADE_TIMERS` constant and its load/save code paths; do NOT add active cleanup — absence of read = silent ignore (turns T010 Green) (FR-036, FR-037)
-- [ ] T013 [P] [US4] `MatrixRainCore\ApplicationState.{h,cpp}`: remove `ToggleDebugFadeTimes`, `SetShowDebugFadeTimes`, `GetShowDebugFadeTimes`, change-callback registration, backing bool (FR-036, R8)
-- [ ] T014 [P] [US4] `MatrixRainCore\SharedState.h`: remove `showDebugFadeTimes` live field AND snapshot mirror (FR-036, data-model.md §4)
-- [ ] T015 [P] [US4] `MatrixRainCore\RenderParams.h`: remove `showDebugFadeTimes` (FR-036, data-model.md §5)
-- [ ] T016 [US4] `MatrixRainCore\RenderSystem.{h,cpp}`: remove `RenderDebugFadeTimes` method declaration, definition, and its single call site in the render loop (FR-036)
-- [ ] T017 [US4] `MatrixRainCore\ConfigDialogController.{h,cpp}`: remove `UpdateShowFadeTimers` and any snapshot/restore touching the bool (FR-036)
-- [ ] T018 [US4] `MatrixRain\MatrixRain.rc`: remove `IDC_SHOWFADETIMERS_CHECK` "Show fade timers" control entry; `MatrixRain\resource.h`: remove the `IDC_SHOWFADETIMERS_CHECK` `#define` (FR-036, R8)
-- [ ] T019 [US4] `MatrixRain\ConfigDialog.cpp`: remove `OnShowFadeTimersCheck`, every `CheckDlgButton(..., IDC_SHOWFADETIMERS_CHECK, ...)` site (defaults-apply, settings-load, `WM_COMMAND` dispatch) (FR-036)
-- [ ] T020 [US4] Run `git --no-pager grep -i "fadetimer\|fade.timer" -- MatrixRain MatrixRainCore MatrixRainTests`; expected: 0 matches. Build x64 Debug + run full test suite — must be green before merging to Phase 3 (quickstart §US5, SC-008)
+- [X] T011 [US4] `MatrixRainCore\ScreenSaverSettings.h`: remove `m_showFadeTimers` field and any accessor (FR-036, R8)
+- [X] T012 [US4] `MatrixRainCore\RegistrySettingsProvider.{h,cpp}`: remove `VALUE_SHOW_FADE_TIMERS` constant and its load/save code paths; do NOT add active cleanup — absence of read = silent ignore (turns T010 Green) (FR-036, FR-037)
+- [X] T013 [P] [US4] `MatrixRainCore\ApplicationState.{h,cpp}`: remove `ToggleDebugFadeTimes`, `SetShowDebugFadeTimes`, `GetShowDebugFadeTimes`, change-callback registration, backing bool (FR-036, R8)
+- [X] T014 [P] [US4] `MatrixRainCore\SharedState.h`: remove `showDebugFadeTimes` live field AND snapshot mirror (FR-036, data-model.md §4)
+- [X] T015 [P] [US4] `MatrixRainCore\RenderParams.h`: remove `showDebugFadeTimes` (FR-036, data-model.md §5)
+- [X] T016 [US4] `MatrixRainCore\RenderSystem.{h,cpp}`: remove `RenderDebugFadeTimes` method declaration, definition, and its single call site in the render loop (FR-036)
+- [X] T017 [US4] `MatrixRainCore\ConfigDialogController.{h,cpp}`: remove `UpdateShowFadeTimers` and any snapshot/restore touching the bool (FR-036)
+- [X] T018 [US4] `MatrixRain\MatrixRain.rc`: remove `IDC_SHOWFADETIMERS_CHECK` "Show fade timers" control entry; `MatrixRain\resource.h`: remove the `IDC_SHOWFADETIMERS_CHECK` `#define` (FR-036, R8)
+- [X] T019 [US4] `MatrixRain\ConfigDialog.cpp`: remove `OnShowFadeTimersCheck`, every `CheckDlgButton(..., IDC_SHOWFADETIMERS_CHECK, ...)` site (defaults-apply, settings-load, `WM_COMMAND` dispatch) (FR-036)
+- [X] T020 [US4] Run `git --no-pager grep -i "fadetimer\|fade.timer" -- MatrixRain MatrixRainCore MatrixRainTests`; expected: 0 matches. Build x64 Debug + run full test suite — must be green before merging to Phase 3 (quickstart §US5, SC-008)
 
 **Checkpoint**: Fade-timer feature gone. Test suite re-baselined. Dialog code is now safe to restructure without dead controls.
 

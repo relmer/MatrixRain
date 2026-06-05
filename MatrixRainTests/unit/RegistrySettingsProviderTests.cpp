@@ -449,6 +449,41 @@ namespace MatrixRainTests
                 RegCloseKey (hKey);
             }
         }
+
+
+
+
+        // v1.5 T010 — legacy ShowFadeTimers REG_DWORD must be silently ignored.
+        // The field was removed from ScreenSaverSettings; absence of any read
+        // path in the provider satisfies the requirement.  We assert Load()
+        // succeeds when the legacy value is present, with no behavioural
+        // impact on the new schema.
+        TEST_METHOD (LegacyShowFadeTimersIsSilentlyIgnored)
+        {
+            DeleteTestRegistryKey();
+
+
+            // Arrange: create the key and stamp the legacy value.
+            HKEY    hKey   = nullptr;
+            LSTATUS status = RegCreateKeyExW (HKEY_CURRENT_USER, TEST_REGISTRY_KEY_PATH,
+                                              0, nullptr, REG_OPTION_NON_VOLATILE,
+                                              KEY_WRITE, nullptr, &hKey, nullptr);
+            Assert::AreEqual ((LONG)ERROR_SUCCESS, (LONG)status, L"Test setup should create registry key");
+
+            DWORD dwLegacy = 1;
+            RegSetValueExW (hKey, L"ShowFadeTimers", 0, REG_DWORD,
+                            (const BYTE *)&dwLegacy, sizeof (DWORD));
+            RegCloseKey (hKey);
+
+
+            // Act
+            ScreenSaverSettings settings;
+            HRESULT             hr = m_provider.Load (settings);
+
+
+            // Assert: Load completes successfully; nothing to read into.
+            Assert::AreEqual (S_OK, hr, L"Load should succeed in presence of legacy ShowFadeTimers value");
+        }
     };
 }
 

@@ -208,15 +208,6 @@ void ConfigDialogController::UpdateShowDebugStats (bool showDebugStats)
 
 
 
-void ConfigDialogController::UpdateShowFadeTimers (bool showFadeTimers)
-{
-    m_settings.m_showFadeTimers = showFadeTimers;
-}
-
-
-
-
-
 HRESULT ConfigDialogController::ApplyChanges()
 {
     HRESULT hr = S_OK;

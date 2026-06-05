@@ -343,11 +343,6 @@ void Application::InitializeApplicationState (const ScreenSaverModeContext * pSc
         m_sharedState.showStatistics = show;
     });
 
-    m_appState->RegisterShowDebugFadeTimesCallback ([this](bool show) {
-        std::lock_guard<std::mutex> lock (m_sharedState.mutex);
-        m_sharedState.showDebugFadeTimes = show;
-    });
-    
     // Initialize SharedState from saved settings
     {
         const auto & settings = m_appState->GetSettings();
@@ -358,7 +353,6 @@ void Application::InitializeApplicationState (const ScreenSaverModeContext * pSc
         m_sharedState.glowIntensityPercent  = settings.m_glowIntensityPercent;
         m_sharedState.glowSizePercent       = settings.m_glowSizePercent;
         m_sharedState.showStatistics        = m_appState->GetShowStatistics();
-        m_sharedState.showDebugFadeTimes    = m_appState->GetShowDebugFadeTimes();
     }
 
     // Apply settings to subsystems and bind input once the primary render
@@ -1308,7 +1302,6 @@ void Application::OnKeyDown (WPARAM wParam)
 
                     m_sharedState.colorScheme      = m_appState->GetColorScheme();
                     m_sharedState.showStatistics   = m_appState->GetShowStatistics();
-                    m_sharedState.showDebugFadeTimes = m_appState->GetShowDebugFadeTimes();
                 }
             }
             break;

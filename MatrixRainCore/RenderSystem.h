@@ -155,7 +155,6 @@ private:
     void    BuildOverlayInstances    (std::span<const HintCharacter> chars, float charScale, float baseY, float cellHeight, std::span<const float> xPositions, float advanceScale);
     void    RenderOverlayInstances   ();
     void    RenderTwoColumnOverlay   (std::span<const HintCharacter> chars, int marginCols, int keyColChars, int gapChars, int numRows, float cellHeight, float padding);
-    void    RenderDebugFadeTimes     (const AnimationSystem & animationSystem);
     HRESULT ApplyBloom();
     void    RenderFullscreenPass     (ID3D11RenderTargetView * pRenderTarget, ID3D11PixelShader * pPixelShader, ID3D11ShaderResourceView * const * ppShaderResources, UINT numResources);
     void    SetRenderPipelineState   (ID3D11InputLayout * pInputLayout, D3D11_PRIMITIVE_TOPOLOGY topology, ID3D11Buffer * pVertexBuffer, UINT stride, ID3D11VertexShader * pVertexShader, ID3D11Buffer * pConstantBuffer, ID3D11PixelShader * pPixelShader);

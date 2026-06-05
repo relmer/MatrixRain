@@ -525,7 +525,6 @@ void MonitorRenderContext::Render (const SharedState::Snapshot & snapshot)
     int         rainPercentage     = snapshot.densityPercent;
     int         streakCount        = static_cast<int> (m_animationSystem->GetActiveStreakCount());
     int         activeHeadCount    = static_cast<int> (m_animationSystem->GetActiveHeadCount());
-    bool        showDebugFadeTimes = snapshot.showDebugFadeTimes;
     float       elapsedTime        = snapshot.elapsedTime;
 
     // Overlay pointers — only the primary context owns an OverlayState
@@ -547,7 +546,6 @@ void MonitorRenderContext::Render (const SharedState::Snapshot & snapshot)
         .rainPercentage     = rainPercentage,
         .streakCount        = streakCount,
         .activeHeadCount    = activeHeadCount,
-        .showDebugFadeTimes = showDebugFadeTimes,
         .elapsedTime        = elapsedTime,
         .pHelpOverlay       = pHelpOverlay,
         .pHotkeyOverlay     = pHotkeyOverlay,

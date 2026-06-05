@@ -118,12 +118,6 @@ public:
     void UpdateShowDebugStats (bool showDebugStats);
 
     /// <summary>
-    /// Update show fade timers flag.
-    /// </summary>
-    /// <param name="showFadeTimers">True to show fade timer overlay</param>
-    void UpdateShowFadeTimers (bool showFadeTimers);
-
-    /// <summary>
     /// Apply and persist all changes to registry.
     /// </summary>
     /// <returns>S_OK on success, error HRESULT otherwise</returns>

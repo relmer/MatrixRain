@@ -33,7 +33,6 @@ struct ScreenSaverSettings
     int                                 m_glowSizePercent       { DEFAULT_GLOW_SIZE_PERCENT       };
     bool                                m_startFullscreen       { true  };
     bool                                m_showDebugStats        { false };
-    bool                                m_showFadeTimers        { false };
     bool                                m_multiMonitorEnabled   { true  };
     std::wstring                        m_gpuAdapter;                          // Empty (default) = system default
 

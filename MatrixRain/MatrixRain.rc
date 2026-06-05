@@ -156,7 +156,6 @@ BEGIN
     CONTROL         "Start in fullscreen",IDC_STARTFULLSCREEN_CHECK,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,255,130,10
     CONTROL         "Render on all monitors",IDC_MULTIMONITOR_CHECK,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,270,130,10
     CONTROL         "Show debug statistics",IDC_SHOWDEBUG_CHECK,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,150,255,135,10
-    CONTROL         "Show fade timers",IDC_SHOWFADETIMERS_CHECK,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,150,270,135,10
     
     // Bottom buttons — Reset at the left margin, OK + Cancel at the right.
     PUSHBUTTON      "Reset",IDC_RESET_BUTTON,15,295,50,14

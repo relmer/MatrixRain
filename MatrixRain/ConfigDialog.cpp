@@ -834,11 +834,6 @@ static BOOL OnInitDialog (HWND hDlg, LPARAM initParam)
     {
         ShowWindow (GetDlgItem (hDlg, IDC_STARTFULLSCREEN_CHECK), SW_HIDE);
     }
-#ifdef _DEBUG
-    CheckDlgButton (hDlg, IDC_SHOWFADETIMERS_CHECK,  pSettings->m_showFadeTimers  ? BST_CHECKED : BST_UNCHECKED);
-#else
-    ShowWindow (GetDlgItem (hDlg, IDC_SHOWFADETIMERS_CHECK), SW_HIDE);
-#endif
     
     fSuccess = TRUE;
 
@@ -1185,39 +1180,6 @@ Error:
 
 
 
-#ifdef _DEBUG
-////////////////////////////////////////////////////////////////////////////////
-//
-//  OnShowFadeTimersCheck
-//
-////////////////////////////////////////////////////////////////////////////////
-
-static void OnShowFadeTimersCheck (HWND hDlg)
-{
-    HRESULT                  hr          = S_OK;
-    ConfigDialogController * pController = GetControllerFromDialog (hDlg);
-    bool                     checked     = IsDlgButtonChecked (hDlg, IDC_SHOWFADETIMERS_CHECK) == BST_CHECKED;
-
-
-
-    CBRAEx (pController != nullptr, E_UNEXPECTED);
-
-    pController->UpdateShowFadeTimers (checked);
-    
-    // If live overlay mode, immediately apply fade timers display
-    if (Application * pApp = GetApplicationFromDialog (hDlg))
-    {
-        pApp->GetApplicationState()->SetShowDebugFadeTimes (checked);
-    }
-
-Error:
-    return;
-}
-#endif
-
-
-
-
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -1290,9 +1252,6 @@ static void OnResetButton (HWND hDlg)
 
     CheckDlgButton (hDlg, IDC_STARTFULLSCREEN_CHECK, pDefaults->m_startFullscreen ? BST_CHECKED : BST_UNCHECKED);
     CheckDlgButton (hDlg, IDC_SHOWDEBUG_CHECK,       pDefaults->m_showDebugStats  ? BST_CHECKED : BST_UNCHECKED);
-#ifdef _DEBUG
-    CheckDlgButton (hDlg, IDC_SHOWFADETIMERS_CHECK,  pDefaults->m_showFadeTimers  ? BST_CHECKED : BST_UNCHECKED);
-#endif
     
     // If live overlay mode, propagate changes to running application
     // (ResetToDefaults already updated controller settings, now trigger live propagation)
@@ -1465,12 +1424,6 @@ static BOOL OnCommand (HWND hDlg, WPARAM wParam)
         case IDC_SHOWDEBUG_CHECK:
             OnShowDebugCheck (hDlg);
             break;
-            
-#ifdef _DEBUG
-        case IDC_SHOWFADETIMERS_CHECK:
-            OnShowFadeTimersCheck (hDlg);
-            break;
-#endif
             
         case IDC_RESET_BUTTON:
             OnResetButton (hDlg);

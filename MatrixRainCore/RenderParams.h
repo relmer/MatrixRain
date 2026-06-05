@@ -27,7 +27,6 @@ struct RenderParams
     int             rainPercentage     = 0;
     int             streakCount        = 0;
     int             activeHeadCount    = 0;
-    bool            showDebugFadeTimes = false;
     float           elapsedTime        = 0.0f;
     const Overlay * pHelpOverlay       = nullptr;
     const Overlay * pHotkeyOverlay     = nullptr;

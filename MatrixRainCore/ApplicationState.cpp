@@ -42,7 +42,6 @@ void ApplicationState::Initialize (const ScreenSaverModeContext * pScreenSaverCo
                                   (pScreenSaverContext->m_mode == ScreenSaverMode::ScreenSaverPreview ||
                                    pScreenSaverContext->m_mode == ScreenSaverMode::ScreenSaverFull);
     
-    m_showDebugFadeTimes = false;
     m_showStatistics     = isPreviewOrScreenSaver ? false : m_settings.m_showDebugStats;
     
     // Map color scheme key to enum
@@ -92,21 +91,6 @@ void ApplicationState::CycleColorScheme()
 
     HRESULT hr = SaveSettings();
     IGNORE_RETURN_VALUE (hr, S_OK);
-}
-
-
-
-
-
-void ApplicationState::ToggleDebugFadeTimes()
-{
-    m_showDebugFadeTimes = !m_showDebugFadeTimes;
-
-    // Notify registered listener (e.g., Application's SharedState sync)
-    if (m_showDebugFadeTimesChangeCallback)
-    {
-        m_showDebugFadeTimesChangeCallback (m_showDebugFadeTimes);
-    }
 }
 
 
@@ -228,15 +212,6 @@ void ApplicationState::RegisterShowStatisticsCallback (std::function<void(bool)>
 
 
 
-void ApplicationState::RegisterShowDebugFadeTimesCallback (std::function<void(bool)> callback)
-{
-    m_showDebugFadeTimesChangeCallback = callback;
-}
-
-
-
-
-
 void ApplicationState::SetGlowIntensity (int intensityPercent)
 {
     m_settings.m_glowIntensityPercent = intensityPercent;
@@ -297,7 +272,6 @@ void ApplicationState::ApplySettings (const ScreenSaverSettings & settings)
     
     // Update runtime state to match settings
     m_displayMode        = m_settings.m_startFullscreen ? DisplayMode::Fullscreen : DisplayMode::Windowed;
-    m_showDebugFadeTimes = m_settings.m_showFadeTimers;
     m_showStatistics     = m_settings.m_showDebugStats;
     
     // Map color scheme key to enum
@@ -312,11 +286,6 @@ void ApplicationState::ApplySettings (const ScreenSaverSettings & settings)
     if (m_showStatisticsChangeCallback)
     {
         m_showStatisticsChangeCallback (m_showStatistics);
-    }
-
-    if (m_showDebugFadeTimesChangeCallback)
-    {
-        m_showDebugFadeTimesChangeCallback (m_showDebugFadeTimes);
     }
 }
 
@@ -359,31 +328,6 @@ void ApplicationState::SetShowStatistics (bool show)
 
     HRESULT hr = SaveSettings();
     IGNORE_RETURN_VALUE (hr, S_OK);
-}
-
-
-
-
-
-void ApplicationState::SetShowDebugFadeTimes (bool show)
-{
-    // Prevent enabling fade timers in preview or screensaver modes
-    bool isPreviewOrScreenSaver = m_pScreenSaverContext &&
-                                  (m_pScreenSaverContext->m_mode == ScreenSaverMode::ScreenSaverPreview ||
-                                   m_pScreenSaverContext->m_mode == ScreenSaverMode::ScreenSaverFull);
-    
-    if (isPreviewOrScreenSaver && show)
-    {
-        return;  // Ignore request to enable in preview/screensaver modes
-    }
-    
-    m_showDebugFadeTimes = show;
-
-    // Notify registered listener (e.g., Application's SharedState sync)
-    if (m_showDebugFadeTimesChangeCallback)
-    {
-        m_showDebugFadeTimesChangeCallback (show);
-    }
 }
 
 

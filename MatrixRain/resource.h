@@ -26,7 +26,6 @@
 #define IDC_COLORSCHEME_COMBO           1009
 #define IDC_STARTFULLSCREEN_CHECK       1010
 #define IDC_SHOWDEBUG_CHECK             1011
-#define IDC_SHOWFADETIMERS_CHECK        1012
 #define IDC_RESET_BUTTON                1013
 #define IDC_MULTIMONITOR_CHECK          1014
 #define IDC_MULTIMONITOR_INFO           1015
