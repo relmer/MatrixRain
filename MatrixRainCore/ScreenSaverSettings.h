@@ -26,6 +26,21 @@ struct ScreenSaverSettings
     static constexpr int MAX_GLOW_SIZE_PERCENT       = 200;
     static constexpr int DEFAULT_GLOW_SIZE_PERCENT   = 100;
 
+    // v1.5 (FR-027, FR-028, data-model.md §1): scanline post-pass.  Both
+    // ints are unit-less percentages clamped to [1,100] on read and write.
+    static constexpr int MIN_SCANLINES_INTENSITY_PERCENT     = 1;
+    static constexpr int MAX_SCANLINES_INTENSITY_PERCENT     = 100;
+    static constexpr int DEFAULT_SCANLINES_INTENSITY_PERCENT = 30;
+
+    static constexpr int MIN_SCANLINES_STYLE                 = 1;
+    static constexpr int MAX_SCANLINES_STYLE                 = 100;
+    static constexpr int DEFAULT_SCANLINES_STYLE             = 50;
+
+    // v1.5 (FR-030, FR-033, FR-038): RGB(0,255,0) is the default seed shown
+    // by the colour chooser the first time the user opens it — it is NOT
+    // written to the registry until the user actually clicks OK.
+    static constexpr COLORREF DEFAULT_CUSTOM_COLOR           = RGB (0, 255, 0);
+
     int                                 m_densityPercent        { DEFAULT_DENSITY_PERCENT         };
     std::wstring                        m_colorSchemeKey        { L"cycle" };
     int                                 m_animationSpeedPercent { DEFAULT_ANIMATION_SPEED_PERCENT };
@@ -35,6 +50,19 @@ struct ScreenSaverSettings
     bool                                m_showDebugStats        { false };
     bool                                m_multiMonitorEnabled   { true  };
     std::wstring                        m_gpuAdapter;                          // Empty (default) = system default
+
+    // v1.5 additions (data-model.md §1, FR-020, FR-027, FR-028, FR-030,
+    // FR-033, FR-044).  All 5 of (glowEnabled, scanlinesEnabled,
+    // scanlinesIntensity, scanlinesStyle, customColor) participate in
+    // ConfigDialogController live-mode snapshot/rollback.  m_customColorPalette
+    // is INTENTIONALLY NOT in the rollback set per FR-035 — it's persisted
+    // unconditionally on chooser-OK and survives Cancel.
+    bool                                m_glowEnabled           { true  };
+    bool                                m_scanlinesEnabled      { true  };
+    int                                 m_scanlinesIntensity    { DEFAULT_SCANLINES_INTENSITY_PERCENT };
+    int                                 m_scanlinesStyle        { DEFAULT_SCANLINES_STYLE };
+    COLORREF                            m_customColor           { DEFAULT_CUSTOM_COLOR };
+    std::array<COLORREF, 16>            m_customColorPalette    {};            // FR-035 unconditional persistence; zero-init = "no saved palette"
 
     // User Story 5 - graphics quality preset + advanced control values.
     // The High preset is calibrated to today's exact rendering so users
@@ -61,6 +89,8 @@ inline void ScreenSaverSettings::Clamp()
     m_animationSpeedPercent = ClampPercent        (m_animationSpeedPercent, MIN_ANIMATION_SPEED_PERCENT, MAX_ANIMATION_SPEED_PERCENT);
     m_glowIntensityPercent  = ClampPercent        (m_glowIntensityPercent, MIN_GLOW_INTENSITY_PERCENT, MAX_GLOW_INTENSITY_PERCENT);
     m_glowSizePercent       = ClampPercent        (m_glowSizePercent, MIN_GLOW_SIZE_PERCENT, MAX_GLOW_SIZE_PERCENT);
+    m_scanlinesIntensity    = ClampPercent        (m_scanlinesIntensity, MIN_SCANLINES_INTENSITY_PERCENT, MAX_SCANLINES_INTENSITY_PERCENT);
+    m_scanlinesStyle        = ClampPercent        (m_scanlinesStyle,     MIN_SCANLINES_STYLE,             MAX_SCANLINES_STYLE);
 }
 
 

@@ -12,6 +12,7 @@
 #include "Overlay.h"
 #include "RenderParams.h"
 #include "RenderSystem.h"
+#include "ScanlineStyleMapping.h"
 #include "Viewport.h"
 
 
@@ -553,7 +554,16 @@ void MonitorRenderContext::Render (const SharedState::Snapshot & snapshot)
         .elapsedTime        = elapsedTime,
         .pHelpOverlay       = pHelpOverlay,
         .pHotkeyOverlay     = pHotkeyOverlay,
-        .pUsageOverlay      = pUsageOverlay
+        .pUsageOverlay      = pUsageOverlay,
+
+        // v1.5 (T027, data-model.md §5): per-frame copy of the v1.5
+        // SharedState mirrors, with int→float conversions performed once
+        // here (cheap) rather than in every SharedState writer.
+        .glowEnabled        = snapshot.glowEnabled,
+        .scanlinesEnabled   = snapshot.scanlinesEnabled,
+        .scanlinesIntensity = static_cast<float> (snapshot.scanlinesIntensity) / 100.0f,
+        .scanlinesLineCount = ScanlineLineCount (snapshot.scanlinesStyle),
+        .customColor        = static_cast<COLORREF> (snapshot.customColor),
     };
 
     m_renderSystem->Render (*m_animationSystem, *m_viewport, renderParams);

@@ -117,6 +117,15 @@ public:
     /// <param name="showDebugStats">True to show debug statistics</param>
     void UpdateShowDebugStats (bool showDebugStats);
 
+    // v1.5 setters (US1 T025, FR-004, FR-020, FR-027, FR-028, FR-030,
+    // FR-033, FR-044) — mutate m_settings, clamp where applicable, and
+    // (in live mode) propagate via m_snapshot.applicationStateRef.
+    void UpdateGlowEnabled         (bool     enabled);
+    void UpdateScanlinesEnabled    (bool     enabled);
+    void UpdateScanlinesIntensity  (int      intensityPercent);
+    void UpdateScanlinesStyle      (int      style);
+    void UpdateCustomColor         (COLORREF color);
+
     /// <summary>
     /// Apply and persist all changes to registry.
     /// </summary>
