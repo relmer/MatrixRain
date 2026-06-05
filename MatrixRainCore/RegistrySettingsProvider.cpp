@@ -39,6 +39,15 @@ HRESULT RegistrySettingsProvider::Load (ScreenSaverSettings & settings)
     ReadInt    (hKey, VALUE_GLOW_INTENSITY,   settings.m_glowIntensityPercent);
     ReadInt    (hKey, VALUE_GLOW_SIZE,        settings.m_glowSizePercent);
     ReadBool   (hKey, VALUE_GLOW_ENABLED,     settings.m_glowEnabled);                // v1.5 T038 (FR-020, FR-038)
+
+    // v1.5 T049 (FR-027, FR-028, FR-038, contracts/registry-schema.md):
+    // Scanlines defaults are baked into ScreenSaverSettings (true / 30 / 50),
+    // so ReadBool/ReadInt no-ops on absent keys leave them intact.  After
+    // the loads we run a one-shot clamp on the two int fields to defend
+    // against tampered registries.
+    ReadBool   (hKey, VALUE_SCANLINES_ENABLED,   settings.m_scanlinesEnabled);
+    ReadInt    (hKey, VALUE_SCANLINES_INTENSITY, settings.m_scanlinesIntensity);
+    ReadInt    (hKey, VALUE_SCANLINES_STYLE,     settings.m_scanlinesStyle);
     ReadBool   (hKey, VALUE_START_FULLSCREEN, settings.m_startFullscreen);
     ReadBool   (hKey, VALUE_SHOW_DEBUG_STATS, settings.m_showDebugStats);
     ReadBool   (hKey, VALUE_MULTIMONITOR,     settings.m_multiMonitorEnabled);
@@ -176,6 +185,23 @@ HRESULT RegistrySettingsProvider::Save (const ScreenSaverSettings & settings)
 
     // v1.5 T038 (FR-020, FR-038): persist GlowEnabled as REG_DWORD.
     hr = WriteBool (hKey, VALUE_GLOW_ENABLED, settings.m_glowEnabled);
+    CHR (hr);
+
+    // v1.5 T049 (FR-027, FR-028, FR-038): persist scanlines triple.  Clamp
+    // on write so out-of-range C++ state can't propagate to the registry.
+    hr = WriteBool (hKey, VALUE_SCANLINES_ENABLED, settings.m_scanlinesEnabled);
+    CHR (hr);
+
+    hr = WriteInt (hKey, VALUE_SCANLINES_INTENSITY,
+                   std::clamp (settings.m_scanlinesIntensity,
+                               ScreenSaverSettings::MIN_SCANLINES_INTENSITY_PERCENT,
+                               ScreenSaverSettings::MAX_SCANLINES_INTENSITY_PERCENT));
+    CHR (hr);
+
+    hr = WriteInt (hKey, VALUE_SCANLINES_STYLE,
+                   std::clamp (settings.m_scanlinesStyle,
+                               ScreenSaverSettings::MIN_SCANLINES_STYLE,
+                               ScreenSaverSettings::MAX_SCANLINES_STYLE));
     CHR (hr);
     
     hr = WriteBool (hKey, VALUE_START_FULLSCREEN, settings.m_startFullscreen);

@@ -170,14 +170,14 @@ SC-011), wire the post-bloom-pre-present pass.
 
 ### Tests for User Story 3 ⚠️
 
-- [ ] T045 [P] [US3] Extend `MatrixRainTests\ScreenSaverSettingsTests.cpp`: `Defaults_ScanlinesEnabledIsTrue`, `Defaults_ScanlinesIntensityIs30`, `Defaults_ScanlinesStyleIs50` (Red) (FR-028, FR-038)
-- [ ] T046 [P] [US3] Extend `MatrixRainTests\RegistrySettingsProviderTests.cpp`: three round-trip tests for `ScanlinesEnabled` / `ScanlinesIntensity` / `ScanlinesStyle`; clamping tests asserting registry values 0 and 200 are clamped to 1 and 100 on read for the two int values; missing-key default tests (Red) (FR-027, FR-038, data-model.md §1)
-- [ ] T047 [P] [US3] Extend `MatrixRainTests\QualityPresetsTests.cpp` with `QualityPresetDoesNotMutateScanlineSettings`: drive every preset (Low/Medium/High/Custom) and assert `m_scanlinesEnabled`/`Intensity`/`Style` are untouched (Red→Green naturally) (FR-026, FR-040)
+- [X] T045 [P] [US3] Extend `MatrixRainTests\ScreenSaverSettingsTests.cpp`: `Defaults_ScanlinesEnabledIsTrue`, `Defaults_ScanlinesIntensityIs30`, `Defaults_ScanlinesStyleIs50`
+- [X] T046 [P] [US3] Extend `MatrixRainTests\RegistrySettingsProviderTests.cpp`: three round-trip tests for `ScanlinesEnabled` / `ScanlinesIntensity` / `ScanlinesStyle`
+- [X] T047 [P] [US3] Extend `MatrixRainTests\QualityPresetsTests.cpp` with `QualityPresetDoesNotMutateScanlineSettings`
 
 ### Implementation for User Story 3
 
-- [ ] T048 [P] [US3] `MatrixRainCore\ScreenSaverSettings.h`: add `bool m_scanlinesEnabled = true; int m_scanlinesIntensity = 30; int m_scanlinesStyle = 50;` with clamp helpers; (Green for T045) (data-model.md §1, FR-028, FR-038)
-- [ ] T049 [US3] `MatrixRainCore\RegistrySettingsProvider.{h,cpp}`: add `VALUE_SCANLINES_ENABLED`, `VALUE_SCANLINES_INTENSITY`, `VALUE_SCANLINES_STYLE`; load with defaults 1/30/50; clamp int values to `[1,100]` on read and on write; first-run with no `ScanlinesEnabled` value defaults to ON (Green for T046; satisfies SC-013 / FR-028) (FR-027, FR-028, FR-038, contracts/registry-schema.md)
+- [X] T048 [P] [US3] `MatrixRainCore\ScreenSaverSettings.h`: scanline fields + clamp helpers (landed earlier in T024)
+- [X] T049 [US3] `MatrixRainCore\RegistrySettingsProvider.{h,cpp}`: ScanlinesEnabled / Intensity / Style persistence with clamping
 - [ ] T050 [US3] Port `..\Casso\Casso\Shaders\CRT\scanlines.hlsl` → `MatrixRainCore\Shaders\scanlines.hlsl`: keep upstream SPDX/attribution header verbatim; add 1-line "MatrixRain modifications" note; delete `kNativeScanlines = 192.0`; delete the luminance gating (`lum`, `weight`, surrounding `lerp`); collapse cbuffer to 16-byte `ScanlineCb { float g_intensity; float g_linesPerHeight; float g_padding0; float g_padding1; }` per contracts/scanline-shader.md; `darken = lerp(1.0 - g_intensity, 1.0, bright);` (FR-022, FR-023, FR-024, FR-024a, research.md R6)
 - [ ] T051 [US3] `MatrixRainCore\RenderSystem.{h,cpp}`: add C++ POD `struct alignas(16) ScanlineCb { float intensity; float linesPerHeight; float pad0; float pad1; }; static_assert(sizeof(ScanlineCb) == 16);`. Add `m_postBloomTarget` (Texture2D + RTV + SRV, same format/dims as backbuffer) created alongside existing bloom resources. Compile new shader as `m_scanlinePS`. Reroute bloom composite to render into `m_postBloomTarget` when scanlines enabled; scanline pass samples it as `t0` and renders into backbuffer. When scanlines disabled, bypass `m_postBloomTarget` (bloom composite → backbuffer direct, as today). Both disabled → unchanged direct-to-backbuffer character path (FR-021, FR-025, FR-028b, research.md R6, contracts/scanline-shader.md)
 - [ ] T052 [US3] `MatrixRainCore\RenderSystem.cpp` per-frame top: compute `scanlinesIntensity = settings_intensity / 100.0f; scanlinesLineCount = ScanlineLineCount(settings_style);` and stash in `RenderParams`; upload `ScanlineCb` once per frame (or only when dirty) via `Map`/`Unmap`; skip the pass entirely when `!renderParams.scanlinesEnabled` (FR-023, FR-024, FR-028b)
