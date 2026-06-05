@@ -384,7 +384,9 @@ namespace MatrixRainTests
             // Assert
             Assert::AreEqual (100, settings.m_densityPercent,        L"Density should be clamped to MAX_DENSITY_PERCENT");
             Assert::AreEqual (100, settings.m_animationSpeedPercent, L"Animation speed should be clamped to MAX");
-            Assert::AreEqual (0,   settings.m_glowIntensityPercent,  L"Glow intensity should be clamped to MIN");
+            Assert::AreEqual (ScreenSaverSettings::MIN_GLOW_INTENSITY_PERCENT,
+                              settings.m_glowIntensityPercent,
+                              L"Glow intensity should be clamped to MIN (T040 reverted floor from 0 to 1 — explicit on/off now lives on m_glowEnabled)");
         }
         
         

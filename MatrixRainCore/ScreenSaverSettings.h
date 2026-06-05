@@ -18,7 +18,10 @@ struct ScreenSaverSettings
     static constexpr int MAX_ANIMATION_SPEED_PERCENT     = 100;
     static constexpr int DEFAULT_ANIMATION_SPEED_PERCENT = 75;
     
-    static constexpr int MIN_GLOW_INTENSITY_PERCENT     = 0;
+    // v1.5 (T040, FR-014): the Glow Intensity slider's min is restored from
+    // the v1.4 special-cased 0 (= "glow disabled" sentinel) back to 1.  The
+    // explicit on/off semantics now live on m_glowEnabled (Phase 4 US2).
+    static constexpr int MIN_GLOW_INTENSITY_PERCENT     = 1;
     static constexpr int MAX_GLOW_INTENSITY_PERCENT     = 200;
     static constexpr int DEFAULT_GLOW_INTENSITY_PERCENT = 100;
     

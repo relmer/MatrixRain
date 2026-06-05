@@ -170,8 +170,12 @@ BEGIN
     LTEXT           "GPU:",IDC_STATIC,15,14,58,8
     COMBOBOX        IDC_GPU_COMBO,90,12,195,120,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
 
-    // Glow Enabled checkbox placeholder — wired in Phase 4 (US2).
-    CONTROL         "Enable glow",IDC_GLOW_ENABLED_CHECK,"Button",BS_AUTOCHECKBOX | WS_TABSTOP | WS_DISABLED,15,36,130,10
+    // Glow Enabled checkbox (US2 T040, FR-008): drives the m_glowEnabled
+    // toggle.  ApplyGlowEnabledUI on the frame side mirrors its state into
+    // EnableWindow on the Visuals-tab Glow Intensity / Glow Size trios and
+    // the Performance-tab Quality Preset / Glow Passes / Glow Resolution /
+    // Glow Smoothness trios.
+    CONTROL         "Enable glow",IDC_GLOW_ENABLED_CHECK,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,36,130,10
 
     GROUPBOX        "Graphics performance and quality",IDC_QUALITY_GROUPBOX,7,52,286,118
     LTEXT           "Quality:",IDC_STATIC,15,64,58,8

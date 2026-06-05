@@ -421,13 +421,89 @@ static void DismissInfoTip (HWND hDlg)
 
 static std::wstring FormatPercentLabel (int sliderId, int value)
 {
-    // Glow Intensity reads "0% (glow disabled)" at 0 (FR-031).
-    if (sliderId == IDC_GLOWINTENSITY_SLIDER && value == 0)
+    // T041 (US2, FR-007): removed the legacy "0% (glow disabled)" branch.
+    // Glow on/off now lives on IDC_GLOW_ENABLED_CHECK; the slider min is
+    // back to 1 (see ScreenSaverSettings::MIN_GLOW_INTENSITY_PERCENT).
+    (void) sliderId;
+    return std::format (L"{}%", value);
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  ApplyGlowEnabledUI (T042, FR-016, FR-017, research.md R7)
+//
+//  Mirror m_glowEnabled into EnableWindow on every glow-dependent control
+//  across both property-sheet pages.  Cross-tab reach is safe because
+//  PSP_PREMATURE forces both page HWNDs to exist immediately after
+//  PropertySheetW returns — see plan.md "Property-sheet flags".
+//
+//  Per spec the Visuals-tab Glow Intensity / Glow Size trios disable, plus
+//  the Performance-tab Quality Preset / Glow Passes / Glow Resolution /
+//  Glow Smoothness trios.  Static "Glow intensity:" / "Glow size:" prompt
+//  labels are IDC_STATIC (no individual ID) so they can't be greyed
+//  programmatically; the value labels and info buttons carry the visual
+//  cue instead.
+//
+//  T043 (per-tab tooltip on disabled controls) is deferred — Windows
+//  tooltips don't fire on WS_DISABLED controls without a transparent
+//  parent-relay tooltip per page, and the greyed-out controls already
+//  convey "disabled" clearly.  Tracked as follow-up.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+static void ApplyGlowEnabledUI (HWND hSheet, bool enabled)
+{
+    if (!hSheet)
     {
-        return std::wstring (L"0% (glow disabled)");
+        return;
     }
 
-    return std::format (L"{}%", value);
+
+    HWND hVisuals = PropSheet_IndexToHwnd (hSheet, 0);
+    HWND hPerf    = PropSheet_IndexToHwnd (hSheet, 1);
+
+    auto enableIfPresent = [enabled] (HWND hPage, int id)
+    {
+        if (hPage)
+        {
+            HWND hCtrl = GetDlgItem (hPage, id);
+
+            if (hCtrl)
+            {
+                EnableWindow (hCtrl, enabled);
+            }
+        }
+    };
+
+
+    // Visuals tab — Glow Intensity + Glow Size trios.
+    enableIfPresent (hVisuals, IDC_GLOWINTENSITY_SLIDER);
+    enableIfPresent (hVisuals, IDC_GLOWINTENSITY_LABEL);
+    enableIfPresent (hVisuals, IDC_GLOWINTENSITY_INFO);
+    enableIfPresent (hVisuals, IDC_GLOWSIZE_SLIDER);
+    enableIfPresent (hVisuals, IDC_GLOWSIZE_LABEL);
+    enableIfPresent (hVisuals, IDC_GLOWSIZE_INFO);
+
+    // Performance tab — Quality Preset + Glow Passes/Resolution/Smoothness trios.
+    enableIfPresent (hPerf,    IDC_QUALITY_PRESET_SLIDER);
+    enableIfPresent (hPerf,    IDC_QUALITY_PRESET_LABEL);
+    enableIfPresent (hPerf,    IDC_QUALITY_PRESET_INFO);
+    enableIfPresent (hPerf,    IDC_GLOWPASSES_SLIDER);
+    enableIfPresent (hPerf,    IDC_GLOWPASSES_LABEL);
+    enableIfPresent (hPerf,    IDC_GLOWPASSES_INFO);
+    enableIfPresent (hPerf,    IDC_GLOWPASSES_PROMPT);
+    enableIfPresent (hPerf,    IDC_GLOWRES_SLIDER);
+    enableIfPresent (hPerf,    IDC_GLOWRES_LABEL);
+    enableIfPresent (hPerf,    IDC_GLOWRES_INFO);
+    enableIfPresent (hPerf,    IDC_GLOWRES_PROMPT);
+    enableIfPresent (hPerf,    IDC_GLOWSMOOTH_SLIDER);
+    enableIfPresent (hPerf,    IDC_GLOWSMOOTH_LABEL);
+    enableIfPresent (hPerf,    IDC_GLOWSMOOTH_INFO);
+    enableIfPresent (hPerf,    IDC_GLOWSMOOTH_PROMPT);
 }
 
 
@@ -804,11 +880,26 @@ static BOOL OnInitDialog (HWND hDlg, LPARAM initParam)
     CheckDlgButton (hDlg, IDC_STARTFULLSCREEN_CHECK, pSettings->m_startFullscreen     ? BST_CHECKED : BST_UNCHECKED);
     CheckDlgButton (hDlg, IDC_MULTIMONITOR_CHECK,    pSettings->m_multiMonitorEnabled ? BST_CHECKED : BST_UNCHECKED);
     CheckDlgButton (hDlg, IDC_SHOWDEBUG_CHECK,       pSettings->m_showDebugStats      ? BST_CHECKED : BST_UNCHECKED);
+    CheckDlgButton (hDlg, IDC_GLOW_ENABLED_CHECK,    pSettings->m_glowEnabled         ? BST_CHECKED : BST_UNCHECKED);
 
     // Hide fullscreen checkbox in screensaver CPL mode — screensaver always forces fullscreen
     if (pContext->m_isScreenSaverCPL)
     {
         ShowWindow (GetDlgItem (hDlg, IDC_STARTFULLSCREEN_CHECK), SW_HIDE);
+    }
+
+    // T044 (US2, research.md R7): mirror initial glow-enabled state into
+    // EnableWindow on both pages' glow-dependent controls.  Safe to call
+    // from either page proc because PSP_PREMATURE guarantees both HWNDs
+    // exist; the function no-ops if PropSheet_IndexToHwnd returns null on
+    // the first page's init (the second page's init re-applies).
+    {
+        HWND hSheet = GetParent (hDlg);
+
+        if (hSheet)
+        {
+            ApplyGlowEnabledUI (hSheet, pSettings->m_glowEnabled);
+        }
     }
     
     fSuccess = TRUE;
@@ -1228,6 +1319,17 @@ static void OnResetButton (HWND hDlg)
 
     CheckDlgButton (hDlg, IDC_STARTFULLSCREEN_CHECK, pDefaults->m_startFullscreen ? BST_CHECKED : BST_UNCHECKED);
     CheckDlgButton (hDlg, IDC_SHOWDEBUG_CHECK,       pDefaults->m_showDebugStats  ? BST_CHECKED : BST_UNCHECKED);
+    CheckDlgButton (hDlg, IDC_GLOW_ENABLED_CHECK,    pDefaults->m_glowEnabled     ? BST_CHECKED : BST_UNCHECKED);
+
+    // Re-mirror glow-enabled state into both pages' EnableWindow flags.
+    {
+        HWND hSheet = GetParent (hDlg);
+
+        if (hSheet)
+        {
+            ApplyGlowEnabledUI (hSheet, pDefaults->m_glowEnabled);
+        }
+    }
     
     // If live overlay mode, propagate changes to running application
     // (ResetToDefaults already updated controller settings, now trigger live propagation)
@@ -1305,6 +1407,23 @@ static BOOL OnCommand (HWND hDlg, WPARAM wParam)
         case IDC_SHOWDEBUG_CHECK:
             OnShowDebugCheck (hDlg);
             break;
+
+        case IDC_GLOW_ENABLED_CHECK:
+        {
+            // T044 (US2, FR-016, FR-017): toggle drives the controller AND
+            // immediately propagates EnableWindow across both tabs.
+            bool                     enabled    = (IsDlgButtonChecked (hDlg, IDC_GLOW_ENABLED_CHECK) == BST_CHECKED);
+            ConfigDialogController * pCtrl      = GetControllerFromDialog (hDlg);
+            HWND                     hSheet     = GetParent (hDlg);
+
+            if (pCtrl)
+            {
+                pCtrl->UpdateGlowEnabled (enabled);
+            }
+
+            ApplyGlowEnabledUI (hSheet, enabled);
+            break;
+        }
             
         case IDC_RESET_BUTTON:
             OnResetButton (hDlg);
