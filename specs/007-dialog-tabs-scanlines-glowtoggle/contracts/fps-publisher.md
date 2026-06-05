@@ -73,8 +73,9 @@ correct. There is no acquire/release pairing because:
 
 `m_hasPublishedFps` starts `false`. The first frame's `Tick()` writes
 both fields. Once `true`, it stays `true` for the lifetime of the
-context (it is never reset). This guarantees that "no published frame
-yet" → display `--`; any value of 0.0 fps after at least one published
-frame → display `0` (a real reading of zero fps is shown as `0 fps`,
-not as `-- fps`, matching user expectation that `--` means
-"unmeasured").
+context (it is never reset). The sentinel is used internally by the
+dialog timer to distinguish "no reading yet" from "real 0 fps", but
+the rendered title shows `0 fps` in both cases per FR-012 (the format
+string is uniformly `%u`/`%u`, with no placeholder token in the
+output). The sentinel matters for downstream logic that wants to
+suppress action until a real reading arrives.

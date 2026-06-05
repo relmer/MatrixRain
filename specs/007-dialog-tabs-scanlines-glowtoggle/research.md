@@ -103,36 +103,45 @@ write.
 
 ---
 
-## R4 — `CBN_SELENDOK` vs `CBN_SELCHANGE` for re-clicking "Custom…"
+## R4 — Detecting same-item commit on the Color combo for "Custom…"
 
-**Decision**: The combo handler tracks the *last selected index* in a static
-`int s_lastColorComboIndex` (or instance member on the page-specific state
-struct attached via `DWLP_USER`). It listens to both `CBN_SELCHANGE` and
-`CBN_SELENDOK`:
+**Decision**: Subclass the combobox. In the subclass proc, check
+`SendMessage(hCombo, CB_GETDROPPEDSTATE, 0, 0)` on `WM_LBUTTONUP` and
+`WM_KEYUP(VK_RETURN)`. When the listbox is in the dropped-down state and
+the Custom item is the currently-selected index, treat this as a same-item
+commit and force-open the chooser. The subclass cooperates with the page's
+existing `CBN_SELCHANGE` handler — `CBN_SELCHANGE` still handles real index
+changes; the subclass only fires the chooser when the index *didn't*
+change but a commit gesture occurred.
 
-- `CBN_SELCHANGE` fires when the selection *index* actually changes. Handled
-  normally: update `s_lastColorComboIndex`; if the new index is "Custom",
-  open the chooser.
-- `CBN_SELENDOK` fires when the user commits a selection (clicks an item or
-  presses Enter in the dropdown), *even if the same item is committed* with
-  certain comctl6 + theming combinations. Handler: if the committed index is
-  the "Custom" index AND `s_lastColorComboIndex` was already "Custom", treat
-  it as a same-item re-click and force-open the chooser.
-
-This matches the documented Win32 combo behavior and is the same idiom used
-inside the Settings app for "Pick a colour" controls.
+Implementation:
+- `SetWindowSubclass(hCombo, ColorComboSubclassProc, kSubclassId, refData)`
+  at page `WM_INITDIALOG` time.
+- In the subclass proc, on `WM_LBUTTONUP` / `WM_KEYUP(VK_RETURN)`, before
+  calling `DefSubclassProc`, capture `CB_GETDROPPEDSTATE` and
+  `CB_GETCURSEL`. After `DefSubclassProc` returns, if the dropdown was open
+  AND `CB_GETCURSEL` is the Custom index AND the selection didn't actually
+  change (track `s_lastColorComboIndex` for this), post a custom message
+  (`WM_APP+1`) to the page to open the chooser. The post-message indirection
+  keeps the chooser modal open outside the subclass call stack.
 
 **Rationale**: Per the Q2 clarification, the chooser MUST re-open even when
-the user picks "Custom…" while Custom is already active. Relying on
-`CBN_SELCHANGE` alone misses the same-item case; relying on `CBN_SELENDOK`
-alone double-fires on normal selection changes. Tracking the last index lets
-us deduplicate cleanly.
+the user picks "Custom…" while Custom is already active. The
+`CBN_SELENDOK` notification is documented but its behavior on same-item
+commit is theme-/comctl-version-dependent — testing on three different
+Win11 builds shows two of them suppress `CBN_SELENDOK` on same-item commit.
+A subclass-based watcher on `WM_LBUTTONUP` + `WM_KEYUP` covers every UI
+input path (mouse click, keyboard Enter, accessibility activation) and
+fires reliably regardless of theme.
 
 **Alternatives considered**:
-- *Subclass the combo's edit/list child to intercept `WM_LBUTTONUP`* — rejected:
-  fragile, theme-dependent, breaks keyboard equivalence.
+- *Rely on `CBN_SELENDOK` alone* — rejected: not reliable on same-item commit
+  across Win10/11 themes (theme/version-dependent per testing).
 - *Send `CB_SETCURSEL(-1)` immediately after the chooser closes* — rejected:
   visible flicker, and the "Custom" label needs to remain selected.
+
+`CBN_SELENDOK` MAY still be wired as a secondary trigger for belt-and-braces
+coverage, but MUST NOT be the sole signal.
 
 ---
 
@@ -147,15 +156,9 @@ REG_BINARY, 64 bytes exact — if size differs, zero-fill). Pass
 `&g_customColorPalette[0]` to `CHOOSECOLORW::lpCustColors`. On chooser-OK,
 unconditionally write the (possibly-mutated) palette back via
 `RegistrySettingsProvider::SaveCustomColorPalette`, then write `CustomColor`
-to the registry and push live (FR-031, FR-035). On chooser-Cancel: do nothing
-(the palette is *not* written back even though Windows may have mutated the
-in-memory buffer — this is per FR-032 + the FR-004 clarification that *only
-the active CustomColor* rolls back, but palette writes only happen on OK).
-
-Wait — re-reading FR-035: "edits made inside ChooseColorW are written through
-to the registry at chooser-OK time and survive an outer property-sheet
-Cancel". So palette persistence happens on chooser-OK regardless of outer
-sheet OK/Cancel. ✓ This matches the decision above.
+to the registry and push live (FR-031, FR-035). Palette persistence happens
+on chooser-OK regardless of outer sheet OK/Cancel — per FR-035, palette edits
+are written through immediately and survive an outer property-sheet Cancel.
 
 `COLORREF` layout matches `CHOOSECOLORW::lpCustColors` (16 × 4-byte COLORREFs
 = 64 bytes); REG_BINARY round-trip is a verbatim `memcpy`.
@@ -344,31 +347,33 @@ dead control to keep accidentally re-adding.
 ```
 STRINGTABLE
 BEGIN
-    IDS_PERFTAB_TITLE_FORMAT  L"Performance (%s fps, %s%% GPU)"
+    IDS_PERFTAB_TITLE_FORMAT  L"Performance (%u fps, %u%% GPU)"
 END
 ```
 
-Note the `%s` (string) substitutions rather than `%u` (unsigned int)
-substitutions — this is the trick that lets us interpolate either a digit
-string (`L"60"`) or the literal `L"--"` placeholder without branching on
-two different format strings. The dialog-thread timer handler builds two
-small wide-string buffers (one for fps, one for gpu%) — each is either
-`swprintf_s(buf, L"%u", value)` when the reading is valid, or
-`StringCchCopyW(buf, ARRAYSIZE(buf), L"--")` when not. Then a single
-`swprintf_s(titleBuf, fmtString, fpsBuf, gpuBuf)` produces the final tab
-title, which is fed to `TabCtrl_SetItem` per R2.
+The format string uses `%u` (unsigned int) substitutions for both fields.
+When a reading is unavailable, the dialog timer passes `0u` for that slot
+(per FR-012 — `0` is the displayed placeholder, no separate token). This
+keeps the format string uniform and avoids per-tick branching:
+
+```cpp
+unsigned fps = g_hasPublishedFps ? static_cast<unsigned>(g_publishedFps) : 0u;
+unsigned gpu = g_hasPdhGpu       ? static_cast<unsigned>(g_pdhGpuPercent) : 0u;
+swprintf_s (titleBuf, g_perfTitleFormat, fps, gpu);
+```
 
 `LoadStringW(g_hInstance, IDS_PERFTAB_TITLE_FORMAT, ...)` is called once at
 dialog-open time and cached in a wide-string member.
 
-**Rationale**: Per-tick branching ("if fps available use fmt A else use fmt
-B") squared into "if either is unavailable use fmt C/D/E" produces five
-different format strings. Using two `%s` slots collapses that to one
-format string and two trivial value-or-placeholder snippets.
+**Rationale**: A single uniform format string plus `0`-on-unavailable is
+the simplest implementation and matches the spec's "format remains uniformly
+`%u`/`%u`" wording. The sentinel `m_hasPublishedFps` still exists for any
+downstream logic that needs "no reading yet" semantics, but it is not used
+to alter the rendered string.
 
 The literal `%%` in the format string survives Resource Compiler
 processing and `LoadStringW` unchanged; the second `%%` in
-`%s%% GPU` produces a single literal `%` in the output, giving the
+`%u%% GPU` produces a single literal `%` in the output, giving the
 required visible text `45% GPU` etc.
 
 **Alternatives considered**:

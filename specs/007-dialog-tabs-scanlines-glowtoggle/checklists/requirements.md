@@ -45,7 +45,7 @@
   FR-040..FR-043 and in the Assumptions section.
 - **Re-validated 2026-02-23** after scanlines controls expansion (Win11
   toggle + Intensity + continuous Style slider; default ON; luminance
-  gating removed; upgrade behavior break added as US6/FR-028d/SC-013).
+  gating removed; upgrade behavior break absorbed into FR-028 + SC-013).
   All checklist items still pass; no regressions. The new `ScanlinesStyle`
   exponential mapping formula is preserved verbatim in FR-023 so
   implementation cannot drift from the intended perceptual curve.

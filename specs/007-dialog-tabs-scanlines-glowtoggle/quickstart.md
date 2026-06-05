@@ -33,7 +33,7 @@ x64\Debug\MatrixRain.exe /c
    updates immediately (no Apply press needed).
 4. Switch to Performance; within 1 s the tab label should read
    something like `Performance (60 fps, 12% GPU)`. Initial display
-   before first publication should show `Performance (-- fps, --% GPU)`.
+   before first publication shows `Performance (0 fps, 0% GPU)`.
 5. Change Density again, then click Cancel. The preview reverts to the
    pre-dialog Density value.
 
@@ -67,10 +67,10 @@ x64\Debug\MatrixRain.exe /c
 
 1. Color combo → Custom… → ChooseColorW opens pre-populated with
    `RGB(0,255,0)` on first use. Pick a non-default colour, OK.
-2. Preview rain renders in the chosen colour. Combo shows `Custom`.
+2. Preview rain renders in the chosen colour. Combo shows `Custom…` (the dropdown label and the selected-item display use the same string; no string mutation on selection).
 3. Color combo → Custom… again (re-click the same item). Chooser
    re-opens pre-populated with the previously chosen colour (this
-   exercises the `CBN_SELENDOK` force-open path).
+   exercises the subclass-based same-item-commit detection path).
 4. Edit a palette swatch in the chooser, click OK. Re-open the chooser
    later — the edited swatch is retained.
 5. Click Cancel on the *outer* property sheet. Active colour reverts
@@ -104,7 +104,7 @@ constraints request:
 1. **Foundational** — manifest verification (no change expected),
    resource.h new control IDs, `MatrixRainCore/Shaders/` directory,
    `ScanlineStyleMapping.{h,cpp}` skeleton + unit tests (red).
-2. **US4 / FR-039..043: fade-timer removal** — all symbol/file
+2. **US4 / FR-036, FR-037: fade-timer removal** — all symbol/file
    deletions per R8 inventory, paired test deletions, registry
    silent-ignore test added. Single logical commit per touched
    subsystem (ApplicationState removal, SharedState removal,
@@ -126,7 +126,8 @@ constraints request:
    upload + extra render target + 3 controls on Visuals tab + 3
    registry values + tests.
 6. **US5 — Custom color picker** — `ColorScheme::Custom` enum variant
-   + Color combo entry + `CBN_SELENDOK` force-open handler + ChooseColorW
+   + Color combo entry + subclass-based same-item-commit detection
+   (CB_GETDROPPEDSTATE on WM_LBUTTONUP / WM_KEYUP) + ChooseColorW
    integration + palette REG_BINARY round-trip (unconditional persist)
    + `CustomColor` registry round-trip + tests.
 7. **US6 — CHANGELOG / docs / migration note** — CHANGELOG entry

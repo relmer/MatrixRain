@@ -56,13 +56,10 @@ TCITEMW    item    = {};
 
 item.mask = TCIF_TEXT;
 
-if (g_hasPublishedFps) swprintf_s (fpsBuf, L"%u", static_cast<unsigned> (g_publishedFps));
-else                   StringCchCopyW (fpsBuf, ARRAYSIZE (fpsBuf), L"--");
+unsigned fps = g_hasPublishedFps ? static_cast<unsigned> (g_publishedFps)   : 0;
+unsigned gpu = g_hasPdhGpu       ? static_cast<unsigned> (g_pdhGpuPercent) : 0;
 
-if (g_hasPdhGpu)       swprintf_s (gpuBuf, L"%u", static_cast<unsigned> (g_pdhGpuPercent));
-else                   StringCchCopyW (gpuBuf, ARRAYSIZE (gpuBuf), L"--");
-
-swprintf_s (title, g_perfTitleFormat, fpsBuf, gpuBuf);   // "Performance (%s fps, %s%% GPU)"
+swprintf_s (title, g_perfTitleFormat, fps, gpu);   // "Performance (%u fps, %u%% GPU)"
 item.pszText = title;
 
 TabCtrl_SetItem (hTab, 1 /* Performance is page index 1 */, &item);
@@ -72,6 +69,8 @@ Contract:
 - Timer fires at most once per second (`SetTimer (hSheet, IDT_PERF, 1000, NULL)`).
 - Format string is loaded once at sheet creation via
   `LoadStringW (g_hInstance, IDS_PERFTAB_TITLE_FORMAT, g_perfTitleFormat, ...)`.
+- When either reading is unavailable, the integer is rendered as `0` (per
+  FR-012 — the format string remains uniformly `%u`/`%u`, no placeholder token).
 - `g_publishedFps` / `g_hasPublishedFps` are reads from
   `MonitorRenderContext::m_publishedFps` / `m_hasPublishedFps` (see
   `fps-publisher.md`), selecting the primary monitor's context.

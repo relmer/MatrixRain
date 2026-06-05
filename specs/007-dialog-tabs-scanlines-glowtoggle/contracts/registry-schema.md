@@ -45,4 +45,4 @@ Rollback-eligible (snapshot at dialog-open; restored on Cancel/X/Alt+F4):
 - `CustomColorPalette_AbsentZeroFillsSixtyFourBytes`
 - `CustomColorPalette_WrongSizeTreatedAsAbsent`
 - `CustomColorPalette_SixtyFourByteRoundTrip`
-- `LegacyShowFadeTimers_PresentValueDoesNotPreventLoad` (FR-037)
+- `LegacyShowFadeTimersIsSilentlyIgnored` (FR-037)

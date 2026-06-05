@@ -13,7 +13,8 @@ to receive a CPU-computed line count), three new Visuals-tab controls (Scanlines
 Enabled / Intensity / Style), an explicit `Glow Enabled` checkbox on the Performance
 tab that fully bypasses the bloom pipeline and disables glow-related controls on
 both tabs, and a `Custom…` color combo entry that opens `ChooseColorW` (palette
-persisted unconditionally; same-item re-click forces re-open via `CBN_SELENDOK`).
+persisted unconditionally; same-item re-click forces re-open via a subclass-based
+watcher checking `CB_GETDROPPEDSTATE` on commit messages).
 Excise the orphaned fade-timer debug overlay top-to-bottom before the tab
 restructure so the dialog code is clean when it is split. OK commits live values
 to the registry; Cancel / X / Alt+F4 all roll back via the existing
@@ -96,9 +97,9 @@ MatrixRainCore/                          # static library — all testable logic
 ├── ConfigDialogController.{h,cpp}       # extend snapshot/rollback for 5 new fields (FR-044)
 ├── ConfigDialogSnapshot.h               # add GlowEnabled, ScanlinesEnabled/Intensity/Style, CustomColor
 ├── FPSCounter.{h,cpp}                   # unchanged, reused by atomic publisher
-├── MonitorRenderContext.{h,cpp}         # add std::atomic<float> m_publishedFps; write per frame, lock-free read (FR-010)
+├── MonitorRenderContext.{h,cpp}         # add std::atomic<float> m_publishedFps + std::atomic<bool> m_hasPublishedFps; write per frame, lock-free read (FR-010)
 ├── QualityPresets.{h,cpp}               # unchanged (scanlines deliberately excluded; FR-026, FR-040)
-├── RegistrySettingsProvider.{h,cpp}     # remove VALUE_SHOW_FADE_TIMERS; add 6 new values (FR-027, FR-031, FR-035, FR-036, FR-037, FR-038)
+├── RegistrySettingsProvider.{h,cpp}     # remove VALUE_SHOW_FADE_TIMERS; add 6 new values (FR-020, FR-027, FR-031, FR-035, FR-038)
 ├── RenderParams.h                       # remove showDebugFadeTimes; add glowEnabled, scanlinesEnabled, scanlinesIntensity, scanlinesLineCount, colorScheme.customRgb
 ├── RenderSystem.{h,cpp}                 # remove RenderDebugFadeTimes; bypass bloom pipeline when !glowEnabled; add scanline post-pass + cbuffer (FR-015, FR-021..FR-025, FR-028b)
 ├── ScreenSaverSettings.h                # remove m_showFadeTimers; add the 6 new settings + ColorScheme::Custom support
@@ -109,7 +110,7 @@ MatrixRainCore/Shaders/                  # new shaders directory (mirrors Casso 
 └── scanlines.hlsl                       # ported from ../Casso/Casso/Shaders/CRT/scanlines.hlsl with modifications per FR-023, FR-024, FR-024a
 
 MatrixRain/                              # thin Win32 UI shell .exe
-├── ConfigDialog.{h,cpp}                 # REPLACED: now creates PropertySheetW, hosts two page DLGPROCs, owns 1 Hz title timer, wires CBN_SELENDOK custom-color force-open, ChooseColorW + palette REG_BINARY round-trip
+├── ConfigDialog.{h,cpp}                 # REPLACED: now creates PropertySheetW, hosts two page DLGPROCs, owns 1 Hz title timer, wires the subclass-based same-item custom-color re-open handler, ChooseColorW + palette REG_BINARY round-trip
 ├── MatrixRain.rc                        # REPLACED: 2 DIALOG templates (Visuals page, Performance page), removed Show Fade Timers checkbox, new string-table entry "Performance (%u fps, %u%% GPU)", new control IDs in resource.h
 ├── MatrixRain.manifest                  # already declares comctl32 v6 + per-monitor v2 DPI — verify no change needed
 ├── main.cpp                             # unchanged
