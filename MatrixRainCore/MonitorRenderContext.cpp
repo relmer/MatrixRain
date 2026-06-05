@@ -392,6 +392,10 @@ void MonitorRenderContext::RenderThreadProc()
         if (m_fpsCounter)
         {
             m_fpsCounter->Update (deltaTime);
+
+            // T023 (US1, FR-010): publish to the lock-free pair consumed by the
+            // property-sheet 1 Hz title timer.  See contracts/fps-publisher.md.
+            PublishFps (m_fpsCounter->GetFPS());
         }
 
         // The primary context owns the shared color-cycle clock: advance it and

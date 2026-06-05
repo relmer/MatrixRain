@@ -106,12 +106,12 @@ applies live; title refreshes ≤1 s; OK commits, Cancel/X/Alt+F4 roll back.
 
 ### Tests for User Story 1 ⚠️
 
-- [ ] T021 [P] [US1] Write `MatrixRainTests\unit\MonitorRenderContextFpsPublisherTests.cpp`: assert default `m_publishedFps == 0.0f` AND `m_hasPublishedFps == false`; assert that publishing a value updates both atomically and that subsequent loads observe both (Red) (FR-010, contracts/fps-publisher.md, research.md R3)
+- [X] T021 [P] [US1] Write `MatrixRainTests\unit\MonitorRenderContextFpsPublisherTests.cpp`: assert default `m_publishedFps == 0.0f` AND `m_hasPublishedFps == false`; assert that publishing a value updates both atomically and that subsequent loads observe both (Red) (FR-010, contracts/fps-publisher.md, research.md R3)
 - [ ] T022 [P] [US1] Extend `MatrixRainTests\ConfigDialogControllerTests.cpp` with `EnterLiveMode_SnapshotsAllV15Fields` and `CancelLiveMode_RestoresAllV15Fields` covering all 5 new fields: `glowEnabled`, `scanlinesEnabled`, `scanlinesIntensity`, `scanlinesStyle`, `customColor`. Assert `customColorPalette` is NOT in the snapshot set (FR-035 carve-out) (Red) (FR-004, FR-044, data-model.md §3)
 
 ### Implementation for User Story 1
 
-- [ ] T023 [US1] `MatrixRainCore\MonitorRenderContext.{h,cpp}`: add `std::atomic<float> m_publishedFps {0.0f};` and `std::atomic<bool> m_hasPublishedFps {false};`; in the per-frame post-`FPSCounter::Tick()` path, `store(..., memory_order_relaxed)` both. Provide lock-free accessor pair `GetPublishedFps(bool & outHasValue) const` (Green for T021) (FR-010, contracts/fps-publisher.md, research.md R3)
+- [X] T023 [US1] `MatrixRainCore\MonitorRenderContext.{h,cpp}`: add `std::atomic<float> m_publishedFps {0.0f};` and `std::atomic<bool> m_hasPublishedFps {false};`; in the per-frame post-`FPSCounter::Tick()` path, `store(..., memory_order_relaxed)` both. Provide lock-free accessor pair `GetPublishedFps(bool & outHasValue) const` (Green for T021) (FR-010, contracts/fps-publisher.md, research.md R3)
 - [ ] T024 [P] [US1] `MatrixRainCore\ConfigDialogSnapshot.h`: add 5 new fields per data-model §3 (`bool glowEnabled; bool scanlinesEnabled; int scanlinesIntensity; int scanlinesStyle; COLORREF customColor;`). Explicit comment noting palette is INTENTIONALLY excluded per FR-035 (FR-004, FR-044)
 - [ ] T025 [US1] `MatrixRainCore\ConfigDialogController.{h,cpp}`: extend `EnterLiveMode()`/`CancelLiveMode()` to snapshot/restore the 5 new fields and push restored values into `SharedState`; add `UpdateGlowEnabled`, `UpdateScanlinesEnabled`, `UpdateScanlinesIntensity`, `UpdateScanlinesStyle`, `UpdateCustomColor` accessors (Green for T022) (FR-004, FR-044, data-model.md §3)
 - [ ] T026 [P] [US1] `MatrixRainCore\SharedState.h`: add live atomics (`liveGlowEnabled`, `liveScanlinesEnabled`, `liveScanlinesIntensity`, `liveScanlinesStyle`, `liveCustomColor`) AND non-atomic snapshot mirrors per data-model.md §4 (FR-044)

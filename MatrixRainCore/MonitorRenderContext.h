@@ -66,6 +66,36 @@ public:
     HWND   Hwnd()      const { return m_hwnd;      }
     bool   IsPrimary() const { return m_isPrimary; }
 
+    ////////////////////////////////////////////////////////////////////////////
+    //
+    //  FPS publisher (T023, FR-010, contracts/fps-publisher.md, research.md R3)
+    //
+    //  Lock-free pair used by the property-sheet 1 Hz title timer running on
+    //  the dialog thread.  Producer is the render thread, in RenderThreadProc
+    //  immediately after FPSCounter::Update().  Consumer reads via the
+    //  combined-getter form below; memory_order_relaxed is correct because
+    //  the float is the only shared datum and a torn read is impossible on
+    //  4-byte-aligned x64/ARM64 atomic float load/store.
+    //
+    ////////////////////////////////////////////////////////////////////////////
+
+    void   PublishFps        (float fps) noexcept
+    {
+        m_publishedFps   .store (fps,  std::memory_order_relaxed);
+        m_hasPublishedFps.store (true, std::memory_order_relaxed);
+    }
+
+    float  GetPublishedFps   (bool & outHasValue) const noexcept
+    {
+        outHasValue = m_hasPublishedFps.load (std::memory_order_relaxed);
+        return       m_publishedFps    .load (std::memory_order_relaxed);
+    }
+
+    bool   HasPublishedFps   () const noexcept
+    {
+        return m_hasPublishedFps.load (std::memory_order_relaxed);
+    }
+
 private:
     void RenderThreadProc();
     void Update (const SharedState::Snapshot & snapshot, float deltaTime);
@@ -90,4 +120,10 @@ private:
     OverlayState      * m_overlays     { nullptr };
     ApplicationState  * m_primaryClock { nullptr };
     std::atomic<bool> * m_inTransition { nullptr };
+
+    // T023 (US1, FR-010): lock-free FPS publisher, written once per frame by
+    // the render thread and read by the dialog 1 Hz title timer.  See the
+    // accessor block above for ordering rationale.
+    std::atomic<float> m_publishedFps    { 0.0f  };
+    std::atomic<bool>  m_hasPublishedFps { false };
 };
