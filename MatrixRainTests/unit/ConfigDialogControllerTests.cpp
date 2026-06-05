@@ -1048,5 +1048,61 @@ namespace MatrixRainTests
                               static_cast<DWORD> (appAfter.m_customColor),
                               L"app customColor restored");
         }
+
+
+        ////////////////////////////////////////////////////////////////////////
+        //
+        //  T033b (US1, FR-004a, SC-011): the OK button's `PSN_APPLY` path
+        //  calls CommitLiveMode, which must Save() every rollback-eligible
+        //  field (5 new v1.5 + 3 existing v1.4 representative samples)
+        //  through the settings provider.  Tests the registry-write path
+        //  end-to-end via InMemorySettingsProvider.
+        //
+        ////////////////////////////////////////////////////////////////////////
+
+        TEST_METHOD (CommitLiveMode_WritesAllV15Fields)
+        {
+            HRESULT                          hr = S_OK;
+            ConfigDialogController           controller (m_settingsProvider);
+            ApplicationState                 appState   (m_settingsProvider);
+
+
+            hr = controller.Initialize();
+            Assert::AreEqual (S_OK, hr);
+
+            appState.Initialize (nullptr);
+
+            hr = controller.InitializeLiveMode (&appState);
+            Assert::AreEqual (S_OK, hr);
+
+            // Mutate the 5 new v1.5 fields + 3 existing v1.4 fields.
+            controller.UpdateGlowEnabled        (false);
+            controller.UpdateScanlinesEnabled   (false);
+            controller.UpdateScanlinesIntensity (77);
+            controller.UpdateScanlinesStyle     (22);
+            controller.UpdateCustomColor        (RGB (10, 20, 30));
+
+            controller.UpdateDensity            (42);
+            controller.UpdateAnimationSpeed     (88);
+            controller.UpdateGlowIntensity      (175);
+
+            hr = controller.CommitLiveMode();
+            Assert::AreEqual (S_OK, hr, L"CommitLiveMode returns S_OK in live mode");
+
+            // All 8 fields must have round-tripped through the provider.
+            const ScreenSaverSettings & stored = m_settingsProvider.GetStored();
+            Assert::IsFalse  (stored.m_glowEnabled,                                L"glowEnabled persisted");
+            Assert::IsFalse  (stored.m_scanlinesEnabled,                           L"scanlinesEnabled persisted");
+            Assert::AreEqual (77,                  stored.m_scanlinesIntensity,    L"scanlinesIntensity persisted");
+            Assert::AreEqual (22,                  stored.m_scanlinesStyle,        L"scanlinesStyle persisted");
+            Assert::AreEqual (static_cast<DWORD> (RGB (10, 20, 30)),
+                              static_cast<DWORD> (stored.m_customColor),
+                              L"customColor persisted");
+            Assert::AreEqual (42,                  stored.m_densityPercent,        L"densityPercent persisted");
+            Assert::AreEqual (88,                  stored.m_animationSpeedPercent, L"animationSpeedPercent persisted");
+            Assert::AreEqual (175,                 stored.m_glowIntensityPercent,  L"glowIntensityPercent persisted");
+
+            Assert::IsFalse (controller.IsLiveMode(), L"CommitLiveMode clears live-mode state");
+        }
     };
 }  // namespace MatrixRainTests
