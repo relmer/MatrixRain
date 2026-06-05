@@ -141,12 +141,12 @@ private:
         wchar_t counterPath[256];
         DWORD   pid = GetCurrentProcessId();
 
-        // Filter to 3D engine only (what MatrixRain actually uses for its
-        // draw calls).  Wildcards expand to one instance per (LUID, engine
-        // instance).  Task Manager's Processes-tab GPU column reports the
-        // MAX across these.
+        // Match Task Manager's per-process GPU column: wildcard across ALL
+        // engine types and take the MAX of the resulting array.  Filtering
+        // to engtype_3D undercounts because the bloom pipeline also runs
+        // work on the Copy and Compute engines (DXGI blits, present, etc).
         StringCchPrintfW (counterPath, ARRAYSIZE (counterPath),
-                          L"\\GPU Engine(*pid_%lu*engtype_3D)\\Utilization Percentage",
+                          L"\\GPU Engine(*pid_%lu*)\\Utilization Percentage",
                           pid);
 
         if (PdhAddEnglishCounterW (m_query, counterPath, 0, &m_counter) != ERROR_SUCCESS)
