@@ -287,6 +287,9 @@
     <ResourceCompile Include="MatrixRain.rc" />
   </ItemGroup>
   <ItemGroup>
+    <Manifest Include="MatrixRain.manifest" />
+  </ItemGroup>
+  <ItemGroup>
     <Image Include="MatrixRain.ico" />
   </ItemGroup>
   <ItemGroup>
