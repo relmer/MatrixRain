@@ -936,5 +936,117 @@ namespace MatrixRainTests
             Logger::WriteMessage ("Live dialog shutdown test requires UI harness to simulate parent window destruction. Skipping until automation is implemented.\n");
             return;
         }
+
+
+
+
+
+        ////////////////////////////////////////////////////////////////////////
+        //
+        //  T022 (US1, FR-004, FR-044): live-mode snapshot/rollback covers the
+        //  5 new v1.5 fields, and the customColorPalette is INTENTIONALLY NOT
+        //  snapshotted (FR-035 carve-out — palette is persisted directly on
+        //  chooser-OK and never rolled back).
+        //
+        ////////////////////////////////////////////////////////////////////////
+
+        TEST_METHOD (EnterLiveMode_SnapshotsAllV15Fields)
+        {
+            ScreenSaverSettings              initial {};
+            HRESULT                          hr      = S_OK;
+            ConfigDialogController           controller (m_settingsProvider);
+            ApplicationState                 appState   (m_settingsProvider);
+
+
+            initial.m_glowEnabled         = true;
+            initial.m_scanlinesEnabled    = true;
+            initial.m_scanlinesIntensity  = 30;
+            initial.m_scanlinesStyle      = 50;
+            initial.m_customColor         = RGB (0, 255, 0);
+            initial.m_customColorPalette  = { RGB (1, 2, 3), RGB (4, 5, 6) };
+
+            hr = m_settingsProvider.Save (initial);
+            Assert::AreEqual (S_OK, hr);
+
+            hr = controller.Initialize();
+            Assert::AreEqual (S_OK, hr);
+
+            appState.Initialize (nullptr);
+
+            hr = controller.InitializeLiveMode (&appState);
+            Assert::AreEqual (S_OK, hr, L"EnterLiveMode (InitializeLiveMode) succeeds");
+
+            // Mutate live, then cancel — snapshot must roll back the 5 fields.
+            controller.UpdateGlowEnabled        (false);
+            controller.UpdateScanlinesEnabled   (false);
+            controller.UpdateScanlinesIntensity (99);
+            controller.UpdateScanlinesStyle     (1);
+            controller.UpdateCustomColor        (RGB (255, 0, 0));
+
+            // Palette is NOT rollback-eligible — direct write survives Cancel.
+            ScreenSaverSettings paletteChange = controller.GetSettings();
+            paletteChange.m_customColorPalette = { RGB (10, 20, 30) };
+
+            hr = controller.CancelLiveMode();
+            Assert::AreEqual (S_OK, hr);
+
+            const ScreenSaverSettings & restored = controller.GetSettings();
+            Assert::IsTrue   (restored.m_glowEnabled,                        L"glowEnabled restored");
+            Assert::IsTrue   (restored.m_scanlinesEnabled,                   L"scanlinesEnabled restored");
+            Assert::AreEqual (30,                  restored.m_scanlinesIntensity, L"scanlinesIntensity restored");
+            Assert::AreEqual (50,                  restored.m_scanlinesStyle,     L"scanlinesStyle restored");
+            Assert::AreEqual (static_cast<DWORD> (RGB (0, 255, 0)),
+                              static_cast<DWORD> (restored.m_customColor),
+                              L"customColor restored");
+        }
+
+
+        TEST_METHOD (CancelLiveMode_RestoresAllV15Fields)
+        {
+            // Distinct from the prior test: verifies CancelLiveMode pushes the
+            // restored values into the ApplicationState live-mirror, not just
+            // back into controller-local m_settings (FR-044).
+            ScreenSaverSettings              initial {};
+            HRESULT                          hr      = S_OK;
+            ConfigDialogController           controller (m_settingsProvider);
+            ApplicationState                 appState   (m_settingsProvider);
+
+
+            initial.m_glowEnabled        = true;
+            initial.m_scanlinesEnabled   = true;
+            initial.m_scanlinesIntensity = 30;
+            initial.m_scanlinesStyle     = 50;
+            initial.m_customColor        = RGB (0, 255, 0);
+
+            hr = m_settingsProvider.Save (initial);
+            Assert::AreEqual (S_OK, hr);
+
+            hr = controller.Initialize();
+            Assert::AreEqual (S_OK, hr);
+
+            appState.Initialize (nullptr);
+
+            hr = controller.InitializeLiveMode (&appState);
+            Assert::AreEqual (S_OK, hr);
+
+            controller.UpdateGlowEnabled        (false);
+            controller.UpdateScanlinesEnabled   (false);
+            controller.UpdateScanlinesIntensity (88);
+            controller.UpdateScanlinesStyle     (12);
+            controller.UpdateCustomColor        (RGB (200, 100, 50));
+
+            hr = controller.CancelLiveMode();
+            Assert::AreEqual (S_OK, hr);
+
+            // ApplicationState restored via ApplySettings(snapshot) path.
+            const ScreenSaverSettings & appAfter = appState.GetSettings();
+            Assert::IsTrue   (appAfter.m_glowEnabled,                        L"app glowEnabled restored");
+            Assert::IsTrue   (appAfter.m_scanlinesEnabled,                   L"app scanlinesEnabled restored");
+            Assert::AreEqual (30,                  appAfter.m_scanlinesIntensity, L"app scanlinesIntensity restored");
+            Assert::AreEqual (50,                  appAfter.m_scanlinesStyle,     L"app scanlinesStyle restored");
+            Assert::AreEqual (static_cast<DWORD> (RGB (0, 255, 0)),
+                              static_cast<DWORD> (appAfter.m_customColor),
+                              L"app customColor restored");
+        }
     };
 }  // namespace MatrixRainTests
