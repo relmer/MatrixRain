@@ -86,7 +86,8 @@ static constexpr UINT_PTR kInfoButtonSubclassId = 0xC0C00C1Bu;
 // controller has already pushed the defaults through to `ApplicationState`
 // for the live-preview path, so this message is strictly about UI re-sync,
 // not about settings propagation.
-#define WM_APP_RESET_RESYNC (WM_APP + 50)
+#define WM_APP_RESET_RESYNC      (WM_APP + 50)
+#define WM_APP_REPOSITION_RESET  (WM_APP + 51)
 
 
 
@@ -2039,6 +2040,13 @@ static INT_PTR CALLBACK PageDlgProc (HWND   hDlg,
                             pController->CancelChanges();
                         }
                     }
+                    // Explicitly allow the cancel to proceed.  PSN_RESET's
+                    // return value is conveyed via DWLP_MSGRESULT: FALSE
+                    // allows the close, TRUE prevents it.  Without this
+                    // explicit clear, DWLP_MSGRESULT may carry over a
+                    // non-zero value from a prior notification and silently
+                    // veto Cancel / X / Esc.
+                    SetWindowLongPtr (hDlg, DWLP_MSGRESULT, FALSE);
                     result = TRUE;
                     break;
             }
@@ -2289,7 +2297,16 @@ static int CALLBACK PropSheetCallback (HWND hSheet, UINT uMsg, LPARAM lParam)
             // broadcasts WM_APP_RESET_RESYNC to both pages.  Created here
             // (not in the trampoline) so the page HWNDs and the OK button
             // already exist for the layout math in CreateFrameResetButton.
+            //
+            // PSCB_INITIALIZED runs BEFORE the property sheet finishes
+            // its internal resize-around-pages step — so the OK button
+            // is still at its initial small-template position right now.
+            // We create the Reset button anywhere here, then POST a
+            // WM_APP_REPOSITION_RESET to ourselves so the SheetFrameSubclass
+            // can reposition it AFTER PropertySheetW returns control to the
+            // message loop (i.e., after the sheet has finalized its layout).
             CreateFrameResetButton (hSheet);
+            PostMessageW (hSheet, WM_APP_REPOSITION_RESET, 0, 0);
             break;
         }
     }
@@ -2389,10 +2406,11 @@ LRESULT CALLBACK SheetFrameSubclass (HWND     hSheet,
     // sheet has finished sizing itself around the pages — PSCB_INITIALIZED
     // (where the button is created) fires while OK/Cancel are still at
     // their initial small-template positions, so any positioning done
-    // there strands Reset in the middle of the dialog.  WM_SHOWWINDOW
-    // with wParam==TRUE fires once when the sheet becomes visible AFTER
-    // all layout is complete; we reposition there.
-    if (msg == WM_SHOWWINDOW && wParam == TRUE)
+    // there strands Reset in the middle of the dialog.  We use a posted
+    // custom message (WM_APP_REPOSITION_RESET) dispatched from the
+    // message loop AFTER PropertySheetW returns control — by then the
+    // sheet has finalized its layout and OK is in its real footer slot.
+    if (msg == WM_APP_REPOSITION_RESET)
     {
         HWND  hReset = GetDlgItem (hSheet, IDC_RESET_DEFAULTS);
         HWND  hOk    = GetDlgItem (hSheet, IDOK);
