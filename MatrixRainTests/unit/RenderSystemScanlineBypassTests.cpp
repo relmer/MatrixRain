@@ -43,14 +43,14 @@ namespace MatrixRainTests
             }
 
 
-            TEST_METHOD (ScanlineBypassedWhenGlowDisabled)
+            TEST_METHOD (ScanlineRunsWhenGlowDisabled)
             {
                 RenderParams params {};
                 params.scanlinesEnabled = true;
                 params.glowEnabled      = false;
 
-                Assert::IsFalse (ShouldRunScanlinePass (params),
-                                 L"glowEnabled=false must bypass the scanline pass even when scanlinesEnabled");
+                Assert::IsTrue (ShouldRunScanlinePass (params),
+                                L"scanlines must still run when only glow is disabled (Render routes the no-glow scene copy through m_postBloomTarget so the scanline PS has an SRV)");
             }
 
 

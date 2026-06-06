@@ -66,17 +66,16 @@ inline bool ShouldRunBloomPass (const RenderParams & params) noexcept
 ////////////////////////////////////////////////////////////////////////////////
 //
 //  ShouldRunScanlinePass — pure helper consulted by RenderSystem::Render and
-//  unit-tested in RenderSystemScanlineBypassTests.cpp.  Returns true only
-//  when scanlines are enabled AND the bloom pipeline is also running.  Per
-//  the v1.5 user spec (mini-phase 2.5 sibling decision), scanlines are
-//  bypassed whenever Glow Enabled is OFF — the bloom composite is the host
-//  of the post-bloom-target plumbing the scanline pass samples from.
+//  unit-tested in RenderSystemScanlineBypassTests.cpp.  Returns true when
+//  scanlines are enabled — independently of the glow toggle.  The Render
+//  path routes the no-glow direct-scene-to-target write into m_postBloomTarget
+//  when scanlines are wanted so the scanline PS still has an SRV to sample.
 //
 ////////////////////////////////////////////////////////////////////////////////
 
 inline bool ShouldRunScanlinePass (const RenderParams & params) noexcept
 {
-    return params.scanlinesEnabled && params.glowEnabled;
+    return params.scanlinesEnabled;
 }
 
 

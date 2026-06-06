@@ -2414,18 +2414,18 @@ void RenderSystem::Render (const AnimationSystem & animationSystem, const Viewpo
 
         // v1.5 (T039, FR-015): bypass the entire bloom pipeline when the
         // user has toggled Glow Enabled OFF.  The scene texture is composited
-        // straight to the backbuffer; bloom resources stay allocated so
+        // straight to the backbuffer (or into m_postBloomTarget when the
+        // scanline pass is also active); bloom resources stay allocated so
         // re-enabling is instant.  See ShouldRunBloomPass in RenderSystem.h
         // for the unit-tested decision predicate.
         //
         // v1.5 (T051, T052, FR-028b): when the scanline pass is active, the
-        // composite (or, in the glow-off bypass branch, the direct scene
-        // copy) writes into m_postBloomTarget instead of the swapchain
-        // backbuffer; the scanline PS then samples it and writes the final
-        // image to the backbuffer.  ShouldRunScanlinePass also gates on
-        // glowEnabled, so the scanline branch is only ever taken alongside
-        // the bloom composite path — the glow-off bypass therefore never
-        // routes through m_postBloomTarget today.
+        // composite (or the direct scene copy in the glow-off branch) writes
+        // into m_postBloomTarget instead of the swapchain backbuffer; the
+        // scanline PS then samples it and writes the final image to the
+        // backbuffer.  Scanlines run independently of glow now — the no-glow
+        // branch routes through m_postBloomTarget too so scanlines always
+        // have a populated SRV.
         bool                     wantScanlines    = ShouldRunScanlinePass (params)
                                                     && m_scanlinePS
                                                     && m_postBloomRTV
@@ -2434,29 +2434,25 @@ void RenderSystem::Render (const AnimationSystem & animationSystem, const Viewpo
                                                     ? m_postBloomRTV.Get()
                                                     : m_renderTargetView.Get();
 
+        if (wantScanlines)
+        {
+            // Per-frame Map/Unmap of the scanline cbuffer.  Cheap; the
+            // intensity + line-count atomics were resolved upstream in
+            // MonitorRenderContext::BuildRenderParams.
+            (void)UploadScanlineConstants (params);
+        }
+
         if (ShouldRunBloomPass (params))
         {
-            if (wantScanlines)
-            {
-                // Per-frame Map/Unmap of the scanline cbuffer.  Cheap; the
-                // intensity + line-count atomics were resolved upstream in
-                // MonitorRenderContext::BuildRenderParams.
-                (void)UploadScanlineConstants (params);
-            }
-
             (void)ApplyBloom (pCompositeTarget);
-
-            if (wantScanlines)
-            {
-                (void)ApplyScanlinePass();
-            }
         }
         else
         {
-            // Direct scene-to-backbuffer copy: render the scene texture without
-            // the bloom extract/blur/composite passes.  No scanlines here per
-            // ShouldRunScanlinePass's glow-gate (see comment above).
-            m_context->OMSetRenderTargets (1, m_renderTargetView.GetAddressOf(), nullptr);
+            // Direct scene-to-target copy: render the scene texture without
+            // the bloom extract/blur/composite passes.  When scanlines are
+            // active we still route through m_postBloomTarget so the scanline
+            // PS has something to sample.
+            m_context->OMSetRenderTargets (1, &pCompositeTarget, nullptr);
             m_context->OMSetBlendState (nullptr, nullptr, 0xffffffff);
 
             ID3D11ShaderResourceView * sceneSrv[] = { m_sceneSRV.Get() };
@@ -2468,7 +2464,12 @@ void RenderSystem::Render (const AnimationSystem & animationSystem, const Viewpo
                                     nullptr,
                                     nullptr);
             m_context->PSSetSamplers (0, 1, m_samplerState.GetAddressOf());
-            RenderFullscreenPass (m_renderTargetView.Get(), m_compositePS.Get(), sceneSrv, 1);
+            RenderFullscreenPass (pCompositeTarget, m_compositePS.Get(), sceneSrv, 1);
+        }
+
+        if (wantScanlines)
+        {
+            (void)ApplyScanlinePass();
         }
     }
     else
