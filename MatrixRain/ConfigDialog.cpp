@@ -1391,8 +1391,24 @@ static COLORREF ResolveSwatchColor (HWND hDlg)
 
     ColorScheme scheme       = (idx == 4) ? ColorScheme::ColorCycle
                                           : static_cast<ColorScheme> (idx);
-    float       elapsedTime  = static_cast<float> (GetTickCount64()) / 1000.0f;
-    Color4      c            = GetColorRGB (scheme, elapsedTime);
+    // Use the running ApplicationState's elapsed-time clock so the swatch
+    // and the rain compute identical cycle phase.  Falls back to system
+    // tick count only if Application/AppState isn't available (CPL preview
+    // launched without a running rain instance).
+    float       elapsedTime  = 0.0f;
+    Application * pApp       = GetApplicationFromDialog (hDlg);
+
+
+    if (pApp && pApp->GetApplicationState())
+    {
+        elapsedTime = pApp->GetApplicationState()->GetElapsedTime();
+    }
+    else
+    {
+        elapsedTime = static_cast<float> (GetTickCount64()) / 1000.0f;
+    }
+
+    Color4 c = GetColorRGB (scheme, elapsedTime);
 
 
     return RGB (static_cast<BYTE> (std::clamp (c.r, 0.0f, 1.0f) * 255.0f + 0.5f),
