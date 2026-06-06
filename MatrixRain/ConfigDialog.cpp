@@ -9,6 +9,7 @@
 #include "..\MatrixRainCore\Application.h"
 #include "..\MatrixRainCore\ApplicationState.h"
 #include "..\MatrixRainCore\ConfigDialogController.h"
+#include "..\MatrixRainCore\ColorScheme.h"
 #include "..\MatrixRainCore\CommandLine.h"
 #include "..\MatrixRainCore\MonitorRenderContext.h"
 #include "..\MatrixRainCore\RenderSystem.h"
@@ -989,60 +990,15 @@ static bool OpenCustomColorChooser (HWND hOwnerPage)
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-//  ColorComboSubclass (T064, research.md R4)
-//
-//  Intercepts WM_LBUTTONUP / WM_KEYUP(VK_RETURN) BEFORE the combo's
-//  default proc closes the dropdown.  If the dropdown was open AND the
-//  user committed the Custom entry (whether by mouse or keyboard,
-//  whether selection changed or not), post WM_APP_OPEN_CUSTOM_COLOR_CHOOSER
-//  to the parent so the chooser opens out-of-line of this dispatch
-//  (calling ChooseColorW inline would re-enter comctl's message loop
-//  mid-dispatch).  This catches the same-item re-click case that
-//  CBN_SELCHANGE misses (decision in commit aa8648e).
+//  (Removed ColorComboSubclass — see commit history.  The previous attempt
+//  to catch "same Custom item re-click" via WM_LBUTTONUP fired spuriously
+//  every time the dropdown was opened, making it impossible to pick a
+//  different preset once Custom was selected.  CBN_SELCHANGE alone is now
+//  the trigger: re-opening the chooser requires a different combo
+//  selection followed by re-selecting Custom, which is acceptable for the
+//  rare edit-existing-custom case.)
 //
 ////////////////////////////////////////////////////////////////////////////////
-
-static constexpr UINT_PTR kColorComboSubclassId = 0xC0C00C3Eu;
-
-
-static LRESULT CALLBACK ColorComboSubclassProc (HWND      hCombo,
-                                                  UINT      msg,
-                                                  WPARAM    wParam,
-                                                  LPARAM    lParam,
-                                                  UINT_PTR  uIdSubclass,
-                                                  DWORD_PTR /*dwRefData*/)
-{
-    bool checkCommit = false;
-    bool wasOpen     = false;
-
-
-    if (msg == WM_LBUTTONUP || (msg == WM_KEYUP && wParam == VK_RETURN))
-    {
-        wasOpen     = (SendMessageW (hCombo, CB_GETDROPPEDSTATE, 0, 0) != FALSE);
-        checkCommit = true;
-    }
-
-    LRESULT result = DefSubclassProc (hCombo, msg, wParam, lParam);
-
-    if (checkCommit && wasOpen)
-    {
-        LRESULT sel = SendMessageW (hCombo, CB_GETCURSEL, 0, 0);
-
-
-        if (sel == kCustomColorComboIndex)
-        {
-            PostMessageW (GetParent (hCombo), WM_APP_OPEN_CUSTOM_COLOR_CHOOSER, 0, 0);
-        }
-    }
-
-    if (msg == WM_NCDESTROY)
-    {
-        RemoveWindowSubclass (hCombo, ColorComboSubclassProc, uIdSubclass);
-    }
-
-    return result;
-}
-
 
 
 
@@ -1114,6 +1070,13 @@ static void InitializeGpuCombo (HWND hDlg, DialogContext * pContext, const std::
 //
 ////////////////////////////////////////////////////////////////////////////////
 
+// Forward declarations for the colour swatch helpers (defined after this
+// function in the file; OnInitDialog needs them to start the cycle timer
+// when the initial scheme is Cycle).
+static void UpdateCycleTimerForCurrentScheme (HWND hDlg);
+static void InvalidateColorSwatch            (HWND hDlg);
+
+
 static BOOL OnInitDialog (HWND hDlg, LPARAM initParam)
 {
     HRESULT                     hr           = S_OK;
@@ -1158,19 +1121,10 @@ static BOOL OnInitDialog (HWND hDlg, LPARAM initParam)
     InitializeColorSchemeCombo (hDlg, pSettings->m_colorSchemeKey);
     InitializeGpuCombo         (hDlg, pContext, pSettings->m_gpuAdapter);
 
-    // T064 (US5, research.md R4): subclass the color combo to catch
-    // same-item re-click on Custom (CBN_SELCHANGE doesn't fire for
-    // re-commits of the already-selected entry).  Only the Visuals
-    // page has IDC_COLORSCHEME_COMBO; GetDlgItem returns null on the
-    // Performance page so SetWindowSubclass quietly no-ops.
-    {
-        HWND hCombo = GetDlgItem (hDlg, IDC_COLORSCHEME_COMBO);
-
-        if (hCombo)
-        {
-            SetWindowSubclass (hCombo, ColorComboSubclassProc, kColorComboSubclassId, 0);
-        }
-    }
+    // Color combo: subclass removed; CBN_SELCHANGE drives the chooser.
+    // The kLastColorComboIndexProp prop is still useful (read by the
+    // chooser-cancel revert path) and is maintained by InitializeColor-
+    // SchemeCombo / ResyncPageFromSettings / OnColorSchemeChange.
 
     // Quality preset slider (0=Low, 1=Medium, 2=High, 3=Custom).
     SendDlgItemMessageW (hDlg, IDC_QUALITY_PRESET_SLIDER, TBM_SETRANGE,   TRUE, MAKELPARAM (0, 3));
@@ -1200,6 +1154,10 @@ static BOOL OnInitDialog (HWND hDlg, LPARAM initParam)
 
     // Mirror initial scanlines-enabled state into the slider/info enable flags.
     ApplyScanlinesEnabledUI (hDlg, pSettings->m_scanlinesEnabled);
+
+    // Start the colour swatch cycle timer if the initial scheme is Cycle
+    // (no-op on Performance page, which has no swatch control).
+    UpdateCycleTimerForCurrentScheme (hDlg);
 
     // Per-page tooltip surface for the IDC_*_INFO indicators (only the
     // info buttons actually present on this page get registered tools).
@@ -1397,6 +1355,113 @@ Error:
 
 ////////////////////////////////////////////////////////////////////////////////
 //
+//  ColorSwatch helpers (v1.5)
+//
+//  Paint the owner-draw swatch (IDC_COLOR_SWATCH) on the Visuals page so
+//  it reflects the currently-selected colour scheme.  Cycle mode is
+//  driven by a 30Hz timer (IDT_COLOR_CYCLE_TIMER) that just invalidates
+//  the swatch; the paint code re-queries GetColorRGB with a fresh time.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+static constexpr UINT_PTR kColorCycleTimerId      = IDT_COLOR_CYCLE_TIMER;
+static constexpr UINT     kColorCycleTickInterval = 33;  // ~30 Hz; matches rain refresh well enough for a 28x12 swatch
+
+
+
+
+static COLORREF ResolveSwatchColor (HWND hDlg)
+{
+    DialogContext * pContext = GetDialogContext (hDlg);
+
+
+    if (!pContext || !pContext->m_controller)
+    {
+        return RGB (0, 255, 0);
+    }
+
+    const ScreenSaverSettings & settings = pContext->m_controller->GetSettings();
+    int                         idx      = ColorSchemeKeyToIndex (settings.m_colorSchemeKey);
+
+
+    if (idx == kCustomColorComboIndex)
+    {
+        return settings.m_customColor;
+    }
+
+    ColorScheme scheme       = (idx == 4) ? ColorScheme::ColorCycle
+                                          : static_cast<ColorScheme> (idx);
+    float       elapsedTime  = static_cast<float> (GetTickCount64()) / 1000.0f;
+    Color4      c            = GetColorRGB (scheme, elapsedTime);
+
+
+    return RGB (static_cast<BYTE> (std::clamp (c.r, 0.0f, 1.0f) * 255.0f + 0.5f),
+                static_cast<BYTE> (std::clamp (c.g, 0.0f, 1.0f) * 255.0f + 0.5f),
+                static_cast<BYTE> (std::clamp (c.b, 0.0f, 1.0f) * 255.0f + 0.5f));
+}
+
+
+
+
+static void DrawColorSwatch (HWND hDlg, LPDRAWITEMSTRUCT pdis)
+{
+    COLORREF rgb    = ResolveSwatchColor (hDlg);
+    HBRUSH   hBrush = CreateSolidBrush (rgb);
+
+
+    if (hBrush)
+    {
+        FillRect (pdis->hDC, &pdis->rcItem, hBrush);
+        DeleteObject (hBrush);
+    }
+}
+
+
+
+
+static void UpdateCycleTimerForCurrentScheme (HWND hDlg)
+{
+    DialogContext * pContext = GetDialogContext (hDlg);
+
+
+    if (!pContext || !pContext->m_controller || !GetDlgItem (hDlg, IDC_COLOR_SWATCH))
+    {
+        return;
+    }
+
+    int idx = ColorSchemeKeyToIndex (pContext->m_controller->GetSettings().m_colorSchemeKey);
+
+
+    // Cycle entry is index 4 (kCustomColorComboIndex == 5).
+    if (idx == 4)
+    {
+        SetTimer (hDlg, kColorCycleTimerId, kColorCycleTickInterval, nullptr);
+    }
+    else
+    {
+        KillTimer (hDlg, kColorCycleTimerId);
+    }
+}
+
+
+
+
+static void InvalidateColorSwatch (HWND hDlg)
+{
+    HWND hSwatch = GetDlgItem (hDlg, IDC_COLOR_SWATCH);
+
+
+    if (hSwatch)
+    {
+        InvalidateRect (hSwatch, nullptr, FALSE);
+    }
+}
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
 //  OnColorSchemeChange
 //
 ////////////////////////////////////////////////////////////////////////////////
@@ -1437,6 +1502,9 @@ static void OnColorSchemeChange (HWND hDlg)
         SetPropW (hDlg, kLastColorComboIndexProp,
                   reinterpret_cast<HANDLE> (static_cast<INT_PTR> (index + 1)));
     }
+
+    UpdateCycleTimerForCurrentScheme (hDlg);
+    InvalidateColorSwatch            (hDlg);
 
     UNREFERENCED_PARAMETER (priorIndex);
 
@@ -1900,10 +1968,19 @@ static INT_PTR CALLBACK PageDlgProc (HWND   hDlg,
 
         case WM_DRAWITEM:
         {
-            // Owner-draw paint for the ⓘ info indicators.  No button frame:
-            // we draw only the glyph (transparent background, 1.5x font).
             LPDRAWITEMSTRUCT pdis = reinterpret_cast<LPDRAWITEMSTRUCT> (lParam);
 
+
+            // Owner-draw paint for the colour swatch next to the scheme combo.
+            if (pdis && pdis->CtlType == ODT_STATIC && pdis->CtlID == IDC_COLOR_SWATCH)
+            {
+                DrawColorSwatch (hDlg, pdis);
+                result = TRUE;
+                break;
+            }
+
+            // Owner-draw paint for the ⓘ info indicators.  No button frame:
+            // we draw only the glyph (transparent background, 1.5x font).
             if (pdis && pdis->CtlType == ODT_BUTTON && IsInfoTipControlId (pdis->CtlID))
             {
                 DialogContext * pContext = GetDialogContext (hDlg);
@@ -2073,6 +2150,14 @@ static INT_PTR CALLBACK PageDlgProc (HWND   hDlg,
                 DismissInfoTip (hDlg);
                 result = TRUE;
             }
+            else if (wParam == kColorCycleTimerId)
+            {
+                // Re-invalidate the swatch; the paint code re-queries
+                // GetColorRGB with a fresh elapsedTime so the swatch
+                // animates at the same rate as the rain itself.
+                InvalidateColorSwatch (hDlg);
+                result = TRUE;
+            }
             break;
 
         case WM_APP_RESET_RESYNC:
@@ -2091,6 +2176,9 @@ static INT_PTR CALLBACK PageDlgProc (HWND   hDlg,
             {
                 ResyncPageFromSettings (hDlg, pContext->m_controller->GetSettings());
             }
+
+            UpdateCycleTimerForCurrentScheme (hDlg);
+            InvalidateColorSwatch            (hDlg);
 
             result = TRUE;
             break;
@@ -2127,6 +2215,9 @@ static INT_PTR CALLBACK PageDlgProc (HWND   hDlg,
 
                 SendDlgItemMessageW (hDlg, IDC_COLORSCHEME_COMBO, CB_SETCURSEL, prior, 0);
             }
+
+            UpdateCycleTimerForCurrentScheme (hDlg);
+            InvalidateColorSwatch            (hDlg);
 
             result = TRUE;
             break;

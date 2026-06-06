@@ -2529,12 +2529,12 @@ void RenderSystem::RenderFPSCounter (float fps, int rainPercentage, int streakCo
     //   "Rain xxx% (yyy heads / zzz total), ww FPS, GPU vv%"
     if (gpuLoadValid)
     {
-        swprintf_s (fpsText, L"Rain %d%% (%d heads / %d total), %.0f FPS, GPU %.0f%%",
+        swprintf_s (fpsText, L"Rain %d%% (%d heads / %d total), %.0f fps, %.0f%% GPU",
                     rainPercentage, activeHeadCount, streakCount, fps, gpuLoadPercent);
     }
     else
     {
-        swprintf_s (fpsText, L"Rain %d%% (%d heads / %d total), %.0f FPS, GPU --%%",
+        swprintf_s (fpsText, L"Rain %d%% (%d heads / %d total), %.0f fps, --%% GPU",
                     rainPercentage, activeHeadCount, streakCount, fps);
     }
 

@@ -9,6 +9,7 @@
 
 // v1.5 timer IDs
 #define IDT_PERF_TITLE_TIMER            5001
+#define IDT_COLOR_CYCLE_TIMER           5002
 
 // v1.5 string resources
 #define IDS_VISUALS_TAB_TITLE           40001
@@ -84,13 +85,19 @@
 // the timer proc can update them uniformly via GetDlgItem on each page.
 #define IDC_FPS_GPU_READOUT                 1052
 
+// v1.5: owner-draw colour swatch shown to the right of IDC_COLORSCHEME_-
+// COMBO on the Visuals page.  Reflects the currently-selected scheme:
+// fills with the static palette entry, the custom colour, or the
+// animated cycle colour (driven at ~30Hz by IDT_COLOR_CYCLE_TIMER).
+#define IDC_COLOR_SWATCH                    1053
+
 // Next default values for new objects
 // 
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        105
 #define _APS_NEXT_COMMAND_VALUE         40004
-#define _APS_NEXT_CONTROL_VALUE         1053
+#define _APS_NEXT_CONTROL_VALUE         1054
 #define _APS_NEXT_SYMED_VALUE           101
 #endif
 #endif
