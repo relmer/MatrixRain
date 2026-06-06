@@ -21,7 +21,14 @@ enum class ColorScheme
     Red                = 2,                     // Danger red (255, 50, 50)
     Amber              = 3,                     // Warm amber (255, 191, 0)
     __StaticColorCount,                         // Number of static colors (not including ColorCycle)
-    ColorCycle         = __StaticColorCount     // Continuously cycles through all colors smoothly
+    ColorCycle         = __StaticColorCount,    // Continuously cycles through all colors smoothly
+
+    // v1.5 US5 (T059, FR-033, FR-039, SC-007): user-picked RGB persisted
+    // as a separate COLORREF in ScreenSaverSettings::m_customColor.  Slot
+    // is appended at ordinal 5 — v1.4 ordinals 0..4 (Green/Blue/Red/
+    // Amber/Cycle) MUST stay frozen so existing registry values continue
+    // to round-trip after a v1.5 upgrade.
+    Custom             = 5
 };
 
 /// <summary>

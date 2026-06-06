@@ -93,6 +93,58 @@ namespace MatrixRainTests
                 // Should be green (0, 255, 100)
                 Assert::IsTrue (color.g > 0.9f, L"Default scheme should be predominantly green");
             }
+
+
+            ////////////////////////////////////////////////////////////////
+            //
+            //  T056 (US5, FR-033, FR-039, SC-007): Custom color scheme.
+            //  The Custom slot is appended at ordinal 5; v1.4 ordinals
+            //  (Green=0, Blue=1, Red=2, Amber=3, ColorCycle=4) MUST
+            //  remain frozen so existing v1.4 registry values round-trip
+            //  unchanged on a v1.5 upgrade.
+            //
+            ////////////////////////////////////////////////////////////////
+
+            TEST_METHOD (CustomColorSchemeIsOrdinal5)
+            {
+                Assert::AreEqual (5, static_cast<int> (ColorScheme::Custom),
+                                  L"Custom MUST be ordinal 5 (appended past ColorCycle=4)");
+            }
+
+
+            TEST_METHOD (V14OrdinalsAreFrozen)
+            {
+                Assert::AreEqual (0, static_cast<int> (ColorScheme::Green),       L"Green still 0");
+                Assert::AreEqual (1, static_cast<int> (ColorScheme::Blue),        L"Blue still 1");
+                Assert::AreEqual (2, static_cast<int> (ColorScheme::Red),         L"Red still 2");
+                Assert::AreEqual (3, static_cast<int> (ColorScheme::Amber),       L"Amber still 3");
+                Assert::AreEqual (4, static_cast<int> (ColorScheme::ColorCycle),  L"ColorCycle still 4");
+            }
+
+
+            TEST_METHOD (CustomColorSchemeRoundTripsViaKey)
+            {
+                Assert::IsTrue  (ColorScheme::Custom == ParseColorSchemeKey (L"custom"),
+                                 L"L\"custom\" parses to ColorScheme::Custom");
+                Assert::AreEqual (std::wstring (L"custom"), ColorSchemeToKey (ColorScheme::Custom),
+                                  L"ColorScheme::Custom serialises to L\"custom\"");
+                Assert::IsTrue  (IsValidColorSchemeKey (L"custom"), L"\"custom\" is valid");
+                Assert::IsTrue  (IsValidColorSchemeKey (L"Custom"), L"case-insensitive valid");
+            }
+
+
+            TEST_METHOD (CustomColorSchemeIsNotInHotkeyCycle)
+            {
+                // GetNextColorScheme advances Green/Blue/Red/Amber/Cycle
+                // back to Green; Custom is opt-in via the combo only and
+                // must NOT appear in the hotkey rotation (FR-039).
+                ColorScheme current = ColorScheme::ColorCycle;
+
+
+                current = GetNextColorScheme (current);
+                Assert::IsTrue (current == ColorScheme::Green,
+                                L"ColorCycle wraps to Green, skipping Custom");
+            }
     };
 }  // namespace MatrixRainTests
 

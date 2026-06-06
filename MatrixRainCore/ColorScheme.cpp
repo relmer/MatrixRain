@@ -119,10 +119,10 @@ ColorScheme ParseColorSchemeKey (const std::wstring & key)
     if (key == L"red")        return ColorScheme::Red;
     if (key == L"amber")      return ColorScheme::Amber;
     if (key == L"cycle")      return ColorScheme::ColorCycle;
+    if (key == L"custom")     return ColorScheme::Custom;
 
     return ColorScheme::Green;  // Default for unrecognized keys
 }
-
 
 
 
@@ -136,10 +136,10 @@ std::wstring ColorSchemeToKey (ColorScheme scheme)
         case ColorScheme::Red:        return L"red";
         case ColorScheme::Amber:      return L"amber";
         case ColorScheme::ColorCycle: return L"cycle";
+        case ColorScheme::Custom:     return L"custom";
         default:                      return L"green";
     }
 }
-
 
 
 
@@ -153,5 +153,6 @@ bool IsValidColorSchemeKey (const std::wstring & key)
            lowerKey == L"blue"   ||
            lowerKey == L"red"    ||
            lowerKey == L"amber"  ||
-           lowerKey == L"cycle";
+           lowerKey == L"cycle"  ||
+           lowerKey == L"custom";
 }
