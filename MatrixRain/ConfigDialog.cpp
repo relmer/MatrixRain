@@ -2208,34 +2208,41 @@ static VOID CALLBACK PerfTitleTimerProc (HWND hSheet, UINT /*msg*/, UINT_PTR /*i
         gpu = static_cast<unsigned> (gpuLoad + 0.5);
     }
 
-    WCHAR title[64] = {};
-    StringCchPrintfW (title,
-                      ARRAYSIZE (title),
+    WCHAR readout[64] = {};
+    StringCchPrintfW (readout,
+                      ARRAYSIZE (readout),
                       pContext->m_perfTitleFormat,
                       fps,
                       gpu);
 
-    HWND hTab = PropSheet_GetTabControl (hSheet);
-
-    if (!hTab)
+    // Bail if value unchanged — avoids flicker on repaint of identical text.
+    if (wcscmp (pContext->m_lastPerfTabTitle, readout) == 0)
     {
         return;
     }
 
-    if (wcscmp (pContext->m_lastPerfTabTitle, title) == 0)
-    {
-        return;
-    }
+    StringCchCopyW (pContext->m_lastPerfTabTitle,
+                    ARRAYSIZE (pContext->m_lastPerfTabTitle),
+                    readout);
 
-    TCITEMW item = {};
-    item.mask    = TCIF_TEXT;
-    item.pszText = title;
-
-    if (TabCtrl_SetItem (hTab, 1 /* Performance is page index 1 */, &item))
+    // Write to the bottom-right readout static on every page.  Pages may
+    // not exist yet during the very first tick — GetDlgItem returns NULL
+    // and SetWindowTextW is harmless on NULL? — no, it isn't; guard.
+    for (int i = 0; i < 2; i++)
     {
-        StringCchCopyW (pContext->m_lastPerfTabTitle,
-                        ARRAYSIZE (pContext->m_lastPerfTabTitle),
-                        title);
+        HWND hPage = PropSheet_IndexToHwnd (hSheet, i);
+
+
+        if (hPage)
+        {
+            HWND hReadout = GetDlgItem (hPage, IDC_FPS_GPU_READOUT);
+
+
+            if (hReadout)
+            {
+                SetWindowTextW (hReadout, readout);
+            }
+        }
     }
 }
 
@@ -2283,36 +2290,13 @@ static int CALLBACK PropSheetCallback (HWND hSheet, UINT uMsg, LPARAM lParam)
                 pContext->m_pApp->SetConfigDialog (hSheet);
             }
 
-            // Centre the sheet over the application window (live overlay)
-            // or the primary monitor (CPL).  Moved here from the per-page
-            // OnInitDialog — the frame is what the user sees, not the pages.
-            {
-                RECT  sheetRect  = {};
-                RECT  centerRect = {};
-                HWND  appHwnd    = pContext->m_pApp ? pContext->m_pApp->GetMainWindowHwnd() : nullptr;
-
-                GetWindowRect (hSheet, &sheetRect);
-
-                int sheetW = sheetRect.right  - sheetRect.left;
-                int sheetH = sheetRect.bottom - sheetRect.top;
-
-                if (appHwnd)
-                {
-                    GetWindowRect (appHwnd, &centerRect);
-                }
-                else
-                {
-                    centerRect.left   = 0;
-                    centerRect.top    = 0;
-                    centerRect.right  = GetSystemMetrics (SM_CXSCREEN);
-                    centerRect.bottom = GetSystemMetrics (SM_CYSCREEN);
-                }
-
-                int x = (centerRect.left + centerRect.right  - sheetW) / 2;
-                int y = (centerRect.top  + centerRect.bottom - sheetH) / 2;
-
-                SetWindowPos (hSheet, nullptr, x, y, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
-            }
+            // Centring is deferred to WM_APP_REPOSITION_RESET (posted at
+            // the bottom of PSCB_INITIALIZED).  PSCB_INITIALIZED runs
+            // BEFORE comctl32 resizes the sheet to fit the pages, so
+            // GetWindowRect here would return the small-template size and
+            // mis-centre the dialog.  The posted message fires after
+            // PropertySheetW returns to the message loop, by which point
+            // the sheet has its real outer dimensions.
 
             // Load the format string once and cache on the context.
             LoadStringW (GetModuleHandleW (nullptr),
@@ -2542,6 +2526,39 @@ LRESULT CALLBACK SheetFrameSubclass (HWND     hSheet,
     if (msg == WM_APP_REPOSITION_RESET)
     {
         RepositionFrameResetButton (hSheet);
+
+        // Centre the sheet now that comctl32 has finalized its outer
+        // dimensions to fit the pages.  Centering at PSCB_INITIALIZED
+        // uses pre-resize geometry and lands the dialog off-centre.
+        {
+            DialogContext * pContext = static_cast<DialogContext *> (GetPropW (hSheet, kSheetContextProp));
+            RECT            sheetRect  = {};
+            RECT            centerRect = {};
+            HWND            appHwnd    = (pContext && pContext->m_pApp) ? pContext->m_pApp->GetMainWindowHwnd() : nullptr;
+
+
+            GetWindowRect (hSheet, &sheetRect);
+
+            int sheetW = sheetRect.right  - sheetRect.left;
+            int sheetH = sheetRect.bottom - sheetRect.top;
+
+            if (appHwnd && IsWindow (appHwnd))
+            {
+                GetWindowRect (appHwnd, &centerRect);
+            }
+            else
+            {
+                centerRect.left   = 0;
+                centerRect.top    = 0;
+                centerRect.right  = GetSystemMetrics (SM_CXSCREEN);
+                centerRect.bottom = GetSystemMetrics (SM_CYSCREEN);
+            }
+
+            int x = (centerRect.left + centerRect.right  - sheetW) / 2;
+            int y = (centerRect.top  + centerRect.bottom - sheetH) / 2;
+
+            SetWindowPos (hSheet, nullptr, x, y, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
+        }
     }
 
     // Mini-phase 2.5: frame-scope Reset button.  Pages don't see this

@@ -45,12 +45,13 @@ STRINGTABLE
 BEGIN
     1, "MatrixRain"
 
-    // v1.5 (T028, FR-009, FR-012): property-sheet tab labels.  The
-    // Performance tab is updated once per second to embed live FPS + GPU%
-    // via swprintf_s on IDS_PERFTAB_TITLE_FORMAT.
+    // v1.5 (T028, FR-009, FR-012): property-sheet tab labels.  Live FPS +
+    // GPU% are displayed in a per-page bottom-right static (IDC_FPS_GPU_-
+    // READOUT) via swprintf_s on IDS_FPS_GPU_READOUT_FORMAT — the tab
+    // titles themselves stay constant so the tab control doesn't flicker.
     IDS_VISUALS_TAB_TITLE             "Visuals"
     IDS_PERFORMANCE_TAB_TITLE_INITIAL "Performance"
-    IDS_PERFTAB_TITLE_FORMAT          "Performance (%u fps, %u%% GPU)"
+    IDS_PERFTAB_TITLE_FORMAT          "%u fps, %u%% GPU"
 END
 
 
@@ -128,7 +129,7 @@ END
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-IDD_VISUALS_PAGE DIALOGEX 0, 0, 300, 194
+IDD_VISUALS_PAGE DIALOGEX 0, 0, 300, 232
 STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_DISABLED | WS_CAPTION
 CAPTION "Visuals"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
@@ -169,11 +170,17 @@ BEGIN
     LTEXT           "50",IDC_SCANLINES_STYLE_VALUE,257,149,28,8
 
     CONTROL         "Start in fullscreen",IDC_STARTFULLSCREEN_CHECK,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,176,130,10
+
+    // Bottom-right live FPS / GPU% readout (1 Hz update from PerfTitle-
+    // TimerProc).  Same control id on both pages so the timer can address
+    // them uniformly.  Right-aligned text; field right edge matches the
+    // trackbar/combo right edge above (x=285 = 155+130).
+    LTEXT           "",IDC_FPS_GPU_READOUT,155,216,130,8,SS_RIGHT
 END
 
 
 
-IDD_PERFORMANCE_PAGE DIALOGEX 0, 0, 300, 224
+IDD_PERFORMANCE_PAGE DIALOGEX 0, 0, 300, 232
 STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_DISABLED | WS_CAPTION
 CAPTION "Performance"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
@@ -213,6 +220,9 @@ BEGIN
     LTEXT           "High",IDC_GLOWSMOOTH_LABEL,257,166,28,8
 
     CONTROL         "Show performance metrics",IDC_SHOWDEBUG_CHECK,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,198,160,10
+
+    // Bottom-right live FPS / GPU% readout — see IDD_VISUALS_PAGE for notes.
+    LTEXT           "",IDC_FPS_GPU_READOUT,155,216,130,8,SS_RIGHT
 END
 
 #endif    // English (United States) resources

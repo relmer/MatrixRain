@@ -79,13 +79,18 @@
 // sheets don't expose a native Reset button.
 #define IDC_RESET_DEFAULTS                  1051
 
+// v1.5: per-page bottom-right FPS / GPU readout (replaces the live FPS/GPU
+// suffix on the Performance tab title).  Same control ID on both pages so
+// the timer proc can update them uniformly via GetDlgItem on each page.
+#define IDC_FPS_GPU_READOUT                 1052
+
 // Next default values for new objects
 // 
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        105
 #define _APS_NEXT_COMMAND_VALUE         40004
-#define _APS_NEXT_CONTROL_VALUE         1052
+#define _APS_NEXT_CONTROL_VALUE         1053
 #define _APS_NEXT_SYMED_VALUE           101
 #endif
 #endif
