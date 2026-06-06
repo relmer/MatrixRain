@@ -343,6 +343,18 @@ void Application::InitializeApplicationState (const ScreenSaverModeContext * pSc
         m_sharedState.showStatistics = show;
     });
 
+    // v1.5 (T062, FR-016/021/028/034 live preview): bulk callback fired
+    // from ApplicationState::ApplySettings.  Atomic-stores into the
+    // SharedState.live* fields the render thread reads via GetSnapshot
+    // each frame.  Lock-free path (atomics, not the SharedState mutex).
+    m_appState->RegisterV15LiveCallback ([this](const ScreenSaverSettings & settings) {
+        m_sharedState.liveGlowEnabled       .store (settings.m_glowEnabled,                                    std::memory_order_relaxed);
+        m_sharedState.liveScanlinesEnabled  .store (settings.m_scanlinesEnabled,                               std::memory_order_relaxed);
+        m_sharedState.liveScanlinesIntensity.store (settings.m_scanlinesIntensity,                             std::memory_order_relaxed);
+        m_sharedState.liveScanlinesStyle    .store (settings.m_scanlinesStyle,                                 std::memory_order_relaxed);
+        m_sharedState.liveCustomColor       .store (static_cast<DWORD> (settings.m_customColor),               std::memory_order_relaxed);
+    });
+
     // Initialize SharedState from saved settings
     {
         const auto & settings = m_appState->GetSettings();
@@ -353,6 +365,16 @@ void Application::InitializeApplicationState (const ScreenSaverModeContext * pSc
         m_sharedState.glowIntensityPercent  = settings.m_glowIntensityPercent;
         m_sharedState.glowSizePercent       = settings.m_glowSizePercent;
         m_sharedState.showStatistics        = m_appState->GetShowStatistics();
+
+        // v1.5 (T062 bootstrap): seed the live atomics from persisted
+        // settings so the very first frame uses the user's saved values
+        // (otherwise the atomics keep their in-struct defaults until the
+        // first ApplySettings call from the dialog).
+        m_sharedState.liveGlowEnabled       .store (settings.m_glowEnabled,                              std::memory_order_relaxed);
+        m_sharedState.liveScanlinesEnabled  .store (settings.m_scanlinesEnabled,                         std::memory_order_relaxed);
+        m_sharedState.liveScanlinesIntensity.store (settings.m_scanlinesIntensity,                       std::memory_order_relaxed);
+        m_sharedState.liveScanlinesStyle    .store (settings.m_scanlinesStyle,                           std::memory_order_relaxed);
+        m_sharedState.liveCustomColor       .store (static_cast<DWORD> (settings.m_customColor),         std::memory_order_relaxed);
     }
 
     // Apply settings to subsystems and bind input once the primary render

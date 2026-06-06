@@ -109,6 +109,17 @@ public:
     void RegisterShowStatisticsCallback (std::function<void(bool)> callback);
 
     /// <summary>
+    /// Register a bulk callback for the v1.5 live atomics (glowEnabled,
+    /// scanlinesEnabled, scanlinesIntensity, scanlinesStyle, customColor).
+    /// Fired from `ApplySettings` so the dialog thread's per-control
+    /// setters (which all funnel through ApplySettings) reach SharedState
+    /// in one lock-free dispatch.  Application wires this to atomic-stores
+    /// on SharedState.live* so the render thread picks up the new values
+    /// via GetSnapshot on the next frame.
+    /// </summary>
+    void RegisterV15LiveCallback (std::function<void(const ScreenSaverSettings &)> callback);
+
+    /// <summary>
     /// Update animation speed setting.
     /// </summary>
     /// <param name="speedPercent">Animation speed percentage (1-100)</param>
@@ -181,6 +192,13 @@ private:
     std::function<void(ColorScheme)> m_colorSchemeChangeCallback        = nullptr;                 // Callback for color scheme changes
     std::function<void(bool)>        m_showStatisticsChangeCallback     = nullptr;                 // Callback for show-statistics changes
     std::function<void(const AdvancedGraphicsValues &)> m_advancedGraphicsChangeCallback = nullptr; // Callback for US5 advanced graphics changes
+
+    // v1.5 (US2/US3/US5 live preview): single bulk callback fired from
+    // ApplySettings, wired by Application.cpp to atomic-store every
+    // SharedState.live* field in one shot.  Simpler than five per-field
+    // callbacks because UpdateGlowEnabled / UpdateScanlines* / UpdateCustomColor
+    // all funnel through ApplySettings anyway, so one signal is sufficient.
+    std::function<void(const ScreenSaverSettings &)> m_v15LiveCallback                = nullptr;
 };
 
 

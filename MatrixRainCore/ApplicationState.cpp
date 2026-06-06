@@ -211,6 +211,14 @@ void ApplicationState::RegisterShowStatisticsCallback (std::function<void(bool)>
 
 
 
+void ApplicationState::RegisterV15LiveCallback (std::function<void(const ScreenSaverSettings &)> callback)
+{
+    m_v15LiveCallback = callback;
+}
+
+
+
+
 
 void ApplicationState::SetGlowIntensity (int intensityPercent)
 {
@@ -286,6 +294,16 @@ void ApplicationState::ApplySettings (const ScreenSaverSettings & settings)
     if (m_showStatisticsChangeCallback)
     {
         m_showStatisticsChangeCallback (m_showStatistics);
+    }
+
+    // v1.5 (T062 + US2/US3 live preview): fire the bulk callback so
+    // Application can atomic-store every SharedState.live* field in
+    // one lock-free dispatch.  Without this, UpdateGlowEnabled /
+    // UpdateScanlines* / UpdateCustomColor mutate m_settings but the
+    // render thread keeps reading the initial-value atomics.
+    if (m_v15LiveCallback)
+    {
+        m_v15LiveCallback (m_settings);
     }
 }
 

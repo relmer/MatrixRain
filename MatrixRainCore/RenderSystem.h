@@ -220,7 +220,7 @@ private:
 
     // Rendering helpers
     void    SortStreaksByDepth       (std::vector<const CharacterStreak *> & streaks);
-    HRESULT UpdateInstanceBuffer     (const AnimationSystem & animationSystem, ColorScheme colorScheme, float elapsedTime);
+    HRESULT UpdateInstanceBuffer     (const AnimationSystem & animationSystem, ColorScheme colorScheme, float elapsedTime, COLORREF customColor);
     void    ClearRenderTarget();
     void    RenderFPSCounter         (float fps, int rainPercentage, int streakCount, int activeHeadCount, double gpuLoadPercent, bool gpuLoadValid);
     void    DrawFeatheredGlow        (const wchar_t * fpsText, UINT32 textLength, const D2D1_RECT_F & textRect);

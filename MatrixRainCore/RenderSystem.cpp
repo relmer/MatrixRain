@@ -2181,7 +2181,7 @@ void RenderSystem::BuildCharacterInstanceData (const CharacterInstance & charact
 
 
 
-HRESULT RenderSystem::UpdateInstanceBuffer (const AnimationSystem& animationSystem, ColorScheme colorScheme, float elapsedTime)
+HRESULT RenderSystem::UpdateInstanceBuffer (const AnimationSystem& animationSystem, ColorScheme colorScheme, float elapsedTime, COLORREF customColor)
 {
     HRESULT                  hr             = S_OK;
     Color4                   schemeColor    = GetColorRGB (colorScheme, elapsedTime);
@@ -2189,6 +2189,16 @@ HRESULT RenderSystem::UpdateInstanceBuffer (const AnimationSystem& animationSyst
     size_t                   bytesToCopy;
 
 
+
+    // v1.5 US5 (T062, FR-033, FR-034): when the user picks ColorScheme::
+    // Custom, override the static-palette lookup with their persisted RGB.
+    // COLORREF is 0x00BBGGRR, normalise each channel to [0..1] for Color4.
+    if (colorScheme == ColorScheme::Custom)
+    {
+        schemeColor = Color4 (static_cast<float> (GetRValue (customColor)) / 255.0f,
+                              static_cast<float> (GetGValue (customColor)) / 255.0f,
+                              static_cast<float> (GetBValue (customColor)) / 255.0f);
+    }
 
     // Clear working data from previous frame (reuse allocated capacity)
     m_instanceData.clear();
@@ -2329,7 +2339,7 @@ void RenderSystem::Render (const AnimationSystem & animationSystem, const Viewpo
     }
 
     // Update instance buffer with character data
-    (void) UpdateInstanceBuffer (animationSystem, params.colorScheme, params.elapsedTime);
+    (void) UpdateInstanceBuffer (animationSystem, params.colorScheme, params.elapsedTime, params.customColor);
 
     if (m_instanceData.empty())
     {
