@@ -3,7 +3,7 @@
 **Feature Branch**: `007-dialog-tabs-scanlines-glowtoggle`
 **Created**: 2026-02-23
 **Last Updated**: 2026-02-23 (clarifications recorded: palette persistence unconditional; Custom re-click reopens chooser; pinned `Performance (%u fps, %u%% GPU)` format with `--` placeholder; Glow/Scanlines enabled controls demoted to standard checkboxes — Win11 pill deferred; OK/Cancel/X dismissal semantics enumerated)
-**Status**: Draft
+**Status**: Implemented
 **Base Branch**: `006-multimon-gpu-efficiency` (v1.4 multimon/GPU work — required infrastructure)
 **Input**: User description: "MatrixRain v1.5 — settings dialog overhaul (two-tab property sheet, live perf readout), CRT scanlines visual effect, explicit Glow on/off toggle (Win11 XAML-style), custom color picker, and complete removal of the orphaned fade-timer debug overlay."
 
