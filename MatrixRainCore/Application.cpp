@@ -971,16 +971,18 @@ Error:
 
 void Application::RebuildContextsForCurrentMode()
 {
-    HRESULT           hr = S_OK;
+    HRESULT           hr            = S_OK;
+    HWND              hConfigDialog = m_hConfigDialog;
     std::vector<HWND> hwnds;
 
 
-    // Close any live config dialog first — the rebuild destroys the primary
-    // window that owns it, which would otherwise orphan the dialog.
-    if (m_hConfigDialog)
+    // Keep the live config dialog alive across the primary-window rebuild.
+    // Temporarily clear its owner so destroying the old render window cannot
+    // take the property sheet with it; the owner is restored after the new
+    // primary window exists.
+    if (hConfigDialog)
     {
-        DestroyWindow (m_hConfigDialog);
-        m_hConfigDialog = nullptr;
+        SetWindowLongPtrW (hConfigDialog, GWLP_HWNDPARENT, 0);
     }
 
 
@@ -1018,6 +1020,11 @@ void Application::RebuildContextsForCurrentMode()
     if (SUCCEEDED (hr))
     {
         StartRenderThreads();
+    }
+
+    if (hConfigDialog && IsWindow (hConfigDialog) && m_hwnd)
+    {
+        SetWindowLongPtrW (hConfigDialog, GWLP_HWNDPARENT, reinterpret_cast<LONG_PTR> (m_hwnd));
     }
 
     m_inDisplayModeTransition = false;

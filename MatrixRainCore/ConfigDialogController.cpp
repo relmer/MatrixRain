@@ -135,6 +135,11 @@ void ConfigDialogController::UpdateGlowSize (int glowSizePercent)
 void ConfigDialogController::UpdateStartFullscreen (bool startFullscreen)
 {
     m_settings.m_startFullscreen = startFullscreen;
+
+    if (m_snapshot.isLiveMode && m_snapshot.applicationStateRef)
+    {
+        m_snapshot.applicationStateRef->ApplySettings (m_settings);
+    }
 }
 
 

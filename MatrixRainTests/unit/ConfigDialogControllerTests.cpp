@@ -851,6 +851,34 @@ namespace MatrixRainTests
 
 
 
+        TEST_METHOD (TestLiveModePropagatesStartFullscreenChanges)
+        {
+            ConfigDialogController controller (m_settingsProvider);
+            ApplicationState       appState   (m_settingsProvider);
+            HRESULT                hr         = S_OK;
+
+
+
+            hr = controller.Initialize();
+            Assert::AreEqual (S_OK, hr);
+
+            appState.Initialize (nullptr);
+
+            hr = controller.InitializeLiveMode (&appState);
+            Assert::AreEqual (S_OK, hr);
+
+            controller.UpdateStartFullscreen (false);
+
+            Assert::IsFalse (appState.GetSettings().m_startFullscreen,
+                             L"start fullscreen should propagate to ApplicationState settings");
+            Assert::AreEqual (static_cast<int> (DisplayMode::Windowed),
+                              static_cast<int> (appState.GetDisplayMode()),
+                              L"display mode should mirror the live fullscreen setting");
+        }
+
+
+
+
         // T052.6: Test CancelLiveMode reverts ApplicationState to snapshot
         TEST_METHOD (TestCancelLiveModeRevertsApplicationState)
         {
