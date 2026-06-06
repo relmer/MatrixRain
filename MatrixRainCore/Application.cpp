@@ -890,6 +890,20 @@ int Application::Run()
         // If live overlay dialog is active, let the property sheet handle dialog messages
         if (m_hConfigDialog && PropSheet_IsDialogMessage (m_hConfigDialog, &msg))
         {
+            // Canonical modeless property-sheet teardown: when the user
+            // clicks OK or Cancel, comctl32 signals it by making
+            // PropSheet_GetCurrentPageHwnd return NULL.  The page procs
+            // themselves do NOT destroy the sheet (destroying mid-
+            // notification re-enters the frame subclass and overflows
+            // the stack).  Instead the message loop polls here, then
+            // DestroyWindow's the sheet from outside any dispatch.
+            if (m_hConfigDialog && !PropSheet_GetCurrentPageHwnd (m_hConfigDialog))
+            {
+                DestroyWindow (m_hConfigDialog);
+                // SetConfigDialog(nullptr) and PostQuitMessage (in
+                // SettingsDialog mode) are handled by the sheet frame's
+                // WM_DESTROY subclass.
+            }
             continue;
         }
 

@@ -2016,20 +2016,15 @@ static INT_PTR CALLBACK PageDlgProc (HWND   hDlg,
                             pController->ApplyChanges();
                         }
 
-                        if (pContext->m_isModeless)
-                        {
-                            // Defer destruction: tearing the sheet down
-                            // synchronously while still inside comctl32's
-                            // PSN_APPLY notification dispatch corrupts the
-                            // dispatcher's per-page iteration state and
-                            // recursively re-enters the frame subclass
-                            // (manifests as a stack overflow inside
-                            // PropSheet_IsDialogMessage).  Posting WM_CLOSE
-                            // lets comctl32 unwind cleanly first; the
-                            // sheet's default WM_CLOSE handler calls
-                            // DestroyWindow on the next message-loop tick.
-                            PostMessageW (GetParent (hDlg), WM_CLOSE, 0, 0);
-                        }
+                        // Modeless sheets: do NOT destroy here.  The
+                        // canonical pattern is for the page to acknowledge
+                        // PSN_APPLY (PSNRET_NOERROR) and let comctl32 mark
+                        // the sheet "closed" by making PropSheet_GetCurrent-
+                        // PageHwnd return NULL.  The message loop polls
+                        // that and DestroyWindow's the sheet from outside
+                        // any notification dispatch.  Destroying from in
+                        // here re-enters the subclass through cascading
+                        // WM_DESTROY traffic.
                     }
                     SetWindowLongPtr (hDlg, DWLP_MSGRESULT, PSNRET_NOERROR);
                     result = TRUE;
@@ -2057,11 +2052,7 @@ static INT_PTR CALLBACK PageDlgProc (HWND   hDlg,
                             pController->CancelChanges();
                         }
 
-                        if (pContext->m_isModeless)
-                        {
-                            // Defer destruction (see PSN_APPLY for rationale).
-                            PostMessageW (GetParent (hDlg), WM_CLOSE, 0, 0);
-                        }
+                        // See PSN_APPLY: no destroy from here.
                     }
                     // Explicitly allow the cancel to proceed.  PSN_RESET's
                     // return value is conveyed via DWLP_MSGRESULT: FALSE
