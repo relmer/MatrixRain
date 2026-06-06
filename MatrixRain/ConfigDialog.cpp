@@ -53,9 +53,10 @@ struct DialogContext
     // performs the commit/rollback work.
     HWND                                      m_hSheet              = nullptr;
     bool                                      m_applied             = false;
-    bool                                      m_rolledBack          = false;
-    bool                                      m_isModeless          = false;
-    WCHAR                                     m_perfTitleFormat[64] = {};
+    bool                                      m_rolledBack              = false;
+    bool                                      m_isModeless              = false;
+    WCHAR                                     m_perfTitleFormat[64]     = {};
+    WCHAR                                     m_lastPerfTabTitle[64]    = {};
 };
 
 
@@ -2219,11 +2220,21 @@ static VOID CALLBACK PerfTitleTimerProc (HWND hSheet, UINT /*msg*/, UINT_PTR /*i
         return;
     }
 
+    if (wcscmp (pContext->m_lastPerfTabTitle, title) == 0)
+    {
+        return;
+    }
+
     TCITEMW item = {};
     item.mask    = TCIF_TEXT;
     item.pszText = title;
 
-    TabCtrl_SetItem (hTab, 1 /* Performance is page index 1 */, &item);
+    if (TabCtrl_SetItem (hTab, 1 /* Performance is page index 1 */, &item))
+    {
+        StringCchCopyW (pContext->m_lastPerfTabTitle,
+                        ARRAYSIZE (pContext->m_lastPerfTabTitle),
+                        title);
+    }
 }
 
 
