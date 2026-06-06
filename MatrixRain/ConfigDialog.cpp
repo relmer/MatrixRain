@@ -1414,6 +1414,19 @@ static void DrawColorSwatch (HWND hDlg, LPDRAWITEMSTRUCT pdis)
         FillRect (pdis->hDC, &pdis->rcItem, hBrush);
         DeleteObject (hBrush);
     }
+
+    // Draw a 1-pixel black border so the swatch reads as a swatch
+    // (BS_OWNERDRAW buttons don't render any frame on their own).
+    FrameRect (pdis->hDC, &pdis->rcItem, reinterpret_cast<HBRUSH> (GetStockObject (BLACK_BRUSH)));
+
+    if (pdis->itemState & ODS_FOCUS)
+    {
+        RECT focusRect = pdis->rcItem;
+
+
+        InflateRect (&focusRect, -2, -2);
+        DrawFocusRect (pdis->hDC, &focusRect);
+    }
 }
 
 
@@ -1829,6 +1842,16 @@ static BOOL OnCommand (HWND hDlg, WPARAM wParam)
             }
             break;
 
+        case IDC_COLOR_SWATCH:
+            if (HIWORD (wParam) == BN_CLICKED)
+            {
+                // Clicking the swatch always opens the chooser, regardless
+                // of the current scheme.  On OK the chooser switches the
+                // active scheme to Custom and updates settings.m_customColor.
+                PostMessageW (hDlg, WM_APP_OPEN_CUSTOM_COLOR_CHOOSER, 0, 0);
+            }
+            break;
+
         case IDC_GPU_COMBO:
             if (HIWORD (wParam) == CBN_SELCHANGE)
             {
@@ -1972,7 +1995,7 @@ static INT_PTR CALLBACK PageDlgProc (HWND   hDlg,
 
 
             // Owner-draw paint for the colour swatch next to the scheme combo.
-            if (pdis && pdis->CtlType == ODT_STATIC && pdis->CtlID == IDC_COLOR_SWATCH)
+            if (pdis && pdis->CtlType == ODT_BUTTON && pdis->CtlID == IDC_COLOR_SWATCH)
             {
                 DrawColorSwatch (hDlg, pdis);
                 result = TRUE;

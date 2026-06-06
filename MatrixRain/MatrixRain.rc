@@ -155,7 +155,11 @@ BEGIN
     // Color combo width matches the trackbar width above it (w=162, ending at x=252).
     LTEXT           "Color:",IDC_STATIC,15,103,58,8
     COMBOBOX        IDC_COLORSCHEME_COMBO,90,100,162,80,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    CONTROL         "",IDC_COLOR_SWATCH,"Static",SS_OWNERDRAW | SS_SUNKEN,257,101,28,12
+    // Owner-draw button (not static) so the system gives us click + tab
+    // handling for free; clicking the swatch opens the colour chooser
+    // regardless of which scheme is currently selected.  Height matches
+    // the closed combo edit area (12 DLU for 8pt MS Shell Dlg).
+    CONTROL         "",IDC_COLOR_SWATCH,"Button",BS_OWNERDRAW | WS_TABSTOP,257,100,28,12
 
     // Scanline intensity/style sliders stay on the Visuals page; only the
     // Enable scanlines checkbox lives on the Performance page (alongside
