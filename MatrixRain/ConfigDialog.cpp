@@ -268,6 +268,61 @@ static bool IsInfoTipControlId (int id)
 
 
 
+////////////////////////////////////////////////////////////////////////////////
+//
+//  IsDisabledGlowTooltipId (T043, FR-018, FR-019)
+//
+//  Catalogues every control that goes grey when Glow Enabled is OFF.
+//  Used by both `RegisterDisabledGlowTooltipRects` (which registers a
+//  rect-based parent-relative TOOLINFO per control) AND the
+//  TTN_NEEDTEXTW/TTN_GETDISPINFOW branch in `PageDlgProc` (which
+//  recognises the uId as a sentinel and supplies the per-tab text).
+//  Disabled controls don't fire WM_MOUSEMOVE, so mouse events bubble to
+//  the parent dialog — the rect-based tools on the parent catch the
+//  hover and show the explanatory tip.  When glow is ON, the controls
+//  consume their own mouse events and the parent rect tools never fire.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+static bool IsDisabledGlowTooltipId (int id)
+{
+    switch (id)
+    {
+        // Visuals tab — glow intensity / glow size trios.
+        case IDC_GLOWINTENSITY_SLIDER:
+        case IDC_GLOWINTENSITY_LABEL:
+        case IDC_GLOWINTENSITY_INFO:
+        case IDC_GLOWSIZE_SLIDER:
+        case IDC_GLOWSIZE_LABEL:
+        case IDC_GLOWSIZE_INFO:
+
+        // Performance tab — quality preset + glow-passes / -resolution /
+        // -smoothness trios (matches ApplyGlowEnabledUI's coverage).
+        case IDC_QUALITY_PRESET_SLIDER:
+        case IDC_QUALITY_PRESET_LABEL:
+        case IDC_QUALITY_PRESET_INFO:
+        case IDC_GLOWPASSES_PROMPT:
+        case IDC_GLOWPASSES_SLIDER:
+        case IDC_GLOWPASSES_LABEL:
+        case IDC_GLOWPASSES_INFO:
+        case IDC_GLOWRES_PROMPT:
+        case IDC_GLOWRES_SLIDER:
+        case IDC_GLOWRES_LABEL:
+        case IDC_GLOWRES_INFO:
+        case IDC_GLOWSMOOTH_PROMPT:
+        case IDC_GLOWSMOOTH_SLIDER:
+        case IDC_GLOWSMOOTH_LABEL:
+        case IDC_GLOWSMOOTH_INFO:
+            return true;
+
+        default:
+            return false;
+    }
+}
+
+
+
+
 static int TickFrequencyForSliderId (int id)
 {
     switch (id)
@@ -365,6 +420,57 @@ static HWND CreateAndRegisterTooltip (HWND hDlg)
     trackTool.lpszText  = const_cast<LPWSTR> (L"");
 
     SendMessageW (hTooltip, TTM_ADDTOOLW, 0, (LPARAM) &trackTool);
+
+
+    // T043 (US2, FR-018, FR-019): rect-based tooltip tools on the parent
+    // dialog for every control that goes grey when Glow Enabled is OFF.
+    // Disabled children don't fire WM_MOUSEMOVE, so the events bubble to
+    // the parent and the parent-relative rect tool catches them — when
+    // glow is ON the controls consume their own mouse events and these
+    // rect tools never activate (silently dormant).  TTF_SUBCLASS makes
+    // the tooltip subclass the parent so we don't need to manually relay
+    // WM_MOUSEMOVE.  uId is the control's IDC_* so the TTN_NEEDTEXTW
+    // branch can identify which tool fired without an HWND lookup.
+    for (int id = 1000; id < 1100; id++)
+    {
+        if (!IsDisabledGlowTooltipId (id))
+        {
+            continue;
+        }
+
+        HWND hCtrl = GetDlgItem (hDlg, id);
+
+        if (!hCtrl)
+        {
+            // Control isn't on this page (e.g., the Performance-tab
+            // sliders won't exist when we're initialising the Visuals
+            // page).  Skip — the other page's call registers its own.
+            continue;
+        }
+
+
+        RECT  childRect = {};
+
+        GetWindowRect (hCtrl, &childRect);
+
+        POINT topLeft     = { childRect.left,  childRect.top };
+        POINT bottomRight = { childRect.right, childRect.bottom };
+
+        ScreenToClient (hDlg, &topLeft);
+        ScreenToClient (hDlg, &bottomRight);
+
+        TOOLINFOW ti  = { sizeof (TOOLINFOW) };
+        ti.uFlags     = TTF_SUBCLASS;
+        ti.hwnd       = hDlg;
+        ti.uId        = static_cast<UINT_PTR> (id);
+        ti.rect.left   = topLeft.x;
+        ti.rect.top    = topLeft.y;
+        ti.rect.right  = bottomRight.x;
+        ti.rect.bottom = bottomRight.y;
+        ti.lpszText   = LPSTR_TEXTCALLBACKW;
+
+        SendMessageW (hTooltip, TTM_ADDTOOLW, 0, reinterpret_cast<LPARAM> (&ti));
+    }
 
     return hTooltip;
 }
@@ -1662,13 +1768,30 @@ static INT_PTR CALLBACK PageDlgProc (HWND   hDlg,
             // Tooltip text callback — supplies the locked infotip string.
             if (pnmhdr->code == TTN_GETDISPINFOW || pnmhdr->code == TTN_NEEDTEXTW)
             {
-                NMTTDISPINFOW * pdi       = reinterpret_cast<NMTTDISPINFOW *> (lParam);
-                HWND            hToolHwnd = reinterpret_cast<HWND> (pdi->hdr.idFrom);
-                int             toolId    = GetDlgCtrlID (hToolHwnd);
+                NMTTDISPINFOW * pdi    = reinterpret_cast<NMTTDISPINFOW *> (lParam);
+                int             toolId = static_cast<int> (pdi->hdr.idFrom);
 
-                if (IsInfoTipControlId (toolId))
+                // T043 (US2, FR-018, FR-019): rect-based parent tools for
+                // disabled glow controls.  uId is the IDC_* directly (no
+                // HWND indirection).  Per-tab text — the Visuals tab points
+                // users at the Performance tab where the actual toggle lives.
+                if (IsDisabledGlowTooltipId (toolId))
                 {
-                    pdi->lpszText = const_cast<LPWSTR> (GetInfoTipText (toolId));
+                    bool isVisualsPage = GetDlgItem (hDlg, IDC_GLOWINTENSITY_SLIDER) != nullptr;
+
+                    pdi->lpszText = const_cast<LPWSTR> (isVisualsPage
+                                                        ? L"Glow is disabled on the performance tab."
+                                                        : L"Glow is disabled.");
+                    result = TRUE;
+                    break;
+                }
+
+                HWND hToolHwnd = reinterpret_cast<HWND> (pdi->hdr.idFrom);
+                int  ctrlId    = GetDlgCtrlID (hToolHwnd);
+
+                if (IsInfoTipControlId (ctrlId))
+                {
+                    pdi->lpszText = const_cast<LPWSTR> (GetInfoTipText (ctrlId));
                     result        = TRUE;
                 }
                 break;
