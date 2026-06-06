@@ -1204,5 +1204,92 @@ namespace MatrixRainTests
                               appState.GetShowStatistics(),
                               L"derived show-statistics mirrored");
         }
+
+
+        ////////////////////////////////////////////////////////////////////////
+        //
+        //  T058 (US5, FR-004, FR-035): the active CustomColor MUST roll back
+        //  on Cancel (it's a normal rollback-eligible field), but the
+        //  CustomColorPalette MUST NOT — the palette lives outside the
+        //  snapshot rollback set so swatch edits made during a live session
+        //  survive even when the user cancels the dialog.
+        //
+        ////////////////////////////////////////////////////////////////////////
+
+        TEST_METHOD (CustomColorRollsBackOnCancel)
+        {
+            HRESULT                hr = S_OK;
+            ConfigDialogController controller (m_settingsProvider);
+            ApplicationState       appState   (m_settingsProvider);
+
+
+            hr = controller.Initialize();
+            Assert::AreEqual (S_OK, hr);
+
+            appState.Initialize (nullptr);
+
+            hr = controller.InitializeLiveMode (&appState);
+            Assert::AreEqual (S_OK, hr);
+
+            // Snapshot taken at the default green RGB(0,255,0).
+            const COLORREF originalColor = controller.GetSettings().m_customColor;
+
+            controller.UpdateCustomColor (RGB (42, 84, 168));
+            Assert::AreEqual (static_cast<DWORD> (RGB (42, 84, 168)),
+                              static_cast<DWORD> (controller.GetSettings().m_customColor),
+                              L"Live mutation visible before Cancel");
+
+            hr = controller.CancelLiveMode();
+            Assert::AreEqual (S_OK, hr);
+
+            Assert::AreEqual (static_cast<DWORD> (originalColor),
+                              static_cast<DWORD> (controller.GetSettings().m_customColor),
+                              L"Cancel must restore the snapshot CustomColor (FR-004)");
+        }
+
+
+        TEST_METHOD (CustomColorPaletteIsNOTRolledBackOnCancel)
+        {
+            HRESULT                  hr = S_OK;
+            ConfigDialogController   controller (m_settingsProvider);
+            ApplicationState         appState   (m_settingsProvider);
+            std::array<COLORREF, 16> mutatedPalette {};
+
+
+            hr = controller.Initialize();
+            Assert::AreEqual (S_OK, hr);
+
+            appState.Initialize (nullptr);
+
+            hr = controller.InitializeLiveMode (&appState);
+            Assert::AreEqual (S_OK, hr);
+
+            // Mutate the palette directly via the settings struct (the
+            // chooser-dialog wiring in T065 will do the equivalent via
+            // CHOOSECOLORW::lpCustColors).  Mark each slot with a distinct
+            // RGB so the post-Cancel assertion is unambiguous.
+            for (size_t i = 0; i < mutatedPalette.size(); i++)
+            {
+                mutatedPalette[i] = RGB (static_cast<BYTE> (i + 1),
+                                          static_cast<BYTE> (i * 2 + 1),
+                                          static_cast<BYTE> (i * 3 + 1));
+            }
+
+            controller.SetCustomColorPalette (mutatedPalette);
+
+            hr = controller.CancelLiveMode();
+            Assert::AreEqual (S_OK, hr);
+
+            // Per FR-035: palette is outside the rollback set — every slot
+            // must still hold the mutated value after Cancel.
+            const ScreenSaverSettings & post = controller.GetSettings();
+
+            for (size_t i = 0; i < post.m_customColorPalette.size(); i++)
+            {
+                Assert::AreEqual (static_cast<DWORD> (mutatedPalette[i]),
+                                  static_cast<DWORD> (post.m_customColorPalette[i]),
+                                  L"Palette slot must survive Cancel (FR-035 carve-out)");
+            }
+        }
     };
 }  // namespace MatrixRainTests

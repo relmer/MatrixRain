@@ -127,6 +127,19 @@ public:
     void UpdateCustomColor         (COLORREF color);
 
     /// <summary>
+    /// Write the full 16-swatch ChooseColor palette into the settings.
+    /// FR-035 carve-out: the palette is INTENTIONALLY OUTSIDE the live-
+    /// mode snapshot rollback set — swatch edits made during a live
+    /// session survive Cancel.  No live propagation either, since the
+    /// palette only feeds CHOOSECOLORW::lpCustColors (not a rendering
+    /// parameter).  Persisted unconditionally on every Save.
+    /// </summary>
+    void SetCustomColorPalette (const std::array<COLORREF, 16> & palette)
+    {
+        m_settings.m_customColorPalette = palette;
+    }
+
+    /// <summary>
     /// Apply and persist all changes to registry.
     /// </summary>
     /// <returns>S_OK on success, error HRESULT otherwise</returns>
