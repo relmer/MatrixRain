@@ -26,6 +26,7 @@ namespace MatrixRainTests
                 Assert::IsTrue   (settings.m_startFullscreen, L"startFullscreen default");
                 Assert::IsFalse  (settings.m_showDebugStats, L"showDebugStats default");
                 Assert::IsFalse  (settings.m_showFadeTimers, L"showFadeTimers default");
+                Assert::IsTrue   (settings.m_multiMonitorEnabled, L"multiMonitorEnabled default");
                 Assert::IsFalse  (settings.m_lastSavedTimestamp.has_value(), L"lastSavedTimestamp default");
             }
 

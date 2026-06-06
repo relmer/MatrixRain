@@ -37,6 +37,8 @@
 
 #include <CommCtrl.h>
 #include <PathCch.h>
+#include <Pdh.h>
+#include <PdhMsg.h>
 #include <ShellApi.h>
 #include <ShellScalingApi.h>
 #include <StrSafe.h>
@@ -47,6 +49,7 @@
 #include <d3d11_1.h>
 #include <d3dcompiler.h>
 #include <dxgi1_2.h>
+#include <dxgi1_6.h>
 #include <wrl/client.h>
 
 

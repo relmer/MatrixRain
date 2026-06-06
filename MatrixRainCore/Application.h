@@ -1,5 +1,6 @@
 #pragma once
 
+#include "RebuildCoalescer.h"
 #include "RegistrySettingsProvider.h"
 #include "ScreenSaverModeContext.h"
 #include "SharedState.h"
@@ -75,6 +76,12 @@ public:
     // Posted to the primary window to rebuild contexts outside any dialog proc
     static constexpr UINT            WM_APP_REBUILD_CONTEXTS = WM_APP + 1;
 
+    // Posted by per-monitor render threads when Present returns a device-lost
+    // HRESULT.  The HandleMessage handler routes the request through
+    // m_rebuildCoalescer so an N-monitor burst (driver reset, sleep/resume)
+    // collapses to a single subsequent WM_APP_REBUILD_CONTEXTS.
+    static constexpr UINT            WM_APP_DEVICE_LOST      = WM_APP + 2;
+
 private:
     // Core systems
     RegistrySettingsProvider                           m_settingsProvider;
@@ -84,6 +91,8 @@ private:
     std::unique_ptr<InputSystem>                       m_inputSystem;
     std::unique_ptr<ApplicationState>                  m_appState;
     OverlayState                                       m_overlays;
+    RebuildCoalescer                                   m_rebuildCoalescer;
+    std::optional<LUID>                                m_resolvedAdapter;
 
     // Win32 window`
     HWND              m_hwnd                    { nullptr };

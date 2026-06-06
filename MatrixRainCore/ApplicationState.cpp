@@ -23,9 +23,9 @@ void ApplicationState::Initialize (const ScreenSaverModeContext * pScreenSaverCo
     // Load settings from provider (falls back to defaults if no data exists)
     HRESULT hr = m_settingsProvider.Load (m_settings);
     
-    // hr == S_FALSE means key didn't exist, used defaults (not an error)
-    // hr == S_OK means loaded from registry successfully
-    // Any other HRESULT is an actual error, but we continue with defaults
+    // hr == S_FALSE means key didn't exist, used defaults (not an error).
+    // Capture this for first-run heuristics (e.g., FR-037 quality preset).
+    m_isFirstRun = (hr == S_FALSE);
     UNREFERENCED_PARAMETER (hr);
     
     // Apply settings to runtime state
@@ -185,6 +185,15 @@ void ApplicationState::RegisterGlowSizeCallback (std::function<void(int)> callba
 
 
 
+void ApplicationState::RegisterAdvancedGraphicsCallback (std::function<void(const AdvancedGraphicsValues &)> callback)
+{
+    m_advancedGraphicsChangeCallback = callback;
+}
+
+
+
+
+
 void ApplicationState::RegisterColorSchemeCallback (std::function<void(ColorScheme)> callback)
 {
     m_colorSchemeChangeCallback = callback;
@@ -258,6 +267,24 @@ void ApplicationState::SetGlowSize (int sizePercent)
 
     HRESULT hr = SaveSettings();
     IGNORE_RETURN_VALUE (hr, S_OK);
+}
+
+
+
+
+
+void ApplicationState::SetAdvancedGraphics (const AdvancedGraphicsValues & values)
+{
+    m_settings.m_advancedValues = values;
+
+    if (m_advancedGraphicsChangeCallback)
+    {
+        m_advancedGraphicsChangeCallback (values);
+    }
+
+    // Note: we DON'T SaveSettings() here - the controller already owns
+    // the persistence path on dialog OK / live cancel.  This setter is
+    // purely the live-preview pump.
 }
 
 
@@ -397,5 +424,36 @@ HRESULT
 ApplicationState::SaveSettings()
 {
     return m_settingsProvider.Save (m_settings);
+}
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  ApplicationState::ApplyFirstRunQualityPreset
+//
+////////////////////////////////////////////////////////////////////////////////
+
+HRESULT ApplicationState::ApplyFirstRunQualityPreset (QualityPreset preset)
+{
+    if (preset != QualityPreset::Custom)
+    {
+        m_settings.m_qualityPreset  = preset;
+        m_settings.m_advancedValues = LookupPresetValues (preset);
+
+        // Keep the legacy top-level glow-intensity field in sync with the
+        // advanced cluster's copy.  ScreenSaverSettings carries glow
+        // intensity in both m_glowIntensityPercent (read by Application's
+        // unconditional SharedState seed) and m_advancedValues.m_glow-
+        // IntensityPercent (read by the live-mode advanced-graphics
+        // callback).  RegistrySettingsProvider::Save persists the top-
+        // level field — without this mirror the preset's intensity (e.g.
+        // 75 for Low) is silently overwritten by the unchanged default
+        // (100), and the next launch starts at the wrong value.
+        m_settings.m_glowIntensityPercent = m_settings.m_advancedValues.m_glowIntensityPercent;
+    }
+
+    return SaveSettings();
 }
 

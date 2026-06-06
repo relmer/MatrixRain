@@ -9,6 +9,7 @@
 #include "GlyphAtlas.h"
 #include "IRenderSystem.h"
 #include "Overlay.h"
+#include "QualityPresets.h"
 #include "RenderParams.h"
 #include "Viewport.h"
 #include "ColorScheme.h"
@@ -40,7 +41,7 @@ class RenderSystem : public IRenderSystem
 public:
     ~RenderSystem();
 
-    HRESULT Initialize (HWND hwnd, UINT width, UINT height);
+    HRESULT Initialize (HWND hwnd, UINT width, UINT height, std::optional<LUID> adapterLuid = std::nullopt);
 
     HRESULT BuildGlyphAtlas();
 
@@ -48,7 +49,7 @@ public:
 
     void Render (const AnimationSystem & animationSystem, const Viewport & viewport, const RenderParams & params) override;
 
-    void Present() override;
+    HRESULT Present() override;
 
     void Resize (UINT width, UINT height) override;
 
@@ -63,6 +64,10 @@ public:
     void SetGlowIntensity (int intensityPercent) override;
 
     void SetGlowSize (int sizePercent) override;
+
+    void SetBlurPasses     (int passes)  override;
+    void SetBloomResolution (int divisor) override;
+    void SetBlurTaps       (int taps)    override;
 
     void SetCharacterScaleOverride (float scale) override;
 
@@ -143,7 +148,7 @@ private:
     void    SortStreaksByDepth       (std::vector<const CharacterStreak *> & streaks);
     HRESULT UpdateInstanceBuffer     (const AnimationSystem & animationSystem, ColorScheme colorScheme, float elapsedTime);
     void    ClearRenderTarget();
-    void    RenderFPSCounter         (float fps, int rainPercentage, int streakCount, int activeHeadCount);
+    void    RenderFPSCounter         (float fps, int rainPercentage, int streakCount, int activeHeadCount, double gpuLoadPercent, bool gpuLoadValid);
     void    DrawFeatheredGlow        (const wchar_t * fpsText, UINT32 textLength, const D2D1_RECT_F & textRect);
     void    DrawFeatheredBackground  (std::span<const HintCharacter> chars, std::span<const float> xPositions, float advanceScale, float baseY, float cellHeight, int numRows, float padding, float opacityScale);
     void    ComputeRowRects          (std::span<const HintCharacter> chars, std::span<const float> xPositions, float advanceScale, float baseY, float cellHeight, int numRows, float hPad, float vPad);
@@ -192,7 +197,11 @@ private:
     ComPtr<ID3D11ShaderResourceView>  m_blurTempSRV;
     ComPtr<ID3D11PixelShader>         m_bloomExtractPS;
     ComPtr<ID3D11PixelShader>         m_blurHorizontalPS;
+    ComPtr<ID3D11PixelShader>         m_blurHorizontalPS9;
+    ComPtr<ID3D11PixelShader>         m_blurHorizontalPS5;
     ComPtr<ID3D11PixelShader>         m_blurVerticalPS;
+    ComPtr<ID3D11PixelShader>         m_blurVerticalPS9;
+    ComPtr<ID3D11PixelShader>         m_blurVerticalPS5;
     ComPtr<ID3D11PixelShader>         m_compositePS;
     ComPtr<ID3D11PixelShader>         m_haloPS;
     ComPtr<ID3D11Buffer>              m_fullscreenQuadVB;
@@ -241,6 +250,11 @@ private:
     // Window handle (for DPI queries)
     HWND m_hwnd { nullptr };
 
+    // User-selected adapter LUID, or nullopt for system default.  Captured
+    // in Initialize and consumed by CreateDevice to route D3D device
+    // creation to the requested GPU on hybrid laptops.
+    std::optional<LUID> m_requestedAdapterLuid;
+
     // Render target dimensions
     UINT m_renderWidth  { 0 };
     UINT m_renderHeight { 0 };
@@ -251,6 +265,12 @@ private:
     // Glow effect parameters
     float m_glowIntensity { 2.5f };  // Bloom intensity multiplier (100% = 2.5)
     float m_glowSize      { 1.0f };  // Blur radius multiplier (100% = 1.0)
+
+    // User Story 5 - graphics quality runtime parameters.  Driven by the
+    // settings snapshot path the same way m_glowIntensity is.
+    int               m_blurPasses              { 3 };
+    ResolutionDivisor m_bloomResolutionDivisor  { ResolutionDivisor::Half };
+    BlurTaps          m_blurTaps                { BlurTaps::High };
 
     // Character scale override (bypasses viewport-based scaling when set)
     std::optional<float> m_characterScaleOverride;

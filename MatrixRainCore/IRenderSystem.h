@@ -35,8 +35,10 @@ public:
     // synchronously and must not be retained past the call.
     virtual void Render (const AnimationSystem & animationSystem, const Viewport & viewport, const RenderParams & params) = 0;
 
-    // Present the rendered frame; blocks on this monitor's VBlank.
-    virtual void Present() = 0;
+    // Present the rendered frame; blocks on this monitor's VBlank.  Returns
+    // the HRESULT from the underlying swap-chain Present so callers can
+    // detect device-lost (see DeviceLost.h / IsDeviceLost).
+    virtual HRESULT Present() = 0;
 
     // Recreate swap-chain buffers for a new client size.
     virtual void Resize (UINT width, UINT height) = 0;
@@ -47,6 +49,11 @@ public:
     // Live-tunable render settings broadcast from shared UI state.
     virtual void SetGlowIntensity (int intensityPercent) = 0;
     virtual void SetGlowSize      (int sizePercent)      = 0;
+
+    // User Story 5 - advanced graphics quality knobs from shared state.
+    virtual void SetBlurPasses    (int passes)                  = 0;
+    virtual void SetBloomResolution (int divisor)               = 0;
+    virtual void SetBlurTaps      (int taps)                    = 0;
 
     // Fixed character scale that bypasses viewport-based scaling.
     virtual void SetCharacterScaleOverride (float scale) = 0;

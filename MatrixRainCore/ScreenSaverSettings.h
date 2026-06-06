@@ -1,5 +1,7 @@
 #pragma once
 
+#include "QualityPresets.h"
+
 using SystemClockTimePoint = std::chrono::system_clock::time_point;
 
 
@@ -32,6 +34,16 @@ struct ScreenSaverSettings
     bool                                m_startFullscreen       { true  };
     bool                                m_showDebugStats        { false };
     bool                                m_showFadeTimers        { false };
+    bool                                m_multiMonitorEnabled   { true  };
+    std::wstring                        m_gpuAdapter;                          // Empty (default) = system default
+
+    // User Story 5 - graphics quality preset + advanced control values.
+    // The High preset is calibrated to today's exact rendering so users
+    // who upgrade and never open the dialog see no visible change (FR-022).
+    QualityPreset                          m_qualityPreset         { QualityPreset::High };
+    AdvancedGraphicsValues                 m_advancedValues;                          // Defaults to High row
+    std::optional<AdvancedGraphicsValues>  m_lastCustom;                              // Last user-customized set
+
     std::optional<SystemClockTimePoint> m_lastSavedTimestamp;
 
     void Clamp();

@@ -14,9 +14,14 @@
 #include "InputSystem.h"
 #include "FPSCounter.h"
 #include "MonitorRenderContext.h"
+#include "MonitorInfo.h"
 #include "MonitorLayout.h"
+#include "MultiMonitorGate.h"
+#include "QualityPresets.h"
 #include "RenderThreadInputs.h"
+#include "WindowsAdapterProvider.h"
 #include "WindowsMonitorProvider.h"
+#include "AdapterSelection.h"
 #include "ScreenSaverModeContext.h"
 #include "UnicodeSymbols.h"
 #include "Version.h"
@@ -252,6 +257,52 @@ void Application::InitializeApplicationState (const ScreenSaverModeContext * pSc
     m_pScreenSaverContext = pScreenSaverContext;
 
     m_appState->Initialize (m_pScreenSaverContext);
+
+    // First-run quality preset heuristic (FR-037).  Runs only on a truly
+    // fresh install (no registry key existed); upgrades from earlier
+    // versions keep the High preset's defaults so the visual output is
+    // identical to what they saw before (FR-022).
+    if (m_appState->IsFirstRun())
+    {
+        std::vector<AdapterInfo>  adapters    = WindowsAdapterProvider{}.EnumerateAdapters();
+        uint64_t                  totalPixels = 0;
+
+        if (m_monitorProvider)
+        {
+            for (const MonitorInfo & monitor : m_monitorProvider->GetMonitors())
+            {
+                totalPixels += static_cast<uint64_t> (monitor.Width()) *
+                               static_cast<uint64_t> (monitor.Height());
+            }
+        }
+
+        QualityPreset firstRunPreset = PickDefaultQualityPreset (adapters, totalPixels);
+        (void) m_appState->ApplyFirstRunQualityPreset (firstRunPreset);
+
+        // Also seed SharedState so the first frame renders at the chosen
+        // preset's values (the snapshot path picks up subsequent changes).
+        {
+            std::lock_guard<std::mutex> lock (m_sharedState.mutex);
+            const ScreenSaverSettings & s = m_appState->GetSettings();
+
+            m_sharedState.glowIntensityPercent   = s.m_advancedValues.m_glowIntensityPercent;
+            m_sharedState.blurPasses             = s.m_advancedValues.m_blurPasses;
+            m_sharedState.bloomResolutionDivisor = s.m_advancedValues.m_bloomResolutionDivisor;
+            m_sharedState.blurTaps               = s.m_advancedValues.m_blurTaps;
+        }
+    }
+    else
+    {
+        // Existing install: seed SharedState from the loaded advanced
+        // values so the render thread renders at whatever preset/custom
+        // values the user previously saved.
+        std::lock_guard<std::mutex> lock (m_sharedState.mutex);
+        const ScreenSaverSettings & s = m_appState->GetSettings();
+
+        m_sharedState.blurPasses             = s.m_advancedValues.m_blurPasses;
+        m_sharedState.bloomResolutionDivisor = s.m_advancedValues.m_bloomResolutionDivisor;
+        m_sharedState.blurTaps               = s.m_advancedValues.m_blurTaps;
+    }
     
     // Register for settings change notifications — write to SharedState
     m_appState->RegisterDensityChangeCallback ([this](int densityPercent) {
@@ -272,6 +323,14 @@ void Application::InitializeApplicationState (const ScreenSaverModeContext * pSc
     m_appState->RegisterGlowSizeCallback ([this](int sizePercent) {
         std::lock_guard<std::mutex> lock (m_sharedState.mutex);
         m_sharedState.glowSizePercent = sizePercent;
+    });
+
+    m_appState->RegisterAdvancedGraphicsCallback ([this](const AdvancedGraphicsValues & values) {
+        std::lock_guard<std::mutex> lock (m_sharedState.mutex);
+        m_sharedState.glowIntensityPercent   = values.m_glowIntensityPercent;
+        m_sharedState.blurPasses             = values.m_blurPasses;
+        m_sharedState.bloomResolutionDivisor = values.m_bloomResolutionDivisor;
+        m_sharedState.blurTaps               = values.m_blurTaps;
     });
 
     m_appState->RegisterColorSchemeCallback ([this](ColorScheme scheme) {
@@ -340,6 +399,20 @@ HRESULT Application::CreateRenderContexts()
     HRESULT hr = S_OK;
 
 
+    // Resolve the user's preferred GPU adapter (description -> LUID) once
+    // per (re)build so every per-monitor context is created on the same
+    // device.  A saved adapter that is no longer present silently falls
+    // back to the system default (FR-014); the resolved value is consumed
+    // by AddContext when it constructs each MonitorRenderContext.
+    {
+        WindowsAdapterProvider   provider;
+        std::vector<AdapterInfo> adapters = provider.EnumerateAdapters();
+        std::wstring             saved    = m_appState ? m_appState->GetSettings().m_gpuAdapter : std::wstring();
+
+        m_resolvedAdapter = ResolveAdapter (adapters, saved);
+    }
+
+
     if (ShouldSpanAllMonitors())
     {
         hr = CreateFullscreenContexts();
@@ -373,18 +446,18 @@ Error:
 
 bool Application::ShouldSpanAllMonitors() const
 {
+    std::optional<ScreenSaverMode> saverMode;
+
     if (m_pScreenSaverContext)
     {
-        ScreenSaverMode mode = m_pScreenSaverContext->m_mode;
-
-        if (mode == ScreenSaverMode::ScreenSaverPreview ||
-            mode == ScreenSaverMode::HelpRequested)
-        {
-            return false;
-        }
+        saverMode = m_pScreenSaverContext->m_mode;
     }
 
-    return m_appState && m_appState->GetDisplayMode() == DisplayMode::Fullscreen;
+
+    bool         multiMonEnabled = m_appState && m_appState->GetSettings().m_multiMonitorEnabled;
+    DisplayMode  displayMode     = m_appState ? m_appState->GetDisplayMode() : DisplayMode::Windowed;
+
+    return ::ShouldSpanAllMonitors (multiMonEnabled, displayMode, saverMode);
 }
 
 
@@ -511,7 +584,7 @@ HRESULT Application::AddContext (const POINT & position, const SIZE & size, DWOR
 
     context = std::make_unique<MonitorRenderContext> (isPrimary);
 
-    hr = context->Initialize (hwnd, static_cast<UINT> (size.cx), static_cast<UINT> (size.cy));
+    hr = context->Initialize (hwnd, static_cast<UINT> (size.cx), static_cast<UINT> (size.cy), m_resolvedAdapter);
     CHR (hr);
 
     if (isPrimary)
@@ -1103,7 +1176,35 @@ LRESULT Application::HandleMessage (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM 
             return 0;
 
         case WM_APP_REBUILD_CONTEXTS:
+            // Coalesced burst handler — clear the latch so any further
+            // topology / device-loss notifications that arrive while we
+            // are rebuilding can request a follow-up rebuild.
+            m_rebuildCoalescer.Consume();
             RebuildContextsForCurrentMode();
+            return 0;
+
+        case WM_DISPLAYCHANGE:
+            // Monitor topology changed (add, remove, resolution, primary
+            // reassignment).  Windows broadcasts WM_DISPLAYCHANGE to every
+            // top-level window we own, so coalesce to a single rebuild via
+            // the latch; the rebuild itself is then driven by the
+            // WM_APP_REBUILD_CONTEXTS case above.
+            if (m_rebuildCoalescer.RequestRebuild() && m_hwnd)
+            {
+                PostMessageW (m_hwnd, WM_APP_REBUILD_CONTEXTS, 0, 0);
+            }
+            return 0;
+
+        case WM_APP_DEVICE_LOST:
+            // Per-monitor render thread reported Present() returned a
+            // device-lost HRESULT.  Device removal usually hits every
+            // monitor's render thread within milliseconds of each other, so
+            // funnel through the coalescer the same way WM_DISPLAYCHANGE
+            // does to avoid N back-to-back full-rebuild cycles.
+            if (m_rebuildCoalescer.RequestRebuild() && m_hwnd)
+            {
+                PostMessageW (m_hwnd, WM_APP_REBUILD_CONTEXTS, 0, 0);
+            }
             return 0;
 
         default:

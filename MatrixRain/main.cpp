@@ -37,6 +37,14 @@ int APIENTRY wWinMain(_In_     HINSTANCE hInstance,
     // Set DPI awareness to per-monitor V2 for consistent physical pixel measurements
     SetProcessDpiAwarenessContext (DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
 
+    // Register comctl32 v6 common controls (trackbars, themed buttons,
+    // comboboxes, etc.) so the config dialog renders with the modern
+    // Win11 themed appearance instead of the unthemed XP-classic fallback.
+    {
+        INITCOMMONCONTROLSEX iccex = { sizeof (iccex), ICC_STANDARD_CLASSES | ICC_BAR_CLASSES };
+        InitCommonControlsEx (&iccex);
+    }
+
     // Parse command-line arguments
     {
         CommandLine cmdLine;

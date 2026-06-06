@@ -8,7 +8,265 @@
 #include "Overlay.h"
 #include "OverlayColor.h"
 
+#pragma comment(lib, "pdh.lib")
+
 using Microsoft::WRL::ComPtr;
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  GPU load via PDH (matches Task Manager's per-process "GPU" column).
+//
+//  Singleton inside this translation unit — one PDH query for the whole
+//  process, polled at most every 1 s (Task Manager itself samples at
+//  ~1 Hz).  Returns -1.0 until at least one collection has succeeded
+//  (PDH counters return no data on the very first collection call).
+//
+//  The counter path is the system-wide wildcard `\GPU Engine(*)\Utilization
+//  Percentage`.  PDH expands the wildcard ONCE at AddCounter time and
+//  returns values only for the instances that existed then — new engine
+//  instances created later (driver reset, GPU sleep/resume, eGPU hot-plug,
+//  another D3D process starting) would otherwise be invisible to us.  To
+//  keep the readings honest we close and re-open the query every
+//  `kRefreshIntervalMs` so the wildcard gets re-expanded against the
+//  current set of engine instances.  Result-loop filters to our own PID
+//  by matching the `pid_NNNN_` substring of each instance name; the
+//  per-engine-type sums are then MAX-reduced (same shape Task Manager
+//  uses for the per-process "GPU" column).
+//
+////////////////////////////////////////////////////////////////////////////////
+
+namespace {
+
+class GpuLoadMonitor
+{
+public:
+    GpuLoadMonitor() = default;
+
+    ~GpuLoadMonitor()
+    {
+        ReleaseQuery();
+    }
+
+    GpuLoadMonitor (const GpuLoadMonitor &) = delete;
+    GpuLoadMonitor & operator= (const GpuLoadMonitor &) = delete;
+
+    // Returns most-recent load percentage in [0, 100], or -1.0 when not
+    // yet ready (initialization failed, or first collection has not yet
+    // produced data).  Thread-safe.
+    double GetLoadPercent()
+    {
+        std::lock_guard<std::mutex> lock (m_mutex);
+
+        ULONGLONG nowTick = GetTickCount64();
+
+
+        if (m_initFailed)
+        {
+            return -1.0;
+        }
+
+        // Throttle PDH polling to ~1 Hz (matches Task Manager's update rate).
+        if (m_lastPollTick != 0 && (nowTick - m_lastPollTick) < kPollIntervalMs)
+        {
+            return m_cachedLoad;
+        }
+
+        m_lastPollTick = nowTick;
+
+        if (!EnsureQueryReady (nowTick))
+        {
+            return m_cachedLoad;
+        }
+
+        DWORD                       itemCount = 0;
+        PDH_FMT_COUNTERVALUE_ITEM_W * items   = nullptr;
+
+
+        if (!CollectCounters (itemCount, items))
+        {
+            return m_cachedLoad;
+        }
+
+        m_cachedLoad = AggregateMaxPerEngineType (items, itemCount);
+        return m_cachedLoad;
+    }
+
+private:
+    static constexpr ULONGLONG kPollIntervalMs    = 1000;     // 1 Hz polling
+    static constexpr ULONGLONG kRefreshIntervalMs = 10000;    // re-expand wildcard every 10 s
+
+    // Open the PDH query and add the wildcard counter.  Stores the open
+    // time in m_lastRefreshTick so EnsureQueryReady knows when to recycle
+    // the query to re-expand the wildcard.
+    bool Initialize (ULONGLONG nowTick)
+    {
+        if (PdhOpenQueryW (nullptr, 0, &m_query) != ERROR_SUCCESS)
+        {
+            m_query = nullptr;
+            return false;
+        }
+
+        m_ownPid = GetCurrentProcessId();
+
+        if (PdhAddEnglishCounterW (m_query,
+                                   L"\\GPU Engine(*)\\Utilization Percentage",
+                                   0,
+                                   &m_counter) != ERROR_SUCCESS)
+        {
+            ReleaseQuery();
+            return false;
+        }
+
+        m_lastRefreshTick = nowTick;
+
+        // Prime the query — PDH returns no data on the very first collect.
+        PdhCollectQueryData (m_query);
+        return true;
+    }
+
+    void ReleaseQuery()
+    {
+        if (m_query)
+        {
+            PdhCloseQuery (m_query);
+        }
+
+        m_query   = nullptr;
+        m_counter = nullptr;
+    }
+
+    // Lazily open the query on first call, and periodically recycle it so
+    // PDH re-expands the wildcard against the current set of GPU engine
+    // instances (see class comment).  Returns false if the query couldn't
+    // be opened (latches m_initFailed so subsequent calls fast-bail).
+    bool EnsureQueryReady (ULONGLONG nowTick)
+    {
+        if (m_query && (nowTick - m_lastRefreshTick) >= kRefreshIntervalMs)
+        {
+            ReleaseQuery();
+        }
+
+        if (!m_query)
+        {
+            if (!Initialize (nowTick))
+            {
+                m_initFailed = true;
+                return false;
+            }
+
+            // The priming Collect inside Initialize produced no data; let
+            // the next GetLoadPercent tick do the first real read.
+            return false;
+        }
+
+        if (PdhCollectQueryData (m_query) != ERROR_SUCCESS)
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    // Two-pass PdhGetFormattedCounterArrayW: first call to size the buffer,
+    // second to fill it.  On return outItems points into m_arrayBuf (which
+    // remains valid until the next call on the same thread under m_mutex).
+    bool CollectCounters (DWORD & outItemCount, PDH_FMT_COUNTERVALUE_ITEM_W * & outItems)
+    {
+        DWORD      bufferBytes = 0;
+        PDH_STATUS s           = PDH_CSTATUS_NO_OBJECT;
+
+
+        outItemCount = 0;
+        outItems     = nullptr;
+
+        s = PdhGetFormattedCounterArrayW (m_counter, PDH_FMT_DOUBLE, &bufferBytes, &outItemCount, nullptr);
+
+        if (s != PDH_MORE_DATA || outItemCount == 0)
+        {
+            return false;
+        }
+
+        m_arrayBuf.resize (bufferBytes);
+        outItems = reinterpret_cast<PDH_FMT_COUNTERVALUE_ITEM_W *> (m_arrayBuf.data());
+
+        if (PdhGetFormattedCounterArrayW (m_counter, PDH_FMT_DOUBLE, &bufferBytes, &outItemCount, outItems) != ERROR_SUCCESS)
+        {
+            outItems     = nullptr;
+            outItemCount = 0;
+            return false;
+        }
+
+        return true;
+    }
+
+    // Task Manager's per-process "GPU" column for our process:
+    //   for each engine type (3D / Compute / Copy / Video* / ...):
+    //     sum utilization across every instance of that engine type for
+    //     OUR PID only
+    //   take MAX across engine types
+    double AggregateMaxPerEngineType (const PDH_FMT_COUNTERVALUE_ITEM_W * items, DWORD count) const
+    {
+        wchar_t                         pidMarker[32];
+        std::map<std::wstring, double>  sumPerEngineType;
+        double                          maxLoad           = 0.0;
+
+
+        StringCchPrintfW (pidMarker, ARRAYSIZE (pidMarker), L"pid_%lu_", m_ownPid);
+
+        for (DWORD i = 0; i < count; i++)
+        {
+            if (items[i].FmtValue.CStatus != ERROR_SUCCESS || !items[i].szName)
+            {
+                continue;
+            }
+
+            std::wstring_view name (items[i].szName);
+
+            if (name.find (pidMarker) == std::wstring_view::npos)
+            {
+                continue;
+            }
+
+            constexpr std::wstring_view kEngTypeMarker = L"engtype_";
+            size_t                      pos            = name.find (kEngTypeMarker);
+            std::wstring                engineType     = (pos != std::wstring_view::npos)
+                                                            ? std::wstring (name.substr (pos + kEngTypeMarker.size()))
+                                                            : std::wstring (L"<unknown>");
+
+            sumPerEngineType[engineType] += items[i].FmtValue.doubleValue;
+        }
+
+        for (const auto & [type, sum] : sumPerEngineType)
+        {
+            maxLoad = (std::max) (maxLoad, sum);
+        }
+
+        return (std::min) (maxLoad, 100.0);
+    }
+
+
+    std::mutex            m_mutex;
+    PDH_HQUERY            m_query           { nullptr };
+    PDH_HCOUNTER          m_counter         { nullptr };
+    ULONGLONG             m_lastPollTick    { 0 };
+    ULONGLONG             m_lastRefreshTick { 0 };
+    DWORD                 m_ownPid          { 0 };
+    double                m_cachedLoad      { -1.0 };
+    bool                  m_initFailed      { false };
+    std::vector<uint8_t>  m_arrayBuf;
+};
+
+
+GpuLoadMonitor & SharedGpuLoadMonitor()
+{
+    static GpuLoadMonitor s_monitor;
+    return s_monitor;
+}
+
+}  // namespace
 
 
 
@@ -23,7 +281,7 @@ RenderSystem::~RenderSystem()
 
 
 
-HRESULT RenderSystem::Initialize (HWND hwnd, UINT width, UINT height)
+HRESULT RenderSystem::Initialize (HWND hwnd, UINT width, UINT height, std::optional<LUID> adapterLuid)
 {
     HRESULT        hr       = S_OK;
     D3D11_VIEWPORT viewport = {};
@@ -33,6 +291,12 @@ HRESULT RenderSystem::Initialize (HWND hwnd, UINT width, UINT height)
     m_hwnd         = hwnd;
     m_renderWidth  = width;
     m_renderHeight = height;
+
+    // Remember the user's chosen adapter (if any) so CreateDevice can route
+    // device creation to the matching DXGI adapter.  nullopt = use the
+    // system default (preserves the existing behaviour for callers that
+    // do not opt in to GPU selection).
+    m_requestedAdapterLuid = adapterLuid;
     
     hr = CreateDevice();
     CHR (hr);
@@ -145,10 +409,13 @@ Error:
 
 HRESULT RenderSystem::CreateDevice()
 {
-    HRESULT           hr                = S_OK;
-    UINT              createDeviceFlags = D3D11_CREATE_DEVICE_BGRA_SUPPORT; // Required for Direct2D interop
-    D3D_FEATURE_LEVEL featureLevels[]   = { D3D_FEATURE_LEVEL_11_1, D3D_FEATURE_LEVEL_11_0 };
-    D3D_FEATURE_LEVEL featureLevel;
+    HRESULT                              hr                = S_OK;
+    UINT                                 createDeviceFlags = D3D11_CREATE_DEVICE_BGRA_SUPPORT; // Required for Direct2D interop
+    D3D_FEATURE_LEVEL                    featureLevels[]   = { D3D_FEATURE_LEVEL_11_1, D3D_FEATURE_LEVEL_11_0 };
+    D3D_FEATURE_LEVEL                    featureLevel;
+    Microsoft::WRL::ComPtr<IDXGIAdapter1> requestedAdapter;
+    D3D_DRIVER_TYPE                      driverType        = D3D_DRIVER_TYPE_HARDWARE;
+    IDXGIAdapter *                       pAdapterForCreate = nullptr;
 
 
     
@@ -156,8 +423,28 @@ HRESULT RenderSystem::CreateDevice()
     createDeviceFlags |= D3D11_CREATE_DEVICE_DEBUG;
 #endif
 
-    hr = D3D11CreateDevice (nullptr,                   // Default adapter
-                            D3D_DRIVER_TYPE_HARDWARE,  // Hardware acceleration
+    // If the user picked a specific adapter, look it up by LUID and use it
+    // here.  D3D11CreateDevice REQUIRES driver type UNKNOWN when a non-null
+    // adapter is passed.  On any lookup failure we silently fall back to
+    // the default-adapter path so a vanished GPU never blocks startup
+    // (FR-014).
+    if (m_requestedAdapterLuid.has_value())
+    {
+        Microsoft::WRL::ComPtr<IDXGIFactory4> pFactory4;
+
+        if (SUCCEEDED (CreateDXGIFactory1 (IID_PPV_ARGS (&pFactory4))))
+        {
+            if (SUCCEEDED (pFactory4->EnumAdapterByLuid (*m_requestedAdapterLuid,
+                                                          IID_PPV_ARGS (&requestedAdapter))))
+            {
+                pAdapterForCreate = requestedAdapter.Get();
+                driverType        = D3D_DRIVER_TYPE_UNKNOWN;
+            }
+        }
+    }
+
+    hr = D3D11CreateDevice (pAdapterForCreate,         // Explicit adapter or nullptr for default
+                            driverType,                // UNKNOWN if explicit adapter, else HARDWARE
                             nullptr,                   // No software rasterizer
                             createDeviceFlags,
                             featureLevels,
@@ -876,7 +1163,9 @@ static const char * s_kszBlurHorizontalShaderSource = R"(
             
             float4 color = float4(0, 0, 0, 0);
             
-            // 13-tap Gaussian blur (horizontal), spread scaled by glowSize
+            // 13-tap Gaussian blur (horizontal), spread scaled by glowSize.
+            // High-smoothness variant; see ..._Tap5 / ..._Tap9 below for the
+            // cheaper Low/Medium quality variants selected at bind time.
             float weights[13] = { 0.02, 0.04, 0.06, 0.08, 0.10, 0.12, 0.16, 0.12, 0.10, 0.08, 0.06, 0.04, 0.02 };
             for (int i = -6; i <= 6; i++)
             {
@@ -884,6 +1173,86 @@ static const char * s_kszBlurHorizontalShaderSource = R"(
                 color += inputTexture.Sample(samplerState, input.uv + offset) * weights[i + 6];
             }
             
+            return color;
+        }
+    )";
+
+
+
+
+static const char * s_kszBlurHorizontalShader9TapSource = R"(
+        cbuffer BloomConstants : register(b0)
+        {
+            float bloomIntensity;
+            float glowSize;
+            float2 padding;
+        };
+
+        Texture2D inputTexture : register(t0);
+        SamplerState samplerState : register(s0);
+
+        struct PSInput
+        {
+            float4 position : SV_POSITION;
+            float2 uv : TEXCOORD;
+        };
+
+        float4 main(PSInput input) : SV_TARGET
+        {
+            uint width, height;
+            inputTexture.GetDimensions(width, height);
+            float texelX = glowSize / width;
+
+            float4 color = float4(0, 0, 0, 0);
+
+            // 9-tap Gaussian blur (horizontal) - Medium quality variant.
+            float weights[9] = { 0.05, 0.09, 0.12, 0.15, 0.18, 0.15, 0.12, 0.09, 0.05 };
+            for (int i = -4; i <= 4; i++)
+            {
+                float2 offset = float2(i * texelX, 0);
+                color += inputTexture.Sample(samplerState, input.uv + offset) * weights[i + 4];
+            }
+
+            return color;
+        }
+    )";
+
+
+
+
+static const char * s_kszBlurHorizontalShader5TapSource = R"(
+        cbuffer BloomConstants : register(b0)
+        {
+            float bloomIntensity;
+            float glowSize;
+            float2 padding;
+        };
+
+        Texture2D inputTexture : register(t0);
+        SamplerState samplerState : register(s0);
+
+        struct PSInput
+        {
+            float4 position : SV_POSITION;
+            float2 uv : TEXCOORD;
+        };
+
+        float4 main(PSInput input) : SV_TARGET
+        {
+            uint width, height;
+            inputTexture.GetDimensions(width, height);
+            float texelX = glowSize / width;
+
+            float4 color = float4(0, 0, 0, 0);
+
+            // 5-tap Gaussian blur (horizontal) - Low quality variant.
+            float weights[5] = { 0.10, 0.24, 0.32, 0.24, 0.10 };
+            for (int i = -2; i <= 2; i++)
+            {
+                float2 offset = float2(i * texelX, 0);
+                color += inputTexture.Sample(samplerState, input.uv + offset) * weights[i + 2];
+            }
+
             return color;
         }
     )";
@@ -913,7 +1282,8 @@ static const char * s_kszBlurVerticalShaderSource = R"(
             
             float4 color = float4(0, 0, 0, 0);
             
-            // 13-tap Gaussian blur (vertical), spread scaled by glowSize
+            // 13-tap Gaussian blur (vertical), spread scaled by glowSize.
+            // High-smoothness variant; see ..._Tap5 / ..._Tap9 below.
             float weights[13] = { 0.02, 0.04, 0.06, 0.08, 0.10, 0.12, 0.16, 0.12, 0.10, 0.08, 0.06, 0.04, 0.02 };
             for (int i = -6; i <= 6; i++)
             {
@@ -921,6 +1291,84 @@ static const char * s_kszBlurVerticalShaderSource = R"(
                 color += inputTexture.Sample(samplerState, input.uv + offset) * weights[i + 6];
             }
             
+            return color;
+        }
+    )";
+
+
+
+
+static const char * s_kszBlurVerticalShader9TapSource = R"(
+        cbuffer BloomConstants : register(b0)
+        {
+            float bloomIntensity;
+            float glowSize;
+            float2 padding;
+        };
+
+        Texture2D inputTexture : register(t0);
+        SamplerState samplerState : register(s0);
+
+        struct PSInput
+        {
+            float4 position : SV_POSITION;
+            float2 uv : TEXCOORD;
+        };
+
+        float4 main(PSInput input) : SV_TARGET
+        {
+            uint width, height;
+            inputTexture.GetDimensions(width, height);
+            float texelY = glowSize / height;
+
+            float4 color = float4(0, 0, 0, 0);
+
+            float weights[9] = { 0.05, 0.09, 0.12, 0.15, 0.18, 0.15, 0.12, 0.09, 0.05 };
+            for (int i = -4; i <= 4; i++)
+            {
+                float2 offset = float2(0, i * texelY);
+                color += inputTexture.Sample(samplerState, input.uv + offset) * weights[i + 4];
+            }
+
+            return color;
+        }
+    )";
+
+
+
+
+static const char * s_kszBlurVerticalShader5TapSource = R"(
+        cbuffer BloomConstants : register(b0)
+        {
+            float bloomIntensity;
+            float glowSize;
+            float2 padding;
+        };
+
+        Texture2D inputTexture : register(t0);
+        SamplerState samplerState : register(s0);
+
+        struct PSInput
+        {
+            float4 position : SV_POSITION;
+            float2 uv : TEXCOORD;
+        };
+
+        float4 main(PSInput input) : SV_TARGET
+        {
+            uint width, height;
+            inputTexture.GetDimensions(width, height);
+            float texelY = glowSize / height;
+
+            float4 color = float4(0, 0, 0, 0);
+
+            float weights[5] = { 0.10, 0.24, 0.32, 0.24, 0.10 };
+            for (int i = -2; i <= 2; i++)
+            {
+                float2 offset = float2(0, i * texelY);
+                color += inputTexture.Sample(samplerState, input.uv + offset) * weights[i + 2];
+            }
+
             return color;
         }
     )";
@@ -1073,7 +1521,11 @@ HRESULT RenderSystem::CompileBloomShaders()
     ComPtr<ID3DBlob>       quadVSBlob;
     ComPtr<ID3DBlob>       extractPSBlob;
     ComPtr<ID3DBlob>       blurHPSBlob;
+    ComPtr<ID3DBlob>       blurH9PSBlob;
+    ComPtr<ID3DBlob>       blurH5PSBlob;
     ComPtr<ID3DBlob>       blurVPSBlob;
+    ComPtr<ID3DBlob>       blurV9PSBlob;
+    ComPtr<ID3DBlob>       blurV5PSBlob;
     ComPtr<ID3DBlob>       compositePSBlob;
     ComPtr<ID3DBlob>       haloPSBlob;
     QuadVertex             quadVertices[]     = {
@@ -1087,12 +1539,16 @@ HRESULT RenderSystem::CompileBloomShaders()
     D3D11_BUFFER_DESC      vbDesc             = { };
     D3D11_SUBRESOURCE_DATA vbData             = { };
     ShaderCompileEntry     bloomShaderTable[] = {
-        { s_kszQuadVertexShaderSource,         "QuadVS",    "main", "vs_5_0", L"D3DCompile failed for quad vertex shader",     quadVSBlob.GetAddressOf(),      nullptr              },
-        { s_kszBloomExtractShaderSource,       "Extract",   "main", "ps_5_0", L"D3DCompile failed for bloom extract shader",   extractPSBlob.GetAddressOf(),   &m_bloomExtractPS    },
-        { s_kszBlurHorizontalShaderSource,     "BlurH",     "main", "ps_5_0", L"D3DCompile failed for horizontal blur shader", blurHPSBlob.GetAddressOf(),     &m_blurHorizontalPS  },
-        { s_kszBlurVerticalShaderSource,       "BlurV",     "main", "ps_5_0", L"D3DCompile failed for vertical blur shader",   blurVPSBlob.GetAddressOf(),     &m_blurVerticalPS    },
-        { s_kszBloomCompositeShaderSource,     "Composite", "main", "ps_5_0", L"D3DCompile failed for composite shader",       compositePSBlob.GetAddressOf(), &m_compositePS       },
-        { s_kszHaloShaderSource,               "Halo",      "main", "ps_5_0", L"D3DCompile failed for halo shader",            haloPSBlob.GetAddressOf(),      &m_haloPS            }
+        { s_kszQuadVertexShaderSource,             "QuadVS",    "main", "vs_5_0", L"D3DCompile failed for quad vertex shader",         quadVSBlob.GetAddressOf(),      nullptr                },
+        { s_kszBloomExtractShaderSource,           "Extract",   "main", "ps_5_0", L"D3DCompile failed for bloom extract shader",       extractPSBlob.GetAddressOf(),   &m_bloomExtractPS      },
+        { s_kszBlurHorizontalShaderSource,         "BlurH13",   "main", "ps_5_0", L"D3DCompile failed for horizontal blur 13-tap",     blurHPSBlob.GetAddressOf(),     &m_blurHorizontalPS    },
+        { s_kszBlurHorizontalShader9TapSource,     "BlurH9",    "main", "ps_5_0", L"D3DCompile failed for horizontal blur 9-tap",      blurH9PSBlob.GetAddressOf(),    &m_blurHorizontalPS9   },
+        { s_kszBlurHorizontalShader5TapSource,     "BlurH5",    "main", "ps_5_0", L"D3DCompile failed for horizontal blur 5-tap",      blurH5PSBlob.GetAddressOf(),    &m_blurHorizontalPS5   },
+        { s_kszBlurVerticalShaderSource,           "BlurV13",   "main", "ps_5_0", L"D3DCompile failed for vertical blur 13-tap",       blurVPSBlob.GetAddressOf(),     &m_blurVerticalPS      },
+        { s_kszBlurVerticalShader9TapSource,       "BlurV9",    "main", "ps_5_0", L"D3DCompile failed for vertical blur 9-tap",        blurV9PSBlob.GetAddressOf(),    &m_blurVerticalPS9     },
+        { s_kszBlurVerticalShader5TapSource,       "BlurV5",    "main", "ps_5_0", L"D3DCompile failed for vertical blur 5-tap",        blurV5PSBlob.GetAddressOf(),    &m_blurVerticalPS5     },
+        { s_kszBloomCompositeShaderSource,         "Composite", "main", "ps_5_0", L"D3DCompile failed for composite shader",           compositePSBlob.GetAddressOf(), &m_compositePS         },
+        { s_kszHaloShaderSource,                   "Halo",      "main", "ps_5_0", L"D3DCompile failed for halo shader",                haloPSBlob.GetAddressOf(),      &m_haloPS              }
     };
 
 
@@ -1144,6 +1600,7 @@ HRESULT RenderSystem::CreateBloomResources (UINT width, UINT height)
     HRESULT              hr           = S_OK;
     UINT                 bloomWidth;
     UINT                 bloomHeight;
+    int                  divisor      = 0;
     D3D11_TEXTURE2D_DESC sceneTexDesc = { };
     D3D11_TEXTURE2D_DESC texDesc      = { };
 
@@ -1171,9 +1628,12 @@ HRESULT RenderSystem::CreateBloomResources (UINT width, UINT height)
     hr = m_device->CreateShaderResourceView (m_sceneTexture.Get(), nullptr, &m_sceneSRV);
     CHRA (hr);
 
-    // Create bloom extraction texture (half resolution for performance)
-    bloomWidth  = width / 2;
-    bloomHeight = height / 2;
+    // Create bloom extraction texture (size driven by the Resolution slider:
+    // Full/Half/Quarter/Eighth map to integer divisors 1/2/4/8).
+    divisor = std::clamp (static_cast<int> (m_bloomResolutionDivisor), 1, 8);
+
+    bloomWidth  = std::max (1u, width  / static_cast<UINT> (divisor));
+    bloomHeight = std::max (1u, height / static_cast<UINT> (divisor));
 
     texDesc.Width            = bloomWidth;
     texDesc.Height           = bloomHeight;
@@ -1321,20 +1781,24 @@ void RenderSystem::SetViewport(UINT width, UINT height)
 
 HRESULT RenderSystem::ApplyBloom()
 {
-    HRESULT                    hr            = S_OK;
+    HRESULT                    hr              = S_OK;
     ID3D11ShaderResourceView * srvs[2];
-    ID3D11Buffer             * nullCB        = nullptr;
+    ID3D11Buffer             * nullCB          = nullptr;
     D3D11_MAPPED_SUBRESOURCE   mappedBloomCB;
+    int                        viewportDivisor = 0;
+    ID3D11PixelShader        * blurH           = nullptr;
+    ID3D11PixelShader        * blurV           = nullptr;
+    int                        passCount       = 0;
 
 
 
     // Safety check - if render target or bloom resources are being recreated during resize, skip
     CBREx (m_renderTargetView && m_sceneTexture && m_bloomTexture && m_bloomExtractPS && m_compositePS, E_UNEXPECTED);
     
-    // Scene texture already has the rendered characters - no need to copy from backbuffer
-    
-    // Set viewport for half-resolution processing
-    SetViewport (m_renderWidth / 2, m_renderHeight / 2);
+    // Bloom viewport matches the bloom buffer size (resolution-divisor scaled).
+    viewportDivisor = std::clamp (static_cast<int> (m_bloomResolutionDivisor), 1, 8);
+    SetViewport (std::max (1u, m_renderWidth  / static_cast<UINT> (viewportDivisor)),
+                 std::max (1u, m_renderHeight / static_cast<UINT> (viewportDivisor)));
     
     // EXTRACTION PASS: Extract only bright pixels from scene to bloom texture
     SetRenderPipelineState (m_fullscreenQuadInputLayout.Get(),
@@ -1366,16 +1830,35 @@ HRESULT RenderSystem::ApplyBloom()
     // Bind constant buffer for blur shaders (glowSize controls spread)
     m_context->PSSetConstantBuffers (0, 1, m_bloomConstantBuffer.GetAddressOf());
 
+    // Select the blur shader variant matching the user's current smoothness
+    // setting.  Low/Medium variants use cheaper 5-tap / 9-tap kernels; High
+    // uses the canonical 13-tap kernel.
+    blurH = m_blurHorizontalPS.Get();
+    blurV = m_blurVerticalPS.Get();
+
+    if (m_blurTaps == BlurTaps::Low && m_blurHorizontalPS5 && m_blurVerticalPS5)
+    {
+        blurH = m_blurHorizontalPS5.Get();
+        blurV = m_blurVerticalPS5.Get();
+    }
+    else if (m_blurTaps == BlurTaps::Medium && m_blurHorizontalPS9 && m_blurVerticalPS9)
+    {
+        blurH = m_blurHorizontalPS9.Get();
+        blurV = m_blurVerticalPS9.Get();
+    }
+
     // Multiple blur passes: each H+V pass blurs the previous result,
-    // creating an exponentially wider and softer glow.  Three passes with
-    // a 13-tap kernel produce a very wide, cinematic bloom falloff.
-    for (int pass = 0; pass < 3; ++pass)
+    // creating an exponentially wider and softer glow.  Pass count and
+    // smoothness are both runtime-configurable via the Quality preset.
+    passCount = std::clamp (m_blurPasses, 1, 4);
+
+    for (int pass = 0; pass < passCount; ++pass)
     {
         // Horizontal blur pass (bloom → temp)
-        RenderFullscreenPass (m_blurTempRTV.Get(), m_blurHorizontalPS.Get(), m_bloomSRV.GetAddressOf(), 1);
+        RenderFullscreenPass (m_blurTempRTV.Get(), blurH, m_bloomSRV.GetAddressOf(), 1);
 
         // Vertical blur pass (temp → bloom)
-        RenderFullscreenPass (m_bloomRTV.Get(), m_blurVerticalPS.Get(), m_blurTempSRV.GetAddressOf(), 1);
+        RenderFullscreenPass (m_bloomRTV.Get(), blurV, m_blurTempSRV.GetAddressOf(), 1);
     }
     
     // Restore full viewport
@@ -1723,8 +2206,37 @@ void RenderSystem::Render (const AnimationSystem & animationSystem, const Viewpo
         renderOverlay (params.pHotkeyOverlay);
         renderOverlay (params.pUsageOverlay);
 
-        // Apply bloom (extracts bright pixels including overlay text, composites to backbuffer)
-        (void)ApplyBloom();
+        // Apply bloom (extracts bright pixels including overlay text, composites
+        // to backbuffer).  When the user has dialed Glow Intensity to 0% the
+        // entire bloom pipeline is bypassed and the scene texture is composited
+        // directly to the backbuffer (FR-031: "glow disabled" = true off, not
+        // just darker).
+        if (m_glowIntensity > 0.0f)
+        {
+            (void)ApplyBloom();
+        }
+        else
+        {
+            // Direct scene-to-backbuffer copy: render the scene texture without
+            // the bloom extract/blur/composite passes.  Bind a null SRV at
+            // slot 1 (bloom) so the composite PS doesn't sample whatever
+            // texture was left bound there by a previous bloom-on frame —
+            // PSSetShaderResources with numResources=1 only touches slot 0.
+            m_context->OMSetRenderTargets (1, m_renderTargetView.GetAddressOf(), nullptr);
+            m_context->OMSetBlendState (nullptr, nullptr, 0xffffffff);
+
+            ID3D11ShaderResourceView * srvs[] = { m_sceneSRV.Get(), nullptr };
+
+            SetRenderPipelineState (m_fullscreenQuadInputLayout.Get(),
+                                    D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST,
+                                    m_fullscreenQuadVB.Get(),
+                                    sizeof (float) * 5,
+                                    m_fullscreenQuadVS.Get(),
+                                    nullptr,
+                                    nullptr);
+            m_context->PSSetSamplers (0, 1, m_samplerState.GetAddressOf());
+            RenderFullscreenPass (m_renderTargetView.Get(), m_compositePS.Get(), srvs, 2);
+        }
     }
     else
     {
@@ -1736,7 +2248,10 @@ void RenderSystem::Render (const AnimationSystem & animationSystem, const Viewpo
     // Render FPS counter overlay if fps > 0
     if (params.fps > 0.0f)
     {
-        RenderFPSCounter (params.fps, params.rainPercentage, params.streakCount, params.activeHeadCount);
+        double gpuLoad      = SharedGpuLoadMonitor().GetLoadPercent();
+        bool   gpuLoadValid = gpuLoad >= 0.0;
+
+        RenderFPSCounter (params.fps, params.rainPercentage, params.streakCount, params.activeHeadCount, gpuLoad, gpuLoadValid);
     }
 
     // Debug: Render fade times when enabled and only one streak is visible
@@ -1750,19 +2265,21 @@ void RenderSystem::Render (const AnimationSystem & animationSystem, const Viewpo
 
 
 
-void RenderSystem::Present()
+HRESULT RenderSystem::Present()
 {
-    if (m_swapChain)
+    if (!m_swapChain)
     {
-        m_swapChain->Present (1, 0); // VSync enabled
+        return S_OK;
     }
+
+    return m_swapChain->Present (1, 0); // VSync enabled
 }
 
 
 
 
 
-void RenderSystem::RenderFPSCounter (float fps, int rainPercentage, int streakCount, int activeHeadCount)
+void RenderSystem::RenderFPSCounter (float fps, int rainPercentage, int streakCount, int activeHeadCount, double gpuLoadPercent, bool gpuLoadValid)
 {
     HRESULT                   hr           = S_OK;
     bool                      drawing      = false;
@@ -1781,8 +2298,18 @@ void RenderSystem::RenderFPSCounter (float fps, int rainPercentage, int streakCo
     m_d2dContext->BeginDraw();
     drawing = true;
 
-    // Format FPS text with rain density info: "Rain xxx% (yyy heads / zzz total), ww FPS"
-    swprintf_s (fpsText, L"Rain %d%% (%d heads / %d total), %.0f FPS", rainPercentage, activeHeadCount, streakCount, fps);
+    // Format FPS text with rain density info and GPU load:
+    //   "Rain xxx% (yyy heads / zzz total), ww FPS, GPU vv%"
+    if (gpuLoadValid)
+    {
+        swprintf_s (fpsText, L"Rain %d%% (%d heads / %d total), %.0f FPS, GPU %.0f%%",
+                    rainPercentage, activeHeadCount, streakCount, fps, gpuLoadPercent);
+    }
+    else
+    {
+        swprintf_s (fpsText, L"Rain %d%% (%d heads / %d total), %.0f FPS, GPU --%%",
+                    rainPercentage, activeHeadCount, streakCount, fps);
+    }
 
     // Get render target size for positioning
     size = m_d2dContext->GetSize();
@@ -2879,6 +3406,64 @@ void RenderSystem::SetGlowSize (int sizePercent)
     // Convert percentage (50-200) to multiplier (0.5-2.0)
     // Default is 100% = 1.0 multiplier
     m_glowSize = sizePercent / 100.0f;
+}
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  RenderSystem::SetBlurPasses / SetBloomResolution / SetBlurTaps
+//
+////////////////////////////////////////////////////////////////////////////////
+
+void RenderSystem::SetBlurPasses (int passes)
+{
+    m_blurPasses = passes;
+}
+
+
+void RenderSystem::SetBloomResolution (int divisor)
+{
+    // Stored as the divisor integer (1/2/4/8); a bloom-buffer recreate is
+    // required when this changes.  The viewport divisor in ApplyBloom uses
+    // the same enum value to keep the half/quarter/eighth render consistent.
+    ResolutionDivisor newDiv;
+
+    switch (divisor)
+    {
+        case 1: newDiv = ResolutionDivisor::Full;    break;
+        case 4: newDiv = ResolutionDivisor::Quarter; break;
+        case 8: newDiv = ResolutionDivisor::Eighth;  break;
+        case 2:
+        default:
+            newDiv = ResolutionDivisor::Half;
+            break;
+    }
+
+    if (newDiv != m_bloomResolutionDivisor)
+    {
+        m_bloomResolutionDivisor = newDiv;
+
+        // Recreate the bloom textures at the new resolution.  Recreate is
+        // a no-op if the device is not yet initialized.
+        if (m_device && m_renderWidth > 0 && m_renderHeight > 0)
+        {
+            (void)CreateBloomResources (m_renderWidth, m_renderHeight);
+        }
+    }
+}
+
+
+void RenderSystem::SetBlurTaps (int taps)
+{
+    switch (taps)
+    {
+        case 5:  m_blurTaps = BlurTaps::Low;    break;
+        case 9:  m_blurTaps = BlurTaps::Medium; break;
+        case 13:
+        default: m_blurTaps = BlurTaps::High;   break;
+    }
 }
 
 

@@ -69,6 +69,49 @@ public:
     void UpdateStartFullscreen (bool startFullscreen);
 
     /// <summary>
+    /// Update multi-monitor enabled flag.  When true, MatrixRain creates a
+    /// render context per connected monitor in fullscreen mode; when false,
+    /// it uses a single primary-only window.  The dialog handler is
+    /// expected to post WM_APP_REBUILD_CONTEXTS after calling this so the
+    /// running app picks up the new gate decision (see FR-003).  The
+    /// CancelLiveMode path automatically reverts via the snapshot, but the
+    /// dialog handler must likewise post a rebuild on Cancel for the
+    /// reverted setting to take visual effect (see FR-031b).
+    /// </summary>
+    /// <param name="multiMonitorEnabled">True to span all monitors</param>
+    void UpdateMultiMonitorEnabled (bool multiMonitorEnabled);
+
+    /// <summary>
+    /// Update the user-selected GPU adapter (by DXGI description string).
+    /// Empty string means "use the system default adapter".  The dialog
+    /// handler is expected to post WM_APP_REBUILD_CONTEXTS after calling
+    /// this so the running app rebuilds its contexts on the new device
+    /// (FR-015).  Cancel-revert is automatic via the snapshot, but the
+    /// dialog handler must post a rebuild on Cancel for the reverted
+    /// adapter selection to take visual effect (FR-031b).
+    /// </summary>
+    /// <param name="description">DXGI adapter description (Empty for default)</param>
+    void UpdateGpuAdapter (const std::wstring & description);
+
+    /// <summary>
+    /// Update the current quality preset.  When set to a named preset,
+    /// also snaps m_advancedValues to that preset's lookup row (so the
+    /// dialog can reflect them back into the advanced sliders).  When
+    /// set to Custom, restores LastCustom if saved, else leaves the
+    /// advanced values at their current state.  Cancel-revert is
+    /// automatic via the snapshot.
+    /// </summary>
+    void UpdateQualityPreset (QualityPreset preset);
+
+    /// <summary>
+    /// Update the four advanced graphics control values as a unit.  Always
+    /// updates LastCustom (FR-023) AND recomputes m_qualityPreset via
+    /// DetectActivePreset so the dialog can refresh the preset combo
+    /// (typically flipping it to Custom when knobs drift off the table).
+    /// </summary>
+    void UpdateAdvancedGraphicsValues (const AdvancedGraphicsValues & values);
+
+    /// <summary>
     /// Update show debug stats flag.
     /// </summary>
     /// <param name="showDebugStats">True to show debug statistics</param>
@@ -127,6 +170,22 @@ public:
     /// </summary>
     /// <returns>True if live mode active, false for modal mode</returns>
     bool IsLiveMode() const { return m_snapshot.isLiveMode; }
+
+    /// <summary>
+    /// True if the currently-pending settings differ from the live-mode
+    /// snapshot in any field that requires the monitor render contexts to
+    /// be torn down and rebuilt (multi-monitor span, or selected GPU
+    /// adapter).  Used by the dialog to suppress an unnecessary
+    /// destroy/recreate flicker on OK / Cancel when nothing rebuild-worthy
+    /// has changed.
+    /// </summary>
+    bool LiveModeRebuildRequired() const
+    {
+        if (!m_snapshot.isLiveMode) return false;
+        if (m_settings.m_multiMonitorEnabled != m_snapshot.snapshotSettings.m_multiMonitorEnabled) return true;
+        if (m_settings.m_gpuAdapter          != m_snapshot.snapshotSettings.m_gpuAdapter)          return true;
+        return false;
+    }
 
 private:
     ISettingsProvider   & m_settingsProvider;            // Settings provider (not owned)

@@ -40,6 +40,11 @@ public:
     /// <param name="pScreenSaverContext">Screensaver mode context for runtime behavior (nullptr for normal mode)</param>
     void Initialize (const ScreenSaverModeContext * pScreenSaverContext);
 
+    /// Was the most recent settings Load() a brand-new install (no
+    /// registry key existed)?  Used by Application to decide whether to
+    /// run the first-run quality-preset heuristic (FR-037).
+    bool IsFirstRun () const { return m_isFirstRun; }
+
     /// <summary>
     /// Toggle between Windowed and Fullscreen display modes.
     /// </summary>
@@ -87,6 +92,14 @@ public:
     void RegisterGlowSizeCallback (std::function<void(int)> callback);
 
     /// <summary>
+    /// Register a callback to be notified when the advanced graphics
+    /// values (preset-driven or custom) change.  Used by Application to
+    /// push the new values into SharedState so the render thread picks
+    /// them up via the snapshot path on the next frame (US5 live preview).
+    /// </summary>
+    void RegisterAdvancedGraphicsCallback (std::function<void(const AdvancedGraphicsValues &)> callback);
+
+    /// <summary>
     /// Register a callback to be notified when the color scheme changes
     /// (via dialog, hotkey, or full settings apply).
     /// </summary>
@@ -126,6 +139,13 @@ public:
     void SetGlowSize (int sizePercent);
 
     /// <summary>
+    /// Update the advanced graphics values (passes / resolution / smoothness
+    /// + glow intensity as a unit).  Fires the advanced-graphics callback
+    /// so SharedState picks up the new values for the render thread.
+    /// </summary>
+    void SetAdvancedGraphics (const AdvancedGraphicsValues & values);
+
+    /// <summary>
     /// Apply full settings to application state (for live dialog revert).
     /// </summary>
     /// <param name="settings">Settings to apply</param>
@@ -146,6 +166,12 @@ public:
     bool                      GetShowStatistics()      const { return m_showStatistics;      }
     const ScreenSaverSettings GetSettings()            const { return m_settings;            }
 
+    /// First-run convenience: apply a heuristically-chosen quality preset
+    /// to the in-memory settings, populate the advanced values from its
+    /// lookup row, and persist.  Called once at startup by Application
+    /// when IsFirstRun() is true (FR-037).
+    HRESULT ApplyFirstRunQualityPreset (QualityPreset preset);
+
     void    SetDisplayMode        (DisplayMode mode)   { m_displayMode = mode;                 }
     void    SetColorScheme        (ColorScheme scheme);
     void    SetShowStatistics     (bool show);
@@ -161,6 +187,7 @@ private:
     bool                             m_showStatistics                   = false;                   // Show FPS and density statistics
     float                            m_elapsedTime                      = 0.0f;                    // Elapsed time for color cycling animation
     ScreenSaverSettings              m_settings;                                                   // User-configurable settings
+    bool                             m_isFirstRun                       = false;                   // True iff Load() found no registry key
     const ScreenSaverModeContext   * m_pScreenSaverContext              = nullptr;                 // Screensaver mode context (nullptr = normal mode)
     std::function<void(int)>         m_densityChangeCallback            = nullptr;                 // Callback for density changes
     std::function<void(int)>         m_animationSpeedChangeCallback     = nullptr;                 // Callback for animation speed changes
@@ -169,6 +196,7 @@ private:
     std::function<void(ColorScheme)> m_colorSchemeChangeCallback        = nullptr;                 // Callback for color scheme changes
     std::function<void(bool)>        m_showStatisticsChangeCallback     = nullptr;                 // Callback for show-statistics changes
     std::function<void(bool)>        m_showDebugFadeTimesChangeCallback = nullptr;                 // Callback for show-debug-fade-times changes
+    std::function<void(const AdvancedGraphicsValues &)> m_advancedGraphicsChangeCallback = nullptr; // Callback for US5 advanced graphics changes
 };
 
 

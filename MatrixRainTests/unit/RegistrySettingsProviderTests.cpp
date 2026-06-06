@@ -149,6 +149,218 @@ namespace MatrixRainTests
             Assert::IsFalse  (loadSettings.m_startFullscreen, L"StartFullscreen should match saved value");
             Assert::IsTrue   (loadSettings.m_showDebugStats,  L"ShowDebugStats should match saved value");
         }
+
+
+
+
+        TEST_METHOD (TestLoadSettings_MultiMonitor_DefaultsToTrue_WhenAbsent)
+        {
+            DeleteTestRegistryKey();
+
+            HKEY    hKey   = nullptr;
+            LSTATUS status = RegCreateKeyExW (HKEY_CURRENT_USER, TEST_REGISTRY_KEY_PATH, 0, nullptr,
+                                              REG_OPTION_NON_VOLATILE, KEY_WRITE, nullptr, &hKey, nullptr);
+            Assert::AreEqual ((LONG)ERROR_SUCCESS, (LONG)status);
+
+            DWORD density = 50;
+            RegSetValueExW (hKey, L"Density", 0, REG_DWORD, (const BYTE *)&density, sizeof (DWORD));
+            RegCloseKey (hKey);
+
+
+            ScreenSaverSettings settings;
+            HRESULT             hr = m_provider.Load (settings);
+
+
+            Assert::AreEqual (S_OK, hr);
+            Assert::IsTrue   (settings.m_multiMonitorEnabled, L"Absent MultiMonitor value should leave default (true)");
+        }
+
+
+
+
+        TEST_METHOD (TestSaveLoadRoundTrip_MultiMonitor_PreservesFalse)
+        {
+            DeleteTestRegistryKey();
+
+            ScreenSaverSettings saveSettings;
+            saveSettings.m_multiMonitorEnabled = false;
+
+
+            HRESULT hr = m_provider.Save (saveSettings);
+            Assert::AreEqual (S_OK, hr);
+
+
+            ScreenSaverSettings loadSettings;
+            hr = m_provider.Load (loadSettings);
+
+
+            Assert::AreEqual (S_OK, hr);
+            Assert::IsFalse  (loadSettings.m_multiMonitorEnabled, L"MultiMonitor=false should round-trip");
+        }
+
+
+
+
+        TEST_METHOD (TestSaveLoadRoundTrip_MultiMonitor_PreservesTrue)
+        {
+            DeleteTestRegistryKey();
+
+            ScreenSaverSettings saveSettings;
+            saveSettings.m_multiMonitorEnabled = true;
+
+
+            HRESULT hr = m_provider.Save (saveSettings);
+            Assert::AreEqual (S_OK, hr);
+
+
+            ScreenSaverSettings loadSettings;
+            loadSettings.m_multiMonitorEnabled = false; // pre-set opposite to prove the load overwrites
+            hr = m_provider.Load (loadSettings);
+
+
+            Assert::AreEqual (S_OK, hr);
+            Assert::IsTrue   (loadSettings.m_multiMonitorEnabled, L"MultiMonitor=true should round-trip");
+        }
+
+
+
+
+        TEST_METHOD (TestSaveLoadRoundTrip_GpuAdapter_PreservesDescription)
+        {
+            DeleteTestRegistryKey();
+
+            ScreenSaverSettings saveSettings;
+            saveSettings.m_gpuAdapter = L"NVIDIA GeForce RTX 3050 Ti Laptop GPU";
+
+
+            HRESULT hr = m_provider.Save (saveSettings);
+            Assert::AreEqual (S_OK, hr);
+
+
+            ScreenSaverSettings loadSettings;
+            hr = m_provider.Load (loadSettings);
+
+
+            Assert::AreEqual (S_OK, hr);
+            Assert::AreEqual (std::wstring (L"NVIDIA GeForce RTX 3050 Ti Laptop GPU"), loadSettings.m_gpuAdapter);
+        }
+
+
+
+
+        TEST_METHOD (TestSaveLoadRoundTrip_GpuAdapter_EmptyDescription)
+        {
+            DeleteTestRegistryKey();
+
+            ScreenSaverSettings saveSettings;
+            saveSettings.m_gpuAdapter = L"";
+
+
+            HRESULT hr = m_provider.Save (saveSettings);
+            Assert::AreEqual (S_OK, hr);
+
+
+            ScreenSaverSettings loadSettings;
+            loadSettings.m_gpuAdapter = L"non-empty";
+            hr = m_provider.Load (loadSettings);
+
+
+            Assert::AreEqual (S_OK, hr);
+            Assert::AreEqual (std::wstring (L""), loadSettings.m_gpuAdapter);
+        }
+
+
+
+
+        TEST_METHOD (TestSaveLoadRoundTrip_QualityPreset_PreservesNamedPreset)
+        {
+            DeleteTestRegistryKey();
+
+            ScreenSaverSettings saveSettings;
+            saveSettings.m_qualityPreset = QualityPreset::Low;
+
+
+            HRESULT hr = m_provider.Save (saveSettings);
+            Assert::AreEqual (S_OK, hr);
+
+
+            ScreenSaverSettings loadSettings;
+            hr = m_provider.Load (loadSettings);
+
+
+            Assert::AreEqual (S_OK, hr);
+            Assert::IsTrue   (loadSettings.m_qualityPreset == QualityPreset::Low);
+
+            // Per the load logic, the named preset's row is automatically
+            // applied to m_advancedValues.
+            Assert::IsTrue   (loadSettings.m_advancedValues == LookupPresetValues (QualityPreset::Low));
+        }
+
+
+
+
+        TEST_METHOD (TestSaveLoadRoundTrip_LastCustom_AllOrNothing)
+        {
+            DeleteTestRegistryKey();
+
+            ScreenSaverSettings saveSettings;
+            saveSettings.m_qualityPreset = QualityPreset::Custom;
+            saveSettings.m_lastCustom    = AdvancedGraphicsValues { 137, 4, ResolutionDivisor::Eighth, BlurTaps::Low };
+            saveSettings.m_advancedValues = *saveSettings.m_lastCustom;
+
+
+            HRESULT hr = m_provider.Save (saveSettings);
+            Assert::AreEqual (S_OK, hr);
+
+
+            ScreenSaverSettings loadSettings;
+            hr = m_provider.Load (loadSettings);
+
+
+            Assert::AreEqual (S_OK, hr);
+            Assert::IsTrue   (loadSettings.m_qualityPreset == QualityPreset::Custom);
+            Assert::IsTrue   (loadSettings.m_lastCustom.has_value());
+            Assert::AreEqual (137, loadSettings.m_lastCustom->m_glowIntensityPercent);
+            Assert::AreEqual (4,   loadSettings.m_lastCustom->m_blurPasses);
+            Assert::IsTrue   (loadSettings.m_lastCustom->m_bloomResolutionDivisor == ResolutionDivisor::Eighth);
+            Assert::IsTrue   (loadSettings.m_lastCustom->m_blurTaps               == BlurTaps::Low);
+            // Custom + LastCustom present -> advanced values restored from LastCustom.
+            Assert::IsTrue   (loadSettings.m_advancedValues == *loadSettings.m_lastCustom);
+        }
+
+
+
+
+        TEST_METHOD (TestLoadSettings_LastCustom_MissingOneValue_IgnoresAll)
+        {
+            DeleteTestRegistryKey();
+
+            // Manually set 3 of the 4 LastCustom values; omit the 4th to
+            // exercise the all-or-nothing read contract.
+            HKEY    hKey   = nullptr;
+            LSTATUS status = RegCreateKeyExW (HKEY_CURRENT_USER, TEST_REGISTRY_KEY_PATH, 0, nullptr,
+                                              REG_OPTION_NON_VOLATILE, KEY_WRITE, nullptr, &hKey, nullptr);
+            Assert::AreEqual ((LONG)ERROR_SUCCESS, (LONG)status);
+
+            DWORD intensity = 137;
+            DWORD passes    = 4;
+            DWORD smoothness = 5;
+            // VALUE_LASTCUSTOM_RESOLUTION intentionally not written.
+
+            RegSetValueExW (hKey, L"LastCustom_GlowIntensity", 0, REG_DWORD, (const BYTE *)&intensity,  sizeof (DWORD));
+            RegSetValueExW (hKey, L"LastCustom_Passes",        0, REG_DWORD, (const BYTE *)&passes,     sizeof (DWORD));
+            RegSetValueExW (hKey, L"LastCustom_Smoothness",    0, REG_DWORD, (const BYTE *)&smoothness, sizeof (DWORD));
+            RegCloseKey (hKey);
+
+
+            ScreenSaverSettings settings;
+            HRESULT             hr = m_provider.Load (settings);
+
+
+            Assert::AreEqual (S_OK, hr);
+            Assert::IsFalse  (settings.m_lastCustom.has_value(),
+                              L"Missing any LastCustom_* value should yield nullopt (all-or-nothing read contract)");
+        }
         
         
         

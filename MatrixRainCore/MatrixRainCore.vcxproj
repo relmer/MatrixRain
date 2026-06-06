@@ -289,6 +289,14 @@
     <ClInclude Include="ScrambleRevealEffect.h" />
     <ClInclude Include="SharedState.h" />
     <ClInclude Include="OverlayColor.h" />
+    <ClInclude Include="AdapterSelection.h" />
+    <ClInclude Include="DeviceLost.h" />
+    <ClInclude Include="FrameLimiter.h" />
+    <ClInclude Include="IAdapterProvider.h" />
+    <ClInclude Include="InMemoryAdapterProvider.h" />
+    <ClInclude Include="MultiMonitorGate.h" />
+    <ClInclude Include="QualityPresets.h" />
+    <ClInclude Include="RebuildCoalescer.h" />
     <ClInclude Include="InMemorySettingsProvider.h" />
     <ClInclude Include="InputSystem.h" />
     <ClInclude Include="GlyphAtlas.h" />
@@ -309,6 +317,7 @@
     <ClInclude Include="RegistryProvider.h" />
     <ClInclude Include="ScreenSaverInstaller.h" />
     <ClInclude Include="WindowsFileSystemProvider.h" />
+    <ClInclude Include="WindowsAdapterProvider.h" />
     <ClInclude Include="WindowsMonitorProvider.h" />
     <ClInclude Include="WindowsRegistryProvider.h" />
     <ClInclude Include="Timer.h" />
@@ -342,6 +351,13 @@
     <ClCompile Include="MonitorLayout.cpp" />
     <ClCompile Include="RenderThreadInputs.cpp" />
     <ClCompile Include="WindowsMonitorProvider.cpp" />
+    <ClCompile Include="WindowsAdapterProvider.cpp" />
+    <ClCompile Include="AdapterSelection.cpp" />
+    <ClCompile Include="DeviceLost.cpp" />
+    <ClCompile Include="FrameLimiter.cpp" />
+    <ClCompile Include="MultiMonitorGate.cpp" />
+    <ClCompile Include="QualityPresets.cpp" />
+    <ClCompile Include="RebuildCoalescer.cpp" />
     <ClCompile Include="CommandLine.cpp" />
     <ClCompile Include="ScreenSaverInstaller.cpp" />
     <ClCompile Include="ApplicationState.cpp" />

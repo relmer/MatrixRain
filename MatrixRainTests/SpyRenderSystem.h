@@ -25,6 +25,9 @@ public:
     int   m_dpiChangedCount  = 0;
     int   m_glowIntensity    = -1;
     int   m_glowSize         = -1;
+    int   m_blurPasses       = -1;
+    int   m_bloomResolution  = -1;
+    int   m_blurTaps         = -1;
     float m_characterScale   = -1.0f;
     float m_dpiScale         = 1.0f;
 
@@ -45,10 +48,18 @@ public:
     }
 
 
-    void Present() override
+    HRESULT Present() override
     {
         m_presentCount++;
+
+        return m_presentReturnHr;
     }
+
+
+    // Test seam: setting this lets a test simulate Present returning a
+    // device-lost HRESULT (e.g., DXGI_ERROR_DEVICE_REMOVED) so callers
+    // can exercise their recovery paths without a real D3D device.
+    HRESULT m_presentReturnHr = S_OK;
 
 
     void Resize (UINT width, UINT height) override
@@ -75,6 +86,24 @@ public:
     void SetGlowSize (int sizePercent) override
     {
         m_glowSize = sizePercent;
+    }
+
+
+    void SetBlurPasses (int passes) override
+    {
+        m_blurPasses = passes;
+    }
+
+
+    void SetBloomResolution (int divisor) override
+    {
+        m_bloomResolution = divisor;
+    }
+
+
+    void SetBlurTaps (int taps) override
+    {
+        m_blurTaps = taps;
     }
 
 

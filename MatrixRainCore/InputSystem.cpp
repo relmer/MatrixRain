@@ -71,16 +71,6 @@ bool InputSystem::ProcessKeyDown (int virtualKey)
             handled = true;
             break;
 
-#ifdef _DEBUG
-        case VK_OEM_3:              // Backtick/tilde key (`~) — debug only
-            if (m_appState)
-            {
-                m_appState->ToggleDebugFadeTimes();
-                handled = true;
-            }
-            break;
-#endif
-
         default:
             break;
     }

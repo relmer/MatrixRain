@@ -40,6 +40,76 @@ HRESULT RegistrySettingsProvider::Load (ScreenSaverSettings & settings)
     ReadInt    (hKey, VALUE_GLOW_SIZE,        settings.m_glowSizePercent);
     ReadBool   (hKey, VALUE_START_FULLSCREEN, settings.m_startFullscreen);
     ReadBool   (hKey, VALUE_SHOW_DEBUG_STATS, settings.m_showDebugStats);
+    ReadBool   (hKey, VALUE_MULTIMONITOR,     settings.m_multiMonitorEnabled);
+    ReadString (hKey, VALUE_GPU_ADAPTER,      settings.m_gpuAdapter);
+
+    // Quality preset: REG_SZ matching the enum class names.  Empty/missing
+    // value triggers the first-run heuristic in Application::Initialize.
+    {
+        std::wstring presetName;
+
+        if (ReadString (hKey, VALUE_QUALITY_PRESET, presetName) == S_OK)
+        {
+            if      (presetName == L"Low")    settings.m_qualityPreset = QualityPreset::Low;
+            else if (presetName == L"Medium") settings.m_qualityPreset = QualityPreset::Medium;
+            else if (presetName == L"High")   settings.m_qualityPreset = QualityPreset::High;
+            else if (presetName == L"Custom") settings.m_qualityPreset = QualityPreset::Custom;
+        }
+    }
+
+    // Last-custom advanced values: ALL FOUR DWORDs must be present or we
+    // treat the persisted LastCustom as missing.  Partial state is never
+    // honored (registry-schema contract).
+    {
+        int passes        = 0;
+        int resolution    = 0;
+        int smoothness    = 0;
+        int glowIntensity = 0;
+
+        bool havePasses     = ReadInt (hKey, VALUE_LASTCUSTOM_PASSES,         passes)        == S_OK;
+        bool haveResolution = ReadInt (hKey, VALUE_LASTCUSTOM_RESOLUTION,     resolution)    == S_OK;
+        bool haveSmoothness = ReadInt (hKey, VALUE_LASTCUSTOM_SMOOTHNESS,     smoothness)    == S_OK;
+        bool haveIntensity  = ReadInt (hKey, VALUE_LASTCUSTOM_GLOW_INTENSITY, glowIntensity) == S_OK;
+
+        if (havePasses && haveResolution && haveSmoothness && haveIntensity)
+        {
+            AdvancedGraphicsValues v;
+
+            v.m_glowIntensityPercent = std::clamp (glowIntensity, 0,   200);
+            v.m_blurPasses           = std::clamp (passes,        1,   4);
+
+            switch (resolution)
+            {
+                case 1: v.m_bloomResolutionDivisor = ResolutionDivisor::Full;    break;
+                case 2: v.m_bloomResolutionDivisor = ResolutionDivisor::Half;    break;
+                case 4: v.m_bloomResolutionDivisor = ResolutionDivisor::Quarter; break;
+                case 8: v.m_bloomResolutionDivisor = ResolutionDivisor::Eighth;  break;
+                default: v.m_bloomResolutionDivisor = ResolutionDivisor::Half;
+            }
+
+            switch (smoothness)
+            {
+                case 5:  v.m_blurTaps = BlurTaps::Low;    break;
+                case 9:  v.m_blurTaps = BlurTaps::Medium; break;
+                case 13: v.m_blurTaps = BlurTaps::High;   break;
+                default: v.m_blurTaps = BlurTaps::High;
+            }
+
+            settings.m_lastCustom = v;
+        }
+    }
+
+    // When QualityPreset == Custom, restore the advanced values from
+    // LastCustom (if present).  Otherwise advanced values follow the
+    // named preset's lookup row.
+    if (settings.m_qualityPreset == QualityPreset::Custom && settings.m_lastCustom.has_value())
+    {
+        settings.m_advancedValues = *settings.m_lastCustom;
+    }
+    else if (settings.m_qualityPreset != QualityPreset::Custom)
+    {
+        settings.m_advancedValues = LookupPresetValues (settings.m_qualityPreset);
+    }
 
     // Clamp all values to valid ranges
     settings.Clamp();
@@ -108,6 +178,47 @@ HRESULT RegistrySettingsProvider::Save (const ScreenSaverSettings & settings)
     
     hr = WriteBool (hKey, VALUE_SHOW_DEBUG_STATS, settings.m_showDebugStats);
     CHR (hr);
+
+    hr = WriteBool (hKey, VALUE_MULTIMONITOR, settings.m_multiMonitorEnabled);
+    CHR (hr);
+
+    hr = WriteString (hKey, VALUE_GPU_ADAPTER, settings.m_gpuAdapter);
+    CHR (hr);
+
+    // QualityPreset name as REG_SZ.
+    {
+        const wchar_t * name = L"High";
+
+        switch (settings.m_qualityPreset)
+        {
+            case QualityPreset::Low:    name = L"Low";    break;
+            case QualityPreset::Medium: name = L"Medium"; break;
+            case QualityPreset::High:   name = L"High";   break;
+            case QualityPreset::Custom: name = L"Custom"; break;
+        }
+
+        hr = WriteString (hKey, VALUE_QUALITY_PRESET, std::wstring (name));
+        CHR (hr);
+    }
+
+    // LastCustom values: always persist when present so a future switch to
+    // Custom can restore them.  When absent, intentionally leave any prior
+    // values in the registry (no-op write would be a silent migration
+    // gotcha).  The all-or-nothing read enforces consistency.
+    if (settings.m_lastCustom.has_value())
+    {
+        hr = WriteInt (hKey, VALUE_LASTCUSTOM_GLOW_INTENSITY, settings.m_lastCustom->m_glowIntensityPercent);
+        CHR (hr);
+
+        hr = WriteInt (hKey, VALUE_LASTCUSTOM_PASSES,         settings.m_lastCustom->m_blurPasses);
+        CHR (hr);
+
+        hr = WriteInt (hKey, VALUE_LASTCUSTOM_RESOLUTION,     static_cast<int> (settings.m_lastCustom->m_bloomResolutionDivisor));
+        CHR (hr);
+
+        hr = WriteInt (hKey, VALUE_LASTCUSTOM_SMOOTHNESS,     static_cast<int> (settings.m_lastCustom->m_blurTaps));
+        CHR (hr);
+    }
 
 
 Error:

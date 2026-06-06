@@ -7,6 +7,7 @@
 #include "ApplicationState.h"
 #include "ColorScheme.h"
 #include "DensityController.h"
+#include "DeviceLost.h"
 #include "FPSCounter.h"
 #include "Overlay.h"
 #include "RenderParams.h"
@@ -61,14 +62,14 @@ MonitorRenderContext::~MonitorRenderContext()
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-HRESULT MonitorRenderContext::Initialize (HWND hwnd, UINT width, UINT height)
+HRESULT MonitorRenderContext::Initialize (HWND hwnd, UINT width, UINT height, std::optional<LUID> adapterLuid)
 {
     HRESULT hr = S_OK;
 
 
     m_hwnd = hwnd;
 
-    hr = m_renderSystem->Initialize (hwnd, width, height);
+    hr = m_renderSystem->Initialize (hwnd, width, height, adapterLuid);
     CHR (hr);
 
     // Size the viewport to match the swap chain.  The WM_SIZE fired during
@@ -81,6 +82,31 @@ HRESULT MonitorRenderContext::Initialize (HWND hwnd, UINT width, UINT height)
 
         m_animationSystem->SetDpiScale   (dpiScale);
         m_densityController->SetDpiScale (dpiScale);
+    }
+
+    // Engage the frame limiter when this monitor's native refresh exceeds
+    // 60 Hz so we do not pay the full bloom pipeline cost 144 times per
+    // second on a high-refresh display.  At <=60 Hz the limiter is left
+    // unconstructed and the render loop pays zero per-frame overhead for
+    // the cap check (FR-018).
+    {
+        HMONITOR        hMon = MonitorFromWindow (hwnd, MONITOR_DEFAULTTONEAREST);
+        MONITORINFOEXW  mi   = {};
+        DEVMODEW        dm   = {};
+
+        mi.cbSize = sizeof (mi);
+        dm.dmSize = sizeof (dm);
+
+        if (hMon && GetMonitorInfoW (hMon, &mi) &&
+            EnumDisplaySettingsW (mi.szDevice, ENUM_CURRENT_SETTINGS, &dm))
+        {
+            unsigned refreshHz = static_cast<unsigned> (dm.dmDisplayFrequency);
+
+            if (ShouldEngageFrameLimiter (refreshHz))
+            {
+                m_frameLimiter.emplace (60);
+            }
+        }
     }
 
 
@@ -334,6 +360,14 @@ void MonitorRenderContext::RenderThreadProc()
 
     while (!m_shouldStop)
     {
+        // High-refresh frame cap: when this monitor's native refresh is
+        // > 60 Hz the limiter throttles the loop to 60 fps.  At <=60 Hz
+        // m_frameLimiter is empty and this is a single nullopt check.
+        if (m_frameLimiter)
+        {
+            m_frameLimiter->WaitForNextFrame();
+        }
+
         auto  currentTime = steady_clock::now();
         float deltaTime   = duration_cast<duration<float>> (currentTime - lastFrameTime).count();
         lastFrameTime     = currentTime;
@@ -383,6 +417,9 @@ void MonitorRenderContext::RenderThreadProc()
         m_animationSystem->SetAnimationSpeed (snapshot.animationSpeedPercent);
         m_renderSystem->SetGlowIntensity     (snapshot.glowIntensityPercent);
         m_renderSystem->SetGlowSize          (snapshot.glowSizePercent);
+        m_renderSystem->SetBlurPasses        (snapshot.blurPasses);
+        m_renderSystem->SetBloomResolution   (static_cast<int> (snapshot.bloomResolutionDivisor));
+        m_renderSystem->SetBlurTaps          (static_cast<int> (snapshot.blurTaps));
 
         // Update/Render hold the overlay lock (primary only); Present is kept
         // OUTSIDE it so the UI thread's Show/Dismiss is never blocked by VSync.
@@ -398,7 +435,24 @@ void MonitorRenderContext::RenderThreadProc()
             Render (snapshot);
         }
 
-        m_renderSystem->Present();
+        HRESULT presentHr = m_renderSystem->Present();
+
+        if (IsDeviceLost (presentHr))
+        {
+            // GPU is gone (driver reset, removal, sleep/resume).  Stop this
+            // render thread immediately and ask the UI thread to rebuild
+            // every context on whatever adapter is currently available.
+            // Post WM_APP_DEVICE_LOST (not WM_APP_REBUILD_CONTEXTS directly)
+            // so Application::HandleMessage routes the request through the
+            // RebuildCoalescer — an N-monitor burst then collapses to a
+            // single rebuild instead of N back-to-back rebuilds.
+            if (m_hwnd)
+            {
+                PostMessageW (m_hwnd, Application::WM_APP_DEVICE_LOST, 0, 0);
+            }
+
+            break;
+        }
     }
 }
 
