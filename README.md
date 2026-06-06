@@ -29,6 +29,7 @@ I built this Win32/DirectX C++ Matrix-rain screensaver/demo as a test project to
 
 | Version | Highlights |
 | :---: | :--- |
+| **1.4** | Performance optimization release — pick which GPU to render on, plus Quality presets (Low/Medium/High/Custom with per-knob infotips) to dial back GPU load. Adds live multi-monitor toggle, frame cap on >60 Hz displays, and a themed two-column dialog overhaul |
 | **1.3** | Multi-monitor support — independent, DPI-aware Matrix rain on every connected display in fullscreen and screensaver modes |
 | **1.2** | Screensaver install/uninstall (`/install`, `/uninstall`) with UAC elevation and Group Policy detection |
 | **1.1** | In-app overlays — usage dialog (`/?`), startup help hint, and `?` hotkey reference; multi-pass bloom glow with live glow-size control |

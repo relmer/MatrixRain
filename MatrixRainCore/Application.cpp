@@ -1243,6 +1243,18 @@ LRESULT Application::HandleMessage (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM 
             }
             return 0;
 
+        case WM_APP_DEVICE_LOST:
+            // Per-monitor render thread reported Present() returned a
+            // device-lost HRESULT.  Device removal usually hits every
+            // monitor's render thread within milliseconds of each other, so
+            // funnel through the coalescer the same way WM_DISPLAYCHANGE
+            // does to avoid N back-to-back full-rebuild cycles.
+            if (m_rebuildCoalescer.RequestRebuild() && m_hwnd)
+            {
+                PostMessageW (m_hwnd, WM_APP_REBUILD_CONTEXTS, 0, 0);
+            }
+            return 0;
+
         default:
             return DefWindowProc (hwnd, uMsg, wParam, lParam);
     }

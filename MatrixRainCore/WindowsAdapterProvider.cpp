@@ -58,6 +58,7 @@ std::vector<AdapterInfo> WindowsAdapterProvider::EnumerateAdapters() const
     std::vector<AdapterInfo>              adapters;
     std::optional<LUID>                   defaultLuid;
     UINT                                  index          = 0;
+    bool                                  dxgiFailure    = false;
 
 
     hr = CreateDXGIFactory1 (IID_PPV_ARGS (&pFactory));
@@ -81,7 +82,15 @@ std::vector<AdapterInfo> WindowsAdapterProvider::EnumerateAdapters() const
             break;
         }
 
-        CBREx (SUCCEEDED (hr), S_OK);
+        if (FAILED (hr))
+        {
+            // Per contracts/adapter-provider.md: on any DXGI failure return
+            // an empty vector (callers then use the system default-adapter
+            // path).  Latch the failure and bail out of the loop; the
+            // cleared `adapters` happens at the Error: label below.
+            dxgiFailure = true;
+            break;
+        }
 
         hr = pAdapter->GetDesc1 (&desc);
 
@@ -104,5 +113,10 @@ std::vector<AdapterInfo> WindowsAdapterProvider::EnumerateAdapters() const
 
 
 Error:
+    if (dxgiFailure)
+    {
+        adapters.clear();
+    }
+
     return adapters;
 }

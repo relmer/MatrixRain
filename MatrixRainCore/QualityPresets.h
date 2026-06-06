@@ -68,65 +68,29 @@ bool operator== (const AdvancedGraphicsValues & a, const AdvancedGraphicsValues 
 bool operator!= (const AdvancedGraphicsValues & a, const AdvancedGraphicsValues & b);
 
 
-
-
-////////////////////////////////////////////////////////////////////////////////
-//
-//  LookupPresetValues
-//
-//  Returns the values for a named preset.  Passing Custom is a precondition
-//  violation (assert in debug, fall back to High row in release).
-//
-////////////////////////////////////////////////////////////////////////////////
-
+// Returns the values for a named preset.  Passing Custom is a precondition
+// violation (assert in debug, fall back to High row in release).
 AdvancedGraphicsValues LookupPresetValues (QualityPreset preset);
 
 
-
-
-////////////////////////////////////////////////////////////////////////////////
-//
-//  DetectActivePreset
-//
-//  Returns the named preset whose row exactly matches the given advanced
-//  values, or Custom if no named preset matches.
-//
-////////////////////////////////////////////////////////////////////////////////
-
+// Returns the named preset whose row exactly matches the given advanced
+// values, or Custom if no named preset matches.
 QualityPreset DetectActivePreset (const AdvancedGraphicsValues & current);
 
 
-
-
-////////////////////////////////////////////////////////////////////////////////
-//
-//  ApplyPresetSnap
-//
-//  Computes new advanced values when the user changes the preset combo:
+// Computes new advanced values when the user changes the preset combo:
 //   - Named preset            -> the preset's lookup row.
 //   - Custom + lastCustom set -> the saved LastCustom values.
 //   - Custom + no LastCustom  -> current unchanged.
-//
-////////////////////////////////////////////////////////////////////////////////
-
 AdvancedGraphicsValues ApplyPresetSnap (QualityPreset                              preset,
                                         const AdvancedGraphicsValues             & current,
                                         const std::optional<AdvancedGraphicsValues> & lastCustom);
 
 
-
-
-////////////////////////////////////////////////////////////////////////////////
-//
-//  PickDefaultQualityPreset
-//
-//  First-run heuristic (runs only when no QualityPreset is saved).
+// First-run heuristic (runs only when no QualityPreset is saved).
 //   - Any discrete adapter (>=256 MB dedicated VRAM, not software) -> High
 //   - Integrated only, totalMonitorPixels <= 16M                    -> Medium
 //   - Integrated only, totalMonitorPixels  > 16M (~ 2x 4K)          -> Low
-//
-////////////////////////////////////////////////////////////////////////////////
-
 QualityPreset PickDefaultQualityPreset (const std::vector<AdapterInfo> & adapters,
                                         uint64_t                          totalMonitorPixels);
 
