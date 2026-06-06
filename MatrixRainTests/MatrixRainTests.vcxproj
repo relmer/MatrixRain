@@ -316,6 +316,7 @@
     <ClCompile Include="unit\FPSCounterTests.cpp" />
     <ClCompile Include="unit\MonitorRenderContextFpsPublisherTests.cpp" />
     <ClCompile Include="unit\RenderSystemBloomBypassTests.cpp" />
+    <ClCompile Include="unit\RenderSystemScanlineBypassTests.cpp" />
     <ClCompile Include="unit\UsageTextTests.cpp" />
     <ClCompile Include="unit\OverlayHelpHintTests.cpp" />
     <ClCompile Include="unit\OverlayHotkeyTests.cpp" />

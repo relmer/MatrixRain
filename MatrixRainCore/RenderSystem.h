@@ -62,6 +62,42 @@ inline bool ShouldRunBloomPass (const RenderParams & params) noexcept
     return params.glowEnabled;
 }
 
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  ShouldRunScanlinePass — pure helper consulted by RenderSystem::Render and
+//  unit-tested in RenderSystemScanlineBypassTests.cpp.  Returns true only
+//  when scanlines are enabled AND the bloom pipeline is also running.  Per
+//  the v1.5 user spec (mini-phase 2.5 sibling decision), scanlines are
+//  bypassed whenever Glow Enabled is OFF — the bloom composite is the host
+//  of the post-bloom-target plumbing the scanline pass samples from.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+inline bool ShouldRunScanlinePass (const RenderParams & params) noexcept
+{
+    return params.scanlinesEnabled && params.glowEnabled;
+}
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  ScanlineCb — CPU mirror of the HLSL `cbuffer ScanlineCb : register(b0)`
+//  in `MatrixRainCore/Shaders/scanlines.hlsl`.  16 bytes, single-register;
+//  uploaded once per frame via Map/Unmap (D3D11_MAP_WRITE_DISCARD).  See
+//  contracts/scanline-shader.md for the layout contract.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+struct alignas (16) ScanlineCb
+{
+    float intensity;
+    float linesPerHeight;
+    float _padding0;
+    float _padding1;
+};
+static_assert (sizeof (ScanlineCb) == 16, "ScanlineCb must match HLSL b0 register size");
+
 ////////////////////////////////////////////////////////////////////////////////
 //
 //  RenderSystem
@@ -172,6 +208,9 @@ private:
     HRESULT CreateInstanceBuffer();
     HRESULT CreateConstantBuffer();
     HRESULT CreateBloomConstantBuffer();
+    HRESULT CreateScanlineConstantBuffer();
+    HRESULT UploadScanlineConstants     (const RenderParams & params);
+    HRESULT ApplyScanlinePass();
     HRESULT CreateBlendState();
     HRESULT CreateSamplerState();
     HRESULT CreateDirect2DResources();
@@ -190,7 +229,7 @@ private:
     void    BuildOverlayInstances    (std::span<const HintCharacter> chars, float charScale, float baseY, float cellHeight, std::span<const float> xPositions, float advanceScale);
     void    RenderOverlayInstances   ();
     void    RenderTwoColumnOverlay   (std::span<const HintCharacter> chars, int marginCols, int keyColChars, int gapChars, int numRows, float cellHeight, float padding);
-    HRESULT ApplyBloom();
+    HRESULT ApplyBloom (ID3D11RenderTargetView * pCompositeTarget);
     void    RenderFullscreenPass     (ID3D11RenderTargetView * pRenderTarget, ID3D11PixelShader * pPixelShader, ID3D11ShaderResourceView * const * ppShaderResources, UINT numResources);
     void    SetRenderPipelineState   (ID3D11InputLayout * pInputLayout, D3D11_PRIMITIVE_TOPOLOGY topology, ID3D11Buffer * pVertexBuffer, UINT stride, ID3D11VertexShader * pVertexShader, ID3D11Buffer * pConstantBuffer, ID3D11PixelShader * pPixelShader);
     void    SetViewport              (UINT width, UINT height);
@@ -229,6 +268,17 @@ private:
     ComPtr<ID3D11Texture2D>           m_blurTempTexture;
     ComPtr<ID3D11RenderTargetView>    m_blurTempRTV;
     ComPtr<ID3D11ShaderResourceView>  m_blurTempSRV;
+
+    // v1.5 (T051, contracts/scanline-shader.md): post-bloom intermediate
+    // backbuffer-sized render target.  When the scanline pass is active,
+    // the bloom composite (or, for the glow-off bypass branch, the
+    // direct scene copy) writes here instead of the swapchain backbuffer;
+    // the scanline PS then samples this SRV and writes to the swapchain
+    // backbuffer.  Recreated alongside the bloom resources on Resize.
+    ComPtr<ID3D11Texture2D>           m_postBloomTexture;
+    ComPtr<ID3D11RenderTargetView>    m_postBloomRTV;
+    ComPtr<ID3D11ShaderResourceView>  m_postBloomSRV;
+
     ComPtr<ID3D11PixelShader>         m_bloomExtractPS;
     ComPtr<ID3D11PixelShader>         m_blurHorizontalPS;
     ComPtr<ID3D11PixelShader>         m_blurHorizontalPS9;
@@ -238,6 +288,13 @@ private:
     ComPtr<ID3D11PixelShader>         m_blurVerticalPS5;
     ComPtr<ID3D11PixelShader>         m_compositePS;
     ComPtr<ID3D11PixelShader>         m_haloPS;
+
+    // v1.5 (T051): scanline post-pass shader + its 16-byte cbuffer (b0).
+    // m_scanlinePS is left null on init-time compile failure — render-time
+    // checks fall through to skipping the scanline pass entirely without
+    // disabling the user-facing controls (FR-028b: silent bypass).
+    ComPtr<ID3D11PixelShader>         m_scanlinePS;
+    ComPtr<ID3D11Buffer>              m_scanlineConstantBuffer;
     ComPtr<ID3D11Buffer>              m_fullscreenQuadVB;
     ComPtr<ID3D11Buffer>              m_haloConstantBuffer;
     ComPtr<ID3D11Buffer>              m_bloomConstantBuffer;
