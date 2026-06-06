@@ -2248,6 +2248,20 @@ static int CALLBACK PropSheetCallback (HWND hSheet, UINT uMsg, LPARAM lParam)
 
             pContext->m_hSheet = hSheet;
 
+            {
+                LONG_PTR exStyle = GetWindowLongPtrW (hSheet, GWL_EXSTYLE);
+
+
+                SetWindowLongPtrW (hSheet, GWL_EXSTYLE, exStyle & ~WS_EX_CONTEXTHELP);
+                SetWindowPos (hSheet,
+                              nullptr,
+                              0,
+                              0,
+                              0,
+                              0,
+                              SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
+            }
+
             // Update Application's "current dialog" pointer to the sheet
             // frame so the main message loop's IsDialogMessage branch picks
             // up Tab/Enter routing correctly (T031, research.md R1).
