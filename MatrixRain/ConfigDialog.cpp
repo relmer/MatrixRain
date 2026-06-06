@@ -849,12 +849,32 @@ struct ColorSchemeEntry
 
 static constexpr ColorSchemeEntry s_colorSchemeEntries[] =
 {
-    { L"green", L"Green" },
-    { L"blue",  L"Blue"  },
-    { L"red",   L"Red"   },
-    { L"amber", L"Amber" },
-    { L"cycle", L"Cycle" },
+    { L"green",  L"Green"     },
+    { L"blue",   L"Blue"      },
+    { L"red",    L"Red"       },
+    { L"amber",  L"Amber"     },
+    { L"cycle",  L"Cycle"     },
+    { L"custom", L"Custom\u2026" }, // 6th entry per T063 (FR-006 / FR-029)
 };
+
+// US5 (T064): the index of "Custom" in s_colorSchemeEntries — used by
+// OnColorSchemeChange to recognise the user picked it (opens chooser)
+// and by the combo subclass for same-item re-click detection.
+static constexpr int kCustomColorComboIndex = 5;
+
+// US5 (T064, research.md R4): per-page tracking of the last combo
+// selection observed by the subclass.  Lets us distinguish "user
+// picked a different item" (CBN_SELCHANGE will fire) from "user re-
+// clicked the same Custom entry" (CBN_SELCHANGE WON'T fire, but we
+// still want to re-open the chooser).  Stored on the page HWND via
+// SetPropW so the subclass + WM_COMMAND handler can share state.
+static constexpr const wchar_t kLastColorComboIndexProp[] = L"MatrixRainLastColIdx";
+
+// US5 (T064): WM_APP messages used by the combo subclass to defer
+// chooser invocation out of the comctl mouse/key dispatch (calling
+// ChooseColorW inside the message handler would deadlock the modal
+// owner).  Posted from the subclass, handled in PageDlgProc.
+#define WM_APP_OPEN_CUSTOM_COLOR_CHOOSER (WM_APP + 51)
 
 
 
@@ -887,14 +907,138 @@ static int ColorSchemeKeyToIndex (const std::wstring & key)
 
 static void InitializeColorSchemeCombo (HWND hDlg, const std::wstring & currentScheme)
 {
+    int initialIndex = ColorSchemeKeyToIndex (currentScheme);
+
+
     for (const ColorSchemeEntry & entry : s_colorSchemeEntries)
     {
         SendDlgItemMessageW (hDlg, IDC_COLORSCHEME_COMBO, CB_ADDSTRING, 0, (LPARAM) entry.label);
     }
 
-    SendDlgItemMessageW (hDlg, IDC_COLORSCHEME_COMBO, CB_SETCURSEL, ColorSchemeKeyToIndex (currentScheme), 0);
+    SendDlgItemMessageW (hDlg, IDC_COLORSCHEME_COMBO, CB_SETCURSEL, initialIndex, 0);
+
+    // T064 (US5, research.md R4): track the last selected index so the
+    // combo subclass can detect same-item re-click on Custom (CBN_SELCHANGE
+    // doesn't fire when the user re-commits the already-selected entry,
+    // but we still want to re-open the chooser per the colour-picker UX
+    // convention).  Stored +1 so a missing/cleared prop reads as 0 ≠ 0+1.
+    SetPropW (hDlg, kLastColorComboIndexProp,
+              reinterpret_cast<HANDLE> (static_cast<INT_PTR> (initialIndex + 1)));
 }
 
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  OpenCustomColorChooser (T065, FR-029, FR-030, FR-031, FR-032, FR-035)
+//
+//  Modal Win32 ChooseColorW.  Pre-populates rgbResult from the controller's
+//  current m_customColor (RGB(0,255,0) on first launch), seeds lpCustColors
+//  with the 16-swatch palette from settings, opens with CC_FULLOPEN so the
+//  user sees the full editor pane.  On OK: unconditionally writes back the
+//  palette (FR-035 -- swatch edits persist even on outer Cancel), updates
+//  the active CustomColor, and switches scheme to Custom for live preview.
+//  On Cancel: no writes.  Returns true iff the user clicked OK.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+static bool OpenCustomColorChooser (HWND hOwnerPage)
+{
+    ConfigDialogController * pController = GetControllerFromDialog (hOwnerPage);
+
+
+
+    if (!pController)
+    {
+        return false;
+    }
+
+
+    ScreenSaverSettings  workingPalette = pController->GetSettings();
+    CHOOSECOLORW         cc             = {};
+    bool                 accepted       = false;
+
+    cc.lStructSize  = sizeof (cc);
+    cc.hwndOwner    = GetParent (hOwnerPage) ? GetParent (hOwnerPage) : hOwnerPage;
+    cc.rgbResult    = workingPalette.m_customColor;
+    cc.lpCustColors = workingPalette.m_customColorPalette.data();
+    cc.Flags        = CC_FULLOPEN | CC_RGBINIT | CC_ANYCOLOR;
+
+    if (ChooseColorW (&cc))
+    {
+        // Palette FIRST so a subsequent commit (Apply) persists swatch
+        // edits even if the user later switches the scheme away from
+        // Custom (FR-035 unconditional persistence carve-out).
+        pController->SetCustomColorPalette (workingPalette.m_customColorPalette);
+
+        pController->UpdateCustomColor (cc.rgbResult);
+        pController->UpdateColorScheme (L"custom");
+
+        accepted = true;
+    }
+
+    return accepted;
+}
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  ColorComboSubclass (T064, research.md R4)
+//
+//  Intercepts WM_LBUTTONUP / WM_KEYUP(VK_RETURN) BEFORE the combo's
+//  default proc closes the dropdown.  If the dropdown was open AND the
+//  user committed the Custom entry (whether by mouse or keyboard,
+//  whether selection changed or not), post WM_APP_OPEN_CUSTOM_COLOR_CHOOSER
+//  to the parent so the chooser opens out-of-line of this dispatch
+//  (calling ChooseColorW inline would re-enter comctl's message loop
+//  mid-dispatch).  This catches the same-item re-click case that
+//  CBN_SELCHANGE misses (decision in commit aa8648e).
+//
+////////////////////////////////////////////////////////////////////////////////
+
+static constexpr UINT_PTR kColorComboSubclassId = 0xC0C00C3Eu;
+
+
+static LRESULT CALLBACK ColorComboSubclassProc (HWND      hCombo,
+                                                  UINT      msg,
+                                                  WPARAM    wParam,
+                                                  LPARAM    lParam,
+                                                  UINT_PTR  uIdSubclass,
+                                                  DWORD_PTR /*dwRefData*/)
+{
+    bool checkCommit = false;
+    bool wasOpen     = false;
+
+
+    if (msg == WM_LBUTTONUP || (msg == WM_KEYUP && wParam == VK_RETURN))
+    {
+        wasOpen     = (SendMessageW (hCombo, CB_GETDROPPEDSTATE, 0, 0) != FALSE);
+        checkCommit = true;
+    }
+
+    LRESULT result = DefSubclassProc (hCombo, msg, wParam, lParam);
+
+    if (checkCommit && wasOpen)
+    {
+        LRESULT sel = SendMessageW (hCombo, CB_GETCURSEL, 0, 0);
+
+
+        if (sel == kCustomColorComboIndex)
+        {
+            PostMessageW (GetParent (hCombo), WM_APP_OPEN_CUSTOM_COLOR_CHOOSER, 0, 0);
+        }
+    }
+
+    if (msg == WM_NCDESTROY)
+    {
+        RemoveWindowSubclass (hCombo, ColorComboSubclassProc, uIdSubclass);
+    }
+
+    return result;
+}
 
 
 
@@ -1010,6 +1154,20 @@ static BOOL OnInitDialog (HWND hDlg, LPARAM initParam)
     
     InitializeColorSchemeCombo (hDlg, pSettings->m_colorSchemeKey);
     InitializeGpuCombo         (hDlg, pContext, pSettings->m_gpuAdapter);
+
+    // T064 (US5, research.md R4): subclass the color combo to catch
+    // same-item re-click on Custom (CBN_SELCHANGE doesn't fire for
+    // re-commits of the already-selected entry).  Only the Visuals
+    // page has IDC_COLORSCHEME_COMBO; GetDlgItem returns null on the
+    // Performance page so SetWindowSubclass quietly no-ops.
+    {
+        HWND hCombo = GetDlgItem (hDlg, IDC_COLORSCHEME_COMBO);
+
+        if (hCombo)
+        {
+            SetWindowSubclass (hCombo, ColorComboSubclassProc, kColorComboSubclassId, 0);
+        }
+    }
 
     // Quality preset slider (0=Low, 1=Medium, 2=High, 3=Custom).
     SendDlgItemMessageW (hDlg, IDC_QUALITY_PRESET_SLIDER, TBM_SETRANGE,   TRUE, MAKELPARAM (0, 3));
@@ -1245,6 +1403,7 @@ static void OnColorSchemeChange (HWND hDlg)
     HRESULT                  hr          = S_OK;
     ConfigDialogController * pController = GetControllerFromDialog (hDlg);
     int                      index       = 0;
+    int                      priorIndex  = 0;
 
 
 
@@ -1254,7 +1413,29 @@ static void OnColorSchemeChange (HWND hDlg)
 
     CBRAEx (index >= 0 && index < static_cast<int> (ARRAYSIZE (s_colorSchemeEntries)), E_UNEXPECTED);
 
-    pController->UpdateColorScheme (s_colorSchemeEntries[index].key);
+    // T064 (US5, FR-029): selecting "Custom..." opens the chooser before
+    // committing the scheme.  If the user cancels, revert the combo to
+    // the previously selected scheme — they explicitly opted out.  The
+    // chooser invocation runs out-of-line via WM_APP_OPEN_CUSTOM_COLOR_CHOOSER
+    // so the modal doesn't re-enter the CBN_SELCHANGE dispatch.
+    priorIndex = static_cast<int> (reinterpret_cast<INT_PTR> (GetPropW (hDlg, kLastColorComboIndexProp))) - 1;
+
+    if (index == kCustomColorComboIndex)
+    {
+        PostMessageW (hDlg, WM_APP_OPEN_CUSTOM_COLOR_CHOOSER, 0, 0);
+        // Don't update controller yet — defer to the chooser-OK path.
+        // Last-index is NOT updated here either; the post-handler updates
+        // it after the chooser closes (revert path or accept path).
+    }
+    else
+    {
+        pController->UpdateColorScheme (s_colorSchemeEntries[index].key);
+
+        SetPropW (hDlg, kLastColorComboIndexProp,
+                  reinterpret_cast<HANDLE> (static_cast<INT_PTR> (index + 1)));
+    }
+
+    UNREFERENCED_PARAMETER (priorIndex);
 
 Error:
     return;
@@ -1492,6 +1673,15 @@ static void ResyncPageFromSettings (HWND hDlg, const ScreenSaverSettings & setti
 
     schemeIndex = ColorSchemeKeyToIndex (settings.m_colorSchemeKey);
     SendDlgItemMessageW (hDlg, IDC_COLORSCHEME_COMBO, CB_SETCURSEL, schemeIndex, 0);
+
+    // Refresh the last-selection tracker so the next OnColorSchemeChange
+    // reads a sane prior value (the Reset button doesn't pass through
+    // OnColorSchemeChange).
+    if (GetDlgItem (hDlg, IDC_COLORSCHEME_COMBO))
+    {
+        SetPropW (hDlg, kLastColorComboIndexProp,
+                  reinterpret_cast<HANDLE> (static_cast<INT_PTR> (schemeIndex + 1)));
+    }
 
     // Scanline controls (Visuals tab).
     SendDlgItemMessageW (hDlg, IDC_SCANLINES_INTENSITY_SLIDER, TBM_SETPOS, TRUE, settings.m_scanlinesIntensity);
@@ -1878,6 +2068,42 @@ static INT_PTR CALLBACK PageDlgProc (HWND   hDlg,
             if (pContext && pContext->m_controller)
             {
                 ResyncPageFromSettings (hDlg, pContext->m_controller->GetSettings());
+            }
+
+            result = TRUE;
+            break;
+        }
+
+        case WM_APP_OPEN_CUSTOM_COLOR_CHOOSER:
+        {
+            // T064/T065 (US5): the Color combo subclass posted this
+            // (same-item re-click) OR the CBN_SELCHANGE handler did
+            // (initial selection of Custom).  Both paths open the
+            // modal chooser; on Cancel we revert the combo to the
+            // previously selected scheme.  On OK, the controller is
+            // already updated by OpenCustomColorChooser; reflect the
+            // new selection index in our last-selection tracker.
+            bool accepted = OpenCustomColorChooser (hDlg);
+
+
+            if (accepted)
+            {
+                SendDlgItemMessageW (hDlg, IDC_COLORSCHEME_COMBO,
+                                     CB_SETCURSEL, kCustomColorComboIndex, 0);
+                SetPropW (hDlg, kLastColorComboIndexProp,
+                          reinterpret_cast<HANDLE> (static_cast<INT_PTR> (kCustomColorComboIndex + 1)));
+            }
+            else
+            {
+                int prior = static_cast<int> (reinterpret_cast<INT_PTR> (GetPropW (hDlg, kLastColorComboIndexProp))) - 1;
+
+
+                if (prior < 0 || prior >= static_cast<int> (ARRAYSIZE (s_colorSchemeEntries)))
+                {
+                    prior = 0;
+                }
+
+                SendDlgItemMessageW (hDlg, IDC_COLORSCHEME_COMBO, CB_SETCURSEL, prior, 0);
             }
 
             result = TRUE;
