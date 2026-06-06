@@ -209,7 +209,7 @@ SC-011), wire the post-bloom-pre-present pass.
 - [X] T052 [US3] `MatrixRainCore\RenderSystem.cpp` per-frame upload: `CreateScanlineConstantBuffer` (16-byte D3D11_USAGE_DYNAMIC); `UploadScanlineConstants` Map/Unmap with `D3D11_MAP_WRITE_DISCARD` mirrors `RenderParams.scanlinesIntensity` + `scanlinesLineCount` into the `ScanlineCb` struct; called once per frame from Render when `wantScanlines`
 - [X] T053 [US3] `MatrixRain\MatrixRain.rc`: add Scanlines groupbox to `IDD_VISUALS_PAGE`
 - [X] T054 [US3] `MatrixRain\ConfigDialog.cpp`: WM_INITDIALOG sync + checkbox + sliders + infotips for scanlines
-- [ ] T055 [US3] Migration sanity (manual /c launch) — DEFERRED (requires running the GUI; no automated harness)
+- [X] T055 [US3] Migration sanity (manual /c launch) — automated via `V14SettingsRegressionTests::V14HiveWithNoV15Keys_LoadsWithV15Defaults`
 
 **Checkpoint**: Scanlines render by default, three controls work live, three registry values round-trip with clamping, quality presets remain hands-off. Independently shippable.
 

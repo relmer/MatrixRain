@@ -215,6 +215,104 @@ namespace MatrixRainTests
                                   L"v1.5 customColorPalette slot persisted");
             }
         }
+
+
+        // T055 (US3 migration sanity): simulates a real v1.4 install whose
+        // registry hive has NONE of the v1.5-added values present.  Writes
+        // only the v1.4 registry-value names directly (bypassing
+        // RegistrySettingsProvider::Save, which would emit v1.5 values too),
+        // then loads via the provider and asserts every new v1.5 field
+        // resolves to its documented default — FR-038 / SC-013.
+        //
+        // This is the headless-equivalent of "Launch /c on a v1.4-aged
+        // registry hive and verify the dialog appears with v1.5 defaults
+        // and the rain shows scanlines on first launch".
+        TEST_METHOD (V14HiveWithNoV15Keys_LoadsWithV15Defaults)
+        {
+            HKEY hKey       = nullptr;
+            LONG openResult = RegCreateKeyExW (HKEY_CURRENT_USER,
+                                               TEST_REGISTRY_KEY_PATH,
+                                               0,
+                                               nullptr,
+                                               0,
+                                               KEY_WRITE,
+                                               nullptr,
+                                               &hKey,
+                                               nullptr);
+
+
+            Assert::AreEqual (ERROR_SUCCESS, openResult, L"open test hive");
+
+            // Write only the v1.4 fields directly — emulates an upgrade
+            // from a pre-v1.5 install that never wrote the new values.
+            auto writeDword = [hKey] (LPCWSTR name, DWORD value)
+            {
+                DWORD v = value;
+
+                RegSetValueExW (hKey, name, 0, REG_DWORD,
+                                reinterpret_cast<const BYTE *> (&v), sizeof (v));
+            };
+            auto writeString = [hKey] (LPCWSTR name, LPCWSTR value)
+            {
+                RegSetValueExW (hKey, name, 0, REG_SZ,
+                                reinterpret_cast<const BYTE *> (value),
+                                static_cast<DWORD> ((wcslen (value) + 1) * sizeof (WCHAR)));
+            };
+
+
+            writeDword  (L"Density",         60);
+            writeString (L"ColorScheme",     L"blue");
+            writeDword  (L"AnimationSpeed",  80);
+            writeDword  (L"GlowIntensity",   120);
+            writeDword  (L"GlowSize",        110);
+            writeDword  (L"StartFullscreen", 1);
+            writeDword  (L"MultiMonitor",    1);
+            writeString (L"GpuAdapter",      L"Intel UHD Graphics");
+            writeString (L"QualityPreset", L"Medium");
+
+            RegCloseKey (hKey);
+
+            // Act: load via the provider.
+            ScreenSaverSettings loaded;
+
+            Assert::AreEqual (S_OK, m_provider.Load (loaded));
+
+            // Assert: v1.4 fields preserved.
+            Assert::AreEqual (60,                              loaded.m_densityPercent,        L"v1.4 density preserved");
+            Assert::AreEqual (std::wstring (L"blue"),          loaded.m_colorSchemeKey,        L"v1.4 colorScheme preserved");
+            Assert::AreEqual (80,                              loaded.m_animationSpeedPercent, L"v1.4 animSpeed preserved");
+            Assert::AreEqual (120,                             loaded.m_glowIntensityPercent,  L"v1.4 glowIntensity preserved");
+            Assert::AreEqual (110,                             loaded.m_glowSizePercent,       L"v1.4 glowSize preserved");
+            Assert::IsTrue   (loaded.m_startFullscreen,                                        L"v1.4 startFullscreen preserved");
+            Assert::IsTrue   (loaded.m_multiMonitorEnabled,                                    L"v1.4 multiMonitor preserved");
+            Assert::AreEqual (std::wstring (L"Intel UHD Graphics"), loaded.m_gpuAdapter,       L"v1.4 gpuAdapter preserved");
+            Assert::IsTrue   (QualityPreset::Medium == loaded.m_qualityPreset,                 L"v1.4 qualityPreset preserved");
+
+            // Assert: v1.5 fields land at documented defaults.
+            //   FR-020 / FR-038: glow ON by default
+            //   SC-013        : scanlines ON by default (intentional break
+            //                   from the no-visible-change-on-upgrade rule)
+            Assert::IsTrue   (loaded.m_glowEnabled,                                            L"v1.5 glowEnabled defaults true (FR-038)");
+            Assert::IsTrue   (loaded.m_scanlinesEnabled,                                       L"v1.5 scanlinesEnabled defaults true (SC-013)");
+            Assert::AreEqual (ScreenSaverSettings::DEFAULT_SCANLINES_INTENSITY_PERCENT,
+                              loaded.m_scanlinesIntensity,
+                              L"v1.5 scanlinesIntensity defaults to documented value");
+            Assert::AreEqual (ScreenSaverSettings::DEFAULT_SCANLINES_STYLE,
+                              loaded.m_scanlinesStyle,
+                              L"v1.5 scanlinesStyle defaults to documented value");
+            Assert::AreEqual (static_cast<DWORD> (ScreenSaverSettings::DEFAULT_CUSTOM_COLOR),
+                              static_cast<DWORD> (loaded.m_customColor),
+                              L"v1.5 customColor defaults to RGB(0,255,0)");
+
+            // Palette zero-init means "no saved palette" — the chooser
+            // will seed from the system defaults on first open.
+            for (size_t i = 0; i < loaded.m_customColorPalette.size(); i++)
+            {
+                Assert::AreEqual (static_cast<DWORD> (0),
+                                  static_cast<DWORD> (loaded.m_customColorPalette[i]),
+                                  L"v1.5 customColorPalette slot zero-initialised");
+            }
+        }
     };
 
 
