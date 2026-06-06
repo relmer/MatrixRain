@@ -54,6 +54,7 @@ struct DialogContext
     HWND                                      m_hSheet              = nullptr;
     bool                                      m_applied             = false;
     bool                                      m_rolledBack          = false;
+    bool                                      m_isModeless          = false;
     WCHAR                                     m_perfTitleFormat[64] = {};
 };
 
@@ -2013,6 +2014,11 @@ static INT_PTR CALLBACK PageDlgProc (HWND   hDlg,
                         {
                             pController->ApplyChanges();
                         }
+
+                        if (pContext->m_isModeless)
+                        {
+                            DestroyWindow (GetParent (hDlg));
+                        }
                     }
                     SetWindowLongPtr (hDlg, DWLP_MSGRESULT, PSNRET_NOERROR);
                     result = TRUE;
@@ -2038,6 +2044,11 @@ static INT_PTR CALLBACK PageDlgProc (HWND   hDlg,
                         else
                         {
                             pController->CancelChanges();
+                        }
+
+                        if (pContext->m_isModeless)
+                        {
+                            DestroyWindow (GetParent (hDlg));
                         }
                     }
                     // Explicitly allow the cancel to proceed.  PSN_RESET's
@@ -2349,6 +2360,8 @@ static void BuildPropSheet (HINSTANCE         hInstance,
     psPages[1].pszTitle     = MAKEINTRESOURCEW (IDS_PERFORMANCE_TAB_TITLE_INITIAL);
     psPages[1].pfnDlgProc   = PageDlgProc;
     psPages[1].lParam       = reinterpret_cast<LPARAM> (pContext);
+
+    pContext->m_isModeless  = modeless;
 
     psHeader                = {};
     psHeader.dwSize         = sizeof (PROPSHEETHEADERW);
