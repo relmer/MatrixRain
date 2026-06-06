@@ -256,7 +256,7 @@ v1.3/v1.4 users in the CHANGELOG, with the one-click disable path.
 upgrade note mentioning the default-on scanlines change and the disable
 path `Visuals → Scanlines Enabled → OFF`.
 
-- [ ] T067 [US6] `CHANGELOG.md`: add v1.5 entry calling out (a) the intentional visible change on upgrade (existing installs see scanlines render on first launch because `ScanlinesEnabled` defaults to ON), (b) the one-click disable path (Visuals tab → Scanlines Enabled → OFF), (c) summary of other v1.5 features (two-tab property sheet, Glow Enabled toggle, Custom color picker, fade-timer overlay removal). Tone per .github/copilot-instructions.md — neutral and professional (NOT snarky) for artifacts (FR-028, SC-013, quickstart §US6)
+- [X] T067 [US6] `CHANGELOG.md`: add v1.5 entry calling out (a) the intentional visible change on upgrade (existing installs see scanlines render on first launch because `ScanlinesEnabled` defaults to ON), (b) the one-click disable path (Visuals tab → Scanlines Enabled → OFF), (c) summary of other v1.5 features (two-tab property sheet, Glow Enabled toggle, Custom color picker, fade-timer overlay removal). Tone per .github/copilot-instructions.md — neutral and professional (NOT snarky) for artifacts (FR-028, SC-013, quickstart §US6)
 
 **Checkpoint**: Upgrade message in place for the v1.5 release.
 
