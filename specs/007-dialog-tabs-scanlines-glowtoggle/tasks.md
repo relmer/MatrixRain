@@ -92,6 +92,32 @@ slate. Per research.md R8, this is purely deletions with one new test
 
 ---
 
+## Phase 2.5: Mini — Performance-Page Layout Rework + Cross-Page Reset Button
+
+**Goal**: User-driven layout polish on the Performance tab + relocate the
+Reset button to the property-sheet frame so it spans both tabs. Three
+display-only renames (registry value names unchanged).
+
+**Independent Test**: Performance tab matches the spec layout (no group-
+box, top-to-bottom: Use all monitors → Enable glow → GPU → blank →
+quality cluster → blank → Show performance metrics); the "Reset to
+defaults" button is visible footer-left on the sheet frame on every
+tab; clicking Reset snaps both pages' controls back to defaults AND
+the live preview updates instantly.
+
+- [X] T2.5.1 `MatrixRain\MatrixRain.rc`: rewrite `IDD_PERFORMANCE_PAGE` body — remove `IDC_QUALITY_GROUPBOX`, reorder controls per the spec layout, rename `IDC_MULTIMONITOR_CHECK` label "Render on all monitors" → "Use all monitors", rename `IDC_SHOWDEBUG_CHECK` label "Show debug statistics" → "Show performance metrics", remove page-scoped `IDC_RESET_BUTTON` pushbutton (relocated to frame in T2.5.3); `IDC_GLOW_ENABLED_CHECK` label was already "Enable glow"
+- [X] T2.5.2 `MatrixRainTests\unit\ConfigDialogControllerTests.cpp`: add `ResetToDefaults_LiveMode_PushesAllFieldsToSharedState` — enter live mode, mutate every settings field, call `ResetToDefaults`, assert `ApplicationState::GetSettings()` reflects the freshly-reset values (Red)
+- [X] T2.5.3 `MatrixRainCore\ConfigDialogController.cpp`: `ResetToDefaults` pushes the defaults through to `ApplicationState` via `ApplySettings` in live mode (Green for T2.5.2)
+- [X] T2.5.4 `MatrixRain\resource.h`: retire `IDC_QUALITY_GROUPBOX` (1033) and `IDC_RESET_BUTTON` (1013), add `IDC_RESET_DEFAULTS` (1051) for the frame-scope reset pushbutton
+- [X] T2.5.5 `MatrixRain\ConfigDialog.cpp`: define `WM_APP_RESET_RESYNC` (`WM_APP + 50`); add page-agnostic `ResyncPageFromSettings` helper (every `SendDlgItemMessageW` / `CheckDlgButton` is a silent no-op on the page lacking the control); add `WM_APP_RESET_RESYNC` case in `PageDlgProc`
+- [X] T2.5.6 `MatrixRain\ConfigDialog.cpp`: relocate `SheetFrameSubclass` + `kSheetFrameSubclassId` namespace block above `ShowConfigDialog` so the modal trampoline can install it too; add `WM_COMMAND` / `IDC_RESET_DEFAULTS` handler in `SheetFrameSubclass` that calls `controller->ResetToDefaults()`, re-mirrors `ApplyGlowEnabledUI`, and broadcasts `WM_APP_RESET_RESYNC` to every page via `PropSheet_IndexToHwnd`
+- [X] T2.5.7 `MatrixRain\ConfigDialog.cpp`: `CreateFrameResetButton (HWND hSheet)` helper — calculates Reset button rect by mirroring the OK button's right-margin to the left, creates `WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON` "Reset to defaults" parented to the sheet frame, matches OK button's font via `WM_GETFONT` + `WM_SETFONT`; invoked from `PropSheetCallback`'s `PSCB_INITIALIZED` branch (page HWNDs and OK button already exist by then)
+- [X] T2.5.8 `MatrixRain\ConfigDialog.cpp`: install `SheetFrameSubclass` in the modal trampoline (modeless path already installed it); delete the obsolete `OnResetButton` function and its `case IDC_RESET_BUTTON` dispatch in `OnCommand`
+
+**Checkpoint**: Performance tab matches spec layout; Reset button spans both tabs; clicking Reset snaps every control to defaults AND the live preview instantly mirrors the defaults; 435/435 tests green; registry value names unchanged.
+
+---
+
 ## Phase 3: User Story 1 — Property-Sheet Structure + Live Perf Readout (Priority: P1) 🎯 MVP
 
 **Goal**: Convert the single `IDD_MATRIXRAIN_SAVER_CONFIG` dialog into a

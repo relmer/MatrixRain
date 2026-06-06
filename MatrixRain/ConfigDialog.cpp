@@ -79,6 +79,15 @@ static constexpr UINT_PTR kTrackTipUId = 0xC0C00C0Cu;
 // to the tooltip via TTM_RELAYEVENT instead).
 static constexpr UINT_PTR kInfoButtonSubclassId = 0xC0C00C1Bu;
 
+// Mini-phase 2.5 (cross-page Reset button): the property-sheet frame
+// broadcasts this to every page after invoking
+// `ConfigDialogController::ResetToDefaults()` so each page re-reads its
+// own controls from the freshly-reset `controller->GetSettings()`.  The
+// controller has already pushed the defaults through to `ApplicationState`
+// for the live-preview path, so this message is strictly about UI re-sync,
+// not about settings propagation.
+#define WM_APP_RESET_RESYNC (WM_APP + 50)
+
 
 
 
@@ -1341,98 +1350,87 @@ Error:
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-static void OnResetButton (HWND hDlg)
+////////////////////////////////////////////////////////////////////////////////
+//
+//  ResyncPageFromSettings — re-read every control's value from the supplied
+//  settings and update the UI.  Mini-phase 2.5: invoked on the
+//  `WM_APP_RESET_RESYNC` broadcast from the frame's Reset button so a
+//  single click can refresh controls on both tabs without either page
+//  having to know what's on the other.  Page-agnostic by design: each
+//  `GetDlgItem` call returns NULL for IDs not present on this page, so
+//  `SendDlgItemMessageW` / `SetDlgItemTextW` / `CheckDlgButton` are
+//  silent no-ops for the other tab's controls.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+static void ResyncPageFromSettings (HWND hDlg, const ScreenSaverSettings & settings)
 {
-    HRESULT                     hr          = S_OK;
-    ConfigDialogController    * pController = GetControllerFromDialog (hDlg);
-    const ScreenSaverSettings * pDefaults   = nullptr;
-    int                         schemeIndex = 0;
+    int           schemeIndex = 0;
+    DialogContext * pCtx      = GetDialogContext (hDlg);
 
 
 
-    CBRAEx (pController != nullptr, E_UNEXPECTED);
+    // Visuals tab — percent sliders and color combo (silently skipped on
+    // the Performance page since the controls aren't present there).
+    SendDlgItemMessageW (hDlg, IDC_DENSITY_SLIDER,       TBM_SETPOS, TRUE, settings.m_densityPercent);
+    SetDlgItemTextW     (hDlg, IDC_DENSITY_LABEL,        std::format (L"{}%", settings.m_densityPercent).c_str());
 
-    pController->ResetToDefaults();
-    
-    pDefaults = &pController->GetSettings();
-    
-    // Update UI controls
-    SendDlgItemMessageW (hDlg, IDC_DENSITY_SLIDER, TBM_SETPOS, TRUE, pDefaults->m_densityPercent);
-    SetDlgItemTextW     (hDlg, IDC_DENSITY_LABEL, std::format (L"{}%", pDefaults->m_densityPercent).c_str());
-    
-    SendDlgItemMessageW (hDlg, IDC_ANIMSPEED_SLIDER, TBM_SETPOS, TRUE, pDefaults->m_animationSpeedPercent);
-    SetDlgItemTextW     (hDlg, IDC_ANIMSPEED_LABEL, std::format (L"{}%", pDefaults->m_animationSpeedPercent).c_str());
-    
-    SendDlgItemMessageW (hDlg, IDC_GLOWINTENSITY_SLIDER, TBM_SETPOS, TRUE, pDefaults->m_glowIntensityPercent);
-    SetDlgItemTextW     (hDlg, IDC_GLOWINTENSITY_LABEL, std::format (L"{}%", pDefaults->m_glowIntensityPercent).c_str());
-    
-    SendDlgItemMessageW (hDlg, IDC_GLOWSIZE_SLIDER, TBM_SETPOS, TRUE, pDefaults->m_glowSizePercent);
-    SetDlgItemTextW     (hDlg, IDC_GLOWSIZE_LABEL, std::format (L"{}%", pDefaults->m_glowSizePercent).c_str());
-    
-    // Update color scheme combo box
-    schemeIndex = ColorSchemeKeyToIndex (pDefaults->m_colorSchemeKey);
+    SendDlgItemMessageW (hDlg, IDC_ANIMSPEED_SLIDER,     TBM_SETPOS, TRUE, settings.m_animationSpeedPercent);
+    SetDlgItemTextW     (hDlg, IDC_ANIMSPEED_LABEL,      std::format (L"{}%", settings.m_animationSpeedPercent).c_str());
+
+    SendDlgItemMessageW (hDlg, IDC_GLOWINTENSITY_SLIDER, TBM_SETPOS, TRUE, settings.m_glowIntensityPercent);
+    SetDlgItemTextW     (hDlg, IDC_GLOWINTENSITY_LABEL,  std::format (L"{}%", settings.m_glowIntensityPercent).c_str());
+
+    SendDlgItemMessageW (hDlg, IDC_GLOWSIZE_SLIDER,      TBM_SETPOS, TRUE, settings.m_glowSizePercent);
+    SetDlgItemTextW     (hDlg, IDC_GLOWSIZE_LABEL,       std::format (L"{}%", settings.m_glowSizePercent).c_str());
+
+    schemeIndex = ColorSchemeKeyToIndex (settings.m_colorSchemeKey);
     SendDlgItemMessageW (hDlg, IDC_COLORSCHEME_COMBO, CB_SETCURSEL, schemeIndex, 0);
 
-    // v1.4 additions — multimon, GPU, quality preset slider, advanced sliders.
-    CheckDlgButton (hDlg, IDC_MULTIMONITOR_CHECK, pDefaults->m_multiMonitorEnabled ? BST_CHECKED : BST_UNCHECKED);
+    // Scanline controls (Visuals tab).
+    SendDlgItemMessageW (hDlg, IDC_SCANLINES_INTENSITY_SLIDER, TBM_SETPOS, TRUE, settings.m_scanlinesIntensity);
+    SetDlgItemTextW     (hDlg, IDC_SCANLINES_INTENSITY_VALUE,  std::format (L"{}%", settings.m_scanlinesIntensity).c_str());
+    SendDlgItemMessageW (hDlg, IDC_SCANLINES_STYLE_SLIDER,     TBM_SETPOS, TRUE, settings.m_scanlinesStyle);
+    SetDlgItemTextW     (hDlg, IDC_SCANLINES_STYLE_VALUE,      std::format (L"{}", settings.m_scanlinesStyle).c_str());
+    CheckDlgButton      (hDlg, IDC_SCANLINES_ENABLED_CHECK,
+                         settings.m_scanlinesEnabled ? BST_CHECKED : BST_UNCHECKED);
 
+    if (GetDlgItem (hDlg, IDC_SCANLINES_ENABLED_CHECK))
     {
-        DialogContext * pCtx = GetDialogContext (hDlg);
+        ApplyScanlinesEnabledUI (hDlg, settings.m_scanlinesEnabled);
+    }
 
-        if (pCtx)
+    // Performance tab — multimon, glow toggle, GPU combo, quality cluster,
+    // show-metrics toggle.
+    CheckDlgButton (hDlg, IDC_MULTIMONITOR_CHECK,    settings.m_multiMonitorEnabled ? BST_CHECKED : BST_UNCHECKED);
+    CheckDlgButton (hDlg, IDC_SHOWDEBUG_CHECK,       settings.m_showDebugStats      ? BST_CHECKED : BST_UNCHECKED);
+    CheckDlgButton (hDlg, IDC_GLOW_ENABLED_CHECK,    settings.m_glowEnabled         ? BST_CHECKED : BST_UNCHECKED);
+    CheckDlgButton (hDlg, IDC_STARTFULLSCREEN_CHECK, settings.m_startFullscreen     ? BST_CHECKED : BST_UNCHECKED);
+
+    // GPU combo: re-resolve the default-marked entry in the populated list.
+    if (pCtx && GetDlgItem (hDlg, IDC_GPU_COMBO))
+    {
+        int defaultIdx = 0;
+
+
+        for (size_t i = 0; i < pCtx->m_gpuAdapterDescriptions.size(); i++)
         {
-            // Re-resolve the default-marked entry in the existing combo.
-            int defaultIdx = 0;
-
-            for (size_t i = 0; i < pCtx->m_gpuAdapterDescriptions.size(); i++)
+            if (pCtx->m_gpuAdapterDescriptions[i] == settings.m_gpuAdapter)
             {
-                if (pCtx->m_gpuAdapterDescriptions[i] == pDefaults->m_gpuAdapter)
-                {
-                    defaultIdx = static_cast<int> (i);
-                    break;
-                }
+                defaultIdx = static_cast<int> (i);
+                break;
             }
-
-            SendDlgItemMessageW (hDlg, IDC_GPU_COMBO, CB_SETCURSEL, defaultIdx, 0);
         }
+
+        SendDlgItemMessageW (hDlg, IDC_GPU_COMBO, CB_SETCURSEL, defaultIdx, 0);
     }
 
-    SendDlgItemMessageW (hDlg, IDC_QUALITY_PRESET_SLIDER, TBM_SETPOS, TRUE, static_cast<int> (pDefaults->m_qualityPreset));
-    SetDlgItemTextW     (hDlg, IDC_QUALITY_PRESET_LABEL,  FormatQualityPresetLabel (pDefaults->m_qualityPreset));
+    SendDlgItemMessageW (hDlg, IDC_QUALITY_PRESET_SLIDER, TBM_SETPOS, TRUE, static_cast<int> (settings.m_qualityPreset));
+    SetDlgItemTextW     (hDlg, IDC_QUALITY_PRESET_LABEL,  FormatQualityPresetLabel (settings.m_qualityPreset));
 
-    InitializePassesSlider      (hDlg, pDefaults->m_advancedValues.m_blurPasses);
-    InitializeResolutionSlider  (hDlg, static_cast<int> (pDefaults->m_advancedValues.m_bloomResolutionDivisor));
-    InitializeSmoothnessSlider  (hDlg, static_cast<int> (pDefaults->m_advancedValues.m_blurTaps));
-
-    CheckDlgButton (hDlg, IDC_STARTFULLSCREEN_CHECK, pDefaults->m_startFullscreen ? BST_CHECKED : BST_UNCHECKED);
-    CheckDlgButton (hDlg, IDC_SHOWDEBUG_CHECK,       pDefaults->m_showDebugStats  ? BST_CHECKED : BST_UNCHECKED);
-    CheckDlgButton (hDlg, IDC_GLOW_ENABLED_CHECK,    pDefaults->m_glowEnabled     ? BST_CHECKED : BST_UNCHECKED);
-
-    // Re-mirror glow-enabled state into both pages' EnableWindow flags.
-    {
-        HWND hSheet = GetParent (hDlg);
-
-        if (hSheet)
-        {
-            ApplyGlowEnabledUI (hSheet, pDefaults->m_glowEnabled);
-        }
-    }
-    
-    // If live overlay mode, propagate changes to running application
-    // (ResetToDefaults already updated controller settings, now trigger live propagation)
-    CBRAEx (pController != nullptr, E_UNEXPECTED);
-    if (pController->IsLiveMode())
-    {
-        pController->UpdateDensity                (pDefaults->m_densityPercent);
-        pController->UpdateAnimationSpeed         (pDefaults->m_animationSpeedPercent);
-        pController->UpdateGlowIntensity          (pDefaults->m_glowIntensityPercent);
-        pController->UpdateGlowSize               (pDefaults->m_glowSizePercent);
-        pController->UpdateColorScheme            (pDefaults->m_colorSchemeKey.c_str());
-        pController->UpdateAdvancedGraphicsValues (pDefaults->m_advancedValues);
-    }
-
-Error:
-    return;
+    InitializePassesSlider     (hDlg, settings.m_advancedValues.m_blurPasses);
+    InitializeResolutionSlider (hDlg, static_cast<int> (settings.m_advancedValues.m_bloomResolutionDivisor));
+    InitializeSmoothnessSlider (hDlg, static_cast<int> (settings.m_advancedValues.m_blurTaps));
 }
 
 
@@ -1528,10 +1526,6 @@ static BOOL OnCommand (HWND hDlg, WPARAM wParam)
             ApplyScanlinesEnabledUI (hDlg, enabled);
             break;
         }
-            
-        case IDC_RESET_BUTTON:
-            OnResetButton (hDlg);
-            break;
     }
 
 Error:
@@ -1746,6 +1740,27 @@ static INT_PTR CALLBACK PageDlgProc (HWND   hDlg,
             }
             break;
 
+        case WM_APP_RESET_RESYNC:
+        {
+            // Mini-phase 2.5 (cross-page Reset button): the frame's
+            // SheetFrameSubclass already called controller->ResetToDefaults
+            // (which pushed defaults through to ApplicationState for the
+            // live-preview path), and is now broadcasting to every page so
+            // each one re-syncs its own controls.  ResyncPageFromSettings
+            // is page-agnostic — controls absent from this page are silent
+            // no-ops via the null GetDlgItem.
+            DialogContext * pContext = GetDialogContext (hDlg);
+
+
+            if (pContext && pContext->m_controller)
+            {
+                ResyncPageFromSettings (hDlg, pContext->m_controller->GetSettings());
+            }
+
+            result = TRUE;
+            break;
+        }
+
         case WM_ACTIVATE:
             // Lose-focus on the dialog dismisses any active TTF_TRACK tip.
             if (LOWORD (wParam) == WA_INACTIVE)
@@ -1776,6 +1791,12 @@ static INT_PTR CALLBACK PageDlgProc (HWND   hDlg,
 //  DialogContext after the sheet closes.
 //
 ////////////////////////////////////////////////////////////////////////////////
+
+// Forward declaration — defined just before ShowConfigDialog so it can
+// live alongside the SheetFrameSubclass that consumes its IDC_RESET_DEFAULTS
+// WM_COMMAND.  Called from PropSheetCallback's PSCB_INITIALIZED branch.
+static void CreateFrameResetButton (HWND hSheet);
+
 
 static VOID CALLBACK PerfTitleTimerProc (HWND hSheet, UINT /*msg*/, UINT_PTR /*id*/, DWORD /*time*/)
 {
@@ -1912,6 +1933,14 @@ static int CALLBACK PropSheetCallback (HWND hSheet, UINT uMsg, LPARAM lParam)
             // Fire one immediate tick so the title shows something other
             // than "Performance" before the first second elapses.
             PerfTitleTimerProc (hSheet, WM_TIMER, kPerfTitleTimerId, GetTickCount());
+
+            // Mini-phase 2.5: create the frame-scope "Reset to defaults"
+            // pushbutton (property sheets don't expose one natively).  The
+            // SheetFrameSubclass intercepts its WM_COMMAND/BN_CLICKED and
+            // broadcasts WM_APP_RESET_RESYNC to both pages.  Created here
+            // (not in the trampoline) so the page HWNDs and the OK button
+            // already exist for the layout math in CreateFrameResetButton.
+            CreateFrameResetButton (hSheet);
             break;
         }
     }
@@ -1974,84 +2003,24 @@ static void BuildPropSheet (HINSTANCE         hInstance,
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-//  ShowConfigDialog (modal, Control Panel /c:<HWND>)
+//  Sheet-frame subclass (mini-phase 2.5 + v1.5 lifetime cleanup)
 //
-////////////////////////////////////////////////////////////////////////////////
-
-int ShowConfigDialog (HINSTANCE hInstance, const ScreenSaverModeContext & context)
-{
-    HRESULT          hr         = S_OK;
-    DialogContext    dlgContext;
-    PROPSHEETPAGEW   psPages[2] = {};
-    PROPSHEETHEADERW psHeader   = {};
-    HWND             parentHwnd = context.m_previewParentHwnd;
-    INT_PTR          result     = -1;
-    
-
-
-    dlgContext.m_controller = std::make_unique<ConfigDialogController> (dlgContext.m_settingsProvider);
-    dlgContext.m_isScreenSaverCPL = true;
-    hr = dlgContext.m_controller->Initialize();
-    CHRA (hr);
-
-    BuildPropSheet (hInstance, parentHwnd, &dlgContext, /*modeless=*/false, psPages, psHeader);
-
-    // Stash the context on a "hint" property of a temp hidden window?  No —
-    // PSCB_INITIALIZED runs on the sheet hwnd which we don't have ahead of
-    // time.  Workaround: a static thread_local fallback used inside the
-    // callback as a bootstrap (cleared on entry).  Modal path is single-
-    // threaded so this is safe.
-    static thread_local DialogContext * tls_pendingContext = nullptr;
-    tls_pendingContext = &dlgContext;
-
-    // Wrapper callback that installs the SetProp on first call, then
-    // delegates to PropSheetCallback.  We use a lambda-free static here
-    // so it's a plain C callback.
-    struct CbHelper
-    {
-        static int CALLBACK Trampoline (HWND hSheet, UINT uMsg, LPARAM lParam)
-        {
-            if (uMsg == PSCB_INITIALIZED && tls_pendingContext)
-            {
-                SetPropW (hSheet, kSheetContextProp, tls_pendingContext);
-                tls_pendingContext = nullptr;
-            }
-            return PropSheetCallback (hSheet, uMsg, lParam);
-        }
-    };
-    psHeader.pfnCallback = CbHelper::Trampoline;
-
-    result = PropertySheetW (&psHeader);
-
-    if (result == -1)
-    {
-        hr = HRESULT_FROM_WIN32 (GetLastError());
-    }
-
-Error:
-    if (FAILED (hr))
-    {
-        MessageBoxW (nullptr, L"Failed to initialize configuration dialog.", L"Error", MB_OK | MB_ICONERROR);
-        return -1;
-    }
-
-    // PropertySheetW returns ID_PSREBOOT, ID_PSRESTARTWINDOWS, 1 (OK), or 0
-    // (Cancel) in modal mode.  Map to IDOK / IDCANCEL for the caller.
-    return (result > 0) ? IDOK : IDCANCEL;
-}
-
-
-
-
-
-////////////////////////////////////////////////////////////////////////////////
+//  Installed by both modal (`ShowConfigDialog`) and modeless
+//  (`CreateConfigDialog`) trampolines on the first `PSCB_INITIALIZED`
+//  tick.  Two responsibilities:
 //
-//  CreateConfigDialog (modeless, live overlay)
+//    1. Frame-scope Reset button (`IDC_RESET_DEFAULTS`): intercept
+//       `WM_COMMAND`, call `controller->ResetToDefaults()` (the controller
+//       pushes through to `ApplicationState` for the live preview), then
+//       broadcast `WM_APP_RESET_RESYNC` to every page so each tab refreshes
+//       its own controls.  Also re-mirrors the glow-enabled state through
+//       `ApplyGlowEnabledUI` since the default value re-enables the
+//       greyed-out glow trios.
 //
-//  Returns the property-sheet frame HWND via phDlg; lifetime of the
-//  DialogContext is managed by DestroySheetContext when the frame's
-//  WM_DESTROY fires (we observe it via a subclass installed in
-//  PSCB_INITIALIZED).
+//    2. `WM_DESTROY` cleanup: clear `m_pApp->SetConfigDialog(nullptr)`,
+//       post-quit in screensaver-CPL mode, delete the info-tip font, and
+//       (modeless-only) `delete pContext` since the modeless path heap-
+//       allocates the `DialogContext`.
 //
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -2066,9 +2035,48 @@ LRESULT CALLBACK SheetFrameSubclass (HWND     hSheet,
                                       UINT_PTR uIdSubclass,
                                       DWORD_PTR /*dwRefData*/)
 {
+    // Mini-phase 2.5: frame-scope Reset button.  Pages don't see this
+    // WM_COMMAND because the button is parented to the sheet, not a page.
+    if (msg == WM_COMMAND && LOWORD (wParam) == IDC_RESET_DEFAULTS && HIWORD (wParam) == BN_CLICKED)
+    {
+        DialogContext * pContext = static_cast<DialogContext *> (GetPropW (hSheet, kSheetContextProp));
+
+
+        if (pContext && pContext->m_controller)
+        {
+            // Reset settings; controller pushes through to ApplicationState
+            // in live mode so the live preview snaps back instantly.
+            pContext->m_controller->ResetToDefaults();
+
+            const ScreenSaverSettings & defaults = pContext->m_controller->GetSettings();
+
+            // Re-mirror glow-enabled state across both pages' EnableWindow
+            // flags (the default is glow ON, so any greyed-out trios from
+            // a prior glow-off state need to re-enable).
+            ApplyGlowEnabledUI (hSheet, defaults.m_glowEnabled);
+
+            // Broadcast to every page so each one re-syncs its own
+            // controls from the freshly-reset settings.  PSP_PREMATURE
+            // guarantees both page HWNDs already exist.
+            for (int i = 0; i < 2; i++)
+            {
+                HWND hPage = PropSheet_IndexToHwnd (hSheet, i);
+
+
+                if (hPage)
+                {
+                    SendMessageW (hPage, WM_APP_RESET_RESYNC, 0, 0);
+                }
+            }
+        }
+
+        return 0;
+    }
+
     if (msg == WM_DESTROY)
     {
         DialogContext * pContext = static_cast<DialogContext *> (GetPropW (hSheet, kSheetContextProp));
+
 
         if (pContext)
         {
@@ -2111,6 +2119,175 @@ constexpr UINT_PTR kSheetFrameSubclassId = 0xC0C00C2Du;
 
 }  // namespace
 
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  CreateFrameResetButton — mini-phase 2.5 helper.  Property sheets don't
+//  expose a native Reset button, so we create one in PSCB_INITIALIZED and
+//  parent it to the sheet frame.  Positioned at the footer-left edge,
+//  mirroring the right margin of the OK button.  Font matches OK's font
+//  so the button renders consistently across the v6 comctl32 themes.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+static void CreateFrameResetButton (HWND hSheet)
+{
+    HWND      hOk          = GetDlgItem (hSheet, IDOK);
+    HWND      hReset       = nullptr;
+    HFONT     hFont        = nullptr;
+    HINSTANCE hInst        = nullptr;
+    RECT      okScreenRect = {};
+    RECT      sheetClient  = {};
+    POINT     okTopLeft    = {};
+    int       okWidth      = 0;
+    int       okHeight     = 0;
+    int       okClientY    = 0;
+    int       okClientX    = 0;
+    int       rightMargin  = 0;
+    int       resetWidth   = 0;
+
+
+
+    if (!hOk)
+    {
+        return;
+    }
+
+
+    GetWindowRect  (hOk,    &okScreenRect);
+    GetClientRect  (hSheet, &sheetClient);
+
+    okTopLeft.x = okScreenRect.left;
+    okTopLeft.y = okScreenRect.top;
+    ScreenToClient (hSheet, &okTopLeft);
+
+    okClientX   = okTopLeft.x;
+    okClientY   = okTopLeft.y;
+    okWidth     = okScreenRect.right  - okScreenRect.left;
+    okHeight    = okScreenRect.bottom - okScreenRect.top;
+    rightMargin = sheetClient.right - (okClientX + okWidth);
+
+    // "Reset to defaults" is wider than "OK"; size it to ~1.7x the OK width
+    // so the label fits at the default font without crowding (the v6
+    // themed button has its own internal padding so we don't need extra).
+    resetWidth  = static_cast<int> (okWidth * 1.7);
+
+    hInst       = reinterpret_cast<HINSTANCE> (GetWindowLongPtrW (hSheet, GWLP_HINSTANCE));
+
+    hReset = CreateWindowExW (0,
+                              L"BUTTON",
+                              L"Reset to defaults",
+                              WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
+                              rightMargin,
+                              okClientY,
+                              resetWidth,
+                              okHeight,
+                              hSheet,
+                              reinterpret_cast<HMENU> (static_cast<INT_PTR> (IDC_RESET_DEFAULTS)),
+                              hInst,
+                              nullptr);
+
+    if (hReset)
+    {
+        hFont = reinterpret_cast<HFONT> (SendMessageW (hOk, WM_GETFONT, 0, 0));
+
+        if (hFont)
+        {
+            SendMessageW (hReset, WM_SETFONT, reinterpret_cast<WPARAM> (hFont), TRUE);
+        }
+    }
+}
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  ShowConfigDialog (modal, Control Panel /c:<HWND>)
+//
+////////////////////////////////////////////////////////////////////////////////
+
+int ShowConfigDialog (HINSTANCE hInstance, const ScreenSaverModeContext & context)
+{
+    HRESULT          hr         = S_OK;
+    DialogContext    dlgContext;
+    PROPSHEETPAGEW   psPages[2] = {};
+    PROPSHEETHEADERW psHeader   = {};
+    HWND             parentHwnd = context.m_previewParentHwnd;
+    INT_PTR          result     = -1;
+    
+
+
+    dlgContext.m_controller = std::make_unique<ConfigDialogController> (dlgContext.m_settingsProvider);
+    dlgContext.m_isScreenSaverCPL = true;
+    hr = dlgContext.m_controller->Initialize();
+    CHRA (hr);
+
+    BuildPropSheet (hInstance, parentHwnd, &dlgContext, /*modeless=*/false, psPages, psHeader);
+
+    // Stash the context on a "hint" property of a temp hidden window?  No —
+    // PSCB_INITIALIZED runs on the sheet hwnd which we don't have ahead of
+    // time.  Workaround: a static thread_local fallback used inside the
+    // callback as a bootstrap (cleared on entry).  Modal path is single-
+    // threaded so this is safe.
+    static thread_local DialogContext * tls_pendingContext = nullptr;
+    tls_pendingContext = &dlgContext;
+
+    // Wrapper callback that installs the SetProp + sheet subclass on first
+    // call, then delegates to PropSheetCallback.  We use a lambda-free
+    // static here so it's a plain C callback.  The subclass is what makes
+    // the frame-scope Reset button work (mini-phase 2.5) and also handles
+    // WM_DESTROY cleanup of the sheet-context property.
+    struct CbHelper
+    {
+        static int CALLBACK Trampoline (HWND hSheet, UINT uMsg, LPARAM lParam)
+        {
+            if (uMsg == PSCB_INITIALIZED && tls_pendingContext)
+            {
+                SetPropW          (hSheet, kSheetContextProp, tls_pendingContext);
+                SetWindowSubclass (hSheet, SheetFrameSubclass, kSheetFrameSubclassId, 0);
+                tls_pendingContext = nullptr;
+            }
+            return PropSheetCallback (hSheet, uMsg, lParam);
+        }
+    };
+    psHeader.pfnCallback = CbHelper::Trampoline;
+
+    result = PropertySheetW (&psHeader);
+
+    if (result == -1)
+    {
+        hr = HRESULT_FROM_WIN32 (GetLastError());
+    }
+
+Error:
+    if (FAILED (hr))
+    {
+        MessageBoxW (nullptr, L"Failed to initialize configuration dialog.", L"Error", MB_OK | MB_ICONERROR);
+        return -1;
+    }
+
+    // PropertySheetW returns ID_PSREBOOT, ID_PSRESTARTWINDOWS, 1 (OK), or 0
+    // (Cancel) in modal mode.  Map to IDOK / IDCANCEL for the caller.
+    return (result > 0) ? IDOK : IDCANCEL;
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  CreateConfigDialog (modeless, live overlay)
+//
+//  Returns the property-sheet frame HWND via phDlg; lifetime of the
+//  DialogContext is managed by DestroySheetContext when the frame's
+//  WM_DESTROY fires (we observe it via a subclass installed in
+//  PSCB_INITIALIZED).
+//
+////////////////////////////////////////////////////////////////////////////////
 
 HRESULT CreateConfigDialog (HINSTANCE          hInstance,
                              HWND               parentHwnd,

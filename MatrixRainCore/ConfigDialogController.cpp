@@ -330,6 +330,17 @@ void ConfigDialogController::ResetToDefaults()
 {
     // Reset to factory defaults
     m_settings = ScreenSaverSettings();
+
+    // Mini-phase 2.5 (cross-page Reset button): propagate to ApplicationState
+    // in live mode so the live preview snaps back instantly.  ApplySettings
+    // is the same coarse-grained propagation path UpdateGlowEnabled and the
+    // UpdateScanlines* setters already use; the render thread observes the
+    // defaults on the next snapshot regardless of which page (if any) is
+    // currently active when the user clicks the frame-scope Reset button.
+    if (m_snapshot.isLiveMode && m_snapshot.applicationStateRef)
+    {
+        m_snapshot.applicationStateRef->ApplySettings (m_settings);
+    }
 }
 
 

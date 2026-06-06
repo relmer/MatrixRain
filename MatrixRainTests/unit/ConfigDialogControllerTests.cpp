@@ -1104,5 +1104,105 @@ namespace MatrixRainTests
 
             Assert::IsFalse (controller.IsLiveMode(), L"CommitLiveMode clears live-mode state");
         }
+
+
+        ////////////////////////////////////////////////////////////////////////
+        //
+        //  Mini-phase 2.5 (cross-page Reset button): ResetToDefaults must
+        //  push the freshly-reset settings through to ApplicationState so
+        //  the live preview snaps back instantly.  Previously the dialog-
+        //  side OnResetButton walked each Update* setter; now that Reset
+        //  lives on the property-sheet frame and broadcasts a resync to
+        //  both pages, the controller has to own the live-push so the
+        //  render thread sees the defaults regardless of which (if any)
+        //  page is currently active.
+        //
+        ////////////////////////////////////////////////////////////////////////
+
+        TEST_METHOD (ResetToDefaults_LiveMode_PushesAllFieldsToSharedState)
+        {
+            HRESULT                hr = S_OK;
+            ConfigDialogController controller (m_settingsProvider);
+            ApplicationState       appState   (m_settingsProvider);
+
+
+            hr = controller.Initialize();
+            Assert::AreEqual (S_OK, hr);
+
+            appState.Initialize (nullptr);
+
+            hr = controller.InitializeLiveMode (&appState);
+            Assert::AreEqual (S_OK, hr);
+
+            // Mutate every rollback-eligible field away from defaults so a
+            // post-reset GetSettings() comparison against a fresh-default
+            // struct is meaningful.
+            controller.UpdateDensity            (42);
+            controller.UpdateAnimationSpeed     (33);
+            controller.UpdateGlowIntensity      (175);
+            controller.UpdateGlowSize           (150);
+            controller.UpdateColorScheme        (L"red");
+            controller.UpdateGlowEnabled        (false);
+            controller.UpdateScanlinesEnabled   (false);
+            controller.UpdateScanlinesIntensity (88);
+            controller.UpdateScanlinesStyle     (22);
+            controller.UpdateShowDebugStats     (true);
+            controller.UpdateStartFullscreen    (false);
+
+            // Act: reset.  In live mode this must propagate to ApplicationState.
+            controller.ResetToDefaults();
+
+            // Assert: ApplicationState reflects the freshly-reset settings.
+            // ApplySettings is the coarse-grained propagation path the per-
+            // field UpdateGlowEnabled/UpdateScanlines* setters already use,
+            // so the test exercises the same SharedState round-trip the
+            // render thread would observe.
+            ScreenSaverSettings        defaults;
+            const ScreenSaverSettings  asSettings = appState.GetSettings();
+
+            Assert::AreEqual (defaults.m_densityPercent,
+                              asSettings.m_densityPercent,
+                              L"density propagated");
+            Assert::AreEqual (defaults.m_animationSpeedPercent,
+                              asSettings.m_animationSpeedPercent,
+                              L"animation speed propagated");
+            Assert::AreEqual (defaults.m_glowIntensityPercent,
+                              asSettings.m_glowIntensityPercent,
+                              L"glow intensity propagated");
+            Assert::AreEqual (defaults.m_glowSizePercent,
+                              asSettings.m_glowSizePercent,
+                              L"glow size propagated");
+            Assert::AreEqual (defaults.m_scanlinesIntensity,
+                              asSettings.m_scanlinesIntensity,
+                              L"scanlines intensity propagated");
+            Assert::AreEqual (defaults.m_scanlinesStyle,
+                              asSettings.m_scanlinesStyle,
+                              L"scanlines style propagated");
+            Assert::AreEqual (defaults.m_colorSchemeKey,
+                              asSettings.m_colorSchemeKey,
+                              L"color scheme propagated");
+            Assert::AreEqual (defaults.m_glowEnabled,
+                              asSettings.m_glowEnabled,
+                              L"glow-enabled propagated");
+            Assert::AreEqual (defaults.m_scanlinesEnabled,
+                              asSettings.m_scanlinesEnabled,
+                              L"scanlines-enabled propagated");
+            Assert::AreEqual (defaults.m_showDebugStats,
+                              asSettings.m_showDebugStats,
+                              L"show-debug-stats propagated");
+            Assert::AreEqual (defaults.m_startFullscreen,
+                              asSettings.m_startFullscreen,
+                              L"start-fullscreen propagated");
+
+            // ApplicationState's derived runtime mirrors (color scheme enum,
+            // show-statistics flag, display mode) must also have updated
+            // through ApplySettings — proves the broadcast went through the
+            // notify-callback path, not just a silent struct copy.
+            Assert::IsTrue (appState.GetColorScheme()  == ParseColorSchemeKey (defaults.m_colorSchemeKey),
+                            L"derived color-scheme enum mirrored");
+            Assert::AreEqual (defaults.m_showDebugStats,
+                              appState.GetShowStatistics(),
+                              L"derived show-statistics mirrored");
+        }
     };
 }  // namespace MatrixRainTests

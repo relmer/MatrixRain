@@ -26,7 +26,9 @@
 #define IDC_COLORSCHEME_COMBO           1009
 #define IDC_STARTFULLSCREEN_CHECK       1010
 #define IDC_SHOWDEBUG_CHECK             1011
-#define IDC_RESET_BUTTON                1013
+// 1012 - reserved (was UpdateShowFadeTimers / fade-timer overlay control - removed in v1.5 US4)
+// 1013 - reserved (was IDC_RESET_BUTTON, page-scoped pushbutton - replaced
+//        in mini-phase 2.5 by frame-scope IDC_RESET_DEFAULTS=1051)
 #define IDC_MULTIMONITOR_CHECK          1014
 #define IDC_MULTIMONITOR_INFO           1015
 #define IDC_GPU_COMBO                   1016
@@ -46,7 +48,8 @@
 #define IDC_GLOWSMOOTH_INFO             1030
 #define IDC_GLOWINTENSITY_INFO          1031
 #define IDC_GLOWSIZE_INFO               1032
-#define IDC_QUALITY_GROUPBOX            1033
+// 1033 - reserved (was IDC_QUALITY_GROUPBOX, removed in mini-phase 2.5
+//        layout flattening; the quality cluster is no longer wrapped)
 #define IDC_GLOWPASSES_PROMPT           1034
 #define IDC_GLOWRES_PROMPT              1035
 #define IDC_GLOWSMOOTH_PROMPT           1036
@@ -70,13 +73,19 @@
 #define IDC_SCANLINES_STYLE_INFO            1049
 #define IDC_SCANLINES_STYLE_PROMPT          1050
 
+// Mini-phase 2.5: cross-page "Reset to defaults" pushbutton, hosted on the
+// property-sheet frame (not a page) so a single click resets every control
+// on both tabs.  Created programmatically in PSCB_INITIALIZED — property
+// sheets don't expose a native Reset button.
+#define IDC_RESET_DEFAULTS                  1051
+
 // Next default values for new objects
 // 
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        105
 #define _APS_NEXT_COMMAND_VALUE         40004
-#define _APS_NEXT_CONTROL_VALUE         1051
+#define _APS_NEXT_CONTROL_VALUE         1052
 #define _APS_NEXT_SYMED_VALUE           101
 #endif
 #endif
