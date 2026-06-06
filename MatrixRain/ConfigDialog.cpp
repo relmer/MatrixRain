@@ -2407,6 +2407,83 @@ namespace
 {
 
 
+constexpr UINT_PTR kOkButtonSubclassId = 0xC0C00C2Eu;
+
+
+
+
+static void RepositionFrameResetButton (HWND hSheet)
+{
+    HWND hReset = GetDlgItem (hSheet, IDC_RESET_DEFAULTS);
+    HWND hOk    = GetDlgItem (hSheet, IDOK);
+
+
+    if (hReset && hOk)
+    {
+        RECT  okScreenRect  = {};
+        RECT  resetWinRect  = {};
+        RECT  sheetClient   = {};
+        POINT okTopLeft     = {};
+        POINT okBottomRight = {};
+        int   okClientY     = 0;
+        int   okHeight      = 0;
+        int   leftMargin    = 0;
+        int   resetWidth    = 0;
+
+
+        GetWindowRect (hOk, &okScreenRect);
+
+        okTopLeft.x = okScreenRect.left;
+        okTopLeft.y = okScreenRect.top;
+        ScreenToClient (hSheet, &okTopLeft);
+
+        okBottomRight.x = okScreenRect.right;
+        okBottomRight.y = okScreenRect.bottom;
+        ScreenToClient (hSheet, &okBottomRight);
+
+        GetClientRect (hSheet, &sheetClient);
+        GetWindowRect (hReset, &resetWinRect);
+
+        okClientY  = okTopLeft.y;
+        okHeight   = okScreenRect.bottom - okScreenRect.top;
+        leftMargin = sheetClient.right - okBottomRight.x;
+        resetWidth = resetWinRect.right - resetWinRect.left;
+
+        SetWindowPos (hReset,
+                      nullptr,
+                      leftMargin,
+                      okClientY,
+                      resetWidth,
+                      okHeight,
+                      SWP_NOZORDER | SWP_NOACTIVATE);
+    }
+}
+
+
+
+
+LRESULT CALLBACK OkButtonSubclass (HWND     hOk,
+                                    UINT     msg,
+                                    WPARAM   wParam,
+                                    LPARAM   lParam,
+                                    UINT_PTR uIdSubclass,
+                                    DWORD_PTR /*dwRefData*/)
+{
+    if (msg == WM_WINDOWPOSCHANGED)
+    {
+        RepositionFrameResetButton (GetParent (hOk));
+    }
+    else if (msg == WM_NCDESTROY)
+    {
+        RemoveWindowSubclass (hOk, OkButtonSubclass, uIdSubclass);
+    }
+
+    return DefSubclassProc (hOk, msg, wParam, lParam);
+}
+
+
+
+
 LRESULT CALLBACK SheetFrameSubclass (HWND     hSheet,
                                       UINT     msg,
                                       WPARAM   wParam,
@@ -2425,54 +2502,7 @@ LRESULT CALLBACK SheetFrameSubclass (HWND     hSheet,
     // sheet has finalized its layout and OK is in its real footer slot.
     if (msg == WM_APP_REPOSITION_RESET)
     {
-        HWND  hReset = GetDlgItem (hSheet, IDC_RESET_DEFAULTS);
-        HWND  hOk    = GetDlgItem (hSheet, IDOK);
-
-        if (hReset && hOk)
-        {
-            RECT  okScreenRect = {};
-            POINT okTopLeft    = {};
-            int   okHeight     = 0;
-            int   okClientY    = 0;
-            int   leftMargin   = 0;
-            RECT  resetWinRect = {};
-            int   resetWidth   = 0;
-
-            GetWindowRect (hOk, &okScreenRect);
-            okTopLeft.x = okScreenRect.left;
-            okTopLeft.y = okScreenRect.top;
-            ScreenToClient (hSheet, &okTopLeft);
-
-            okClientY    = okTopLeft.y;
-            okHeight     = okScreenRect.bottom - okScreenRect.top;
-
-            // Mirror the OK button's right margin to give Reset the same
-            // gap from the left edge.  okScreenRect.right (relative to
-            // sheet) -> compute distance from sheet's right edge in
-            // client coords, then use that as left margin.
-            {
-                RECT  sheetClient = {};
-                POINT okBottomRight = {};
-
-                GetClientRect (hSheet, &sheetClient);
-                okBottomRight.x = okScreenRect.right;
-                okBottomRight.y = okScreenRect.bottom;
-                ScreenToClient (hSheet, &okBottomRight);
-
-                leftMargin = sheetClient.right - okBottomRight.x;
-            }
-
-            GetWindowRect (hReset, &resetWinRect);
-            resetWidth = resetWinRect.right - resetWinRect.left;
-
-            SetWindowPos (hReset,
-                          nullptr,
-                          leftMargin,
-                          okClientY,
-                          resetWidth,
-                          okHeight,
-                          SWP_NOZORDER | SWP_NOACTIVATE);
-        }
+        RepositionFrameResetButton (hSheet);
     }
 
     // Mini-phase 2.5: frame-scope Reset button.  Pages don't see this
@@ -2637,6 +2667,9 @@ static void CreateFrameResetButton (HWND hSheet)
         {
             SendMessageW (hReset, WM_SETFONT, reinterpret_cast<WPARAM> (hFont), TRUE);
         }
+
+        SetWindowSubclass (hOk, OkButtonSubclass, kOkButtonSubclassId, 0);
+        RepositionFrameResetButton (hSheet);
     }
 }
 
