@@ -688,6 +688,135 @@ namespace MatrixRainTests
             Assert::AreEqual (30, settings.m_scanlinesIntensity,   L"Absent ScanlinesIntensity defaults to 30");
             Assert::AreEqual (50, settings.m_scanlinesStyle,       L"Absent ScanlinesStyle defaults to 50");
         }
+
+
+        ////////////////////////////////////////////////////////////////
+        //
+        //  T057 (US5, FR-030, FR-031, FR-035, FR-038, data-model.md §1,
+        //  contracts/registry-schema.md): CustomColor + CustomColorPalette
+        //  persistence.  The palette persists UNCONDITIONALLY (lives
+        //  outside the snapshot rollback set), is stored as a 64-byte
+        //  REG_BINARY (16 COLORREFs matching CHOOSECOLORW::lpCustColors
+        //  layout), and zero-fills on absent / size-mismatch reads.
+        //
+        ////////////////////////////////////////////////////////////////
+
+        TEST_METHOD (CustomColorRoundTrip)
+        {
+            DeleteTestRegistryKey();
+
+            ScreenSaverSettings savedSettings;
+
+
+            savedSettings.m_customColor = RGB (123, 200, 250);
+
+            Assert::AreEqual (S_OK, m_provider.Save (savedSettings));
+
+            ScreenSaverSettings loaded;
+
+            Assert::AreEqual (S_OK, m_provider.Load (loaded));
+            Assert::AreEqual (static_cast<DWORD> (RGB (123, 200, 250)),
+                              static_cast<DWORD> (loaded.m_customColor),
+                              L"CustomColor must round-trip exactly as REG_DWORD");
+        }
+
+
+        TEST_METHOD (CustomColorAbsentMeansChooserDefault)
+        {
+            // No registry key at all -> Load returns S_FALSE, settings
+            // keep their in-class defaults (DEFAULT_CUSTOM_COLOR = green).
+            DeleteTestRegistryKey();
+
+            ScreenSaverSettings loaded;
+
+            m_provider.Load (loaded);
+            Assert::AreEqual (static_cast<DWORD> (ScreenSaverSettings::DEFAULT_CUSTOM_COLOR),
+                              static_cast<DWORD> (loaded.m_customColor),
+                              L"Absent CustomColor must fall back to DEFAULT_CUSTOM_COLOR");
+        }
+
+
+        TEST_METHOD (CustomColorPaletteRoundTrip)
+        {
+            DeleteTestRegistryKey();
+
+            ScreenSaverSettings savedSettings;
+
+
+            for (size_t i = 0; i < savedSettings.m_customColorPalette.size(); i++)
+            {
+                savedSettings.m_customColorPalette[i] = RGB (static_cast<BYTE> (i * 10),
+                                                              static_cast<BYTE> (i * 11),
+                                                              static_cast<BYTE> (i * 12));
+            }
+
+            Assert::AreEqual (S_OK, m_provider.Save (savedSettings));
+
+            ScreenSaverSettings loaded;
+
+            Assert::AreEqual (S_OK, m_provider.Load (loaded));
+
+            for (size_t i = 0; i < loaded.m_customColorPalette.size(); i++)
+            {
+                Assert::AreEqual (static_cast<DWORD> (savedSettings.m_customColorPalette[i]),
+                                  static_cast<DWORD> (loaded.m_customColorPalette[i]),
+                                  L"Palette slot must round-trip exactly");
+            }
+        }
+
+
+        TEST_METHOD (CustomColorPaletteSizeMismatchYieldsZeroes)
+        {
+            DeleteTestRegistryKey();
+
+            HKEY hKey = nullptr;
+
+            RegCreateKeyExW (HKEY_CURRENT_USER, TEST_REGISTRY_KEY_PATH, 0, nullptr,
+                             REG_OPTION_NON_VOLATILE, KEY_WRITE, nullptr, &hKey, nullptr);
+
+            // Write 32 bytes instead of the expected 64.  Size mismatch
+            // must be treated as "no saved palette" -> zero-fill.
+            BYTE truncated[32] = {};
+
+            for (size_t i = 0; i < sizeof (truncated); i++)
+            {
+                truncated[i] = static_cast<BYTE> (i + 1);
+            }
+
+            RegSetValueExW (hKey, L"CustomColorPalette", 0, REG_BINARY, truncated, sizeof (truncated));
+            RegCloseKey (hKey);
+
+            ScreenSaverSettings loaded;
+
+            m_provider.Load (loaded);
+
+            for (size_t i = 0; i < loaded.m_customColorPalette.size(); i++)
+            {
+                Assert::AreEqual (static_cast<DWORD> (0),
+                                  static_cast<DWORD> (loaded.m_customColorPalette[i]),
+                                  L"Size-mismatch palette must zero-fill");
+            }
+        }
+
+
+        TEST_METHOD (MissingCustomColorPaletteYieldsZeroes)
+        {
+            DeleteTestRegistryKey();
+
+            // Save a settings struct that has the palette zeroed already.
+            // Load and confirm everything is still zero (no garbage from
+            // an uninitialised slot).
+            ScreenSaverSettings loaded;
+
+            m_provider.Load (loaded);
+
+            for (size_t i = 0; i < loaded.m_customColorPalette.size(); i++)
+            {
+                Assert::AreEqual (static_cast<DWORD> (0),
+                                  static_cast<DWORD> (loaded.m_customColorPalette[i]),
+                                  L"Absent palette must zero-fill");
+            }
+        }
     };
 }
 

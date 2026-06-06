@@ -121,6 +121,46 @@ HRESULT RegistrySettingsProvider::Load (ScreenSaverSettings & settings)
         settings.m_advancedValues = LookupPresetValues (settings.m_qualityPreset);
     }
 
+    // v1.5 US5 (T061, FR-030, FR-031, FR-035, contracts/registry-schema.md):
+    // CustomColor (REG_DWORD) — absent means the chooser falls back to
+    // ScreenSaverSettings::DEFAULT_CUSTOM_COLOR on first invocation.
+    // CustomColorPalette (REG_BINARY, exactly 64 bytes = 16 COLORREFs) —
+    // anything other than exact-64-bytes (including missing) zero-fills
+    // the palette per the FR-038 size-mismatch rule.
+    {
+        DWORD customColor = 0;
+
+
+        if (ReadDword (hKey, VALUE_CUSTOM_COLOR, customColor) == S_OK)
+        {
+            settings.m_customColor = static_cast<COLORREF> (customColor);
+        }
+    }
+
+    {
+        DWORD     cbActual = 0;
+        DWORD     dwType   = 0;
+        LSTATUS   lpStat   = RegQueryValueExW (hKey,
+                                                VALUE_CUSTOM_COLOR_PALETTE,
+                                                nullptr,
+                                                &dwType,
+                                                nullptr,
+                                                &cbActual);
+
+
+        settings.m_customColorPalette.fill (0);
+
+        if (lpStat == ERROR_SUCCESS && dwType == REG_BINARY && cbActual == sizeof (settings.m_customColorPalette))
+        {
+            (void)RegQueryValueExW (hKey,
+                                    VALUE_CUSTOM_COLOR_PALETTE,
+                                    nullptr,
+                                    nullptr,
+                                    reinterpret_cast<LPBYTE> (settings.m_customColorPalette.data()),
+                                    &cbActual);
+        }
+    }
+
     // Clamp all values to valid ranges
     settings.Clamp();
 
@@ -250,6 +290,20 @@ HRESULT RegistrySettingsProvider::Save (const ScreenSaverSettings & settings)
         hr = WriteInt (hKey, VALUE_LASTCUSTOM_SMOOTHNESS,     static_cast<int> (settings.m_lastCustom->m_blurTaps));
         CHR (hr);
     }
+
+    // v1.5 US5 (T061, FR-030, FR-031, FR-035): CustomColor + palette.
+    // Both are written unconditionally on every Save (not gated on
+    // colorScheme == Custom or palette non-empty) so a freshly-edited
+    // palette persists even when the user backs out of selecting Custom,
+    // and the active custom RGB is preserved across launches.
+    hr = WriteDword (hKey, VALUE_CUSTOM_COLOR, static_cast<DWORD> (settings.m_customColor));
+    CHR (hr);
+
+    hr = WriteBinary (hKey,
+                      VALUE_CUSTOM_COLOR_PALETTE,
+                      settings.m_customColorPalette.data(),
+                      static_cast<DWORD> (sizeof (settings.m_customColorPalette)));
+    CHR (hr);
 
 
 Error:
@@ -444,6 +498,96 @@ HRESULT RegistrySettingsProvider::WriteString (HKEY hKey, LPCWSTR valueName, con
     cbValue = static_cast<DWORD> ((value.length() + 1) * sizeof (wchar_t));
 
     lstat  = RegSetValueExW (hKey, valueName, 0, REG_SZ, reinterpret_cast<const BYTE *> (value.c_str()), cbValue);
+    CBRA (lstat == ERROR_SUCCESS);
+
+
+Error:
+    return hr;
+}
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  RegistrySettingsProvider::ReadDword (T061)
+//
+//  Distinct from ReadInt only in its out-type (DWORD vs int).  Used for
+//  CustomColor where the COLORREF semantics are 32-bit-unsigned and
+//  treating it as a signed int would round-trip incorrectly for the
+//  high-bit-set blue channel.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+HRESULT RegistrySettingsProvider::ReadDword (HKEY hKey, LPCWSTR valueName, DWORD & outValue)
+{
+    HRESULT hr      = S_OK;
+    DWORD   dwType  = 0;
+    DWORD   dwValue = 0;
+    DWORD   cbValue = sizeof (dwValue);
+    LSTATUS lstat   = ERROR_SUCCESS;
+
+
+
+    lstat = RegQueryValueExW (hKey, valueName, nullptr, &dwType, reinterpret_cast<LPBYTE> (&dwValue), &cbValue);
+
+    BAIL_OUT_IF (lstat == ERROR_FILE_NOT_FOUND, S_FALSE);
+    CBRA (lstat == ERROR_SUCCESS);
+    CBRA (dwType == REG_DWORD);
+
+    outValue = dwValue;
+
+
+Error:
+    return hr;
+}
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  RegistrySettingsProvider::WriteDword (T061)
+//
+////////////////////////////////////////////////////////////////////////////////
+
+HRESULT RegistrySettingsProvider::WriteDword (HKEY hKey, LPCWSTR valueName, DWORD value)
+{
+    HRESULT hr    = S_OK;
+    LSTATUS lstat = ERROR_SUCCESS;
+
+
+
+    lstat = RegSetValueExW (hKey, valueName, 0, REG_DWORD, reinterpret_cast<const BYTE *> (&value), sizeof (DWORD));
+    CBRA (lstat == ERROR_SUCCESS);
+
+
+Error:
+    return hr;
+}
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  RegistrySettingsProvider::WriteBinary (T061)
+//
+//  Generic REG_BINARY writer.  Used for CustomColorPalette (16 COLORREFs
+//  = 64 bytes); the layout deliberately matches CHOOSECOLORW's
+//  `lpCustColors` so the Save side can `memcpy` directly from the
+//  settings struct (research.md R5).
+//
+////////////////////////////////////////////////////////////////////////////////
+
+HRESULT RegistrySettingsProvider::WriteBinary (HKEY hKey, LPCWSTR valueName, const void * pData, DWORD cbData)
+{
+    HRESULT hr    = S_OK;
+    LSTATUS lstat = ERROR_SUCCESS;
+
+
+
+    lstat = RegSetValueExW (hKey, valueName, 0, REG_BINARY, static_cast<const BYTE *> (pData), cbData);
     CBRA (lstat == ERROR_SUCCESS);
 
 
