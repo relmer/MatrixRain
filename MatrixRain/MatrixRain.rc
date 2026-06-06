@@ -128,7 +128,7 @@ END
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-IDD_VISUALS_PAGE DIALOGEX 0, 0, 300, 150
+IDD_VISUALS_PAGE DIALOGEX 0, 0, 300, 194
 STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_DISABLED | WS_CAPTION
 CAPTION "Visuals"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
@@ -155,65 +155,64 @@ BEGIN
     LTEXT           "Color:",IDC_STATIC,15,103,58,8
     COMBOBOX        IDC_COLORSCHEME_COMBO,90,100,162,80,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
 
-    CONTROL         "Start in fullscreen",IDC_STARTFULLSCREEN_CHECK,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,128,130,10
+    // Scanline intensity/style sliders stay on the Visuals page; only the
+    // Enable scanlines checkbox lives on the Performance page (alongside
+    // Enable glow).  Sliders are greyed when the checkbox is off.
+    LTEXT           "Scanline intensity:",IDC_SCANLINES_INTENSITY_PROMPT,15,127,75,8
+    CONTROL         "ⓘ",IDC_SCANLINES_INTENSITY_INFO,"Button",BS_OWNERDRAW | WS_TABSTOP,74,125,14,14
+    CONTROL         "",IDC_SCANLINES_INTENSITY_SLIDER,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,90,125,162,20
+    LTEXT           "30%",IDC_SCANLINES_INTENSITY_VALUE,257,127,28,8
+
+    LTEXT           "Scanline style:",IDC_SCANLINES_STYLE_PROMPT,15,149,75,8
+    CONTROL         "ⓘ",IDC_SCANLINES_STYLE_INFO,"Button",BS_OWNERDRAW | WS_TABSTOP,74,147,14,14
+    CONTROL         "",IDC_SCANLINES_STYLE_SLIDER,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,90,147,162,20
+    LTEXT           "50",IDC_SCANLINES_STYLE_VALUE,257,149,28,8
+
+    CONTROL         "Start in fullscreen",IDC_STARTFULLSCREEN_CHECK,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,176,130,10
 END
 
 
 
-IDD_PERFORMANCE_PAGE DIALOGEX 0, 0, 300, 268
+IDD_PERFORMANCE_PAGE DIALOGEX 0, 0, 300, 224
 STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_DISABLED | WS_CAPTION
 CAPTION "Performance"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     // Top-of-page checkboxes group:
-    //   Use all monitors, Enable glow, Enable scanlines (+intensity/style)
+    //   Use all monitors, Enable glow, Enable scanlines
     CONTROL         "Use all monitors",IDC_MULTIMONITOR_CHECK,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,14,140,10
     CONTROL         "Enable glow",IDC_GLOW_ENABLED_CHECK,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,32,140,10
-
-    // Scanlines moved from Visuals tab to Performance tab (user request,
-    // alongside Enable glow).  No groupbox; the two slider rows below the
-    // checkbox are visually associated by the matching prompt-column.
     CONTROL         "Enable scanlines",IDC_SCANLINES_ENABLED_CHECK,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,50,140,10
 
-    LTEXT           "Scanline intensity:",IDC_SCANLINES_INTENSITY_PROMPT,15,71,75,8
-    CONTROL         "ⓘ",IDC_SCANLINES_INTENSITY_INFO,"Button",BS_OWNERDRAW | WS_TABSTOP,74,69,14,14
-    CONTROL         "",IDC_SCANLINES_INTENSITY_SLIDER,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,90,69,162,20
-    LTEXT           "30%",IDC_SCANLINES_INTENSITY_VALUE,257,71,28,8
-
-    LTEXT           "Scanline style:",IDC_SCANLINES_STYLE_PROMPT,15,93,75,8
-    CONTROL         "ⓘ",IDC_SCANLINES_STYLE_INFO,"Button",BS_OWNERDRAW | WS_TABSTOP,74,91,14,14
-    CONTROL         "",IDC_SCANLINES_STYLE_SLIDER,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,90,91,162,20
-    LTEXT           "50",IDC_SCANLINES_STYLE_VALUE,257,93,28,8
-
     // GPU combo width matches the trackbar widths below it (w=162).
-    LTEXT           "GPU:",IDC_STATIC,15,118,58,8
-    COMBOBOX        IDC_GPU_COMBO,90,115,162,120,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "GPU:",IDC_STATIC,15,74,58,8
+    COMBOBOX        IDC_GPU_COMBO,90,71,162,120,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
 
     // Quality cluster — preset slider + 3 advanced knobs.  No groupbox
     // wrapper: cluster is visually separated by one blank row above and
     // below.  Quality cluster stays as a unit because touching any
     // advanced knob auto-flips the preset to Custom.
-    LTEXT           "Quality:",IDC_STATIC,15,144,58,8
-    CONTROL         "ⓘ",IDC_QUALITY_PRESET_INFO,"Button",BS_OWNERDRAW | WS_TABSTOP,74,142,14,14
-    CONTROL         "",IDC_QUALITY_PRESET_SLIDER,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,90,142,162,20
-    LTEXT           "High",IDC_QUALITY_PRESET_LABEL,257,144,28,8
+    LTEXT           "Quality:",IDC_STATIC,15,100,58,8
+    CONTROL         "ⓘ",IDC_QUALITY_PRESET_INFO,"Button",BS_OWNERDRAW | WS_TABSTOP,74,98,14,14
+    CONTROL         "",IDC_QUALITY_PRESET_SLIDER,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,90,98,162,20
+    LTEXT           "High",IDC_QUALITY_PRESET_LABEL,257,100,28,8
 
-    LTEXT           "Glow passes:",IDC_GLOWPASSES_PROMPT,15,166,58,8
-    CONTROL         "ⓘ",IDC_GLOWPASSES_INFO,"Button",BS_OWNERDRAW | WS_TABSTOP,74,164,14,14
-    CONTROL         "",IDC_GLOWPASSES_SLIDER,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,90,164,162,20
-    LTEXT           "3",IDC_GLOWPASSES_LABEL,257,166,28,8
+    LTEXT           "Glow passes:",IDC_GLOWPASSES_PROMPT,15,122,58,8
+    CONTROL         "ⓘ",IDC_GLOWPASSES_INFO,"Button",BS_OWNERDRAW | WS_TABSTOP,74,120,14,14
+    CONTROL         "",IDC_GLOWPASSES_SLIDER,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,90,120,162,20
+    LTEXT           "3",IDC_GLOWPASSES_LABEL,257,122,28,8
 
-    LTEXT           "Glow resolution:",IDC_GLOWRES_PROMPT,15,188,58,8
-    CONTROL         "ⓘ",IDC_GLOWRES_INFO,"Button",BS_OWNERDRAW | WS_TABSTOP,74,186,14,14
-    CONTROL         "",IDC_GLOWRES_SLIDER,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,90,186,162,20
-    LTEXT           "Half",IDC_GLOWRES_LABEL,257,188,28,8
+    LTEXT           "Glow resolution:",IDC_GLOWRES_PROMPT,15,144,58,8
+    CONTROL         "ⓘ",IDC_GLOWRES_INFO,"Button",BS_OWNERDRAW | WS_TABSTOP,74,142,14,14
+    CONTROL         "",IDC_GLOWRES_SLIDER,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,90,142,162,20
+    LTEXT           "Half",IDC_GLOWRES_LABEL,257,144,28,8
 
-    LTEXT           "Glow smoothness:",IDC_GLOWSMOOTH_PROMPT,15,210,58,8
-    CONTROL         "ⓘ",IDC_GLOWSMOOTH_INFO,"Button",BS_OWNERDRAW | WS_TABSTOP,74,208,14,14
-    CONTROL         "",IDC_GLOWSMOOTH_SLIDER,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,90,208,162,20
-    LTEXT           "High",IDC_GLOWSMOOTH_LABEL,257,210,28,8
+    LTEXT           "Glow smoothness:",IDC_GLOWSMOOTH_PROMPT,15,166,58,8
+    CONTROL         "ⓘ",IDC_GLOWSMOOTH_INFO,"Button",BS_OWNERDRAW | WS_TABSTOP,74,164,14,14
+    CONTROL         "",IDC_GLOWSMOOTH_SLIDER,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,90,164,162,20
+    LTEXT           "High",IDC_GLOWSMOOTH_LABEL,257,166,28,8
 
-    CONTROL         "Show performance metrics",IDC_SHOWDEBUG_CHECK,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,242,160,10
+    CONTROL         "Show performance metrics",IDC_SHOWDEBUG_CHECK,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,198,160,10
 END
 
 #endif    // English (United States) resources
