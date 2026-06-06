@@ -20,16 +20,21 @@ using Microsoft::WRL::ComPtr;
 //  GPU load via PDH (matches Task Manager's per-process "GPU" column).
 //
 //  Singleton inside this translation unit — one PDH query for the whole
-//  process, polled at most every 500 ms (Task Manager itself samples at
+//  process, polled at most every 1 s (Task Manager itself samples at
 //  ~1 Hz).  Returns -1.0 until at least one collection has succeeded
 //  (PDH counters return no data on the very first collection call).
 //
-//  The counter path is "\GPU Engine(*pid_NNNN*engtype_3D)\Utilization
-//  Percentage", expanded by PDH wildcard support to one instance per
-//  physical GPU / engine our process is rendering on.  We MAX across
-//  the resulting array because that's what Task Manager's per-process
-//  GPU column shows; summing tends to over-count when the GPU exposes
-//  multiple instances of the same engine type.
+//  The counter path is the system-wide wildcard `\GPU Engine(*)\Utilization
+//  Percentage`.  PDH expands the wildcard ONCE at AddCounter time and
+//  returns values only for the instances that existed then — new engine
+//  instances created later (driver reset, GPU sleep/resume, eGPU hot-plug,
+//  another D3D process starting) would otherwise be invisible to us.  To
+//  keep the readings honest we close and re-open the query every
+//  `kRefreshIntervalMs` so the wildcard gets re-expanded against the
+//  current set of engine instances.  Result-loop filters to our own PID
+//  by matching the `pid_NNNN_` substring of each instance name; the
+//  per-engine-type sums are then MAX-reduced (same shape Task Manager
+//  uses for the per-process "GPU" column).
 //
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -42,17 +47,11 @@ public:
 
     ~GpuLoadMonitor()
     {
-        if (m_query)
-        {
-            PdhCloseQuery (m_query);
-            m_query   = nullptr;
-            m_counter = nullptr;
-        }
+        ReleaseQuery();
     }
 
     GpuLoadMonitor (const GpuLoadMonitor &) = delete;
     GpuLoadMonitor & operator= (const GpuLoadMonitor &) = delete;
-
 
     // Returns most-recent load percentage in [0, 100], or -1.0 when not
     // yet ready (initialization failed, or first collection has not yet
@@ -61,74 +60,163 @@ public:
     {
         std::lock_guard<std::mutex> lock (m_mutex);
 
+        ULONGLONG nowTick = GetTickCount64();
+
+
         if (m_initFailed)
         {
             return -1.0;
         }
 
-        ULONGLONG nowTick = GetTickCount64();
-
         // Throttle PDH polling to ~1 Hz (matches Task Manager's update rate).
-        if (m_lastPollTick != 0 && (nowTick - m_lastPollTick) < 1000)
+        if (m_lastPollTick != 0 && (nowTick - m_lastPollTick) < kPollIntervalMs)
         {
             return m_cachedLoad;
+        }
+
+        m_lastPollTick = nowTick;
+
+        if (!EnsureQueryReady (nowTick))
+        {
+            return m_cachedLoad;
+        }
+
+        DWORD                       itemCount = 0;
+        PDH_FMT_COUNTERVALUE_ITEM_W * items   = nullptr;
+
+
+        if (!CollectCounters (itemCount, items))
+        {
+            return m_cachedLoad;
+        }
+
+        m_cachedLoad = AggregateMaxPerEngineType (items, itemCount);
+        return m_cachedLoad;
+    }
+
+private:
+    static constexpr ULONGLONG kPollIntervalMs    = 1000;     // 1 Hz polling
+    static constexpr ULONGLONG kRefreshIntervalMs = 10000;    // re-expand wildcard every 10 s
+
+    // Open the PDH query and add the wildcard counter.  Stores the open
+    // time in m_lastRefreshTick so EnsureQueryReady knows when to recycle
+    // the query to re-expand the wildcard.
+    bool Initialize (ULONGLONG nowTick)
+    {
+        if (PdhOpenQueryW (nullptr, 0, &m_query) != ERROR_SUCCESS)
+        {
+            m_query = nullptr;
+            return false;
+        }
+
+        m_ownPid = GetCurrentProcessId();
+
+        if (PdhAddEnglishCounterW (m_query,
+                                   L"\\GPU Engine(*)\\Utilization Percentage",
+                                   0,
+                                   &m_counter) != ERROR_SUCCESS)
+        {
+            ReleaseQuery();
+            return false;
+        }
+
+        m_lastRefreshTick = nowTick;
+
+        // Prime the query — PDH returns no data on the very first collect.
+        PdhCollectQueryData (m_query);
+        return true;
+    }
+
+    void ReleaseQuery()
+    {
+        if (m_query)
+        {
+            PdhCloseQuery (m_query);
+        }
+
+        m_query   = nullptr;
+        m_counter = nullptr;
+    }
+
+    // Lazily open the query on first call, and periodically recycle it so
+    // PDH re-expands the wildcard against the current set of GPU engine
+    // instances (see class comment).  Returns false if the query couldn't
+    // be opened (latches m_initFailed so subsequent calls fast-bail).
+    bool EnsureQueryReady (ULONGLONG nowTick)
+    {
+        if (m_query && (nowTick - m_lastRefreshTick) >= kRefreshIntervalMs)
+        {
+            ReleaseQuery();
         }
 
         if (!m_query)
         {
-            if (!Initialize())
+            if (!Initialize (nowTick))
             {
                 m_initFailed = true;
-                return -1.0;
+                return false;
             }
 
-            // First Collect produces no data; bail out and let the next
-            // GetLoadPercent call do a real read.
-            PdhCollectQueryData (m_query);
-            m_lastPollTick = nowTick;
-            return -1.0;
+            // The priming Collect inside Initialize produced no data; let
+            // the next GetLoadPercent tick do the first real read.
+            return false;
         }
 
         if (PdhCollectQueryData (m_query) != ERROR_SUCCESS)
         {
-            m_lastPollTick = nowTick;
-            return m_cachedLoad;
+            return false;
         }
-        m_lastPollTick = nowTick;
 
-        DWORD bufferBytes = 0;
-        DWORD itemCount   = 0;
-        PDH_STATUS s      = PdhGetFormattedCounterArrayW (m_counter, PDH_FMT_DOUBLE, &bufferBytes, &itemCount, nullptr);
+        return true;
+    }
 
-        if (s != PDH_MORE_DATA || itemCount == 0)
+    // Two-pass PdhGetFormattedCounterArrayW: first call to size the buffer,
+    // second to fill it.  On return outItems points into m_arrayBuf (which
+    // remains valid until the next call on the same thread under m_mutex).
+    bool CollectCounters (DWORD & outItemCount, PDH_FMT_COUNTERVALUE_ITEM_W * & outItems)
+    {
+        DWORD      bufferBytes = 0;
+        PDH_STATUS s           = PDH_CSTATUS_NO_OBJECT;
+
+
+        outItemCount = 0;
+        outItems     = nullptr;
+
+        s = PdhGetFormattedCounterArrayW (m_counter, PDH_FMT_DOUBLE, &bufferBytes, &outItemCount, nullptr);
+
+        if (s != PDH_MORE_DATA || outItemCount == 0)
         {
-            return m_cachedLoad;
+            return false;
         }
 
         m_arrayBuf.resize (bufferBytes);
-        auto * items = reinterpret_cast<PDH_FMT_COUNTERVALUE_ITEM_W *> (m_arrayBuf.data());
+        outItems = reinterpret_cast<PDH_FMT_COUNTERVALUE_ITEM_W *> (m_arrayBuf.data());
 
-        if (PdhGetFormattedCounterArrayW (m_counter, PDH_FMT_DOUBLE, &bufferBytes, &itemCount, items) != ERROR_SUCCESS)
+        if (PdhGetFormattedCounterArrayW (m_counter, PDH_FMT_DOUBLE, &bufferBytes, &outItemCount, outItems) != ERROR_SUCCESS)
         {
-            return m_cachedLoad;
+            outItems     = nullptr;
+            outItemCount = 0;
+            return false;
         }
 
-        // Task Manager's per-process "GPU" column for our process:
-        //   for each engine type (3D / Compute / Copy / Video* / ...):
-        //     sum utilization across every instance of that engine type
-        //     for OUR PID only
-        //   take MAX across engine types
-        //
-        // We keep the wildcard counter "\GPU Engine(*)" so PDH discovers
-        // every engine instance system-wide, and filter to our PID in the
-        // result loop by matching the "pid_NNNN_" substring of each
-        // instance name.
-        wchar_t pidMarker[32];
+        return true;
+    }
+
+    // Task Manager's per-process "GPU" column for our process:
+    //   for each engine type (3D / Compute / Copy / Video* / ...):
+    //     sum utilization across every instance of that engine type for
+    //     OUR PID only
+    //   take MAX across engine types
+    double AggregateMaxPerEngineType (const PDH_FMT_COUNTERVALUE_ITEM_W * items, DWORD count) const
+    {
+        wchar_t                         pidMarker[32];
+        std::map<std::wstring, double>  sumPerEngineType;
+        double                          maxLoad           = 0.0;
+
+
         StringCchPrintfW (pidMarker, ARRAYSIZE (pidMarker), L"pid_%lu_", m_ownPid);
 
-        std::map<std::wstring, double> sumPerEngineType;
-
-        for (DWORD i = 0; i < itemCount; i++)
+        for (DWORD i = 0; i < count; i++)
         {
             if (items[i].FmtValue.CStatus != ERROR_SUCCESS || !items[i].szName)
             {
@@ -139,66 +227,35 @@ public:
 
             if (name.find (pidMarker) == std::wstring_view::npos)
             {
-                continue;       // different process
+                continue;
             }
 
             constexpr std::wstring_view kEngTypeMarker = L"engtype_";
-            size_t pos = name.find (kEngTypeMarker);
-
-            std::wstring engineType = (pos != std::wstring_view::npos)
-                                        ? std::wstring (name.substr (pos + kEngTypeMarker.size()))
-                                        : std::wstring (L"<unknown>");
+            size_t                      pos            = name.find (kEngTypeMarker);
+            std::wstring                engineType     = (pos != std::wstring_view::npos)
+                                                            ? std::wstring (name.substr (pos + kEngTypeMarker.size()))
+                                                            : std::wstring (L"<unknown>");
 
             sumPerEngineType[engineType] += items[i].FmtValue.doubleValue;
         }
 
-        double maxLoad = 0.0;
         for (const auto & [type, sum] : sumPerEngineType)
         {
             maxLoad = (std::max) (maxLoad, sum);
         }
 
-        m_cachedLoad = (std::min) (maxLoad, 100.0);
-        return m_cachedLoad;
-    }
-
-private:
-    bool Initialize()
-    {
-        if (PdhOpenQueryW (nullptr, 0, &m_query) != ERROR_SUCCESS)
-        {
-            m_query = nullptr;
-            return false;
-        }
-
-        m_ownPid = GetCurrentProcessId();
-
-        // System-wide wildcard so PDH discovers every engine instance.
-        // We filter to our PID in the result-processing loop by matching
-        // the "pid_NNNN_" substring of each instance name — embedding the
-        // PID in the counter path itself would expand the wildcard once
-        // at add time and miss instances that become active later.
-        if (PdhAddEnglishCounterW (m_query,
-                                   L"\\GPU Engine(*)\\Utilization Percentage",
-                                   0,
-                                   &m_counter) != ERROR_SUCCESS)
-        {
-            PdhCloseQuery (m_query);
-            m_query   = nullptr;
-            m_counter = nullptr;
-            return false;
-        }
-        return true;
+        return (std::min) (maxLoad, 100.0);
     }
 
 
     std::mutex            m_mutex;
-    PDH_HQUERY            m_query        { nullptr };
-    PDH_HCOUNTER          m_counter      { nullptr };
-    ULONGLONG             m_lastPollTick { 0 };
-    DWORD                 m_ownPid       { 0 };
-    double                m_cachedLoad   { -1.0 };
-    bool                  m_initFailed   { false };
+    PDH_HQUERY            m_query           { nullptr };
+    PDH_HCOUNTER          m_counter         { nullptr };
+    ULONGLONG             m_lastPollTick    { 0 };
+    ULONGLONG             m_lastRefreshTick { 0 };
+    DWORD                 m_ownPid          { 0 };
+    double                m_cachedLoad      { -1.0 };
+    bool                  m_initFailed      { false };
     std::vector<uint8_t>  m_arrayBuf;
 };
 

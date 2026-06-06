@@ -442,12 +442,13 @@ void MonitorRenderContext::RenderThreadProc()
             // GPU is gone (driver reset, removal, sleep/resume).  Stop this
             // render thread immediately and ask the UI thread to rebuild
             // every context on whatever adapter is currently available.
-            // Application::WindowProc handles WM_APP_REBUILD_CONTEXTS for
-            // every monitor window we create, so posting to our own HWND
-            // routes correctly.
+            // Post WM_APP_DEVICE_LOST (not WM_APP_REBUILD_CONTEXTS directly)
+            // so Application::HandleMessage routes the request through the
+            // RebuildCoalescer — an N-monitor burst then collapses to a
+            // single rebuild instead of N back-to-back rebuilds.
             if (m_hwnd)
             {
-                PostMessageW (m_hwnd, Application::WM_APP_REBUILD_CONTEXTS, 0, 0);
+                PostMessageW (m_hwnd, Application::WM_APP_DEVICE_LOST, 0, 0);
             }
 
             break;

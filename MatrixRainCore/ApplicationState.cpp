@@ -439,8 +439,19 @@ HRESULT ApplicationState::ApplyFirstRunQualityPreset (QualityPreset preset)
 {
     if (preset != QualityPreset::Custom)
     {
-        m_settings.m_qualityPreset = preset;
+        m_settings.m_qualityPreset  = preset;
         m_settings.m_advancedValues = LookupPresetValues (preset);
+
+        // Keep the legacy top-level glow-intensity field in sync with the
+        // advanced cluster's copy.  ScreenSaverSettings carries glow
+        // intensity in both m_glowIntensityPercent (read by Application's
+        // unconditional SharedState seed) and m_advancedValues.m_glow-
+        // IntensityPercent (read by the live-mode advanced-graphics
+        // callback).  RegistrySettingsProvider::Save persists the top-
+        // level field — without this mirror the preset's intensity (e.g.
+        // 75 for Low) is silently overwritten by the unchanged default
+        // (100), and the next launch starts at the wrong value.
+        m_settings.m_glowIntensityPercent = m_settings.m_advancedValues.m_glowIntensityPercent;
     }
 
     return SaveSettings();

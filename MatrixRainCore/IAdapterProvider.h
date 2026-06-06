@@ -1,20 +1,11 @@
 #pragma once
 
 
-
-
-////////////////////////////////////////////////////////////////////////////////
-//
-//  AdapterInfo
-//
-//  Describes one rendering-capable GPU adapter discovered at runtime.  Mirrors
-//  the existing MonitorInfo / IMonitorProvider pattern.  Software adapters
-//  (Microsoft Basic Render Driver / WARP) are filtered out by the concrete
-//  provider before the list reaches consumers, so callers never see them and
-//  do not need to re-filter.
-//
-////////////////////////////////////////////////////////////////////////////////
-
+// Describes one rendering-capable GPU adapter discovered at runtime.  Mirrors
+// the existing MonitorInfo / IMonitorProvider pattern.  Software adapters
+// (Microsoft Basic Render Driver / WARP) are filtered out by the concrete
+// provider before the list reaches consumers, so callers never see them and
+// do not need to re-filter.
 struct AdapterInfo
 {
     std::wstring  m_description;     // DXGI_ADAPTER_DESC1::Description (UTF-16)
@@ -25,18 +16,9 @@ struct AdapterInfo
 };
 
 
-
-
-////////////////////////////////////////////////////////////////////////////////
-//
-//  IAdapterProvider
-//
-//  Abstract enumeration of GPU adapters.  WindowsAdapterProvider drives this
-//  via DXGI in production; InMemoryAdapterProvider drives it from a
-//  test-supplied vector for unit tests.
-//
-////////////////////////////////////////////////////////////////////////////////
-
+// Abstract enumeration of GPU adapters.  WindowsAdapterProvider drives this
+// via DXGI in production; InMemoryAdapterProvider drives it from a
+// test-supplied vector for unit tests.
 class IAdapterProvider
 {
 public:
