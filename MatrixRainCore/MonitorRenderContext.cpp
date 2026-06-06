@@ -488,7 +488,25 @@ void MonitorRenderContext::Update (const SharedState::Snapshot & snapshot, float
         (overlays.hotkeyOverlay && overlays.hotkeyOverlay->IsActive()) ||
         (overlays.usageOverlay  && overlays.usageOverlay->IsActive()))
     {
-        Color4 scheme = GetColorRGB (snapshot.colorScheme, snapshot.elapsedTime);
+        Color4 scheme;
+
+
+        // ColorScheme::Custom isn't in the static palette table; resolve
+        // it from snapshot.customColor (COLORREF) so overlay text picks
+        // up the user-chosen colour instead of falling back to green.
+        if (snapshot.colorScheme == ColorScheme::Custom)
+        {
+            COLORREF cc = static_cast<COLORREF> (snapshot.customColor);
+
+            scheme.r = static_cast<float> (GetRValue (cc)) / 255.0f;
+            scheme.g = static_cast<float> (GetGValue (cc)) / 255.0f;
+            scheme.b = static_cast<float> (GetBValue (cc)) / 255.0f;
+            scheme.a = 1.0f;
+        }
+        else
+        {
+            scheme = GetColorRGB (snapshot.colorScheme, snapshot.elapsedTime);
+        }
 
         if (overlays.helpOverlay && overlays.helpOverlay->IsActive())
         {
