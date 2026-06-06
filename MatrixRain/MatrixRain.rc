@@ -178,43 +178,46 @@ STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_DISABLED | WS_CAPTIO
 CAPTION "Performance"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    LTEXT           "GPU:",IDC_STATIC,15,14,58,8
-    COMBOBOX        IDC_GPU_COMBO,90,12,195,120,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    // Mini-phase 2.5 layout: flat top-to-bottom (no groupbox).  Order:
+    // multimon, glow toggle, GPU, blank, quality cluster (4 sliders),
+    // blank, performance-metrics toggle.  Quality cluster stays as a unit
+    // because touching any advanced knob auto-flips the preset to Custom.
+    CONTROL         "Use all monitors",IDC_MULTIMONITOR_CHECK,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,14,140,10
 
     // Glow Enabled checkbox (US2 T040, FR-008): drives the m_glowEnabled
     // toggle.  ApplyGlowEnabledUI on the frame side mirrors its state into
     // EnableWindow on the Visuals-tab Glow Intensity / Glow Size trios and
     // the Performance-tab Quality Preset / Glow Passes / Glow Resolution /
     // Glow Smoothness trios.
-    CONTROL         "Enable glow",IDC_GLOW_ENABLED_CHECK,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,36,130,10
+    CONTROL         "Enable glow",IDC_GLOW_ENABLED_CHECK,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,32,140,10
 
-    GROUPBOX        "Graphics performance and quality",IDC_QUALITY_GROUPBOX,7,52,286,118
-    LTEXT           "Quality:",IDC_STATIC,15,64,58,8
-    CONTROL         "ⓘ",IDC_QUALITY_PRESET_INFO,"Button",BS_OWNERDRAW | WS_TABSTOP,74,62,14,14
-    CONTROL         "",IDC_QUALITY_PRESET_SLIDER,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,90,62,162,20
-    LTEXT           "High",IDC_QUALITY_PRESET_LABEL,257,64,28,8
+    LTEXT           "GPU:",IDC_STATIC,15,52,58,8
+    COMBOBOX        IDC_GPU_COMBO,90,50,195,120,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
 
-    LTEXT           "Glow passes:",IDC_GLOWPASSES_PROMPT,15,86,58,8
-    CONTROL         "ⓘ",IDC_GLOWPASSES_INFO,"Button",BS_OWNERDRAW | WS_TABSTOP,74,84,14,14
-    CONTROL         "",IDC_GLOWPASSES_SLIDER,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,90,84,162,20
-    LTEXT           "3",IDC_GLOWPASSES_LABEL,257,86,28,8
+    // Quality cluster — preset slider + 3 advanced knobs.  No groupbox
+    // wrapper (mini-phase 2.5): the cluster is visually separated by one
+    // blank row above and below.
+    LTEXT           "Quality:",IDC_STATIC,15,80,58,8
+    CONTROL         "ⓘ",IDC_QUALITY_PRESET_INFO,"Button",BS_OWNERDRAW | WS_TABSTOP,74,78,14,14
+    CONTROL         "",IDC_QUALITY_PRESET_SLIDER,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,90,78,162,20
+    LTEXT           "High",IDC_QUALITY_PRESET_LABEL,257,80,28,8
 
-    LTEXT           "Glow resolution:",IDC_GLOWRES_PROMPT,15,108,58,8
-    CONTROL         "ⓘ",IDC_GLOWRES_INFO,"Button",BS_OWNERDRAW | WS_TABSTOP,74,106,14,14
-    CONTROL         "",IDC_GLOWRES_SLIDER,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,90,106,162,20
-    LTEXT           "Half",IDC_GLOWRES_LABEL,257,108,28,8
+    LTEXT           "Glow passes:",IDC_GLOWPASSES_PROMPT,15,102,58,8
+    CONTROL         "ⓘ",IDC_GLOWPASSES_INFO,"Button",BS_OWNERDRAW | WS_TABSTOP,74,100,14,14
+    CONTROL         "",IDC_GLOWPASSES_SLIDER,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,90,100,162,20
+    LTEXT           "3",IDC_GLOWPASSES_LABEL,257,102,28,8
 
-    LTEXT           "Glow smoothness:",IDC_GLOWSMOOTH_PROMPT,15,130,58,8
-    CONTROL         "ⓘ",IDC_GLOWSMOOTH_INFO,"Button",BS_OWNERDRAW | WS_TABSTOP,74,128,14,14
-    CONTROL         "",IDC_GLOWSMOOTH_SLIDER,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,90,128,162,20
-    LTEXT           "High",IDC_GLOWSMOOTH_LABEL,257,130,28,8
+    LTEXT           "Glow resolution:",IDC_GLOWRES_PROMPT,15,124,58,8
+    CONTROL         "ⓘ",IDC_GLOWRES_INFO,"Button",BS_OWNERDRAW | WS_TABSTOP,74,122,14,14
+    CONTROL         "",IDC_GLOWRES_SLIDER,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,90,122,162,20
+    LTEXT           "Half",IDC_GLOWRES_LABEL,257,124,28,8
 
-    CONTROL         "Render on all monitors",IDC_MULTIMONITOR_CHECK,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,180,140,10
-    CONTROL         "Show debug statistics",IDC_SHOWDEBUG_CHECK,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,155,180,135,10
+    LTEXT           "Glow smoothness:",IDC_GLOWSMOOTH_PROMPT,15,146,58,8
+    CONTROL         "ⓘ",IDC_GLOWSMOOTH_INFO,"Button",BS_OWNERDRAW | WS_TABSTOP,74,144,14,14
+    CONTROL         "",IDC_GLOWSMOOTH_SLIDER,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,90,144,162,20
+    LTEXT           "High",IDC_GLOWSMOOTH_LABEL,257,146,28,8
 
-    // Reset to defaults — moved onto the Performance page since OK/Cancel
-    // (and Apply, suppressed by PSH_NOAPPLYNOW) are now frame-owned buttons.
-    PUSHBUTTON      "Reset to defaults",IDC_RESET_BUTTON,15,197,80,14
+    CONTROL         "Show performance metrics",IDC_SHOWDEBUG_CHECK,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,178,160,10
 END
 
 #endif    // English (United States) resources
