@@ -2018,7 +2018,17 @@ static INT_PTR CALLBACK PageDlgProc (HWND   hDlg,
 
                         if (pContext->m_isModeless)
                         {
-                            DestroyWindow (GetParent (hDlg));
+                            // Defer destruction: tearing the sheet down
+                            // synchronously while still inside comctl32's
+                            // PSN_APPLY notification dispatch corrupts the
+                            // dispatcher's per-page iteration state and
+                            // recursively re-enters the frame subclass
+                            // (manifests as a stack overflow inside
+                            // PropSheet_IsDialogMessage).  Posting WM_CLOSE
+                            // lets comctl32 unwind cleanly first; the
+                            // sheet's default WM_CLOSE handler calls
+                            // DestroyWindow on the next message-loop tick.
+                            PostMessageW (GetParent (hDlg), WM_CLOSE, 0, 0);
                         }
                     }
                     SetWindowLongPtr (hDlg, DWLP_MSGRESULT, PSNRET_NOERROR);
@@ -2049,7 +2059,8 @@ static INT_PTR CALLBACK PageDlgProc (HWND   hDlg,
 
                         if (pContext->m_isModeless)
                         {
-                            DestroyWindow (GetParent (hDlg));
+                            // Defer destruction (see PSN_APPLY for rationale).
+                            PostMessageW (GetParent (hDlg), WM_CLOSE, 0, 0);
                         }
                     }
                     // Explicitly allow the cancel to proceed.  PSN_RESET's
