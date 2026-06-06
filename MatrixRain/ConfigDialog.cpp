@@ -223,7 +223,7 @@ static int TickFrequencyForSliderId (int id)
         case IDC_DENSITY_SLIDER:        return 5;
         case IDC_ANIMSPEED_SLIDER:      return 5;
         case IDC_GLOWINTENSITY_SLIDER:  return 10;
-        case IDC_GLOWSIZE_SLIDER:       return 10;  // 50..200 -> 16 ticks (midpoint at 125)
+        case IDC_GLOWSIZE_SLIDER:       return 25;  // 50..200 -> 7 ticks at 50,75,100,125,150,175,200 (midpoint 125 preserved per tick-mark-conventions.md)
         case IDC_QUALITY_PRESET_SLIDER: return 1;
         case IDC_GLOWPASSES_SLIDER:     return 1;
         case IDC_GLOWRES_SLIDER:        return 1;

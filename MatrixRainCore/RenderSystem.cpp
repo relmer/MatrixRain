@@ -2218,11 +2218,15 @@ void RenderSystem::Render (const AnimationSystem & animationSystem, const Viewpo
         else
         {
             // Direct scene-to-backbuffer copy: render the scene texture without
-            // the bloom extract/blur/composite passes.
+            // the bloom extract/blur/composite passes.  Bind a null SRV at
+            // slot 1 (bloom) so the composite PS doesn't sample whatever
+            // texture was left bound there by a previous bloom-on frame —
+            // PSSetShaderResources with numResources=1 only touches slot 0.
             m_context->OMSetRenderTargets (1, m_renderTargetView.GetAddressOf(), nullptr);
             m_context->OMSetBlendState (nullptr, nullptr, 0xffffffff);
 
-            ID3D11ShaderResourceView * sceneSrv[] = { m_sceneSRV.Get() };
+            ID3D11ShaderResourceView * srvs[] = { m_sceneSRV.Get(), nullptr };
+
             SetRenderPipelineState (m_fullscreenQuadInputLayout.Get(),
                                     D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST,
                                     m_fullscreenQuadVB.Get(),
@@ -2231,7 +2235,7 @@ void RenderSystem::Render (const AnimationSystem & animationSystem, const Viewpo
                                     nullptr,
                                     nullptr);
             m_context->PSSetSamplers (0, 1, m_samplerState.GetAddressOf());
-            RenderFullscreenPass (m_renderTargetView.Get(), m_compositePS.Get(), sceneSrv, 1);
+            RenderFullscreenPass (m_renderTargetView.Get(), m_compositePS.Get(), srvs, 2);
         }
     }
     else
