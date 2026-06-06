@@ -2384,6 +2384,66 @@ LRESULT CALLBACK SheetFrameSubclass (HWND     hSheet,
                                       UINT_PTR uIdSubclass,
                                       DWORD_PTR /*dwRefData*/)
 {
+    // Mini-phase 2.5: reposition the frame-scope Reset button to its
+    // final left-aligned footer position.  Must happen AFTER property
+    // sheet has finished sizing itself around the pages — PSCB_INITIALIZED
+    // (where the button is created) fires while OK/Cancel are still at
+    // their initial small-template positions, so any positioning done
+    // there strands Reset in the middle of the dialog.  WM_SHOWWINDOW
+    // with wParam==TRUE fires once when the sheet becomes visible AFTER
+    // all layout is complete; we reposition there.
+    if (msg == WM_SHOWWINDOW && wParam == TRUE)
+    {
+        HWND  hReset = GetDlgItem (hSheet, IDC_RESET_DEFAULTS);
+        HWND  hOk    = GetDlgItem (hSheet, IDOK);
+
+        if (hReset && hOk)
+        {
+            RECT  okScreenRect = {};
+            POINT okTopLeft    = {};
+            int   okHeight     = 0;
+            int   okClientY    = 0;
+            int   leftMargin   = 0;
+            RECT  resetWinRect = {};
+            int   resetWidth   = 0;
+
+            GetWindowRect (hOk, &okScreenRect);
+            okTopLeft.x = okScreenRect.left;
+            okTopLeft.y = okScreenRect.top;
+            ScreenToClient (hSheet, &okTopLeft);
+
+            okClientY    = okTopLeft.y;
+            okHeight     = okScreenRect.bottom - okScreenRect.top;
+
+            // Mirror the OK button's right margin to give Reset the same
+            // gap from the left edge.  okScreenRect.right (relative to
+            // sheet) -> compute distance from sheet's right edge in
+            // client coords, then use that as left margin.
+            {
+                RECT  sheetClient = {};
+                POINT okBottomRight = {};
+
+                GetClientRect (hSheet, &sheetClient);
+                okBottomRight.x = okScreenRect.right;
+                okBottomRight.y = okScreenRect.bottom;
+                ScreenToClient (hSheet, &okBottomRight);
+
+                leftMargin = sheetClient.right - okBottomRight.x;
+            }
+
+            GetWindowRect (hReset, &resetWinRect);
+            resetWidth = resetWinRect.right - resetWinRect.left;
+
+            SetWindowPos (hReset,
+                          nullptr,
+                          leftMargin,
+                          okClientY,
+                          resetWidth,
+                          okHeight,
+                          SWP_NOZORDER | SWP_NOACTIVATE);
+        }
+    }
+
     // Mini-phase 2.5: frame-scope Reset button.  Pages don't see this
     // WM_COMMAND because the button is parented to the sheet, not a page.
     if (msg == WM_COMMAND && LOWORD (wParam) == IDC_RESET_DEFAULTS && HIWORD (wParam) == BN_CLICKED)
