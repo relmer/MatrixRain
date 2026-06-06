@@ -2447,12 +2447,11 @@ static void RepositionFrameResetButton (HWND hSheet)
     {
         RECT  okScreenRect  = {};
         RECT  resetWinRect  = {};
-        RECT  sheetClient   = {};
+        HWND  hTab          = nullptr;
         POINT okTopLeft     = {};
-        POINT okBottomRight = {};
         int   okClientY     = 0;
         int   okHeight      = 0;
-        int   leftMargin    = 0;
+        int   leftEdgeX     = 15;     // safe default if tab control missing
         int   resetWidth    = 0;
 
 
@@ -2462,21 +2461,34 @@ static void RepositionFrameResetButton (HWND hSheet)
         okTopLeft.y = okScreenRect.top;
         ScreenToClient (hSheet, &okTopLeft);
 
-        okBottomRight.x = okScreenRect.right;
-        okBottomRight.y = okScreenRect.bottom;
-        ScreenToClient (hSheet, &okBottomRight);
-
-        GetClientRect (hSheet, &sheetClient);
         GetWindowRect (hReset, &resetWinRect);
 
         okClientY  = okTopLeft.y;
         okHeight   = okScreenRect.bottom - okScreenRect.top;
-        leftMargin = sheetClient.right - okBottomRight.x;
         resetWidth = resetWinRect.right - resetWinRect.left;
+
+        // Anchor Reset's LEFT edge to the tab control's LEFT edge so it
+        // sits in the same content column as everything else.  Mirroring
+        // OK's right margin (the prior approach) put Reset way too far
+        // from the dialog's left edge because OK is anchored well inboard
+        // of the right edge.
+        hTab = PropSheet_GetTabControl (hSheet);
+
+        if (hTab)
+        {
+            RECT  tabScreenRect = {};
+            POINT tabTopLeft    = {};
+
+            GetWindowRect (hTab, &tabScreenRect);
+            tabTopLeft.x = tabScreenRect.left;
+            tabTopLeft.y = tabScreenRect.top;
+            ScreenToClient (hSheet, &tabTopLeft);
+            leftEdgeX    = tabTopLeft.x;
+        }
 
         SetWindowPos (hReset,
                       nullptr,
-                      leftMargin,
+                      leftEdgeX,
                       okClientY,
                       resetWidth,
                       okHeight,

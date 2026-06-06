@@ -1025,6 +1025,17 @@ void Application::RebuildContextsForCurrentMode()
     if (hConfigDialog && IsWindow (hConfigDialog) && m_hwnd)
     {
         SetWindowLongPtrW (hConfigDialog, GWLP_HWNDPARENT, reinterpret_cast<LONG_PTR> (m_hwnd));
+
+        // After the rebuild, the newly-created primary render window sits
+        // at the top of the Z-order.  Raise the config dialog back above
+        // it so the user can keep interacting with the settings (otherwise
+        // toggling Start In Fullscreen makes the dialog appear to vanish
+        // behind the rain).  SWP_NOACTIVATE keeps keyboard focus where it
+        // is (still on the dialog control the user just toggled).
+        SetWindowPos (hConfigDialog,
+                      HWND_TOP,
+                      0, 0, 0, 0,
+                      SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
     }
 
     m_inDisplayModeTransition = false;
