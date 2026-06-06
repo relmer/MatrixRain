@@ -887,8 +887,8 @@ int Application::Run()
             break;
         }
 
-        // If live overlay dialog is active, let it handle dialog messages
-        if (m_hConfigDialog && IsDialogMessage (m_hConfigDialog, &msg))
+        // If live overlay dialog is active, let the property sheet handle dialog messages
+        if (m_hConfigDialog && PropSheet_IsDialogMessage (m_hConfigDialog, &msg))
         {
             continue;
         }
