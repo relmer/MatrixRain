@@ -48,9 +48,9 @@ HRESULT ConfigDialogController::Initialize()
 
     m_originalSettings = m_settings;
 
-    // No Error: label here — the function has no CHR/CBR call paths, and
-    // /WX would reject the unreferenced label.  Adding one in the future
-    // is trivial: change the last assignment to a CHR site, label here.
+
+// Error:    // /WX would reject the unreferenced label; uncomment when the
+            // first CHR/CBR/CWR call lands here.
     return S_OK;
 }
 
