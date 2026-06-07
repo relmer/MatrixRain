@@ -427,7 +427,20 @@ void ConfigDialogController::CancelChanges()
 
 void ConfigDialogController::ResetToDefaults()
 {
-    m_settings = ScreenSaverSettings();
+    // FR-035 carve-out: the custom-color palette is INTENTIONALLY NOT
+    // reset.  Capture it before zeroing m_settings (defaults-init wipes
+    // the array to all zeros) and restore it on the freshly defaulted
+    // struct.  Mirror onto the snapshot so a subsequent CancelLiveMode
+    // doesn't observe a stale palette (the snapshot itself never carried
+    // the palette before, but ResetToDefaults is now the one writer to it
+    // that the snapshot can't otherwise see).  Without this, Reset->OK
+    // would write the zeroed palette to the registry and the user's 16
+    // saved swatches would be lost permanently.
+    std::array<COLORREF, 16> palette = m_settings.m_customColorPalette;
+
+    m_settings                                       = ScreenSaverSettings();
+    m_settings.m_customColorPalette                  = palette;
+    m_snapshot.snapshotSettings.m_customColorPalette = palette;
 
     // Mini-phase 2.5 (cross-page Reset button): propagate to ApplicationState
     // in live mode so the live preview snaps back instantly.  ApplySettings

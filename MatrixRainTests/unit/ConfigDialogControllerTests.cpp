@@ -494,6 +494,52 @@ namespace MatrixRainTests
 
 
 
+        // FR-035 regression: Reset-to-defaults MUST preserve the saved
+        // custom-color palette (the "unconditional persistence" carve-out
+        // that ApplyChanges/CancelChanges already honour).  Without this
+        // guard, ResetToDefaults() would assign a default-constructed
+        // ScreenSaverSettings — whose palette is zero-initialised — and
+        // a subsequent OK would persist 16 zeroed slots to the registry,
+        // silently destroying the user's saved swatches.
+        TEST_METHOD (ResetToDefaultsPreservesCustomColorPalette)
+        {
+            HRESULT                  hr         = S_OK;
+            ConfigDialogController   controller (m_settingsProvider);
+            std::array<COLORREF, 16> palette;
+
+
+            hr = controller.Initialize();
+            Assert::AreEqual (S_OK, hr);
+
+            for (size_t i = 0; i < palette.size(); i++)
+            {
+                palette[i] = RGB (static_cast<BYTE> (i * 16),
+                                  static_cast<BYTE> (255 - i * 16),
+                                  static_cast<BYTE> (i * 8));
+            }
+
+            controller.SetCustomColorPalette (palette);
+            controller.UpdateDensity         (25);
+
+            controller.ResetToDefaults();
+
+            const ScreenSaverSettings & settings = controller.GetSettings();
+
+
+            Assert::AreEqual (ScreenSaverSettings::DEFAULT_DENSITY_PERCENT, settings.m_densityPercent,
+                              L"Density should reset to default");
+
+            for (size_t i = 0; i < palette.size(); i++)
+            {
+                Assert::AreEqual (static_cast<DWORD> (palette[i]),
+                                  static_cast<DWORD> (settings.m_customColorPalette[i]),
+                                  L"customColorPalette slot survives ResetToDefaults (FR-035)");
+            }
+        }
+
+
+
+
 
         // T050.1: Test ConfigDialogController creates snapshot in live overlay mode
         TEST_METHOD (TestConfigDialogControllerCreatesSnapshotInLiveMode)

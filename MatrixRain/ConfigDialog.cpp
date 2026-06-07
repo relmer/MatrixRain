@@ -91,6 +91,10 @@ static constexpr UINT_PTR kInfoButtonSubclassId = 0xC0C00C1Bu;
 // not about settings propagation.
 #define WM_APP_RESET_RESYNC      (WM_APP + 50)
 #define WM_APP_REPOSITION_RESET  (WM_APP + 51)
+// WM_APP + 52 is WM_APP_OPEN_CUSTOM_COLOR_CHOOSER (defined below near
+// the color combo plumbing).  All dialog WM_APP IDs are listed here so
+// future additions trip a duplicate-define warning if they collide.
+#define WM_APP_OPEN_CUSTOM_COLOR_CHOOSER (WM_APP + 52)
 
 
 
@@ -874,11 +878,11 @@ static constexpr int kCustomColorComboIndex = 5;
 // SetPropW so the subclass + WM_COMMAND handler can share state.
 static constexpr const wchar_t kLastColorComboIndexProp[] = L"MatrixRainLastColIdx";
 
-// US5 (T064): WM_APP messages used by the combo subclass to defer
-// chooser invocation out of the comctl mouse/key dispatch (calling
-// ChooseColorW inside the message handler would deadlock the modal
-// owner).  Posted from the subclass, handled in PageDlgProc.
-#define WM_APP_OPEN_CUSTOM_COLOR_CHOOSER (WM_APP + 51)
+// US5 (T064): WM_APP message used to defer chooser invocation out of
+// the comctl mouse/key dispatch (calling ChooseColorW inside the message
+// handler would deadlock the modal owner).  Handled in PageDlgProc.
+// Numeric ID defined alongside the other dialog WM_APP IDs at file top
+// (WM_APP + 52) so the duplicate-define check covers all of them.
 
 
 
@@ -2999,8 +3003,18 @@ HRESULT CreateConfigDialog (HINSTANCE          hInstance,
         psHeader.pfnCallback = CbHelper::Trampoline;
     }
 
-    hSheet = reinterpret_cast<HWND> (PropertySheetW (&psHeader));
-    CWRA (hSheet);
+    {
+        // PropertySheetW (modeless) returns -1 on failure, 0 if there's
+        // no current page, or the sheet HWND on success.  reinterpret_-
+        // casting a -1 directly to HWND would produce a non-NULL "handle"
+        // that CWRA happily accepts; then context.release() would leak
+        // the DialogContext (controller, GDI font, etc.) and the caller
+        // would later pass (HWND)-1 to IsWindow/SetWindowLongPtrW.
+        INT_PTR rc = PropertySheetW (&psHeader);
+
+        CBRAEx (rc != -1 && rc != 0, E_FAIL);
+        hSheet = reinterpret_cast<HWND> (rc);
+    }
 
     context.release();   // ownership transferred to the sheet subclass
 
