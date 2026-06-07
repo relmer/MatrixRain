@@ -12,10 +12,10 @@ namespace MatrixRainTests
 
 
     // T051 (US3, FR-028b, contracts/scanline-shader.md): the scanline post-
-    // pass must be bypassed when scanlines are disabled OR when glow is
-    // disabled (the bloom composite hosts the post-bloom-target plumbing
-    // the scanline PS samples from).  The full RenderSystem::Render path
-    // requires a D3D device and isn't unit-testable in isolation; the
+    // pass must be bypassed when scanlines are disabled. GlowEnabled must not
+    // affect scanlines (the no-glow path routes through m_postBloomTarget so the
+    // scanline PS always has an SRV to sample from). The full RenderSystem::Render
+    // path requires a D3D device and isn't unit-testable in isolation; the
     // pure-helper predicate carries the decision logic so the impl branch
     // in RenderSystem.cpp can be reviewed against this contract.
     TEST_CLASS (RenderSystemScanlineBypassTests)
