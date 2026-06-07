@@ -60,7 +60,6 @@ struct SharedState
 
     // Debug/statistics display
     bool        showStatistics        = false;
-    bool        showDebugFadeTimes    = false;
 
     // Pause state (spacebar) — broadcast to every monitor so all displays
     // freeze and resume their rain together.  Does not freeze elapsedTime, so
@@ -71,6 +70,23 @@ struct SharedState
     // owning (primary) render thread and read by every monitor so all displays
     // cycle color in sync.
     float       elapsedTime           = 0.0f;
+
+    // v1.5 live fields (data-model.md §4, FR-044): dialog thread writes,
+    // render thread reads.  Atomics are lock-free on all supported archs.
+    std::atomic<bool>     liveGlowEnabled        { true       };
+    std::atomic<bool>     liveScanlinesEnabled   { true       };
+    std::atomic<int>      liveScanlinesIntensity { ScreenSaverSettings::DEFAULT_SCANLINES_INTENSITY_PERCENT };
+    std::atomic<int>      liveScanlinesStyle     { ScreenSaverSettings::DEFAULT_SCANLINES_STYLE             };
+    std::atomic<DWORD>    liveCustomColor        { static_cast<DWORD> (ScreenSaverSettings::DEFAULT_CUSTOM_COLOR) };
+
+    // v1.5 snapshot mirrors (filled by ConfigDialogController::EnterLiveMode,
+    // restored by CancelLiveMode).  Not atomic because they're only touched
+    // by the dialog thread under m_sharedState.mutex.
+    bool      snapshotGlowEnabled        { true       };
+    bool      snapshotScanlinesEnabled   { true       };
+    int       snapshotScanlinesIntensity { ScreenSaverSettings::DEFAULT_SCANLINES_INTENSITY_PERCENT };
+    int       snapshotScanlinesStyle     { ScreenSaverSettings::DEFAULT_SCANLINES_STYLE             };
+    DWORD     snapshotCustomColor        { static_cast<DWORD> (ScreenSaverSettings::DEFAULT_CUSTOM_COLOR) };
 
 
     ////////////////////////////////////////////////////////////////////////////
@@ -88,11 +104,18 @@ struct SharedState
         int               glowSizePercent        = ScreenSaverSettings::DEFAULT_GLOW_SIZE_PERCENT;
         int               blurPasses             = 3;
         ResolutionDivisor bloomResolutionDivisor = ResolutionDivisor::Half;
-        BlurTaps          blurTaps               = BlurTaps::High;
+        BlurTaps           blurTaps              = BlurTaps::High;
         bool              showStatistics         = false;
-        bool              showDebugFadeTimes     = false;
         bool              isPaused               = false;
         float             elapsedTime            = 0.0f;
+
+        // v1.5 (data-model.md §4): lock-free snapshot of the live atomics
+        // copied once per frame by the render thread under m_sharedState.mutex.
+        bool              glowEnabled            = true;
+        bool              scanlinesEnabled       = true;
+        int               scanlinesIntensity     = ScreenSaverSettings::DEFAULT_SCANLINES_INTENSITY_PERCENT;
+        int               scanlinesStyle         = ScreenSaverSettings::DEFAULT_SCANLINES_STYLE;
+        DWORD             customColor            = static_cast<DWORD> (ScreenSaverSettings::DEFAULT_CUSTOM_COLOR);
     };
 
 
@@ -110,9 +133,13 @@ struct SharedState
             .bloomResolutionDivisor = bloomResolutionDivisor,
             .blurTaps               = blurTaps,
             .showStatistics         = showStatistics,
-            .showDebugFadeTimes     = showDebugFadeTimes,
             .isPaused               = isPaused,
             .elapsedTime            = elapsedTime,
+            .glowEnabled            = liveGlowEnabled       .load (std::memory_order_relaxed),
+            .scanlinesEnabled       = liveScanlinesEnabled  .load (std::memory_order_relaxed),
+            .scanlinesIntensity     = liveScanlinesIntensity.load (std::memory_order_relaxed),
+            .scanlinesStyle         = liveScanlinesStyle    .load (std::memory_order_relaxed),
+            .customColor            = liveCustomColor       .load (std::memory_order_relaxed),
         };
     }
 };

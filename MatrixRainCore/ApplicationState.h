@@ -57,11 +57,6 @@ public:
     void CycleColorScheme();
 
     /// <summary>
-    /// Toggle debug fade times display.
-    /// </summary>
-    void ToggleDebugFadeTimes();
-    
-    /// <summary>
     /// Called when density changes to update and save settings.
     /// </summary>
     /// <param name="densityPercent">New density percentage (0-100)</param>
@@ -114,11 +109,15 @@ public:
     void RegisterShowStatisticsCallback (std::function<void(bool)> callback);
 
     /// <summary>
-    /// Register a callback to be notified when the show-debug-fade-times
-    /// flag changes (via dialog, hotkey, or full settings apply).
+    /// Register a bulk callback for the v1.5 live atomics (glowEnabled,
+    /// scanlinesEnabled, scanlinesIntensity, scanlinesStyle, customColor).
+    /// Fired from `ApplySettings` so the dialog thread's per-control
+    /// setters (which all funnel through ApplySettings) reach SharedState
+    /// in one lock-free dispatch.  Application wires this to atomic-stores
+    /// on SharedState.live* so the render thread picks up the new values
+    /// via GetSnapshot on the next frame.
     /// </summary>
-    /// <param name="callback">Function to call with the new visibility flag</param>
-    void RegisterShowDebugFadeTimesCallback (std::function<void(bool)> callback);
+    void RegisterV15LiveCallback (std::function<void(const ScreenSaverSettings &)> callback);
 
     /// <summary>
     /// Update animation speed setting.
@@ -161,7 +160,6 @@ public:
     // Accessors
     DisplayMode               GetDisplayMode()         const { return m_displayMode;         }
     ColorScheme               GetColorScheme()         const { return m_colorScheme;         }
-    bool                      GetShowDebugFadeTimes()  const { return m_showDebugFadeTimes;  }
     float                     GetElapsedTime()         const { return m_elapsedTime;         }
     bool                      GetShowStatistics()      const { return m_showStatistics;      }
     const ScreenSaverSettings GetSettings()            const { return m_settings;            }
@@ -175,7 +173,6 @@ public:
     void    SetDisplayMode        (DisplayMode mode)   { m_displayMode = mode;                 }
     void    SetColorScheme        (ColorScheme scheme);
     void    SetShowStatistics     (bool show);
-    void    SetShowDebugFadeTimes (bool show);
     void    ToggleStatistics();
     HRESULT SaveSettings();
 
@@ -183,7 +180,6 @@ private:
     ISettingsProvider              & m_settingsProvider;                                           // Settings provider (not owned)
     DisplayMode                      m_displayMode                      = DisplayMode::Fullscreen; // Current display mode
     ColorScheme                      m_colorScheme                      = ColorScheme::Green;      // Current color scheme
-    bool                             m_showDebugFadeTimes               = false;                   // Show debug fade time overlay
     bool                             m_showStatistics                   = false;                   // Show FPS and density statistics
     float                            m_elapsedTime                      = 0.0f;                    // Elapsed time for color cycling animation
     ScreenSaverSettings              m_settings;                                                   // User-configurable settings
@@ -195,8 +191,14 @@ private:
     std::function<void(int)>         m_glowSizeChangeCallback           = nullptr;                 // Callback for glow size changes
     std::function<void(ColorScheme)> m_colorSchemeChangeCallback        = nullptr;                 // Callback for color scheme changes
     std::function<void(bool)>        m_showStatisticsChangeCallback     = nullptr;                 // Callback for show-statistics changes
-    std::function<void(bool)>        m_showDebugFadeTimesChangeCallback = nullptr;                 // Callback for show-debug-fade-times changes
     std::function<void(const AdvancedGraphicsValues &)> m_advancedGraphicsChangeCallback = nullptr; // Callback for US5 advanced graphics changes
+
+    // v1.5 (US2/US3/US5 live preview): single bulk callback fired from
+    // ApplySettings, wired by Application.cpp to atomic-store every
+    // SharedState.live* field in one shot.  Simpler than five per-field
+    // callbacks because UpdateGlowEnabled / UpdateScanlines* / UpdateCustomColor
+    // all funnel through ApplySettings anyway, so one signal is sufficient.
+    std::function<void(const ScreenSaverSettings &)> m_v15LiveCallback                = nullptr;
 };
 
 

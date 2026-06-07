@@ -117,11 +117,27 @@ public:
     /// <param name="showDebugStats">True to show debug statistics</param>
     void UpdateShowDebugStats (bool showDebugStats);
 
+    // v1.5 setters (US1 T025, FR-004, FR-020, FR-027, FR-028, FR-030,
+    // FR-033, FR-044) — mutate m_settings, clamp where applicable, and
+    // (in live mode) propagate via m_snapshot.applicationStateRef.
+    void UpdateGlowEnabled         (bool     enabled);
+    void UpdateScanlinesEnabled    (bool     enabled);
+    void UpdateScanlinesIntensity  (int      intensityPercent);
+    void UpdateScanlinesStyle      (int      style);
+    void UpdateCustomColor         (COLORREF color);
+
     /// <summary>
-    /// Update show fade timers flag.
+    /// Write the full 16-swatch ChooseColor palette into the settings.
+    /// FR-035 carve-out: the palette is INTENTIONALLY OUTSIDE the live-
+    /// mode snapshot rollback set — swatch edits made during a live
+    /// session survive Cancel.  No live propagation either, since the
+    /// palette only feeds CHOOSECOLORW::lpCustColors (not a rendering
+    /// parameter).  Persisted unconditionally on every Save.
     /// </summary>
-    /// <param name="showFadeTimers">True to show fade timer overlay</param>
-    void UpdateShowFadeTimers (bool showFadeTimers);
+    void SetCustomColorPalette (const std::array<COLORREF, 16> & palette)
+    {
+        m_settings.m_customColorPalette = palette;
+    }
 
     /// <summary>
     /// Apply and persist all changes to registry.
@@ -158,6 +174,18 @@ public:
     /// </summary>
     /// <returns>S_OK on success, E_FAIL if not in live mode, error HRESULT otherwise</returns>
     HRESULT ApplyLiveMode();
+
+    /// <summary>
+    /// T033a (US1, FR-004a, SC-011): commit live-mode changes from the
+    /// property-sheet `PSN_APPLY` path.  Persists every rollback-eligible
+    /// field (the 5 new v1.5 fields PLUS the v1.4 fields that participate
+    /// in live-mode rollback) to the registry via
+    /// `m_settingsProvider.Save(m_settings)` and clears the snapshot.
+    /// Functionally identical to `ApplyLiveMode()`; named to match the
+    /// dismissal-semantics contract in `contracts/propertysheet.md` so the
+    /// dialog code reads cleanly.
+    /// </summary>
+    HRESULT CommitLiveMode() { return ApplyLiveMode(); }
 
     /// <summary>
     /// Cancel live mode changes (revert ApplicationState to snapshot and clear).

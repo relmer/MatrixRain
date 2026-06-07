@@ -44,6 +44,14 @@ IDI_MATRIXRAIN          ICON                    "MatrixRain.ico"
 STRINGTABLE
 BEGIN
     1, "MatrixRain"
+
+    // v1.5 (T028, FR-009, FR-012): property-sheet tab labels.  Live FPS +
+    // GPU% are displayed in a per-page bottom-right static (IDC_FPS_GPU_-
+    // READOUT) via swprintf_s on IDS_FPS_GPU_READOUT_FORMAT — the tab
+    // titles themselves stay constant so the tab control doesn't flicker.
+    IDS_VISUALS_TAB_TITLE             "Visuals"
+    IDS_PERFORMANCE_TAB_TITLE_INITIAL "Performance"
+    IDS_PERFTAB_TITLE_FORMAT          "%u fps, %u%% GPU"
 END
 
 
@@ -105,63 +113,123 @@ STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSM
 CAPTION "MatrixRain configuration"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
+END
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// v1.5 (T028, FR-001, FR-005, FR-008): property-sheet pages.  Visuals on
+// the left tab, Performance on the right.  Both tab titles are static; the
+// live "NN fps, NN%% GPU" numbers appear in the bottom-right
+// IDC_FPS_GPU_READOUT static on each page (1 Hz, see PerfTitleTimerProc).
+// Pages share the v1.4 control-id space defined in
+// resource.h; controls reserved for later phases (US2 glow checkbox, US3
+// scanline group, US5 colour combo Custom slot) are laid out here as
+// disabled/empty placeholders so the layout doesn't shift as those tasks
+// land.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+IDD_VISUALS_PAGE DIALOGEX 0, 0, 300, 232
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_DISABLED | WS_CAPTION
+CAPTION "Visuals"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
     LTEXT           "Density:",IDC_STATIC,15,14,58,8
     CONTROL         "",IDC_DENSITY_SLIDER,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,90,12,162,20
     LTEXT           "100%",IDC_DENSITY_LABEL,257,14,28,8
-    
+
     LTEXT           "Speed:",IDC_STATIC,15,36,58,8
     CONTROL         "",IDC_ANIMSPEED_SLIDER,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,90,34,162,20
     LTEXT           "75%",IDC_ANIMSPEED_LABEL,257,36,28,8
-    
+
     LTEXT           "Glow intensity:",IDC_STATIC,15,58,58,8
     CONTROL         "ⓘ",IDC_GLOWINTENSITY_INFO,"Button",BS_OWNERDRAW | WS_TABSTOP,74,56,14,14
     CONTROL         "",IDC_GLOWINTENSITY_SLIDER,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,90,56,162,20
     LTEXT           "100%",IDC_GLOWINTENSITY_LABEL,257,58,28,8
-    
+
     LTEXT           "Glow size:",IDC_STATIC,15,80,58,8
     CONTROL         "ⓘ",IDC_GLOWSIZE_INFO,"Button",BS_OWNERDRAW | WS_TABSTOP,74,78,14,14
     CONTROL         "",IDC_GLOWSIZE_SLIDER,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,90,78,162,20
     LTEXT           "100%",IDC_GLOWSIZE_LABEL,257,80,28,8
-    
-    LTEXT           "Color:",IDC_STATIC,15,103,58,8
-    COMBOBOX        IDC_COLORSCHEME_COMBO,90,100,195,60,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    
-    LTEXT           "GPU:",IDC_STATIC,15,125,58,8
-    COMBOBOX        IDC_GPU_COMBO,90,122,195,120,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    
-    GROUPBOX        "Graphics performance and quality",IDC_QUALITY_GROUPBOX,7,144,286,100
-    LTEXT           "Quality:",IDC_STATIC,15,156,58,8
-    CONTROL         "ⓘ",IDC_QUALITY_PRESET_INFO,"Button",BS_OWNERDRAW | WS_TABSTOP,74,154,14,14
-    CONTROL         "",IDC_QUALITY_PRESET_SLIDER,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,90,154,162,20
-    LTEXT           "High",IDC_QUALITY_PRESET_LABEL,257,156,28,8
-    
-    LTEXT           "Glow passes:",IDC_GLOWPASSES_PROMPT,15,178,58,8
-    CONTROL         "ⓘ",IDC_GLOWPASSES_INFO,"Button",BS_OWNERDRAW | WS_TABSTOP,74,176,14,14
-    CONTROL         "",IDC_GLOWPASSES_SLIDER,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,90,176,162,20
-    LTEXT           "3",IDC_GLOWPASSES_LABEL,257,178,28,8
-    
-    LTEXT           "Glow resolution:",IDC_GLOWRES_PROMPT,15,200,58,8
-    CONTROL         "ⓘ",IDC_GLOWRES_INFO,"Button",BS_OWNERDRAW | WS_TABSTOP,74,198,14,14
-    CONTROL         "",IDC_GLOWRES_SLIDER,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,90,198,162,20
-    LTEXT           "Half",IDC_GLOWRES_LABEL,257,200,28,8
-    
-    LTEXT           "Glow smoothness:",IDC_GLOWSMOOTH_PROMPT,15,222,58,8
-    CONTROL         "ⓘ",IDC_GLOWSMOOTH_INFO,"Button",BS_OWNERDRAW | WS_TABSTOP,74,220,14,14
-    CONTROL         "",IDC_GLOWSMOOTH_SLIDER,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,90,220,162,20
-    LTEXT           "High",IDC_GLOWSMOOTH_LABEL,257,222,28,8
 
-    // Bottom checkboxes — two columns.
-    //   Left  column (x =  15, w = 130): debug-app / behavior toggles
-    //   Right column (x = 150, w = 135): debug-overlay toggles
-    CONTROL         "Start in fullscreen",IDC_STARTFULLSCREEN_CHECK,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,255,130,10
-    CONTROL         "Render on all monitors",IDC_MULTIMONITOR_CHECK,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,270,130,10
-    CONTROL         "Show debug statistics",IDC_SHOWDEBUG_CHECK,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,150,255,135,10
-    CONTROL         "Show fade timers",IDC_SHOWFADETIMERS_CHECK,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,150,270,135,10
-    
-    // Bottom buttons — Reset at the left margin, OK + Cancel at the right.
-    PUSHBUTTON      "Reset",IDC_RESET_BUTTON,15,295,50,14
-    DEFPUSHBUTTON   "OK",IDOK,180,295,50,14
-    PUSHBUTTON      "Cancel",IDCANCEL,235,295,50,14
+    // Color combo width matches the trackbar width above it (w=162, ending at x=252).
+    LTEXT           "Color:",IDC_STATIC,15,103,58,8
+    COMBOBOX        IDC_COLORSCHEME_COMBO,90,100,162,80,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    // Owner-draw button (not static) so the system gives us click + tab
+    // handling for free; clicking the swatch opens the colour chooser
+    // regardless of which scheme is currently selected.  Height matches
+    // the closed combo edit area (12 DLU for 8pt MS Shell Dlg).
+    CONTROL         "",IDC_COLOR_SWATCH,"Button",BS_OWNERDRAW | WS_TABSTOP,257,100,28,12
+
+    // Scanline intensity/style sliders stay on the Visuals page; only the
+    // Enable scanlines checkbox lives on the Performance page (alongside
+    // Enable glow).  Sliders are greyed when the checkbox is off.
+    LTEXT           "Scanline intensity:",IDC_SCANLINES_INTENSITY_PROMPT,15,127,75,8
+    CONTROL         "ⓘ",IDC_SCANLINES_INTENSITY_INFO,"Button",BS_OWNERDRAW | WS_TABSTOP,74,125,14,14
+    CONTROL         "",IDC_SCANLINES_INTENSITY_SLIDER,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,90,125,162,20
+    LTEXT           "30%",IDC_SCANLINES_INTENSITY_VALUE,257,127,28,8
+
+    LTEXT           "Scanline style:",IDC_SCANLINES_STYLE_PROMPT,15,149,75,8
+    CONTROL         "ⓘ",IDC_SCANLINES_STYLE_INFO,"Button",BS_OWNERDRAW | WS_TABSTOP,74,147,14,14
+    CONTROL         "",IDC_SCANLINES_STYLE_SLIDER,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,90,147,162,20
+    LTEXT           "50",IDC_SCANLINES_STYLE_VALUE,257,149,28,8
+
+    CONTROL         "Start in fullscreen",IDC_STARTFULLSCREEN_CHECK,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,176,130,10
+
+    // Bottom-right live FPS / GPU% readout (1 Hz update from PerfTitle-
+    // TimerProc).  Same control id on both pages so the timer can address
+    // them uniformly.  Right-aligned text; field right edge matches the
+    // trackbar/combo right edge above (x=285 = 155+130).
+    LTEXT           "",IDC_FPS_GPU_READOUT,155,216,130,8,SS_RIGHT
+END
+
+
+
+IDD_PERFORMANCE_PAGE DIALOGEX 0, 0, 300, 232
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_DISABLED | WS_CAPTION
+CAPTION "Performance"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    // Top-of-page checkboxes group:
+    //   Use all monitors, Enable glow, Enable scanlines
+    CONTROL         "Use all monitors",IDC_MULTIMONITOR_CHECK,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,14,140,10
+    CONTROL         "Enable glow",IDC_GLOW_ENABLED_CHECK,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,32,140,10
+    CONTROL         "Enable scanlines",IDC_SCANLINES_ENABLED_CHECK,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,50,140,10
+
+    // GPU combo width matches the trackbar widths below it (w=162).
+    LTEXT           "GPU:",IDC_STATIC,15,74,58,8
+    COMBOBOX        IDC_GPU_COMBO,90,71,162,120,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+
+    // Quality cluster — preset slider + 3 advanced knobs.  No groupbox
+    // wrapper: cluster is visually separated by one blank row above and
+    // below.  Quality cluster stays as a unit because touching any
+    // advanced knob auto-flips the preset to Custom.
+    LTEXT           "Quality:",IDC_STATIC,15,100,58,8
+    CONTROL         "ⓘ",IDC_QUALITY_PRESET_INFO,"Button",BS_OWNERDRAW | WS_TABSTOP,74,98,14,14
+    CONTROL         "",IDC_QUALITY_PRESET_SLIDER,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,90,98,162,20
+    LTEXT           "High",IDC_QUALITY_PRESET_LABEL,257,100,28,8
+
+    LTEXT           "Glow passes:",IDC_GLOWPASSES_PROMPT,15,122,58,8
+    CONTROL         "ⓘ",IDC_GLOWPASSES_INFO,"Button",BS_OWNERDRAW | WS_TABSTOP,74,120,14,14
+    CONTROL         "",IDC_GLOWPASSES_SLIDER,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,90,120,162,20
+    LTEXT           "3",IDC_GLOWPASSES_LABEL,257,122,28,8
+
+    LTEXT           "Glow resolution:",IDC_GLOWRES_PROMPT,15,144,58,8
+    CONTROL         "ⓘ",IDC_GLOWRES_INFO,"Button",BS_OWNERDRAW | WS_TABSTOP,74,142,14,14
+    CONTROL         "",IDC_GLOWRES_SLIDER,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,90,142,162,20
+    LTEXT           "Half",IDC_GLOWRES_LABEL,257,144,28,8
+
+    LTEXT           "Glow smoothness:",IDC_GLOWSMOOTH_PROMPT,15,166,58,8
+    CONTROL         "ⓘ",IDC_GLOWSMOOTH_INFO,"Button",BS_OWNERDRAW | WS_TABSTOP,74,164,14,14
+    CONTROL         "",IDC_GLOWSMOOTH_SLIDER,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,90,164,162,20
+    LTEXT           "High",IDC_GLOWSMOOTH_LABEL,257,166,28,8
+
+    CONTROL         "Show performance metrics",IDC_SHOWDEBUG_CHECK,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,198,160,10
+
+    // Bottom-right live FPS / GPU% readout — see IDD_VISUALS_PAGE for notes.
+    LTEXT           "",IDC_FPS_GPU_READOUT,155,216,130,8,SS_RIGHT
 END
 
 #endif    // English (United States) resources

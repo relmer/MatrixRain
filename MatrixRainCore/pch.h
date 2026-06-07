@@ -39,6 +39,7 @@
 #include <PathCch.h>
 #include <Pdh.h>
 #include <PdhMsg.h>
+#include <Prsht.h>
 #include <ShellApi.h>
 #include <ShellScalingApi.h>
 #include <StrSafe.h>

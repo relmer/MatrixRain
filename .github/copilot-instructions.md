@@ -1065,7 +1065,8 @@ git diff       # Bad - will paginate
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan at
-`specs/006-multimon-gpu-efficiency/plan.md` and its supporting research,
-data model, contracts (`specs/006-multimon-gpu-efficiency/contracts/`),
-and quickstart documents.
+`specs/007-dialog-tabs-scanlines-glowtoggle/plan.md` and its supporting
+research, data model, contracts
+(`specs/007-dialog-tabs-scanlines-glowtoggle/contracts/`), and quickstart
+documents.
 <!-- SPECKIT END -->

@@ -68,6 +68,13 @@ public:
     void                SetShowUsageDialogCallback  (std::function<void()> callback) { m_showUsageDialogCallback  = callback; }
     void                ApplyDisplayModeChange()                   { PostMessageW (m_hwnd, WM_APP_REBUILD_CONTEXTS, 0, 0); }
 
+    // v1.5 (T032, FR-010): the property-sheet 1 Hz title timer needs the
+    // primary monitor's MonitorRenderContext to read its published FPS.
+    // Returns nullptr during the brief window in which a multimon rebuild
+    // is in flight (the timer falls back to "0 fps" for that tick — see
+    // contracts/fps-publisher.md).
+    MonitorRenderContext * GetPrimaryRenderContext() const { return m_primary; }
+
     // Window dimensions
     static constexpr UINT            DEFAULT_WIDTH  = 1280;
     static constexpr UINT            DEFAULT_HEIGHT = 720;

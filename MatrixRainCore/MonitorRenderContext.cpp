@@ -12,6 +12,7 @@
 #include "Overlay.h"
 #include "RenderParams.h"
 #include "RenderSystem.h"
+#include "ScanlineStyleMapping.h"
 #include "Viewport.h"
 
 
@@ -392,6 +393,10 @@ void MonitorRenderContext::RenderThreadProc()
         if (m_fpsCounter)
         {
             m_fpsCounter->Update (deltaTime);
+
+            // T023 (US1, FR-010): publish to the lock-free pair consumed by the
+            // property-sheet 1 Hz title timer.  See contracts/fps-publisher.md.
+            PublishFps (m_fpsCounter->GetFPS());
         }
 
         // The primary context owns the shared color-cycle clock: advance it and
@@ -484,7 +489,25 @@ void MonitorRenderContext::Update (const SharedState::Snapshot & snapshot, float
         (overlays.hotkeyOverlay && overlays.hotkeyOverlay->IsActive()) ||
         (overlays.usageOverlay  && overlays.usageOverlay->IsActive()))
     {
-        Color4 scheme = GetColorRGB (snapshot.colorScheme, snapshot.elapsedTime);
+        Color4 scheme;
+
+
+        // ColorScheme::Custom isn't in the static palette table; resolve
+        // it from snapshot.customColor (COLORREF) so overlay text picks
+        // up the user-chosen colour instead of falling back to green.
+        if (snapshot.colorScheme == ColorScheme::Custom)
+        {
+            COLORREF cc = static_cast<COLORREF> (snapshot.customColor);
+
+            scheme.r = static_cast<float> (GetRValue (cc)) / 255.0f;
+            scheme.g = static_cast<float> (GetGValue (cc)) / 255.0f;
+            scheme.b = static_cast<float> (GetBValue (cc)) / 255.0f;
+            scheme.a = 1.0f;
+        }
+        else
+        {
+            scheme = GetColorRGB (snapshot.colorScheme, snapshot.elapsedTime);
+        }
 
         if (overlays.helpOverlay && overlays.helpOverlay->IsActive())
         {
@@ -526,7 +549,6 @@ void MonitorRenderContext::Render (const SharedState::Snapshot & snapshot)
     int         rainPercentage     = snapshot.densityPercent;
     int         streakCount        = static_cast<int> (m_animationSystem->GetActiveStreakCount());
     int         activeHeadCount    = static_cast<int> (m_animationSystem->GetActiveHeadCount());
-    bool        showDebugFadeTimes = snapshot.showDebugFadeTimes;
     float       elapsedTime        = snapshot.elapsedTime;
 
     // Overlay pointers — only the primary context owns an OverlayState
@@ -548,11 +570,19 @@ void MonitorRenderContext::Render (const SharedState::Snapshot & snapshot)
         .rainPercentage     = rainPercentage,
         .streakCount        = streakCount,
         .activeHeadCount    = activeHeadCount,
-        .showDebugFadeTimes = showDebugFadeTimes,
         .elapsedTime        = elapsedTime,
         .pHelpOverlay       = pHelpOverlay,
         .pHotkeyOverlay     = pHotkeyOverlay,
-        .pUsageOverlay      = pUsageOverlay
+        .pUsageOverlay      = pUsageOverlay,
+
+        // v1.5 (T027, data-model.md §5): per-frame copy of the v1.5
+        // SharedState mirrors, with int→float conversions performed once
+        // here (cheap) rather than in every SharedState writer.
+        .glowEnabled        = snapshot.glowEnabled,
+        .scanlinesEnabled   = snapshot.scanlinesEnabled,
+        .scanlinesIntensity = static_cast<float> (snapshot.scanlinesIntensity) / 100.0f,
+        .scanlinesLineCount = ScanlineLineCount (snapshot.scanlinesStyle),
+        .customColor        = static_cast<COLORREF> (snapshot.customColor),
     };
 
     m_renderSystem->Render (*m_animationSystem, *m_viewport, renderParams);

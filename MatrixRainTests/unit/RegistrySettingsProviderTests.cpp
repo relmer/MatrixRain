@@ -384,7 +384,9 @@ namespace MatrixRainTests
             // Assert
             Assert::AreEqual (100, settings.m_densityPercent,        L"Density should be clamped to MAX_DENSITY_PERCENT");
             Assert::AreEqual (100, settings.m_animationSpeedPercent, L"Animation speed should be clamped to MAX");
-            Assert::AreEqual (0,   settings.m_glowIntensityPercent,  L"Glow intensity should be clamped to MIN");
+            Assert::AreEqual (ScreenSaverSettings::MIN_GLOW_INTENSITY_PERCENT,
+                              settings.m_glowIntensityPercent,
+                              L"Glow intensity should be clamped to MIN (T040 reverted floor from 0 to 1 — explicit on/off now lives on m_glowEnabled)");
         }
         
         
@@ -447,6 +449,372 @@ namespace MatrixRainTests
             if (hKey != nullptr)
             {
                 RegCloseKey (hKey);
+            }
+        }
+
+
+
+
+        // v1.5 T010 — legacy ShowFadeTimers REG_DWORD must be silently ignored.
+        // The field was removed from ScreenSaverSettings; absence of any read
+        // path in the provider satisfies the requirement.  We assert Load()
+        // succeeds when the legacy value is present, with no behavioural
+        // impact on the new schema.
+        TEST_METHOD (LegacyShowFadeTimersIsSilentlyIgnored)
+        {
+            DeleteTestRegistryKey();
+
+
+            // Arrange: create the key and stamp the legacy value.
+            HKEY    hKey   = nullptr;
+            LSTATUS status = RegCreateKeyExW (HKEY_CURRENT_USER, TEST_REGISTRY_KEY_PATH,
+                                              0, nullptr, REG_OPTION_NON_VOLATILE,
+                                              KEY_WRITE, nullptr, &hKey, nullptr);
+            Assert::AreEqual ((LONG)ERROR_SUCCESS, (LONG)status, L"Test setup should create registry key");
+
+            DWORD dwLegacy = 1;
+            RegSetValueExW (hKey, L"ShowFadeTimers", 0, REG_DWORD,
+                            (const BYTE *)&dwLegacy, sizeof (DWORD));
+            RegCloseKey (hKey);
+
+
+            // Act
+            ScreenSaverSettings settings;
+            HRESULT             hr = m_provider.Load (settings);
+
+
+            // Assert: Load completes successfully; nothing to read into.
+            Assert::AreEqual (S_OK, hr, L"Load should succeed in presence of legacy ShowFadeTimers value");
+        }
+
+
+
+
+
+        // T035 (US2, FR-020, FR-038, contracts/registry-schema.md):
+        // GlowEnabled persists as a REG_DWORD, defaults to 1 (ON) when
+        // absent, and round-trips both states accurately.
+        TEST_METHOD (GlowEnabledRoundTrip)
+        {
+            DeleteTestRegistryKey();
+
+            ScreenSaverSettings saveOff;
+            saveOff.m_glowEnabled = false;
+
+
+            HRESULT hr = m_provider.Save (saveOff);
+            Assert::AreEqual (S_OK, hr);
+
+
+            ScreenSaverSettings loadOff;
+            hr = m_provider.Load (loadOff);
+            Assert::AreEqual (S_OK, hr);
+            Assert::IsFalse  (loadOff.m_glowEnabled, L"GlowEnabled=false should round-trip");
+
+
+            ScreenSaverSettings saveOn;
+            saveOn.m_glowEnabled = true;
+
+            hr = m_provider.Save (saveOn);
+            Assert::AreEqual (S_OK, hr);
+
+            ScreenSaverSettings loadOn;
+            hr = m_provider.Load (loadOn);
+            Assert::AreEqual (S_OK, hr);
+            Assert::IsTrue   (loadOn.m_glowEnabled, L"GlowEnabled=true should round-trip");
+        }
+
+
+        TEST_METHOD (MissingGlowEnabledDefaultsToOne)
+        {
+            DeleteTestRegistryKey();
+
+            // Create the key WITHOUT GlowEnabled so the read path falls
+            // through to the in-class default.
+            HKEY    hKey   = nullptr;
+            LSTATUS status = RegCreateKeyExW (HKEY_CURRENT_USER, TEST_REGISTRY_KEY_PATH, 0, nullptr,
+                                              REG_OPTION_NON_VOLATILE, KEY_WRITE, nullptr, &hKey, nullptr);
+            Assert::AreEqual ((LONG)ERROR_SUCCESS, (LONG)status);
+
+            DWORD density = 50;
+            RegSetValueExW (hKey, L"Density", 0, REG_DWORD, (const BYTE *)&density, sizeof (DWORD));
+            RegCloseKey (hKey);
+
+
+            ScreenSaverSettings settings;
+            HRESULT             hr = m_provider.Load (settings);
+
+            Assert::AreEqual (S_OK, hr);
+            Assert::IsTrue   (settings.m_glowEnabled, L"Absent GlowEnabled value should leave default (true) per FR-038");
+        }
+
+
+
+
+
+        // T046 (US3, FR-027, FR-028, FR-038, contracts/registry-schema.md):
+        // ScanlinesEnabled / ScanlinesIntensity / ScanlinesStyle persist as
+        // REG_DWORDs, default to ON / 30 / 50 when absent, round-trip
+        // intermediate values exactly, and clamp out-of-range integers on
+        // read (defensive against tampered registries).
+        TEST_METHOD (ScanlinesEnabledRoundTrip)
+        {
+            DeleteTestRegistryKey();
+
+            ScreenSaverSettings off;
+            off.m_scanlinesEnabled = false;
+
+            HRESULT hr = m_provider.Save (off);
+            Assert::AreEqual (S_OK, hr);
+
+            ScreenSaverSettings loadOff;
+            hr = m_provider.Load (loadOff);
+            Assert::AreEqual (S_OK, hr);
+            Assert::IsFalse  (loadOff.m_scanlinesEnabled, L"ScanlinesEnabled=false round-trips");
+
+            ScreenSaverSettings on;
+            on.m_scanlinesEnabled = true;
+            m_provider.Save (on);
+
+            ScreenSaverSettings loadOn;
+            m_provider.Load (loadOn);
+            Assert::IsTrue   (loadOn.m_scanlinesEnabled, L"ScanlinesEnabled=true round-trips");
+        }
+
+
+        TEST_METHOD (ScanlinesIntensityRoundTrip)
+        {
+            DeleteTestRegistryKey();
+
+            ScreenSaverSettings save;
+            save.m_scanlinesIntensity = 77;
+
+            m_provider.Save (save);
+
+            ScreenSaverSettings loaded;
+            m_provider.Load (loaded);
+            Assert::AreEqual (77, loaded.m_scanlinesIntensity, L"ScanlinesIntensity round-trips intermediate value");
+        }
+
+
+        TEST_METHOD (ScanlinesStyleRoundTrip)
+        {
+            DeleteTestRegistryKey();
+
+            ScreenSaverSettings save;
+            save.m_scanlinesStyle = 88;
+
+            m_provider.Save (save);
+
+            ScreenSaverSettings loaded;
+            m_provider.Load (loaded);
+            Assert::AreEqual (88, loaded.m_scanlinesStyle, L"ScanlinesStyle round-trips intermediate value");
+        }
+
+
+        TEST_METHOD (ScanlinesIntensityClampedOnRead)
+        {
+            DeleteTestRegistryKey();
+
+            HKEY    hKey   = nullptr;
+            RegCreateKeyExW (HKEY_CURRENT_USER, TEST_REGISTRY_KEY_PATH, 0, nullptr,
+                             REG_OPTION_NON_VOLATILE, KEY_WRITE, nullptr, &hKey, nullptr);
+
+            DWORD lo = 0;
+            DWORD hi = 200;
+            RegSetValueExW (hKey, L"ScanlinesIntensity", 0, REG_DWORD, (const BYTE *)&lo, sizeof (DWORD));
+            RegCloseKey (hKey);
+
+            ScreenSaverSettings loaded;
+            m_provider.Load (loaded);
+            Assert::AreEqual (1, loaded.m_scanlinesIntensity, L"0 clamps up to MIN (1)");
+
+            DeleteTestRegistryKey();
+            RegCreateKeyExW (HKEY_CURRENT_USER, TEST_REGISTRY_KEY_PATH, 0, nullptr,
+                             REG_OPTION_NON_VOLATILE, KEY_WRITE, nullptr, &hKey, nullptr);
+            RegSetValueExW (hKey, L"ScanlinesIntensity", 0, REG_DWORD, (const BYTE *)&hi, sizeof (DWORD));
+            RegCloseKey (hKey);
+
+            ScreenSaverSettings loaded2;
+            m_provider.Load (loaded2);
+            Assert::AreEqual (100, loaded2.m_scanlinesIntensity, L"200 clamps down to MAX (100)");
+        }
+
+
+        TEST_METHOD (ScanlinesStyleClampedOnRead)
+        {
+            DeleteTestRegistryKey();
+
+            HKEY    hKey   = nullptr;
+            RegCreateKeyExW (HKEY_CURRENT_USER, TEST_REGISTRY_KEY_PATH, 0, nullptr,
+                             REG_OPTION_NON_VOLATILE, KEY_WRITE, nullptr, &hKey, nullptr);
+
+            DWORD lo = 0;
+            DWORD hi = 200;
+            RegSetValueExW (hKey, L"ScanlinesStyle", 0, REG_DWORD, (const BYTE *)&lo, sizeof (DWORD));
+            RegCloseKey (hKey);
+
+            ScreenSaverSettings loaded;
+            m_provider.Load (loaded);
+            Assert::AreEqual (1, loaded.m_scanlinesStyle, L"0 clamps up to MIN (1)");
+
+            DeleteTestRegistryKey();
+            RegCreateKeyExW (HKEY_CURRENT_USER, TEST_REGISTRY_KEY_PATH, 0, nullptr,
+                             REG_OPTION_NON_VOLATILE, KEY_WRITE, nullptr, &hKey, nullptr);
+            RegSetValueExW (hKey, L"ScanlinesStyle", 0, REG_DWORD, (const BYTE *)&hi, sizeof (DWORD));
+            RegCloseKey (hKey);
+
+            ScreenSaverSettings loaded2;
+            m_provider.Load (loaded2);
+            Assert::AreEqual (100, loaded2.m_scanlinesStyle, L"200 clamps down to MAX (100)");
+        }
+
+
+        TEST_METHOD (MissingScanlinesValuesDefaultsAreApplied)
+        {
+            DeleteTestRegistryKey();
+
+            HKEY    hKey   = nullptr;
+            RegCreateKeyExW (HKEY_CURRENT_USER, TEST_REGISTRY_KEY_PATH, 0, nullptr,
+                             REG_OPTION_NON_VOLATILE, KEY_WRITE, nullptr, &hKey, nullptr);
+
+            DWORD density = 50;
+            RegSetValueExW (hKey, L"Density", 0, REG_DWORD, (const BYTE *)&density, sizeof (DWORD));
+            RegCloseKey (hKey);
+
+            ScreenSaverSettings settings;
+            m_provider.Load (settings);
+            Assert::IsTrue   (settings.m_scanlinesEnabled,         L"Absent ScanlinesEnabled defaults ON per SC-013");
+            Assert::AreEqual (30, settings.m_scanlinesIntensity,   L"Absent ScanlinesIntensity defaults to 30");
+            Assert::AreEqual (50, settings.m_scanlinesStyle,       L"Absent ScanlinesStyle defaults to 50");
+        }
+
+
+        ////////////////////////////////////////////////////////////////
+        //
+        //  T057 (US5, FR-030, FR-031, FR-035, FR-038, data-model.md §1,
+        //  contracts/registry-schema.md): CustomColor + CustomColorPalette
+        //  persistence.  The palette persists UNCONDITIONALLY (lives
+        //  outside the snapshot rollback set), is stored as a 64-byte
+        //  REG_BINARY (16 COLORREFs matching CHOOSECOLORW::lpCustColors
+        //  layout), and zero-fills on absent / size-mismatch reads.
+        //
+        ////////////////////////////////////////////////////////////////
+
+        TEST_METHOD (CustomColorRoundTrip)
+        {
+            DeleteTestRegistryKey();
+
+            ScreenSaverSettings savedSettings;
+
+
+            savedSettings.m_customColor = RGB (123, 200, 250);
+
+            Assert::AreEqual (S_OK, m_provider.Save (savedSettings));
+
+            ScreenSaverSettings loaded;
+
+            Assert::AreEqual (S_OK, m_provider.Load (loaded));
+            Assert::AreEqual (static_cast<DWORD> (RGB (123, 200, 250)),
+                              static_cast<DWORD> (loaded.m_customColor),
+                              L"CustomColor must round-trip exactly as REG_DWORD");
+        }
+
+
+        TEST_METHOD (CustomColorAbsentMeansChooserDefault)
+        {
+            // No registry key at all -> Load returns S_FALSE, settings
+            // keep their in-class defaults (DEFAULT_CUSTOM_COLOR = green).
+            DeleteTestRegistryKey();
+
+            ScreenSaverSettings loaded;
+
+            m_provider.Load (loaded);
+            Assert::AreEqual (static_cast<DWORD> (ScreenSaverSettings::DEFAULT_CUSTOM_COLOR),
+                              static_cast<DWORD> (loaded.m_customColor),
+                              L"Absent CustomColor must fall back to DEFAULT_CUSTOM_COLOR");
+        }
+
+
+        TEST_METHOD (CustomColorPaletteRoundTrip)
+        {
+            DeleteTestRegistryKey();
+
+            ScreenSaverSettings savedSettings;
+
+
+            for (size_t i = 0; i < savedSettings.m_customColorPalette.size(); i++)
+            {
+                savedSettings.m_customColorPalette[i] = RGB (static_cast<BYTE> (i * 10),
+                                                              static_cast<BYTE> (i * 11),
+                                                              static_cast<BYTE> (i * 12));
+            }
+
+            Assert::AreEqual (S_OK, m_provider.Save (savedSettings));
+
+            ScreenSaverSettings loaded;
+
+            Assert::AreEqual (S_OK, m_provider.Load (loaded));
+
+            for (size_t i = 0; i < loaded.m_customColorPalette.size(); i++)
+            {
+                Assert::AreEqual (static_cast<DWORD> (savedSettings.m_customColorPalette[i]),
+                                  static_cast<DWORD> (loaded.m_customColorPalette[i]),
+                                  L"Palette slot must round-trip exactly");
+            }
+        }
+
+
+        TEST_METHOD (CustomColorPaletteSizeMismatchYieldsZeroes)
+        {
+            DeleteTestRegistryKey();
+
+            HKEY hKey = nullptr;
+
+            RegCreateKeyExW (HKEY_CURRENT_USER, TEST_REGISTRY_KEY_PATH, 0, nullptr,
+                             REG_OPTION_NON_VOLATILE, KEY_WRITE, nullptr, &hKey, nullptr);
+
+            // Write 32 bytes instead of the expected 64.  Size mismatch
+            // must be treated as "no saved palette" -> zero-fill.
+            BYTE truncated[32] = {};
+
+            for (size_t i = 0; i < sizeof (truncated); i++)
+            {
+                truncated[i] = static_cast<BYTE> (i + 1);
+            }
+
+            RegSetValueExW (hKey, L"CustomColorPalette", 0, REG_BINARY, truncated, sizeof (truncated));
+            RegCloseKey (hKey);
+
+            ScreenSaverSettings loaded;
+
+            m_provider.Load (loaded);
+
+            for (size_t i = 0; i < loaded.m_customColorPalette.size(); i++)
+            {
+                Assert::AreEqual (static_cast<DWORD> (0),
+                                  static_cast<DWORD> (loaded.m_customColorPalette[i]),
+                                  L"Size-mismatch palette must zero-fill");
+            }
+        }
+
+
+        TEST_METHOD (MissingCustomColorPaletteYieldsZeroes)
+        {
+            DeleteTestRegistryKey();
+
+            // Save a settings struct that has the palette zeroed already.
+            // Load and confirm everything is still zero (no garbage from
+            // an uninitialised slot).
+            ScreenSaverSettings loaded;
+
+            m_provider.Load (loaded);
+
+            for (size_t i = 0; i < loaded.m_customColorPalette.size(); i++)
+            {
+                Assert::AreEqual (static_cast<DWORD> (0),
+                                  static_cast<DWORD> (loaded.m_customColorPalette[i]),
+                                  L"Absent palette must zero-fill");
             }
         }
     };

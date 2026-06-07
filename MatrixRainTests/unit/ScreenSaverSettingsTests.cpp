@@ -25,9 +25,21 @@ namespace MatrixRainTests
                 Assert::AreEqual (100, settings.m_glowSizePercent, L"glow size default");
                 Assert::IsTrue   (settings.m_startFullscreen, L"startFullscreen default");
                 Assert::IsFalse  (settings.m_showDebugStats, L"showDebugStats default");
-                Assert::IsFalse  (settings.m_showFadeTimers, L"showFadeTimers default");
                 Assert::IsTrue   (settings.m_multiMonitorEnabled, L"multiMonitorEnabled default");
                 Assert::IsFalse  (settings.m_lastSavedTimestamp.has_value(), L"lastSavedTimestamp default");
+
+                // T034 (US2, FR-038, data-model.md §1): the v1.5 Glow Enabled
+                // toggle defaults ON so users who upgrade and never open the
+                // dialog see no visible change (bloom continues at the same
+                // intensity it had pre-upgrade).
+                Assert::IsTrue   (settings.m_glowEnabled, L"glowEnabled default is true");
+
+                // T045 (US3, FR-028, FR-038): scanlines defaults — enabled
+                // with 30% intensity and style 50 (~387 lines on a 1080-tall
+                // display via ScanlineLineCount).
+                Assert::IsTrue   (settings.m_scanlinesEnabled,        L"scanlinesEnabled default is true (SC-013)");
+                Assert::AreEqual (30, settings.m_scanlinesIntensity,  L"scanlinesIntensity default is 30");
+                Assert::AreEqual (50, settings.m_scanlinesStyle,      L"scanlinesStyle default is 50");
             }
 
 

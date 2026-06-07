@@ -38,8 +38,7 @@ namespace MatrixRainTests
                 .m_glowIntensityPercent  = 120,
                 .m_glowSizePercent       = 150,
                 .m_startFullscreen       = false,
-                .m_showDebugStats        = true,
-                .m_showFadeTimers        = true
+                .m_showDebugStats        = true
             };
             
             HRESULT                hr         = S_OK; 
@@ -63,7 +62,6 @@ namespace MatrixRainTests
             Assert::AreEqual (150,      loaded.m_glowSizePercent,       L"Glow size should match saved value");
             Assert::IsFalse  (loaded.m_startFullscreen,                 L"Start fullscreen should match saved value");
             Assert::IsTrue   (loaded.m_showDebugStats,                  L"Show debug stats should match saved value");
-            Assert::IsTrue   (loaded.m_showFadeTimers,                  L"Show fade timers should match saved value");
         }
 
 
@@ -93,7 +91,6 @@ namespace MatrixRainTests
             Assert::AreEqual (ScreenSaverSettings::DEFAULT_GLOW_SIZE_PERCENT,       loaded.m_glowSizePercent,       L"Should use default glow size");
             Assert::IsTrue   (loaded.m_startFullscreen,                             L"Should default to fullscreen");
             Assert::IsFalse  (loaded.m_showDebugStats,                              L"Should default to no debug stats");
-            Assert::IsFalse  (loaded.m_showFadeTimers,                              L"Should default to no fade timers");
         }
 
 
@@ -317,13 +314,6 @@ namespace MatrixRainTests
 
             controller.UpdateShowDebugStats (false);
             Assert::IsFalse (controller.GetSettings().m_showDebugStats, L"Should set show debug stats to false");
-
-            // Act & Assert: Test fade timers toggle
-            controller.UpdateShowFadeTimers (true);
-            Assert::IsTrue (controller.GetSettings().m_showFadeTimers, L"Should set show fade timers to true");
-
-            controller.UpdateShowFadeTimers (false);
-            Assert::IsFalse (controller.GetSettings().m_showFadeTimers, L"Should set show fade timers to false");
         }
 
 
@@ -499,7 +489,52 @@ namespace MatrixRainTests
             Assert::AreEqual (ScreenSaverSettings::DEFAULT_GLOW_SIZE_PERCENT,       settings.m_glowSizePercent,       L"Glow size should reset to default");
             Assert::IsTrue   (settings.m_startFullscreen,                           L"Start fullscreen should reset to default");
             Assert::IsFalse  (settings.m_showDebugStats,                            L"Show debug stats should reset to default");
-            Assert::IsFalse  (settings.m_showFadeTimers,                            L"Show fade timers should reset to default");
+        }
+
+
+
+
+        // FR-035 regression: Reset-to-defaults MUST preserve the saved
+        // custom-color palette (the "unconditional persistence" carve-out
+        // that ApplyChanges/CancelChanges already honour).  Without this
+        // guard, ResetToDefaults() would assign a default-constructed
+        // ScreenSaverSettings — whose palette is zero-initialised — and
+        // a subsequent OK would persist 16 zeroed slots to the registry,
+        // silently destroying the user's saved swatches.
+        TEST_METHOD (ResetToDefaultsPreservesCustomColorPalette)
+        {
+            HRESULT                  hr         = S_OK;
+            ConfigDialogController   controller (m_settingsProvider);
+            std::array<COLORREF, 16> palette;
+
+
+            hr = controller.Initialize();
+            Assert::AreEqual (S_OK, hr);
+
+            for (size_t i = 0; i < palette.size(); i++)
+            {
+                palette[i] = RGB (static_cast<BYTE> (i * 16),
+                                  static_cast<BYTE> (255 - i * 16),
+                                  static_cast<BYTE> (i * 8));
+            }
+
+            controller.SetCustomColorPalette (palette);
+            controller.UpdateDensity         (25);
+
+            controller.ResetToDefaults();
+
+            const ScreenSaverSettings & settings = controller.GetSettings();
+
+
+            Assert::AreEqual (ScreenSaverSettings::DEFAULT_DENSITY_PERCENT, settings.m_densityPercent,
+                              L"Density should reset to default");
+
+            for (size_t i = 0; i < palette.size(); i++)
+            {
+                Assert::AreEqual (static_cast<DWORD> (palette[i]),
+                                  static_cast<DWORD> (settings.m_customColorPalette[i]),
+                                  L"customColorPalette slot survives ResetToDefaults (FR-035)");
+            }
         }
 
 
@@ -665,8 +700,7 @@ namespace MatrixRainTests
                 .m_glowIntensityPercent  = 150,
                 .m_glowSizePercent       = 175,
                 .m_startFullscreen       = false,
-                .m_showDebugStats        = true,
-                .m_showFadeTimers        = true
+                .m_showDebugStats        = true
             };
             
             HRESULT hr = m_settingsProvider.Save (settings);
@@ -863,6 +897,97 @@ namespace MatrixRainTests
 
 
 
+        TEST_METHOD (TestLiveModePropagatesStartFullscreenChanges)
+        {
+            ConfigDialogController controller (m_settingsProvider);
+            ApplicationState       appState   (m_settingsProvider);
+            HRESULT                hr         = S_OK;
+
+
+
+            hr = controller.Initialize();
+            Assert::AreEqual (S_OK, hr);
+
+            appState.Initialize (nullptr);
+
+            hr = controller.InitializeLiveMode (&appState);
+            Assert::AreEqual (S_OK, hr);
+
+            controller.UpdateStartFullscreen (false);
+
+            Assert::IsFalse (appState.GetSettings().m_startFullscreen,
+                             L"start fullscreen should propagate to ApplicationState settings");
+            Assert::AreEqual (static_cast<int> (DisplayMode::Windowed),
+                              static_cast<int> (appState.GetDisplayMode()),
+                              L"display mode should mirror the live fullscreen setting");
+        }
+
+
+
+
+        // Regression: selecting a GPU adapter in the live config dialog must
+        // push the new description into the running ApplicationState so the
+        // subsequent context rebuild resolves and recreates the device on the
+        // chosen adapter (previously UpdateGpuAdapter mutated only the
+        // controller's private copy, so the rebuild re-resolved the stale
+        // default adapter and kept rendering on the integrated GPU).
+        TEST_METHOD (TestLiveModePropagatesGpuAdapterChanges)
+        {
+            ConfigDialogController controller (m_settingsProvider);
+            ApplicationState       appState   (m_settingsProvider);
+            HRESULT                hr         = S_OK;
+
+
+
+            hr = controller.Initialize();
+            Assert::AreEqual (S_OK, hr);
+
+            appState.Initialize (nullptr);
+
+            hr = controller.InitializeLiveMode (&appState);
+            Assert::AreEqual (S_OK, hr);
+
+            controller.UpdateGpuAdapter (L"NVIDIA GeForce GTX 1060");
+
+            Assert::AreEqual (std::wstring (L"NVIDIA GeForce GTX 1060"),
+                              appState.GetSettings().m_gpuAdapter,
+                              L"selected GPU adapter should propagate to ApplicationState so the "
+                              L"context rebuild recreates the device on the chosen adapter");
+        }
+
+
+
+
+        // Regression: toggling multi-monitor in the live config dialog must
+        // push the new flag into the running ApplicationState so the rebuild's
+        // ShouldSpanAllMonitors() gate reads the fresh value (same root cause
+        // as the GPU-adapter regression above).
+        TEST_METHOD (TestLiveModePropagatesMultiMonitorChanges)
+        {
+            ConfigDialogController controller (m_settingsProvider);
+            ApplicationState       appState   (m_settingsProvider);
+            HRESULT                hr         = S_OK;
+
+
+
+            hr = controller.Initialize();
+            Assert::AreEqual (S_OK, hr);
+
+            appState.Initialize (nullptr);
+
+            hr = controller.InitializeLiveMode (&appState);
+            Assert::AreEqual (S_OK, hr);
+
+            controller.UpdateMultiMonitorEnabled (false);
+
+            Assert::IsFalse (appState.GetSettings().m_multiMonitorEnabled,
+                             L"multi-monitor toggle should propagate to ApplicationState so the "
+                             L"context rebuild spans the new monitor set");
+        }
+
+
+
+
         // T052.6: Test CancelLiveMode reverts ApplicationState to snapshot
         TEST_METHOD (TestCancelLiveModeRevertsApplicationState)
         {
@@ -947,6 +1072,361 @@ namespace MatrixRainTests
             // 5. Verifies dialog closes without crash or leak
             Logger::WriteMessage ("Live dialog shutdown test requires UI harness to simulate parent window destruction. Skipping until automation is implemented.\n");
             return;
+        }
+
+
+
+
+
+        ////////////////////////////////////////////////////////////////////////
+        //
+        //  T022 (US1, FR-004, FR-044): live-mode snapshot/rollback covers the
+        //  5 new v1.5 fields, and the customColorPalette is INTENTIONALLY NOT
+        //  snapshotted (FR-035 carve-out — palette is persisted directly on
+        //  chooser-OK and never rolled back).
+        //
+        ////////////////////////////////////////////////////////////////////////
+
+        TEST_METHOD (EnterLiveMode_SnapshotsAllV15Fields)
+        {
+            ScreenSaverSettings              initial {};
+            HRESULT                          hr      = S_OK;
+            ConfigDialogController           controller (m_settingsProvider);
+            ApplicationState                 appState   (m_settingsProvider);
+
+
+            initial.m_glowEnabled         = true;
+            initial.m_scanlinesEnabled    = true;
+            initial.m_scanlinesIntensity  = 30;
+            initial.m_scanlinesStyle      = 50;
+            initial.m_customColor         = RGB (0, 255, 0);
+            initial.m_customColorPalette  = { RGB (1, 2, 3), RGB (4, 5, 6) };
+
+            hr = m_settingsProvider.Save (initial);
+            Assert::AreEqual (S_OK, hr);
+
+            hr = controller.Initialize();
+            Assert::AreEqual (S_OK, hr);
+
+            appState.Initialize (nullptr);
+
+            hr = controller.InitializeLiveMode (&appState);
+            Assert::AreEqual (S_OK, hr, L"EnterLiveMode (InitializeLiveMode) succeeds");
+
+            // Mutate live, then cancel — snapshot must roll back the 5 fields.
+            controller.UpdateGlowEnabled        (false);
+            controller.UpdateScanlinesEnabled   (false);
+            controller.UpdateScanlinesIntensity (99);
+            controller.UpdateScanlinesStyle     (1);
+            controller.UpdateCustomColor        (RGB (255, 0, 0));
+
+            // Palette is NOT rollback-eligible — direct write survives Cancel.
+            ScreenSaverSettings paletteChange = controller.GetSettings();
+            paletteChange.m_customColorPalette = { RGB (10, 20, 30) };
+
+            hr = controller.CancelLiveMode();
+            Assert::AreEqual (S_OK, hr);
+
+            const ScreenSaverSettings & restored = controller.GetSettings();
+            Assert::IsTrue   (restored.m_glowEnabled,                        L"glowEnabled restored");
+            Assert::IsTrue   (restored.m_scanlinesEnabled,                   L"scanlinesEnabled restored");
+            Assert::AreEqual (30,                  restored.m_scanlinesIntensity, L"scanlinesIntensity restored");
+            Assert::AreEqual (50,                  restored.m_scanlinesStyle,     L"scanlinesStyle restored");
+            Assert::AreEqual (static_cast<DWORD> (RGB (0, 255, 0)),
+                              static_cast<DWORD> (restored.m_customColor),
+                              L"customColor restored");
+        }
+
+
+        TEST_METHOD (CancelLiveMode_RestoresAllV15Fields)
+        {
+            // Distinct from the prior test: verifies CancelLiveMode pushes the
+            // restored values into the ApplicationState live-mirror, not just
+            // back into controller-local m_settings (FR-044).
+            ScreenSaverSettings              initial {};
+            HRESULT                          hr      = S_OK;
+            ConfigDialogController           controller (m_settingsProvider);
+            ApplicationState                 appState   (m_settingsProvider);
+
+
+            initial.m_glowEnabled        = true;
+            initial.m_scanlinesEnabled   = true;
+            initial.m_scanlinesIntensity = 30;
+            initial.m_scanlinesStyle     = 50;
+            initial.m_customColor        = RGB (0, 255, 0);
+
+            hr = m_settingsProvider.Save (initial);
+            Assert::AreEqual (S_OK, hr);
+
+            hr = controller.Initialize();
+            Assert::AreEqual (S_OK, hr);
+
+            appState.Initialize (nullptr);
+
+            hr = controller.InitializeLiveMode (&appState);
+            Assert::AreEqual (S_OK, hr);
+
+            controller.UpdateGlowEnabled        (false);
+            controller.UpdateScanlinesEnabled   (false);
+            controller.UpdateScanlinesIntensity (88);
+            controller.UpdateScanlinesStyle     (12);
+            controller.UpdateCustomColor        (RGB (200, 100, 50));
+
+            hr = controller.CancelLiveMode();
+            Assert::AreEqual (S_OK, hr);
+
+            // ApplicationState restored via ApplySettings(snapshot) path.
+            const ScreenSaverSettings & appAfter = appState.GetSettings();
+            Assert::IsTrue   (appAfter.m_glowEnabled,                        L"app glowEnabled restored");
+            Assert::IsTrue   (appAfter.m_scanlinesEnabled,                   L"app scanlinesEnabled restored");
+            Assert::AreEqual (30,                  appAfter.m_scanlinesIntensity, L"app scanlinesIntensity restored");
+            Assert::AreEqual (50,                  appAfter.m_scanlinesStyle,     L"app scanlinesStyle restored");
+            Assert::AreEqual (static_cast<DWORD> (RGB (0, 255, 0)),
+                              static_cast<DWORD> (appAfter.m_customColor),
+                              L"app customColor restored");
+        }
+
+
+        ////////////////////////////////////////////////////////////////////////
+        //
+        //  T033b (US1, FR-004a, SC-011): the OK button's `PSN_APPLY` path
+        //  calls CommitLiveMode, which must Save() every rollback-eligible
+        //  field (5 new v1.5 + 3 existing v1.4 representative samples)
+        //  through the settings provider.  Tests the registry-write path
+        //  end-to-end via InMemorySettingsProvider.
+        //
+        ////////////////////////////////////////////////////////////////////////
+
+        TEST_METHOD (CommitLiveMode_WritesAllV15Fields)
+        {
+            HRESULT                          hr = S_OK;
+            ConfigDialogController           controller (m_settingsProvider);
+            ApplicationState                 appState   (m_settingsProvider);
+
+
+            hr = controller.Initialize();
+            Assert::AreEqual (S_OK, hr);
+
+            appState.Initialize (nullptr);
+
+            hr = controller.InitializeLiveMode (&appState);
+            Assert::AreEqual (S_OK, hr);
+
+            // Mutate the 5 new v1.5 fields + 3 existing v1.4 fields.
+            controller.UpdateGlowEnabled        (false);
+            controller.UpdateScanlinesEnabled   (false);
+            controller.UpdateScanlinesIntensity (77);
+            controller.UpdateScanlinesStyle     (22);
+            controller.UpdateCustomColor        (RGB (10, 20, 30));
+
+            controller.UpdateDensity            (42);
+            controller.UpdateAnimationSpeed     (88);
+            controller.UpdateGlowIntensity      (175);
+
+            hr = controller.CommitLiveMode();
+            Assert::AreEqual (S_OK, hr, L"CommitLiveMode returns S_OK in live mode");
+
+            // All 8 fields must have round-tripped through the provider.
+            const ScreenSaverSettings & stored = m_settingsProvider.GetStored();
+            Assert::IsFalse  (stored.m_glowEnabled,                                L"glowEnabled persisted");
+            Assert::IsFalse  (stored.m_scanlinesEnabled,                           L"scanlinesEnabled persisted");
+            Assert::AreEqual (77,                  stored.m_scanlinesIntensity,    L"scanlinesIntensity persisted");
+            Assert::AreEqual (22,                  stored.m_scanlinesStyle,        L"scanlinesStyle persisted");
+            Assert::AreEqual (static_cast<DWORD> (RGB (10, 20, 30)),
+                              static_cast<DWORD> (stored.m_customColor),
+                              L"customColor persisted");
+            Assert::AreEqual (42,                  stored.m_densityPercent,        L"densityPercent persisted");
+            Assert::AreEqual (88,                  stored.m_animationSpeedPercent, L"animationSpeedPercent persisted");
+            Assert::AreEqual (175,                 stored.m_glowIntensityPercent,  L"glowIntensityPercent persisted");
+
+            Assert::IsFalse (controller.IsLiveMode(), L"CommitLiveMode clears live-mode state");
+        }
+
+
+        ////////////////////////////////////////////////////////////////////////
+        //
+        //  Mini-phase 2.5 (cross-page Reset button): ResetToDefaults must
+        //  push the freshly-reset settings through to ApplicationState so
+        //  the live preview snaps back instantly.  Previously the dialog-
+        //  side OnResetButton walked each Update* setter; now that Reset
+        //  lives on the property-sheet frame and broadcasts a resync to
+        //  both pages, the controller has to own the live-push so the
+        //  render thread sees the defaults regardless of which (if any)
+        //  page is currently active.
+        //
+        ////////////////////////////////////////////////////////////////////////
+
+        TEST_METHOD (ResetToDefaults_LiveMode_PushesAllFieldsToSharedState)
+        {
+            HRESULT                hr = S_OK;
+            ConfigDialogController controller (m_settingsProvider);
+            ApplicationState       appState   (m_settingsProvider);
+
+
+            hr = controller.Initialize();
+            Assert::AreEqual (S_OK, hr);
+
+            appState.Initialize (nullptr);
+
+            hr = controller.InitializeLiveMode (&appState);
+            Assert::AreEqual (S_OK, hr);
+
+            // Mutate every rollback-eligible field away from defaults so a
+            // post-reset GetSettings() comparison against a fresh-default
+            // struct is meaningful.
+            controller.UpdateDensity            (42);
+            controller.UpdateAnimationSpeed     (33);
+            controller.UpdateGlowIntensity      (175);
+            controller.UpdateGlowSize           (150);
+            controller.UpdateColorScheme        (L"red");
+            controller.UpdateGlowEnabled        (false);
+            controller.UpdateScanlinesEnabled   (false);
+            controller.UpdateScanlinesIntensity (88);
+            controller.UpdateScanlinesStyle     (22);
+            controller.UpdateShowDebugStats     (true);
+            controller.UpdateStartFullscreen    (false);
+
+            // Act: reset.  In live mode this must propagate to ApplicationState.
+            controller.ResetToDefaults();
+
+            // Assert: ApplicationState reflects the freshly-reset settings.
+            // ApplySettings is the coarse-grained propagation path the per-
+            // field UpdateGlowEnabled/UpdateScanlines* setters already use,
+            // so the test exercises the same SharedState round-trip the
+            // render thread would observe.
+            ScreenSaverSettings        defaults;
+            const ScreenSaverSettings  asSettings = appState.GetSettings();
+
+            Assert::AreEqual (defaults.m_densityPercent,
+                              asSettings.m_densityPercent,
+                              L"density propagated");
+            Assert::AreEqual (defaults.m_animationSpeedPercent,
+                              asSettings.m_animationSpeedPercent,
+                              L"animation speed propagated");
+            Assert::AreEqual (defaults.m_glowIntensityPercent,
+                              asSettings.m_glowIntensityPercent,
+                              L"glow intensity propagated");
+            Assert::AreEqual (defaults.m_glowSizePercent,
+                              asSettings.m_glowSizePercent,
+                              L"glow size propagated");
+            Assert::AreEqual (defaults.m_scanlinesIntensity,
+                              asSettings.m_scanlinesIntensity,
+                              L"scanlines intensity propagated");
+            Assert::AreEqual (defaults.m_scanlinesStyle,
+                              asSettings.m_scanlinesStyle,
+                              L"scanlines style propagated");
+            Assert::AreEqual (defaults.m_colorSchemeKey,
+                              asSettings.m_colorSchemeKey,
+                              L"color scheme propagated");
+            Assert::AreEqual (defaults.m_glowEnabled,
+                              asSettings.m_glowEnabled,
+                              L"glow-enabled propagated");
+            Assert::AreEqual (defaults.m_scanlinesEnabled,
+                              asSettings.m_scanlinesEnabled,
+                              L"scanlines-enabled propagated");
+            Assert::AreEqual (defaults.m_showDebugStats,
+                              asSettings.m_showDebugStats,
+                              L"show-debug-stats propagated");
+            Assert::AreEqual (defaults.m_startFullscreen,
+                              asSettings.m_startFullscreen,
+                              L"start-fullscreen propagated");
+
+            // ApplicationState's derived runtime mirrors (color scheme enum,
+            // show-statistics flag, display mode) must also have updated
+            // through ApplySettings — proves the broadcast went through the
+            // notify-callback path, not just a silent struct copy.
+            Assert::IsTrue (appState.GetColorScheme()  == ParseColorSchemeKey (defaults.m_colorSchemeKey),
+                            L"derived color-scheme enum mirrored");
+            Assert::AreEqual (defaults.m_showDebugStats,
+                              appState.GetShowStatistics(),
+                              L"derived show-statistics mirrored");
+        }
+
+
+        ////////////////////////////////////////////////////////////////////////
+        //
+        //  T058 (US5, FR-004, FR-035): the active CustomColor MUST roll back
+        //  on Cancel (it's a normal rollback-eligible field), but the
+        //  CustomColorPalette MUST NOT — the palette lives outside the
+        //  snapshot rollback set so swatch edits made during a live session
+        //  survive even when the user cancels the dialog.
+        //
+        ////////////////////////////////////////////////////////////////////////
+
+        TEST_METHOD (CustomColorRollsBackOnCancel)
+        {
+            HRESULT                hr = S_OK;
+            ConfigDialogController controller (m_settingsProvider);
+            ApplicationState       appState   (m_settingsProvider);
+
+
+            hr = controller.Initialize();
+            Assert::AreEqual (S_OK, hr);
+
+            appState.Initialize (nullptr);
+
+            hr = controller.InitializeLiveMode (&appState);
+            Assert::AreEqual (S_OK, hr);
+
+            // Snapshot taken at the default green RGB(0,255,0).
+            const COLORREF originalColor = controller.GetSettings().m_customColor;
+
+            controller.UpdateCustomColor (RGB (42, 84, 168));
+            Assert::AreEqual (static_cast<DWORD> (RGB (42, 84, 168)),
+                              static_cast<DWORD> (controller.GetSettings().m_customColor),
+                              L"Live mutation visible before Cancel");
+
+            hr = controller.CancelLiveMode();
+            Assert::AreEqual (S_OK, hr);
+
+            Assert::AreEqual (static_cast<DWORD> (originalColor),
+                              static_cast<DWORD> (controller.GetSettings().m_customColor),
+                              L"Cancel must restore the snapshot CustomColor (FR-004)");
+        }
+
+
+        TEST_METHOD (CustomColorPaletteIsNOTRolledBackOnCancel)
+        {
+            HRESULT                  hr = S_OK;
+            ConfigDialogController   controller (m_settingsProvider);
+            ApplicationState         appState   (m_settingsProvider);
+            std::array<COLORREF, 16> mutatedPalette {};
+
+
+            hr = controller.Initialize();
+            Assert::AreEqual (S_OK, hr);
+
+            appState.Initialize (nullptr);
+
+            hr = controller.InitializeLiveMode (&appState);
+            Assert::AreEqual (S_OK, hr);
+
+            // Mutate the palette directly via the settings struct (the
+            // chooser-dialog wiring in T065 will do the equivalent via
+            // CHOOSECOLORW::lpCustColors).  Mark each slot with a distinct
+            // RGB so the post-Cancel assertion is unambiguous.
+            for (size_t i = 0; i < mutatedPalette.size(); i++)
+            {
+                mutatedPalette[i] = RGB (static_cast<BYTE> (i + 1),
+                                          static_cast<BYTE> (i * 2 + 1),
+                                          static_cast<BYTE> (i * 3 + 1));
+            }
+
+            controller.SetCustomColorPalette (mutatedPalette);
+
+            hr = controller.CancelLiveMode();
+            Assert::AreEqual (S_OK, hr);
+
+            // Per FR-035: palette is outside the rollback set — every slot
+            // must still hold the mutated value after Cancel.
+            const ScreenSaverSettings & post = controller.GetSettings();
+
+            for (size_t i = 0; i < post.m_customColorPalette.size(); i++)
+            {
+                Assert::AreEqual (static_cast<DWORD> (mutatedPalette[i]),
+                                  static_cast<DWORD> (post.m_customColorPalette[i]),
+                                  L"Palette slot must survive Cancel (FR-035 carve-out)");
+            }
         }
     };
 }  // namespace MatrixRainTests

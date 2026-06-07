@@ -343,11 +343,18 @@ void Application::InitializeApplicationState (const ScreenSaverModeContext * pSc
         m_sharedState.showStatistics = show;
     });
 
-    m_appState->RegisterShowDebugFadeTimesCallback ([this](bool show) {
-        std::lock_guard<std::mutex> lock (m_sharedState.mutex);
-        m_sharedState.showDebugFadeTimes = show;
+    // v1.5 (T062, FR-016/021/028/034 live preview): bulk callback fired
+    // from ApplicationState::ApplySettings.  Atomic-stores into the
+    // SharedState.live* fields the render thread reads via GetSnapshot
+    // each frame.  Lock-free path (atomics, not the SharedState mutex).
+    m_appState->RegisterV15LiveCallback ([this](const ScreenSaverSettings & settings) {
+        m_sharedState.liveGlowEnabled       .store (settings.m_glowEnabled,                                    std::memory_order_relaxed);
+        m_sharedState.liveScanlinesEnabled  .store (settings.m_scanlinesEnabled,                               std::memory_order_relaxed);
+        m_sharedState.liveScanlinesIntensity.store (settings.m_scanlinesIntensity,                             std::memory_order_relaxed);
+        m_sharedState.liveScanlinesStyle    .store (settings.m_scanlinesStyle,                                 std::memory_order_relaxed);
+        m_sharedState.liveCustomColor       .store (static_cast<DWORD> (settings.m_customColor),               std::memory_order_relaxed);
     });
-    
+
     // Initialize SharedState from saved settings
     {
         const auto & settings = m_appState->GetSettings();
@@ -358,7 +365,16 @@ void Application::InitializeApplicationState (const ScreenSaverModeContext * pSc
         m_sharedState.glowIntensityPercent  = settings.m_glowIntensityPercent;
         m_sharedState.glowSizePercent       = settings.m_glowSizePercent;
         m_sharedState.showStatistics        = m_appState->GetShowStatistics();
-        m_sharedState.showDebugFadeTimes    = m_appState->GetShowDebugFadeTimes();
+
+        // v1.5 (T062 bootstrap): seed the live atomics from persisted
+        // settings so the very first frame uses the user's saved values
+        // (otherwise the atomics keep their in-struct defaults until the
+        // first ApplySettings call from the dialog).
+        m_sharedState.liveGlowEnabled       .store (settings.m_glowEnabled,                              std::memory_order_relaxed);
+        m_sharedState.liveScanlinesEnabled  .store (settings.m_scanlinesEnabled,                         std::memory_order_relaxed);
+        m_sharedState.liveScanlinesIntensity.store (settings.m_scanlinesIntensity,                       std::memory_order_relaxed);
+        m_sharedState.liveScanlinesStyle    .store (settings.m_scanlinesStyle,                           std::memory_order_relaxed);
+        m_sharedState.liveCustomColor       .store (static_cast<DWORD> (settings.m_customColor),         std::memory_order_relaxed);
     }
 
     // Apply settings to subsystems and bind input once the primary render
@@ -871,9 +887,23 @@ int Application::Run()
             break;
         }
 
-        // If live overlay dialog is active, let it handle dialog messages
-        if (m_hConfigDialog && IsDialogMessage (m_hConfigDialog, &msg))
+        // If live overlay dialog is active, let the property sheet handle dialog messages
+        if (m_hConfigDialog && PropSheet_IsDialogMessage (m_hConfigDialog, &msg))
         {
+            // Canonical modeless property-sheet teardown: when the user
+            // clicks OK or Cancel, comctl32 signals it by making
+            // PropSheet_GetCurrentPageHwnd return NULL.  The page procs
+            // themselves do NOT destroy the sheet (destroying mid-
+            // notification re-enters the frame subclass and overflows
+            // the stack).  Instead the message loop polls here, then
+            // DestroyWindow's the sheet from outside any dispatch.
+            if (m_hConfigDialog && !PropSheet_GetCurrentPageHwnd (m_hConfigDialog))
+            {
+                DestroyWindow (m_hConfigDialog);
+                // SetConfigDialog(nullptr) and PostQuitMessage (in
+                // SettingsDialog mode) are handled by the sheet frame's
+                // WM_DESTROY subclass.
+            }
             continue;
         }
 
@@ -955,16 +985,18 @@ Error:
 
 void Application::RebuildContextsForCurrentMode()
 {
-    HRESULT           hr = S_OK;
+    HRESULT           hr            = S_OK;
+    HWND              hConfigDialog = m_hConfigDialog;
     std::vector<HWND> hwnds;
 
 
-    // Close any live config dialog first — the rebuild destroys the primary
-    // window that owns it, which would otherwise orphan the dialog.
-    if (m_hConfigDialog)
+    // Keep the live config dialog alive across the primary-window rebuild.
+    // Temporarily clear its owner so destroying the old render window cannot
+    // take the property sheet with it; the owner is restored after the new
+    // primary window exists.
+    if (hConfigDialog)
     {
-        DestroyWindow (m_hConfigDialog);
-        m_hConfigDialog = nullptr;
+        SetWindowLongPtrW (hConfigDialog, GWLP_HWNDPARENT, 0);
     }
 
 
@@ -1002,6 +1034,22 @@ void Application::RebuildContextsForCurrentMode()
     if (SUCCEEDED (hr))
     {
         StartRenderThreads();
+    }
+
+    if (hConfigDialog && IsWindow (hConfigDialog) && m_hwnd)
+    {
+        SetWindowLongPtrW (hConfigDialog, GWLP_HWNDPARENT, reinterpret_cast<LONG_PTR> (m_hwnd));
+
+        // After the rebuild, the newly-created primary render window sits
+        // at the top of the Z-order.  Raise the config dialog back above
+        // it so the user can keep interacting with the settings (otherwise
+        // toggling Start In Fullscreen makes the dialog appear to vanish
+        // behind the rain).  SWP_NOACTIVATE keeps keyboard focus where it
+        // is (still on the dialog control the user just toggled).
+        SetWindowPos (hConfigDialog,
+                      HWND_TOP,
+                      0, 0, 0, 0,
+                      SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
     }
 
     m_inDisplayModeTransition = false;
@@ -1320,7 +1368,6 @@ void Application::OnKeyDown (WPARAM wParam)
 
                     m_sharedState.colorScheme      = m_appState->GetColorScheme();
                     m_sharedState.showStatistics   = m_appState->GetShowStatistics();
-                    m_sharedState.showDebugFadeTimes = m_appState->GetShowDebugFadeTimes();
                 }
             }
             break;

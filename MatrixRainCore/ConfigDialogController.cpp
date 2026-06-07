@@ -174,6 +174,11 @@ void ConfigDialogController::UpdateGlowSize (int glowSizePercent)
 void ConfigDialogController::UpdateStartFullscreen (bool startFullscreen)
 {
     m_settings.m_startFullscreen = startFullscreen;
+
+    if (m_snapshot.isLiveMode && m_snapshot.applicationStateRef)
+    {
+        m_snapshot.applicationStateRef->ApplySettings (m_settings);
+    }
 }
 
 
@@ -188,6 +193,11 @@ void ConfigDialogController::UpdateStartFullscreen (bool startFullscreen)
 void ConfigDialogController::UpdateMultiMonitorEnabled (bool multiMonitorEnabled)
 {
     m_settings.m_multiMonitorEnabled = multiMonitorEnabled;
+
+    if (m_snapshot.isLiveMode && m_snapshot.applicationStateRef)
+    {
+        m_snapshot.applicationStateRef->ApplySettings (m_settings);
+    }
 }
 
 
@@ -202,6 +212,11 @@ void ConfigDialogController::UpdateMultiMonitorEnabled (bool multiMonitorEnabled
 void ConfigDialogController::UpdateGpuAdapter (const std::wstring & description)
 {
     m_settings.m_gpuAdapter = description;
+
+    if (m_snapshot.isLiveMode && m_snapshot.applicationStateRef)
+    {
+        m_snapshot.applicationStateRef->ApplySettings (m_settings);
+    }
 }
 
 
@@ -287,9 +302,86 @@ void ConfigDialogController::UpdateShowDebugStats (bool showDebugStats)
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void ConfigDialogController::UpdateShowFadeTimers (bool showFadeTimers)
+////////////////////////////////////////////////////////////////////////////////
+//
+//  v1.5 setters (US1 T025, data-model.md §3/§4)
+//
+//  Each setter mutates m_settings and (in live mode) propagates the new
+//  value to ApplicationState via ApplySettings so the SharedState mirror
+//  picks it up on the next render-thread snapshot.  Until US2/US3/US5 wire
+//  individual SharedState atomics, ApplySettings is the coarse-grained
+//  propagation path — it copies the whole struct, which is cheap.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+void ConfigDialogController::UpdateGlowEnabled (bool enabled)
 {
-    m_settings.m_showFadeTimers = showFadeTimers;
+    m_settings.m_glowEnabled = enabled;
+
+    if (m_snapshot.isLiveMode && m_snapshot.applicationStateRef)
+    {
+        m_snapshot.applicationStateRef->ApplySettings (m_settings);
+    }
+}
+
+
+
+
+
+void ConfigDialogController::UpdateScanlinesEnabled (bool enabled)
+{
+    m_settings.m_scanlinesEnabled = enabled;
+
+    if (m_snapshot.isLiveMode && m_snapshot.applicationStateRef)
+    {
+        m_snapshot.applicationStateRef->ApplySettings (m_settings);
+    }
+}
+
+
+
+
+
+void ConfigDialogController::UpdateScanlinesIntensity (int intensityPercent)
+{
+    m_settings.m_scanlinesIntensity = ScreenSaverSettings::ClampPercent (intensityPercent,
+                                                                          ScreenSaverSettings::MIN_SCANLINES_INTENSITY_PERCENT,
+                                                                          ScreenSaverSettings::MAX_SCANLINES_INTENSITY_PERCENT);
+
+    if (m_snapshot.isLiveMode && m_snapshot.applicationStateRef)
+    {
+        m_snapshot.applicationStateRef->ApplySettings (m_settings);
+    }
+}
+
+
+
+
+
+void ConfigDialogController::UpdateScanlinesStyle (int style)
+{
+    m_settings.m_scanlinesStyle = ScreenSaverSettings::ClampPercent (style,
+                                                                      ScreenSaverSettings::MIN_SCANLINES_STYLE,
+                                                                      ScreenSaverSettings::MAX_SCANLINES_STYLE);
+
+    if (m_snapshot.isLiveMode && m_snapshot.applicationStateRef)
+    {
+        m_snapshot.applicationStateRef->ApplySettings (m_settings);
+    }
+}
+
+
+
+
+
+void ConfigDialogController::UpdateCustomColor (COLORREF color)
+{
+    m_settings.m_customColor = color;
+
+    if (m_snapshot.isLiveMode && m_snapshot.applicationStateRef)
+    {
+        m_snapshot.applicationStateRef->ApplySettings (m_settings);
+    }
 }
 
 
@@ -345,7 +437,31 @@ void ConfigDialogController::CancelChanges()
 
 void ConfigDialogController::ResetToDefaults()
 {
-    m_settings = ScreenSaverSettings();
+    // FR-035 carve-out: the custom-color palette is INTENTIONALLY NOT
+    // reset.  Capture it before zeroing m_settings (defaults-init wipes
+    // the array to all zeros) and restore it on the freshly defaulted
+    // struct.  Mirror onto the snapshot so a subsequent CancelLiveMode
+    // doesn't observe a stale palette (the snapshot itself never carried
+    // the palette before, but ResetToDefaults is now the one writer to it
+    // that the snapshot can't otherwise see).  Without this, Reset->OK
+    // would write the zeroed palette to the registry and the user's 16
+    // saved swatches would be lost permanently.
+    std::array<COLORREF, 16> palette = m_settings.m_customColorPalette;
+
+    m_settings                                       = ScreenSaverSettings();
+    m_settings.m_customColorPalette                  = palette;
+    m_snapshot.snapshotSettings.m_customColorPalette = palette;
+
+    // Mini-phase 2.5 (cross-page Reset button): propagate to ApplicationState
+    // in live mode so the live preview snaps back instantly.  ApplySettings
+    // is the same coarse-grained propagation path UpdateGlowEnabled and the
+    // UpdateScanlines* setters already use; the render thread observes the
+    // defaults on the next snapshot regardless of which page (if any) is
+    // currently active when the user clicks the frame-scope Reset button.
+    if (m_snapshot.isLiveMode && m_snapshot.applicationStateRef)
+    {
+        m_snapshot.applicationStateRef->ApplySettings (m_settings);
+    }
 }
 
 
@@ -439,14 +555,23 @@ HRESULT ConfigDialogController::CancelLiveMode()
     
     // Verify we're in live mode
     CBRA (m_snapshot.isLiveMode);
-    
-    // Revert current settings to snapshot (undoing live preview changes)
-    m_settings = m_snapshot.snapshotSettings;
-    
+
+    // FR-035 carve-out: the custom-color palette is INTENTIONALLY NOT
+    // rollback-eligible.  Preserve the live palette across the snapshot
+    // restore so it survives Cancel exactly like the registry copy does.
+    {
+        std::array<COLORREF, 16> livePalette = m_settings.m_customColorPalette;
+
+        // Revert current settings to snapshot (undoing live preview changes)
+        m_settings                       = m_snapshot.snapshotSettings;
+        m_settings.m_customColorPalette  = livePalette;
+        m_snapshot.snapshotSettings.m_customColorPalette = livePalette;
+    }
+
     // Propagate snapshot settings back to ApplicationState to visually revert animation
     if (m_snapshot.applicationStateRef)
     {
-        m_snapshot.applicationStateRef->ApplySettings (m_snapshot.snapshotSettings);
+        m_snapshot.applicationStateRef->ApplySettings (m_settings);
     }
     
     // Clear live mode state

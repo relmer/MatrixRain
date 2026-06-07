@@ -270,6 +270,13 @@ GpuLoadMonitor & SharedGpuLoadMonitor()
 
 
 
+double QueryProcessGpuLoadPercent()
+{
+    return SharedGpuLoadMonitor().GetLoadPercent();
+}
+
+
+
 
 
 RenderSystem::~RenderSystem()
@@ -320,6 +327,9 @@ HRESULT RenderSystem::Initialize (HWND hwnd, UINT width, UINT height, std::optio
     CHR (hr);
 
     hr = CreateBloomConstantBuffer();
+    CHR (hr);
+
+    hr = CreateScanlineConstantBuffer();
     CHR (hr);
 
     hr = CreateBlendState();
@@ -887,6 +897,123 @@ Error:
     return hr;
 }
 
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  RenderSystem::CreateScanlineConstantBuffer (T051, T052)
+//
+//  16-byte D3D11_USAGE_DYNAMIC cbuffer for the scanline PS.  Uploaded
+//  once per frame via Map/Unmap with D3D11_MAP_WRITE_DISCARD when the
+//  scanline pass runs.  Matches the ScanlineCb HLSL layout in
+//  MatrixRainCore/Shaders/scanlines.hlsl (intensity, linesPerHeight,
+//  padding, padding).
+//
+////////////////////////////////////////////////////////////////////////////////
+
+HRESULT RenderSystem::CreateScanlineConstantBuffer()
+{
+    HRESULT           hr         = S_OK;
+    D3D11_BUFFER_DESC bufferDesc = {};
+
+
+
+    bufferDesc.ByteWidth      = sizeof (ScanlineCb);  // 16 bytes
+    bufferDesc.Usage          = D3D11_USAGE_DYNAMIC;
+    bufferDesc.BindFlags      = D3D11_BIND_CONSTANT_BUFFER;
+    bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+
+    hr = m_device->CreateBuffer (&bufferDesc, nullptr, &m_scanlineConstantBuffer);
+    CHRA (hr);
+
+Error:
+    return hr;
+}
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  RenderSystem::UploadScanlineConstants (T052)
+//
+//  Per-frame Map/Unmap of the scanline cbuffer from `params` (intensity
+//  already normalised to [0..1] and line count already computed via
+//  ScanlineLineCount upstream in MonitorRenderContext::BuildRenderParams).
+//
+////////////////////////////////////////////////////////////////////////////////
+
+HRESULT RenderSystem::UploadScanlineConstants (const RenderParams & params)
+{
+    HRESULT                  hr     = S_OK;
+    D3D11_MAPPED_SUBRESOURCE mapped = {};
+    ScanlineCb               cb     = {};
+
+
+
+    CBRAEx (m_scanlineConstantBuffer != nullptr, E_UNEXPECTED);
+
+    cb.intensity      = params.scanlinesIntensity;
+    cb.linesPerHeight = params.scanlinesLineCount;
+
+    hr = m_context->Map (m_scanlineConstantBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
+    CHRA (hr);
+
+    memcpy (mapped.pData, &cb, sizeof (cb));
+    m_context->Unmap (m_scanlineConstantBuffer.Get(), 0);
+
+Error:
+    return hr;
+}
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  RenderSystem::ApplyScanlinePass (T051, contracts/scanline-shader.md)
+//
+//  Reads m_postBloomSRV (which the bloom-composite or scene-bypass branch
+//  rendered into instead of the swapchain backbuffer when the scanline
+//  pass was active) and writes to m_renderTargetView through the scanline
+//  pixel shader.  Bound cbuffer b0 = m_scanlineConstantBuffer, sampler
+//  s0 = m_samplerState.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+HRESULT RenderSystem::ApplyScanlinePass()
+{
+    HRESULT                    hr      = S_OK;
+    ID3D11Buffer       * const nullCB  = nullptr;
+    ID3D11ShaderResourceView * srv[1]  = {};
+
+
+
+    CBRAEx (m_renderTargetView && m_postBloomSRV && m_scanlinePS && m_scanlineConstantBuffer, E_UNEXPECTED);
+
+    // Bind the scanline cbuffer + sampler before the fullscreen pass.
+    m_context->PSSetConstantBuffers (0, 1, m_scanlineConstantBuffer.GetAddressOf());
+    m_context->PSSetSamplers        (0, 1, m_samplerState.GetAddressOf());
+    m_context->OMSetBlendState      (nullptr, nullptr, 0xffffffff);
+
+    SetRenderPipelineState (m_fullscreenQuadInputLayout.Get(),
+                            D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST,
+                            m_fullscreenQuadVB.Get(),
+                            sizeof (float) * 5,
+                            m_fullscreenQuadVS.Get(),
+                            nullptr,
+                            nullptr);
+
+    srv[0] = m_postBloomSRV.Get();
+    RenderFullscreenPass (m_renderTargetView.Get(), m_scanlinePS.Get(), srv, 1);
+
+    // Unbind the scanline cbuffer so subsequent passes don't inherit b0.
+    m_context->PSSetConstantBuffers (0, 1, &nullCB);
+
+Error:
+    return hr;
+}
 
 
 
@@ -1500,6 +1627,56 @@ static const D3D11_INPUT_ELEMENT_DESC s_krgQuadInputLayout[] = {
 };
 
 
+////////////////////////////////////////////////////////////////////////////////
+//
+//  s_kszScanlineShaderSource (T051, contracts/scanline-shader.md, R6)
+//
+//  Inline copy of MatrixRainCore/Shaders/scanlines.hlsl.  The .hlsl file
+//  on disk is the source of truth + documentation; this string is what
+//  D3DCompile actually consumes at runtime (matching the existing pattern
+//  for every other shader in this file).  Keep the two in sync.
+//
+//  ATTRIBUTION: Adapted from crt-pi by Davide Berra (MIT)
+//  Upstream URL:
+//    https://github.com/libretro/glsl-shaders/blob/master/crt/shaders/crt-pi.glsl
+//  SPDX-License-Identifier: MIT
+//
+//  MatrixRain modifications (v1.5):
+//   - line count uploaded per-frame from CPU via g_linesPerHeight
+//   - source-luminance gating removed (FR-024a); darkening is uniform
+//
+////////////////////////////////////////////////////////////////////////////////
+
+static const char * s_kszScanlineShaderSource = R"(
+        cbuffer ScanlineCb : register(b0)
+        {
+            float g_intensity;
+            float g_linesPerHeight;
+            float g_padding0;
+            float g_padding1;
+        };
+
+        Texture2D    tex : register(t0);
+        SamplerState sam : register(s0);
+
+        struct PSInput
+        {
+            float4 pos : SV_POSITION;
+            float2 uv  : TEXCOORD;
+        };
+
+        float4 main (PSInput i) : SV_TARGET
+        {
+            float4 c       = tex.Sample (sam, i.uv);
+            float  linePos = i.uv.y * g_linesPerHeight;
+            float  gap     = sin (linePos * 3.14159265);
+            float  bright  = gap * gap;
+            float  darken  = lerp (1.0 - g_intensity, 1.0, bright);
+            c.rgb *= darken;
+            return c;
+        }
+    )";
+
 
 
 
@@ -1587,6 +1764,50 @@ HRESULT RenderSystem::CompileBloomShaders()
         CHRA (hr);
     }
 
+    // v1.5 (T051, FR-028b): compile the scanline post-pass shader.  Soft-
+    // bypass on failure — we log + clear m_scanlinePS and return S_OK so
+    // the rest of the pipeline boots normally.  Render-time checks fall
+    // through to skipping the scanline pass entirely.  Per the analyze
+    // decision, the dialog's Scanline controls stay enabled and there's
+    // no UI surface for this error (user just doesn't see scanlines).
+    {
+        ComPtr<ID3DBlob>  scanlinePSBlob;
+        ComPtr<ID3DBlob>  scanlineErrorBlob;
+        HRESULT           hrScanline = S_OK;
+
+
+        hrScanline = D3DCompile (s_kszScanlineShaderSource,
+                                  strlen (s_kszScanlineShaderSource),
+                                  "Scanlines",
+                                  nullptr,
+                                  nullptr,
+                                  "main",
+                                  "ps_5_0",
+                                  D3DCOMPILE_ENABLE_STRICTNESS,
+                                  0,
+                                  &scanlinePSBlob,
+                                  &scanlineErrorBlob);
+
+        if (SUCCEEDED (hrScanline))
+        {
+            hrScanline = m_device->CreatePixelShader (scanlinePSBlob->GetBufferPointer(),
+                                                      scanlinePSBlob->GetBufferSize(),
+                                                      nullptr,
+                                                      &m_scanlinePS);
+        }
+
+        if (FAILED (hrScanline))
+        {
+            if (scanlineErrorBlob)
+            {
+                OutputDebugStringA (static_cast<char *> (scanlineErrorBlob->GetBufferPointer()));
+            }
+
+            OutputDebugStringW (L"MatrixRain: scanline shader init failed; scanlines bypassed for this session.\n");
+            m_scanlinePS.Reset();
+        }
+    }
+
 Error:
     return hr;
 }
@@ -1662,6 +1883,40 @@ HRESULT RenderSystem::CreateBloomResources (UINT width, UINT height)
 
     hr = m_device->CreateShaderResourceView (m_blurTempTexture.Get(), nullptr, &m_blurTempSRV);
     CHRA (hr);
+
+    // v1.5 (T051, contracts/scanline-shader.md): post-bloom intermediate
+    // target.  Backbuffer dimensions + the same R8G8B8A8 format as the scene
+    // and bloom intermediates so the scanline PS can sample it at native
+    // resolution and write 1:1 to the swapchain backbuffer.  (The backbuffer
+    // is B8G8R8A8 for D2D interop; the channel-order difference is irrelevant
+    // because the scanline pass is a shader draw — sampler in, output-merger
+    // out, see RenderScanlinePass — not a CopyResource, so the GPU handles
+    // the swizzle transparently.)
+    // Recreated alongside the bloom resources on Resize (Release+Create
+    // pair in RenderSystem::Resize), so a window-size change automatically
+    // reallocates this too.
+    {
+        D3D11_TEXTURE2D_DESC postBloomDesc = {};
+
+
+        postBloomDesc.Width             = width;
+        postBloomDesc.Height            = height;
+        postBloomDesc.MipLevels         = 1;
+        postBloomDesc.ArraySize         = 1;
+        postBloomDesc.Format            = DXGI_FORMAT_R8G8B8A8_UNORM;
+        postBloomDesc.SampleDesc.Count  = 1;
+        postBloomDesc.Usage             = D3D11_USAGE_DEFAULT;
+        postBloomDesc.BindFlags         = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
+
+        hr = m_device->CreateTexture2D (&postBloomDesc, nullptr, &m_postBloomTexture);
+        CHRA (hr);
+
+        hr = m_device->CreateRenderTargetView (m_postBloomTexture.Get(), nullptr, &m_postBloomRTV);
+        CHRA (hr);
+
+        hr = m_device->CreateShaderResourceView (m_postBloomTexture.Get(), nullptr, &m_postBloomSRV);
+        CHRA (hr);
+    }
 
     // Compile bloom shaders and create fullscreen quad resources (only on first call)
     if (!m_bloomExtractPS)
@@ -1779,7 +2034,7 @@ void RenderSystem::SetViewport(UINT width, UINT height)
 
 
 
-HRESULT RenderSystem::ApplyBloom()
+HRESULT RenderSystem::ApplyBloom (ID3D11RenderTargetView * pCompositeTarget)
 {
     HRESULT                    hr              = S_OK;
     ID3D11ShaderResourceView * srvs[2];
@@ -1793,7 +2048,7 @@ HRESULT RenderSystem::ApplyBloom()
 
 
     // Safety check - if render target or bloom resources are being recreated during resize, skip
-    CBREx (m_renderTargetView && m_sceneTexture && m_bloomTexture && m_bloomExtractPS && m_compositePS, E_UNEXPECTED);
+    CBREx (pCompositeTarget && m_sceneTexture && m_bloomTexture && m_bloomExtractPS && m_compositePS, E_UNEXPECTED);
     
     // Bloom viewport matches the bloom buffer size (resolution-divisor scaled).
     viewportDivisor = std::clamp (static_cast<int> (m_bloomResolutionDivisor), 1, 8);
@@ -1864,8 +2119,11 @@ HRESULT RenderSystem::ApplyBloom()
     // Restore full viewport
     SetViewport (m_renderWidth, m_renderHeight);
     
-    // Composite back to backbuffer
-    m_context->OMSetRenderTargets (1, m_renderTargetView.GetAddressOf(), nullptr);
+    // Composite to the caller-supplied target.  When the scanline pass is
+    // about to run, Render passes m_postBloomRTV here so the scanline PS
+    // can sample the composited result and write the final image into the
+    // swapchain backbuffer; otherwise this is the backbuffer RTV directly.
+    m_context->OMSetRenderTargets (1, &pCompositeTarget, nullptr);
     
     // Disable blending for composite (we want to replace, not blend)
     m_context->OMSetBlendState (nullptr, nullptr, 0xffffffff);
@@ -1875,7 +2133,7 @@ HRESULT RenderSystem::ApplyBloom()
     
     srvs[0] = m_sceneSRV.Get();
     srvs[1] = m_bloomSRV.Get();
-    RenderFullscreenPass (m_renderTargetView.Get(), m_compositePS.Get(), srvs, 2);
+    RenderFullscreenPass (pCompositeTarget, m_compositePS.Get(), srvs, 2);
     
     // Unbind constant buffer from pixel shader
     m_context->PSSetConstantBuffers (0, 1, &nullCB);
@@ -1985,7 +2243,7 @@ void RenderSystem::BuildCharacterInstanceData (const CharacterInstance & charact
 
 
 
-HRESULT RenderSystem::UpdateInstanceBuffer (const AnimationSystem& animationSystem, ColorScheme colorScheme, float elapsedTime)
+HRESULT RenderSystem::UpdateInstanceBuffer (const AnimationSystem& animationSystem, ColorScheme colorScheme, float elapsedTime, COLORREF customColor)
 {
     HRESULT                  hr             = S_OK;
     Color4                   schemeColor    = GetColorRGB (colorScheme, elapsedTime);
@@ -1993,6 +2251,16 @@ HRESULT RenderSystem::UpdateInstanceBuffer (const AnimationSystem& animationSyst
     size_t                   bytesToCopy;
 
 
+
+    // v1.5 US5 (T062, FR-033, FR-034): when the user picks ColorScheme::
+    // Custom, override the static-palette lookup with their persisted RGB.
+    // COLORREF is 0x00BBGGRR, normalise each channel to [0..1] for Color4.
+    if (colorScheme == ColorScheme::Custom)
+    {
+        schemeColor = Color4 (static_cast<float> (GetRValue (customColor)) / 255.0f,
+                              static_cast<float> (GetGValue (customColor)) / 255.0f,
+                              static_cast<float> (GetBValue (customColor)) / 255.0f);
+    }
 
     // Clear working data from previous frame (reuse allocated capacity)
     m_instanceData.clear();
@@ -2133,7 +2401,7 @@ void RenderSystem::Render (const AnimationSystem & animationSystem, const Viewpo
     }
 
     // Update instance buffer with character data
-    (void) UpdateInstanceBuffer (animationSystem, params.colorScheme, params.elapsedTime);
+    (void) UpdateInstanceBuffer (animationSystem, params.colorScheme, params.elapsedTime, params.customColor);
 
     if (m_instanceData.empty())
     {
@@ -2206,23 +2474,50 @@ void RenderSystem::Render (const AnimationSystem & animationSystem, const Viewpo
         renderOverlay (params.pHotkeyOverlay);
         renderOverlay (params.pUsageOverlay);
 
-        // Apply bloom (extracts bright pixels including overlay text, composites
-        // to backbuffer).  When the user has dialed Glow Intensity to 0% the
-        // entire bloom pipeline is bypassed and the scene texture is composited
-        // directly to the backbuffer (FR-031: "glow disabled" = true off, not
-        // just darker).
-        if (m_glowIntensity > 0.0f)
+        // v1.5 (T039, FR-015): bypass the entire bloom pipeline when the
+        // user has toggled Glow Enabled OFF.  The scene texture is composited
+        // straight to the backbuffer (or into m_postBloomTarget when the
+        // scanline pass is also active); bloom resources stay allocated so
+        // re-enabling is instant.  See ShouldRunBloomPass in RenderSystem.h
+        // for the unit-tested decision predicate.
+        //
+        // v1.5 (T051, T052, FR-028b): when the scanline pass is active, the
+        // composite (or the direct scene copy in the glow-off branch) writes
+        // into m_postBloomTarget instead of the swapchain backbuffer; the
+        // scanline PS then samples it and writes the final image to the
+        // backbuffer.  Scanlines run independently of glow now — the no-glow
+        // branch routes through m_postBloomTarget too so scanlines always
+        // have a populated SRV.
+        bool                     wantScanlines    = ShouldRunScanlinePass (params)
+                                                    && m_scanlinePS
+                                                    && m_postBloomRTV
+                                                    && m_postBloomSRV;
+        ID3D11RenderTargetView * pCompositeTarget = wantScanlines
+                                                    ? m_postBloomRTV.Get()
+                                                    : m_renderTargetView.Get();
+
+        if (wantScanlines)
         {
-            (void)ApplyBloom();
+            // Per-frame Map/Unmap of the scanline cbuffer.  Cheap; the
+            // intensity + line-count atomics were resolved upstream in
+            // MonitorRenderContext::BuildRenderParams.
+            (void)UploadScanlineConstants (params);
+        }
+
+        if (ShouldRunBloomPass (params))
+        {
+            (void)ApplyBloom (pCompositeTarget);
         }
         else
         {
-            // Direct scene-to-backbuffer copy: render the scene texture without
-            // the bloom extract/blur/composite passes.  Bind a null SRV at
-            // slot 1 (bloom) so the composite PS doesn't sample whatever
-            // texture was left bound there by a previous bloom-on frame —
-            // PSSetShaderResources with numResources=1 only touches slot 0.
-            m_context->OMSetRenderTargets (1, m_renderTargetView.GetAddressOf(), nullptr);
+            // Direct scene-to-target copy: render the scene texture without
+            // the bloom extract/blur/composite passes.  When scanlines are
+            // active we still route through m_postBloomTarget so the scanline
+            // PS has something to sample.  Bind a null SRV at slot 1 (bloom)
+            // so the composite PS doesn't sample whatever texture was left
+            // bound there by a previous bloom-on frame (PSSetShaderResources
+            // with numResources=1 only touches slot 0).
+            m_context->OMSetRenderTargets (1, &pCompositeTarget, nullptr);
             m_context->OMSetBlendState (nullptr, nullptr, 0xffffffff);
 
             ID3D11ShaderResourceView * srvs[] = { m_sceneSRV.Get(), nullptr };
@@ -2235,7 +2530,12 @@ void RenderSystem::Render (const AnimationSystem & animationSystem, const Viewpo
                                     nullptr,
                                     nullptr);
             m_context->PSSetSamplers (0, 1, m_samplerState.GetAddressOf());
-            RenderFullscreenPass (m_renderTargetView.Get(), m_compositePS.Get(), srvs, 2);
+            RenderFullscreenPass (pCompositeTarget, m_compositePS.Get(), srvs, 2);
+        }
+
+        if (wantScanlines)
+        {
+            (void)ApplyScanlinePass();
         }
     }
     else
@@ -2252,12 +2552,6 @@ void RenderSystem::Render (const AnimationSystem & animationSystem, const Viewpo
         bool   gpuLoadValid = gpuLoad >= 0.0;
 
         RenderFPSCounter (params.fps, params.rainPercentage, params.streakCount, params.activeHeadCount, gpuLoad, gpuLoadValid);
-    }
-
-    // Debug: Render fade times when enabled and only one streak is visible
-    if (params.showDebugFadeTimes)
-    {
-        RenderDebugFadeTimes (animationSystem);
     }
 }
 
@@ -2302,12 +2596,12 @@ void RenderSystem::RenderFPSCounter (float fps, int rainPercentage, int streakCo
     //   "Rain xxx% (yyy heads / zzz total), ww FPS, GPU vv%"
     if (gpuLoadValid)
     {
-        swprintf_s (fpsText, L"Rain %d%% (%d heads / %d total), %.0f FPS, GPU %.0f%%",
+        swprintf_s (fpsText, L"Rain %d%% (%d heads / %d total), %.0f fps, %.0f%% GPU",
                     rainPercentage, activeHeadCount, streakCount, fps, gpuLoadPercent);
     }
     else
     {
-        swprintf_s (fpsText, L"Rain %d%% (%d heads / %d total), %.0f FPS, GPU --%%",
+        swprintf_s (fpsText, L"Rain %d%% (%d heads / %d total), %.0f fps, --%% GPU",
                     rainPercentage, activeHeadCount, streakCount, fps);
     }
 
@@ -3112,64 +3406,6 @@ void RenderSystem::DrawFeatheredGlow (const wchar_t * fpsText, UINT32 textLength
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-//  RenderSystem::RenderDebugFadeTimes
-//
-//  Renders fade time remaining to the right of each character for debugging.
-//
-////////////////////////////////////////////////////////////////////////////////
-
-void RenderSystem::RenderDebugFadeTimes (const AnimationSystem& animationSystem)
-{
-    if (!m_d2dContext || !m_fpsBrush || !m_fpsTextFormat)
-    {
-        return;
-    }
-
-    const auto& streaks = animationSystem.GetStreaks();
-
-    m_d2dContext->BeginDraw();
-
-    for (const CharacterStreak& streak : streaks)
-    {
-        const auto& characters = streak.GetCharacters();
-        Vector3     streakPos  = streak.GetPosition();
-
-        for (const auto& character : characters)
-        {
-            // Calculate screen position
-            float screenX = streakPos.x + character.positionOffset.x;
-            float screenY = character.positionOffset.y;
-
-            // Format lifetime text
-            wchar_t fadeText[32];
-            swprintf_s (fadeText, L"%.2f", character.lifetime);
-
-            // Position text to the right of the character
-            D2D1_RECT_F textRect = D2D1::RectF (
-                screenX + 40.0f,    // 40px to the right of character
-                screenY,
-                screenX + 140.0f,
-                screenY + 30.0f
-            );
-
-            // Draw text in white
-            m_d2dContext->DrawText (fadeText,
-                                    static_cast<UINT32> (wcslen (fadeText)),
-                                    m_fpsTextFormat.Get(),
-                                    textRect,
-                                    m_fpsBrush.Get());
-        }
-    }
-
-    m_d2dContext->EndDraw();
-}
-
-
-
-
-
-////////////////////////////////////////////////////////////////////////////////
-//
 //  RenderSystem::Resize
 //
 ////////////////////////////////////////////////////////////////////////////////
@@ -3253,6 +3489,9 @@ void RenderSystem::ReleaseBloomResources()
     m_blurTempSRV.Reset();
     m_blurTempRTV.Reset();
     m_blurTempTexture.Reset();
+    m_postBloomSRV.Reset();
+    m_postBloomRTV.Reset();
+    m_postBloomTexture.Reset();
 }
 
 
