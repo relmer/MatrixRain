@@ -120,8 +120,10 @@ END
 ////////////////////////////////////////////////////////////////////////////////
 //
 // v1.5 (T028, FR-001, FR-005, FR-008): property-sheet pages.  Visuals on
-// the left tab, Performance (which receives the live "(NN fps, NN%% GPU)"
-// title) on the right.  Pages share the v1.4 control-id space defined in
+// the left tab, Performance on the right.  Both tab titles are static; the
+// live "NN fps, NN%% GPU" numbers appear in the bottom-right
+// IDC_FPS_GPU_READOUT static on each page (1 Hz, see PerfTitleTimerProc).
+// Pages share the v1.4 control-id space defined in
 // resource.h; controls reserved for later phases (US2 glow checkbox, US3
 // scanline group, US5 colour combo Custom slot) are laid out here as
 // disabled/empty placeholders so the layout doesn't shift as those tasks

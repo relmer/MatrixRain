@@ -26,14 +26,14 @@ x64\Debug\MatrixRain.exe /c
 ### US1 — Two-tab property sheet + live perf readout
 
 1. Launch with `/c`. Confirm the dialog has two tabs labeled `Visuals`
-   and `Performance` (the Performance tab's title will populate with
-   live numbers within ~1 second).
+   and `Performance`. A bottom-right `NN fps, NN% GPU` readout on each
+   page populates with live numbers within ~1 second.
 2. Confirm there is no Apply button.
 3. Move the Density slider on Visuals; the preview behind the dialog
    updates immediately (no Apply press needed).
-4. Switch to Performance; within 1 s the tab label should read
-   something like `Performance (60 fps, 12% GPU)`. Initial display
-   before first publication shows `Performance (0 fps, 0% GPU)`.
+4. Within 1 s the bottom-right readout (shown on both pages) should
+   read something like `60 fps, 12% GPU`. Before the first publication
+   it shows `0 fps, 0% GPU`.
 5. Change Density again, then click Cancel. The preview reverts to the
    pre-dialog Density value.
 
@@ -54,14 +54,15 @@ x64\Debug\MatrixRain.exe /c
 
 1. On a fresh-install registry state (delete the four `Scanlines*`
    values from the registry root, then launch `/c`):
-2. Visuals tab shows Scanlines Enabled (checked), Intensity (30),
-   Style (50) in that order. The preview shows visible scanlines.
+2. Performance tab shows Scanlines Enabled (checked); Visuals tab shows
+   Scanline Intensity (30) and Style (50) in that order. The preview
+   shows visible scanlines.
 3. Slide Style from 50 → 1. Scanlines become barely visible (~981
    lines).
 4. Slide Style 1 → 100. Scanlines become chunky Apple-II bands (~150
    lines).
-5. Toggle Scanlines Enabled OFF. Preview is bit-identical to no
-   scanline pass.
+5. On the Performance tab, toggle Scanlines Enabled OFF. Preview is
+   bit-identical to no scanline pass.
 
 ### US4 — Custom color picker
 
@@ -94,7 +95,7 @@ launching v1.5 should produce no warnings or behaviour change.
 2. Launch v1.5 against that snapshot.
 3. Scanlines render on the first frame (intentional v1.5 visual
    evolution). The v1.5 CHANGELOG entry calls out the one-click
-   disable path (Visuals → Scanlines Enabled → OFF).
+   disable path (Performance → Scanlines Enabled → OFF).
 
 ## Suggested phase ordering for `/speckit.tasks`
 
@@ -123,8 +124,9 @@ constraints request:
    propagation (R7) + `RenderSystem` bloom pipeline bypass +
    `GlowEnabled` registry round-trip + tooltips + tests.
 5. **US3 — Scanlines** — shader port + `ScanlineCb` struct + per-frame
-   upload + extra render target + 3 controls on Visuals tab + 3
-   registry values + tests.
+   upload + extra render target + Scanline Intensity/Style sliders on
+   Visuals + Enable-scanlines checkbox on Performance + 3 registry
+   values + tests.
 6. **US5 — Custom color picker** — `ColorScheme::Custom` enum variant
    + Color combo entry + subclass-based same-item-commit detection
    (CB_GETDROPPEDSTATE on WM_LBUTTONUP / WM_KEYUP) + ChooseColorW

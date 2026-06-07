@@ -15,16 +15,18 @@ from `specs/006-multimon-gpu-efficiency/data-model.md`.
 | `m_scanlinesEnabled` | `bool` | `true` | `{false, true}` | Yes | `ScanlinesEnabled` DWORD |
 | `m_scanlinesIntensity` | `int` | `30` | `1..100` (percent) | Yes | `ScanlinesIntensity` DWORD |
 | `m_scanlinesStyle` | `int` | `50` | `1..100` (unit-less) | Yes | `ScanlinesStyle` DWORD |
-| `m_customColor` | `COLORREF` | `RGB(0,255,0)` (committed only on first chooser OK) | full 24-bit RGB | Yes | `CustomColor` DWORD |
+| `m_customColor` | `COLORREF` | `RGB(0,255,0)` (default until the user picks a custom colour; persisted on every Save) | full 24-bit RGB | Yes | `CustomColor` DWORD |
 | `m_customColorPalette` | `std::array<COLORREF, 16>` | all zero | full 24-bit RGB per slot | **No** (see FR-035) | `CustomColorPalette` REG_BINARY (64 bytes) |
 | ~~`m_showFadeTimers`~~ | ~~`bool`~~ | — | — | — | ~~`ShowFadeTimers`~~ removed (FR-036) |
 
 Validation rules:
 - `m_scanlinesIntensity` and `m_scanlinesStyle` MUST be clamped to `[1,100]`
   on read and on write (defensive against tampered registry values).
-- `m_customColor` is only written to the registry after a successful
-  chooser-OK; absence in registry means "the user has never picked a custom
-  colour" and the chooser pre-populates with the `RGB(0,255,0)` default
+- `m_customColor` is persisted unconditionally on every `Save()` (like
+  `m_customColorPalette`); the provider receives only a settings struct and
+  has no per-session "chooser-OK occurred" signal to gate on. Absence in the
+  registry therefore only occurs for a registry that predates any v1.5 save,
+  in which case load falls back to the `RGB(0,255,0)` chooser default
   (FR-030).
 - `m_customColorPalette` size mismatch on read (≠ 64 bytes) MUST be
   treated as "no saved palette" and the field zero-initialised — no

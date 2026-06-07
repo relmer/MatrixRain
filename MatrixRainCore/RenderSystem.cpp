@@ -1885,8 +1885,13 @@ HRESULT RenderSystem::CreateBloomResources (UINT width, UINT height)
     CHRA (hr);
 
     // v1.5 (T051, contracts/scanline-shader.md): post-bloom intermediate
-    // target.  Backbuffer dims + format so the scanline PS can sample it
-    // at native resolution and write 1:1 to the swapchain backbuffer.
+    // target.  Backbuffer dimensions + the same R8G8B8A8 format as the scene
+    // and bloom intermediates so the scanline PS can sample it at native
+    // resolution and write 1:1 to the swapchain backbuffer.  (The backbuffer
+    // is B8G8R8A8 for D2D interop; the channel-order difference is irrelevant
+    // because the scanline pass is a shader draw — sampler in, output-merger
+    // out, see RenderScanlinePass — not a CopyResource, so the GPU handles
+    // the swizzle transparently.)
     // Recreated alongside the bloom resources on Resize (Release+Create
     // pair in RenderSystem::Resize), so a window-size change automatically
     // reallocates this too.

@@ -9,9 +9,10 @@ All notable changes to MatrixRain are documented in this file.
 - **Two-tab configuration property sheet.** The single-page settings dialog
   is now split into **Visuals** and **Performance** tabs hosted by the Win32
   `PropertySheetW` host control. Visuals owns Density, Speed, Glow Intensity /
-  Size, Color scheme, Scanlines, and Start-in-fullscreen. Performance owns
-  Multi-monitor, Enable glow, GPU adapter, Quality preset + advanced sliders,
-  and Show performance metrics. Each page shows the primary monitor's FPS
+  Size, Color scheme, the Scanline Intensity / Style sliders, and
+  Start-in-fullscreen. Performance owns Multi-monitor, Enable glow, Enable
+  scanlines, GPU adapter, Quality preset + advanced sliders, and Show
+  performance metrics. Each page shows the primary monitor's FPS
   and the process's GPU load in a bottom-right readout, updated once per
   second (`NN fps, NN% GPU`).
 - **Cross-page "Reset to defaults" button.** Lives in the property-sheet
@@ -24,7 +25,8 @@ All notable changes to MatrixRain are documented in this file.
   tooltip pointing at the toggle's location. Bloom GPU resources stay
   allocated so re-enabling is instant. Replaces the v1.4 "Glow Intensity =
   0" workaround; the slider minimum is back to 1.
-- **CRT scanlines post-process** (Visuals → Scanlines). Enabled by default
+- **CRT scanlines post-process** (Enable toggle on Performance; Intensity /
+  Style sliders on Visuals). Enabled by default
   on fresh installs and after upgrade (see migration note below). Intensity
   slider (1-100, default 30) controls darkening strength; Style slider
   (1-100, default 50) controls line density (Style 1 ≈ 981 lines / Style

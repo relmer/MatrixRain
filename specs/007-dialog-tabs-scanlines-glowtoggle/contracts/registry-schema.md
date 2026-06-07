@@ -11,7 +11,7 @@ key managed by `RegistrySettingsProvider`.
 | `ScanlinesEnabled` | `REG_DWORD` | `1` | missing → `1`; non-zero → `true`; `0` → `false` | written by controller commit (OK path) |
 | `ScanlinesIntensity` | `REG_DWORD` | `30` | missing → `30`; clamp `[1,100]` | written by controller commit (OK path) |
 | `ScanlinesStyle` | `REG_DWORD` | `50` | missing → `50`; clamp `[1,100]` | written by controller commit (OK path) |
-| `CustomColor` | `REG_DWORD` | absent | missing → no in-memory custom-color override (chooser default `RGB(0,255,0)` used); present → 24-bit RGB unpacked into `COLORREF` | written by controller commit (OK path) iff scheme is Custom AND a chooser-OK has occurred during this session |
+| `CustomColor` | `REG_DWORD` | absent | missing → no in-memory custom-color override (chooser default `RGB(0,255,0)` used); present → 24-bit RGB unpacked into `COLORREF` | written **unconditionally on every `Save()`** (same as `CustomColorPalette`); the provider sees only a settings struct and cannot gate on "chooser-OK this session", so absence occurs only in registries that predate any v1.5 save |
 | `CustomColorPalette` | `REG_BINARY` | absent → 64 zero bytes | size must be exactly 64; any other size → treat as absent (zero-filled) | written **unconditionally on chooser-OK** (FR-035); NOT subject to outer property-sheet Cancel rollback |
 
 ## Removed (v1.4 → v1.5)
