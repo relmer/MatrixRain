@@ -193,6 +193,11 @@ void ConfigDialogController::UpdateStartFullscreen (bool startFullscreen)
 void ConfigDialogController::UpdateMultiMonitorEnabled (bool multiMonitorEnabled)
 {
     m_settings.m_multiMonitorEnabled = multiMonitorEnabled;
+
+    if (m_snapshot.isLiveMode && m_snapshot.applicationStateRef)
+    {
+        m_snapshot.applicationStateRef->ApplySettings (m_settings);
+    }
 }
 
 
@@ -207,6 +212,11 @@ void ConfigDialogController::UpdateMultiMonitorEnabled (bool multiMonitorEnabled
 void ConfigDialogController::UpdateGpuAdapter (const std::wstring & description)
 {
     m_settings.m_gpuAdapter = description;
+
+    if (m_snapshot.isLiveMode && m_snapshot.applicationStateRef)
+    {
+        m_snapshot.applicationStateRef->ApplySettings (m_settings);
+    }
 }
 
 

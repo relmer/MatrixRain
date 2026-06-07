@@ -925,6 +925,69 @@ namespace MatrixRainTests
 
 
 
+        // Regression: selecting a GPU adapter in the live config dialog must
+        // push the new description into the running ApplicationState so the
+        // subsequent context rebuild resolves and recreates the device on the
+        // chosen adapter (previously UpdateGpuAdapter mutated only the
+        // controller's private copy, so the rebuild re-resolved the stale
+        // default adapter and kept rendering on the integrated GPU).
+        TEST_METHOD (TestLiveModePropagatesGpuAdapterChanges)
+        {
+            ConfigDialogController controller (m_settingsProvider);
+            ApplicationState       appState   (m_settingsProvider);
+            HRESULT                hr         = S_OK;
+
+
+
+            hr = controller.Initialize();
+            Assert::AreEqual (S_OK, hr);
+
+            appState.Initialize (nullptr);
+
+            hr = controller.InitializeLiveMode (&appState);
+            Assert::AreEqual (S_OK, hr);
+
+            controller.UpdateGpuAdapter (L"NVIDIA GeForce GTX 1060");
+
+            Assert::AreEqual (std::wstring (L"NVIDIA GeForce GTX 1060"),
+                              appState.GetSettings().m_gpuAdapter,
+                              L"selected GPU adapter should propagate to ApplicationState so the "
+                              L"context rebuild recreates the device on the chosen adapter");
+        }
+
+
+
+
+        // Regression: toggling multi-monitor in the live config dialog must
+        // push the new flag into the running ApplicationState so the rebuild's
+        // ShouldSpanAllMonitors() gate reads the fresh value (same root cause
+        // as the GPU-adapter regression above).
+        TEST_METHOD (TestLiveModePropagatesMultiMonitorChanges)
+        {
+            ConfigDialogController controller (m_settingsProvider);
+            ApplicationState       appState   (m_settingsProvider);
+            HRESULT                hr         = S_OK;
+
+
+
+            hr = controller.Initialize();
+            Assert::AreEqual (S_OK, hr);
+
+            appState.Initialize (nullptr);
+
+            hr = controller.InitializeLiveMode (&appState);
+            Assert::AreEqual (S_OK, hr);
+
+            controller.UpdateMultiMonitorEnabled (false);
+
+            Assert::IsFalse (appState.GetSettings().m_multiMonitorEnabled,
+                             L"multi-monitor toggle should propagate to ApplicationState so the "
+                             L"context rebuild spans the new monitor set");
+        }
+
+
+
+
         // T052.6: Test CancelLiveMode reverts ApplicationState to snapshot
         TEST_METHOD (TestCancelLiveModeRevertsApplicationState)
         {
