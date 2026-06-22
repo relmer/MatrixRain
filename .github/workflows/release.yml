@@ -15,7 +15,6 @@ permissions:
   id-token: write
 
 env:
-  MSBUILD_FLAGS: -p:PlatformToolset=v143
   WINGET_PAT: ${{ secrets.WINGET_PAT }}
 
 jobs:
@@ -123,10 +122,10 @@ jobs:
       # --- Build ---
 
       - name: Build Release x64
-        run: msbuild MatrixRain.sln -p:Configuration=Release -p:Platform=x64 ${{ env.MSBUILD_FLAGS }}
+        run: msbuild MatrixRain.sln -p:Configuration=Release -p:Platform=x64
 
       - name: Build Release ARM64
-        run: msbuild MatrixRain.sln -p:Configuration=Release -p:Platform=ARM64 ${{ env.MSBUILD_FLAGS }}
+        run: msbuild MatrixRain.sln -p:Configuration=Release -p:Platform=ARM64
 
       # --- Test ---
 
