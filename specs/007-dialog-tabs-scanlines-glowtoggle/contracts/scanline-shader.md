@@ -16,6 +16,7 @@ research note R6).
 //   - Cbuffer reduced to (intensity, linesPerHeight, padding, padding)
 //   - kNativeScanlines removed; line count uploaded per-frame from CPU
 //   - Source-luminance gating removed (FR-024a); darkening is uniform
+//   - Kernel AREA-AVERAGED over the pixel rather than point sampled
 
 cbuffer ScanlineCb : register (b0)
 {
@@ -34,18 +35,40 @@ struct PSInput
     float2 uv  : TEXCOORD;
 };
 
+static const float kPi = 3.14159265;
+
 float4 main (PSInput i) : SV_TARGET
 {
     float4 c       = tex.Sample (sam, i.uv);
     float  linePos = i.uv.y * g_linesPerHeight;
-    float  gap     = sin (linePos * 3.14159265);
-    float  bright  = gap * gap;
+    float  perPix  = max (abs (ddy (linePos)), 1e-6);
+    float  rolloff = max (sin (kPi * perPix) / (kPi * perPix), 0.0);
+    float  bright  = 0.5 - 0.5 * cos (2.0 * kPi * linePos) * rolloff;
     float  darken  = lerp (1.0 - g_intensity, 1.0, bright);
 
     c.rgb *= darken;
     return c;
 }
 ```
+
+### Why the kernel is area-averaged
+
+The pass lays `g_linesPerHeight` cycles across the render height and the Style
+slider drives that from 150 to 981. Point sampling a periodic signal needs
+better than two pixels per cycle; at 981 lines that is 1.10 px on 1080p and
+1.47 px on 1440p, so most of the slider's lower half sat below Nyquist and
+resolved into a moire beat instead of scanlines. Removing the luminance gate
+(FR-024a) took away the cover Casso had, over a field that is mostly dark
+background with glyphs scrolling through it.
+
+For `sin^2(pi*L) == (1 - cos(2*pi*L)) / 2`, the mean over a pixel spanning
+`dL` cycles is the same kernel scaled by `sinc(dL)`. `dL` comes from `ddy`, so
+it tracks both the slider and the display resolution without either being
+passed in: a dense setting fades toward flat on a 1080p panel rather than
+shimmering, and stays crisp on a 4K one.
+
+Cost, `fxc /T ps_5_0 /O3`: 11 -> 18 instruction slots (one extra sincos, one
+divide, one coarse derivative). Still one texture sample, still no branches.
 
 ## CPU mirror (`MatrixRainCore/RenderSystem.h` adjacent struct)
 

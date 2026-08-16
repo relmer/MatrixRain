@@ -1644,6 +1644,8 @@ static const D3D11_INPUT_ELEMENT_DESC s_krgQuadInputLayout[] = {
 //  MatrixRain modifications (v1.5):
 //   - line count uploaded per-frame from CPU via g_linesPerHeight
 //   - source-luminance gating removed (FR-024a); darkening is uniform
+//   - the kernel is AREA-AVERAGED over the pixel rather than point sampled,
+//     which is what keeps the Style slider usable below 4K (see below)
 //
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -1665,12 +1667,15 @@ static const char * s_kszScanlineShaderSource = R"(
             float2 uv  : TEXCOORD;
         };
 
+        static const float kPi = 3.14159265;
+
         float4 main (PSInput i) : SV_TARGET
         {
             float4 c       = tex.Sample (sam, i.uv);
             float  linePos = i.uv.y * g_linesPerHeight;
-            float  gap     = sin (linePos * 3.14159265);
-            float  bright  = gap * gap;
+            float  perPix  = max (abs (ddy (linePos)), 1e-6);
+            float  rolloff = max (sin (kPi * perPix) / (kPi * perPix), 0.0);
+            float  bright  = 0.5 - 0.5 * cos (2.0 * kPi * linePos) * rolloff;
             float  darken  = lerp (1.0 - g_intensity, 1.0, bright);
             c.rgb *= darken;
             return c;
