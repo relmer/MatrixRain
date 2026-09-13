@@ -1,0 +1,7 @@
+# Spec Kit records a SHA-256 of each file it installs and treats any mismatch
+# as a local edit. Those hashes are of LF files, so a CRLF checkout makes every
+# managed file look modified and forces an upgrade to use --force.
+.specify/**        text eol=lf
+.claude/skills/**  text eol=lf
+.github/agents/**  text eol=lf
+.github/prompts/** text eol=lf
