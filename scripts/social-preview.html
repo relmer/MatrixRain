@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>MatrixRain social preview</title>
+<style>body{margin:0;background:#111}canvas{display:block}</style></head>
+<body>
+<canvas id="c" width="1280" height="640"></canvas>
+<script>
+const W = 1280, H = 640;
+const c = document.getElementById('c');
+const g = c.getContext('2d');
+const GREEN = '#00E676';
+
+window.done = false;
+const img = new Image();
+img.onload = () => { draw(img); window.done = true; };
+img.onerror = e => { window.done = 'error'; };
+// The rain's bloom comes from the background being downscaled and JPEG'd
+// before the canvas ever sees it; -Background supplies that prepared file.
+const bgParam = new URLSearchParams(location.search).get('bg');
+img.src = bgParam || '../assets/MatrixRain.png';
+
+function draw(img) {
+  // --- background: cover-crop the real app frame ---
+  const s = Math.max(W / img.width, H / img.height);
+  const dw = img.width * s, dh = img.height * s;
+  g.drawImage(img, (W - dw) / 2, (H - dh) / 2, dw, dh);
+
+  // --- left scrim so the wordmark reads, rain still faintly visible ---
+  let grd = g.createLinearGradient(0, 0, W * 0.72, 0);
+  grd.addColorStop(0.00, 'rgba(1,6,3,0.97)');
+  grd.addColorStop(0.45, 'rgba(1,6,3,0.93)');
+  grd.addColorStop(0.72, 'rgba(1,6,3,0.45)');
+  grd.addColorStop(1.00, 'rgba(1,6,3,0.00)');
+  g.fillStyle = grd; g.fillRect(0, 0, W, H);
+
+  // --- edge vignette ---
+  grd = g.createLinearGradient(0, 0, 0, H);
+  grd.addColorStop(0, 'rgba(0,0,0,0.55)');
+  grd.addColorStop(0.35, 'rgba(0,0,0,0)');
+  grd.addColorStop(0.75, 'rgba(0,0,0,0)');
+  grd.addColorStop(1, 'rgba(0,0,0,0.65)');
+  g.fillStyle = grd; g.fillRect(0, 0, W, H);
+
+  const X = 72;
+
+  // --- wordmark: white leader glyph over green trail, the app's own look ---
+  g.textBaseline = 'alphabetic';
+  g.font = '700 92px "Segoe UI", Arial, sans-serif';
+  g.shadowColor = 'rgba(0,230,118,0.85)';
+  g.shadowBlur = 38;
+  g.fillStyle = '#EAFFF1';
+  g.fillText('MatrixRain', X, 300);
+  g.shadowBlur = 16;
+  g.fillText('MatrixRain', X, 300);
+  g.shadowBlur = 0;
+
+  // --- accent rule ---
+  g.shadowColor = 'rgba(0,230,118,0.9)'; g.shadowBlur = 20;
+  g.fillStyle = GREEN; g.fillRect(X, 340, 104, 6);
+  g.shadowBlur = 0;
+
+  // --- tagline ---
+  g.font = '400 30px "Segoe UI", Arial, sans-serif';
+  g.fillStyle = '#D7FFE5';
+  g.fillText('Matrix rain screensaver for Windows.', X, 400);
+  g.fillText('Win32 + DirectX, every monitor, 60 fps.', X, 442);
+
+  // --- quip ---
+  g.font = '400 23px "Segoe UI", Arial, sans-serif';
+  g.fillStyle = 'rgba(122,180,145,0.95)';
+  g.fillText('There is no spoon. There is a screensaver.', X, 496);
+
+  // --- in-world flourish: the installed screensaver's filename ---
+  g.font = '500 20px Consolas, "Cascadia Mono", monospace';
+  g.textAlign = 'right';
+  g.fillStyle = '#9CFFC4';
+  g.fillText('C:\\Windows\\System32\\MatrixRain.scr', W - 40, H - 34);
+  g.shadowBlur = 0;
+  g.textAlign = 'left';
+
+  // --- signature scanline pass (the 1.5 feature), very subtle ---
+  g.fillStyle = 'rgba(0,0,0,0.18)';
+  for (let y = 0; y < H; y += 3) g.fillRect(0, y, W, 1);
+}
+
+window.grab = () => c.toDataURL('image/png').split(',')[1];
+</script>
+</body>
+</html>
