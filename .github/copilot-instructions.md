@@ -984,6 +984,14 @@ namespace fs = std::filesystem;  // OK for heavy filesystem usage in this file
 - Wrap at 72 characters
 - Use bullet points (`-`) for multiple changes
 
+### **NEVER** Add AI Attribution
+- **NEVER** add a `Co-authored-by:` trailer for Copilot, Copilot Autofix, or
+  any other AI tool to commit messages
+- **NEVER** add "Generated with ..." or similar AI attribution lines to commit
+  messages or pull request descriptions
+- Leave existing commits alone -- do not rewrite history to remove old
+  trailers
+
 ### Examples
 ```
 fix(core): improve thread safety and correctness
