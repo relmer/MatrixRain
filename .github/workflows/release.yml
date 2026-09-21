@@ -66,10 +66,6 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 30
     environment: release
-    env:
-      # Suppress the IncrementVersion.ps1 PreBuildEvent so the binaries produced
-      # by this job carry the exact VERSION_BUILD that matches the release tag.
-      SKIP_VERSION_INCREMENT: '1'
 
     steps:
       - name: Determine tag
@@ -102,8 +98,8 @@ jobs:
           $content = Get-Content "MatrixRainCore/Version.h" -Raw
           $major = [regex]::Match($content, '#define VERSION_MAJOR\s+(\d+)').Groups[1].Value
           $minor = [regex]::Match($content, '#define VERSION_MINOR\s+(\d+)').Groups[1].Value
-          $build = [regex]::Match($content, '#define VERSION_BUILD\s+(\d+)').Groups[1].Value
-          $headerVersion = "$major.$minor.$build"
+          $patch = [regex]::Match($content, '#define VERSION_PATCH\s+(\d+)').Groups[1].Value
+          $headerVersion = "$major.$minor.$patch"
           $tagVersion = "${{ steps.tag.outputs.version }}"
 
           if ($headerVersion -ne $tagVersion) {

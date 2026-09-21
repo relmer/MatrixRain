@@ -7,9 +7,7 @@ param(
     [string]$Configuration = 'Debug',
 
     [ValidateSet('x64', 'ARM64', 'Auto')]
-    [string]$Platform = 'Auto',
-
-    [switch]$SkipVersionIncrement
+    [string]$Platform = 'Auto'
 )
 
 # Resolve 'Auto' platform to actual architecture
@@ -158,18 +156,6 @@ function Test-BuildArtifacts {
 $scriptExitCode = 0
 
 try {
-    # Increment version before building (unless skipped or cleaning)
-    $isBuildTarget = $Target -in @('Build', 'Rebuild', 'BuildAllRelease', 'RebuildAllRelease')
-    if ($isBuildTarget -and -not $SkipVersionIncrement) {
-        $incrementScript = Join-Path $PSScriptRoot 'IncrementVersion.ps1'
-        if (Test-Path $incrementScript) {
-            & $incrementScript
-            if ($LASTEXITCODE -ne 0) {
-                throw "Version increment failed with exit code $LASTEXITCODE"
-            }
-        }
-    }
-
     if ($Target -eq 'BuildAllRelease' -or $Target -eq 'RebuildAllRelease' -or $Target -eq 'CleanAll') {
         $platformsToBuild = @('x64', 'ARM64')
         if (-not (Test-VSVCPlatformInstalled -MSBuildPath $msbuildPath -Platform 'ARM64')) {
