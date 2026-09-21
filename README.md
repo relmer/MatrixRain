@@ -3,9 +3,7 @@
 [![CI](https://github.com/relmer/MatrixRain/actions/workflows/ci.yml/badge.svg)](https://github.com/relmer/MatrixRain/actions/workflows/ci.yml)
 [![Latest Release](https://img.shields.io/github/v/release/relmer/MatrixRain)](https://github.com/relmer/MatrixRain/releases/latest)
 [![License: MIT](https://img.shields.io/github/license/relmer/MatrixRain)](LICENSE)
-<!--
 [![Downloads](https://img.shields.io/github/downloads/relmer/MatrixRain/total)](https://github.com/relmer/MatrixRain/releases)
--->
 
 <!-- markdownlint-disable MD033 -->
 <video src="https://github.com/user-attachments/assets/bb39535d-49a2-4c40-8d8e-56a37b4a8f1c" autoplay loop muted playsinline></video>
@@ -50,7 +48,8 @@ See [CHANGELOG.md](CHANGELOG.md) for the full release history.
 - [Specs & SpecKit](#specs--speckit) — Spec-driven development and extensive specs for the app.
 - [Requirements](#requirements) — Required tools and SDKs.
 - [Build (Visual Studio)](#build-visual-studio) — How to open and build in Visual Studio.
-- [Build (VS Code)](#build-vs-code) — How to build from VS Code / command line.
+- [Build (VS Code)](#build-vs-code) — How to build from VS Code tasks.
+- [Build (Command Line)](#build-command-line) — How to build and test from PowerShell.
 - [Run](#run) — Running the built app and tests.
 - [Code Organization](#code-organization) — Where the major components live.
 - [Contributing](#contributing) — How to help.
@@ -177,6 +176,89 @@ SpecKit docs: <https://github.com/github/spec-kit>
 - From the menu: `Terminal` -> `Run Task...` and choose `Build Debug (current arch)` or `Build Release (current arch)`.
 - Or open the Command Palette (Ctrl+Shift+P) and run `Tasks: Run Task`, then pick the desired build task.
 
+Every VS Code build/test task is a thin wrapper around the PowerShell scripts described below, so the two paths are equivalent.
+
+## Build (Command Line)
+
+The `scripts/` folder holds the build and test entry points. `Invoke-MatrixRainBuild.ps1` is the canonical way to build from a terminal:
+
+```powershell
+.\scripts\Invoke-MatrixRainBuild.ps1
+```
+
+With no arguments this builds `Debug` for the current architecture. It locates the VS 2026 MSBuild via `vswhere`, verifies `MatrixRain.exe` was produced, and prints a per-configuration summary.
+
+### Build parameters
+
+| Parameter | Values | Default | Description |
+| --------- | ------ | ------- | ----------- |
+| `-Target` | `Build`, `Clean`, `Rebuild`, `BuildAllRelease`, `CleanAll`, `RebuildAllRelease` | `Build` | MSBuild target. The `*All*` variants cover both x64 and ARM64. |
+| `-Configuration` | `Debug`, `Release` | `Debug` | Build configuration. |
+| `-Platform` | `x64`, `ARM64`, `Auto` | `Auto` | `Auto` resolves to the host architecture. |
+
+Common invocations:
+
+```powershell
+# Release build for the current architecture
+.\scripts\Invoke-MatrixRainBuild.ps1 -Configuration Release
+
+# Explicit x64 rebuild from clean
+.\scripts\Invoke-MatrixRainBuild.ps1 -Configuration Release -Platform x64 -Target Rebuild
+
+# Release for both architectures (matches the release workflow)
+.\scripts\Invoke-MatrixRainBuild.ps1 -Target BuildAllRelease
+
+# Clean every configuration and platform
+.\scripts\Invoke-MatrixRainBuild.ps1 -Target CleanAll
+```
+
+If the MSVC ARM64 build tools are not installed, the `*All*` targets report ARM64 as `SKIPPED` and continue with x64 rather than failing.
+
+On an ARM64 host, ARM64 builds automatically pass `PreferredToolArchitecture=arm64` so the native compiler is used.
+
+### Versioning
+
+MatrixRain uses manual semantic versioning — `MAJOR.MINOR.PATCH`, bumped by hand when cutting a release. Builds never modify `Version.h`, so a build leaves your working tree clean.
+
+- **MAJOR** — incompatible / milestone changes
+- **MINOR** — backward-compatible feature additions
+- **PATCH** — backward-compatible fixes
+
+To bump, edit `MatrixRainCore/Version.h` and rebuild:
+
+```cpp
+#define VERSION_MAJOR 1
+#define VERSION_MINOR 6
+#define VERSION_PATCH 0
+#define VERSION_YEAR  2026
+```
+
+The version flows into the app via `VERSION_WSTRING` (shown in the `/?` usage text and the overlay) and into the executable's resource block via `MatrixRain/MatrixRain.rc`. `VERSION_BUILD_TIMESTAMP` — the compiler's `__DATE__ " " __TIME__` — identifies an individual compile when that granularity is needed.
+
+The release workflow (`.github/workflows/release.yml`) validates that the `v#.#.#` git tag matches `Version.h` and fails the release on a mismatch, so bump the header in the same commit you tag.
+
+### Running tests from the command line
+
+`Invoke-MatrixRainTests.ps1` runs the test assembly through `vstest.console.exe` from the VS 2026 install. Build first — it fails fast if the test assembly is missing:
+
+```powershell
+.\scripts\Invoke-MatrixRainTests.ps1 -Configuration Debug -Platform Auto
+```
+
+| Parameter | Values | Default | Description |
+| --------- | ------ | ------- | ----------- |
+| `-Configuration` | `Debug`, `Release` | `Debug` | Which build output to test. |
+| `-Platform` | `x64`, `ARM64`, `Auto` | `Auto` | `Auto` resolves to the host architecture. |
+| `-RunSettings` | *(path)* | `MatrixRainTests.runsettings` | Runsettings file, relative to the repo root. |
+| `-Parallel` | *(switch)* | off | Pass `/Parallel` to `vstest.console.exe`. |
+
+Both scripts exit non-zero on failure, so they can be chained in CI or a local pre-commit check:
+
+```powershell
+.\scripts\Invoke-MatrixRainBuild.ps1 -Configuration Release -Platform x64
+if ($LASTEXITCODE -eq 0) { .\scripts\Invoke-MatrixRainTests.ps1 -Configuration Release -Platform x64 }
+```
+
 ## Run
 
 - After building, run the executable from `x64\Debug\MatrixRain.exe` or `x64\Release\MatrixRain.exe`.
@@ -184,7 +266,13 @@ SpecKit docs: <https://github.com/github/spec-kit>
 ### Tests
 
 - Unit and integration tests are in the `MatrixRainTests` project.
-- To run tests with the Visual Studio Test Runner or `vstest.console.exe` (example):
+- Preferred: use the helper script, which resolves `vstest.console.exe` for you — see [Running tests from the command line](#running-tests-from-the-command-line).
+
+```powershell
+.\scripts\Invoke-MatrixRainTests.ps1 -Configuration Debug -Platform x64
+```
+
+- Tests also run from the Visual Studio Test Runner, or by invoking `vstest.console.exe` directly:
 
 ```powershell
 vstest.console.exe .\x64\Debug\MatrixRainTests.dll
@@ -200,6 +288,10 @@ vstest.console.exe .\x64\Debug\MatrixRainTests.dll
   - `pch.h`/`pch.cpp` — Precompiled headers for faster builds
   - `Ehm.h`/`Ehm.cpp` — Error handling macros and utilities
 - `MatrixRainTests/` — Unit and integration tests.
+- `scripts/` — PowerShell build and test entry points (see [Build (Command Line)](#build-command-line)).
+  - `Invoke-MatrixRainBuild.ps1` — Build/clean/rebuild wrapper around MSBuild.
+  - `Invoke-MatrixRainTests.ps1` — Test runner wrapper around `vstest.console.exe`.
+  - `VSTools.ps1` — Shared helpers that locate the VS 2026 toolchain via `vswhere`.
 - `specs/` — Human-readable specification files (generated/managed with SpecKit in our workflow).
 
 ### Development Notes
