@@ -208,7 +208,7 @@ private:
     HRESULT CreateConstantBuffer();
     HRESULT CreateBloomConstantBuffer();
     HRESULT CreateScanlineConstantBuffer();
-    HRESULT UploadScanlineConstants     (const RenderParams & params);
+    HRESULT UploadScanlineConstants     (const RenderParams & params, float viewportHeightPx, float cellHeightPx);
     HRESULT ApplyScanlinePass();
     HRESULT CreateBlendState();
     HRESULT CreateSamplerState();

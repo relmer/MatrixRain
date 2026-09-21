@@ -236,14 +236,16 @@ static const wchar_t * GetInfoTipText (int infoId)
                    L"Moderate GPU performance impact.";
 
         case IDC_SCANLINES_INTENSITY_INFO:
-            return L"How dark the scanline gaps are between bright lines. 0% disables "
-                   L"the effect; 100% makes the gaps fully black.\r\n"
+            return L"How dark the scanline gaps are between bright lines. 100% makes "
+                   L"the gaps fully black. To turn scanlines off entirely, clear "
+                   L"Enable scanlines on the Performance tab.\r\n"
                    L"\r\n"
                    L"Small GPU performance impact.";
 
         case IDC_SCANLINES_STYLE_INFO:
-            return L"Spacing of the scanlines. Low values produce many fine lines "
-                   L"(modern displays); high values produce a coarse retro-CRT look.\r\n"
+            return L"Number of scanlines across each character. Low values produce "
+                   L"many fine lines; high values produce a coarse retro-CRT look. "
+                   L"Looks the same on every monitor regardless of size or scaling.\r\n"
                    L"\r\n"
                    L"No additional GPU impact.";
 

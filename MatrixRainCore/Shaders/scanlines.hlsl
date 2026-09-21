@@ -6,8 +6,13 @@
 // MatrixRain modifications (v1.5 T050, contracts/scanline-shader.md, research.md R6):
 //   Forked from ..\Casso\Casso\Shaders\CRT\scanlines.hlsl with two changes:
 //     - line-count is supplied per-frame by the CPU via g_linesPerHeight
-//       (ScanlineLineCount(style)) instead of the hardcoded 192.0; this is
-//       what makes the Style slider drive line density 981..150 (FR-023).
+//       instead of the hardcoded 192.0; this is what makes the Style slider
+//       drive line density (FR-023). The CPU derives it from the rain
+//       CHARACTER CELL, not the panel: ScanlineLinesPerCell(style) picks
+//       6..16 lines per cell and ScanlineLineCount() scales that by the
+//       viewport height, so one Style setting holds the same raster-to-glyph
+//       ratio on monitors of differing heights (a portrait 3840-tall panel
+//       previously got 3.6 lines/cell where a 2160-tall one got 6.5).
 //     - luminance gating is removed (no `lum` / `weight` lerp); scanlines
 //       darken every pixel uniformly so dark or empty regions still carry
 //       the CRT pattern (FR-024).
@@ -15,14 +20,15 @@
 //   Resulting shape: darken = lerp(1 - g_intensity, 1, bright).
 //
 // Why the averaging matters MORE here than it did in Casso. This pass lays
-// g_linesPerHeight cycles across the render height, and the Style slider runs
-// that from 150 up to 981. Point sampling needs better than two pixels per
-// cycle; at 981 lines that is 1.10 px on a 1080p panel and 1.47 on 1440p, so
-// most of the slider's lower half sat below Nyquist and turned into a moire
-// beat rather than scanlines. Casso got away with it because its luminance
-// gate suppressed the pattern on dark pixels -- and this fork deliberately
-// removed that gate (FR-024), over a field that is mostly dark background,
-// with glyphs scrolling through it to make the beat crawl.
+// g_linesPerHeight cycles across the render height. The cell-anchored mapping
+// now bounds the densest setting at a 2.25 px pitch, but the roll-off still
+// earns its keep: a reduced characterScale on a short viewport, or a future
+// widening of the range, can push the pitch back toward two pixels, where
+// point sampling turns into a moire beat rather than scanlines. Casso got
+// away with it because its luminance gate suppressed the pattern on dark
+// pixels -- and this fork deliberately removed that gate (FR-024), over a
+// field that is mostly dark background, with glyphs scrolling through it to
+// make the beat crawl.
 //
 // For sin^2(pi*L) == (1 - cos(2*pi*L)) / 2 the mean over a pixel spanning dL
 // cycles has a closed form:

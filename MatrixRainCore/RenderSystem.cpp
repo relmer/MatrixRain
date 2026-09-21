@@ -7,6 +7,7 @@
 #include "ColorScheme.h"
 #include "Overlay.h"
 #include "OverlayColor.h"
+#include "ScanlineStyleMapping.h"
 
 #pragma comment(lib, "pdh.lib")
 
@@ -938,13 +939,17 @@ Error:
 //
 //  RenderSystem::UploadScanlineConstants (T052)
 //
-//  Per-frame Map/Unmap of the scanline cbuffer from `params` (intensity
-//  already normalised to [0..1] and line count already computed via
-//  ScanlineLineCount upstream in MonitorRenderContext::BuildRenderParams).
+//  Per-frame Map/Unmap of the scanline cbuffer from `params`. Intensity is
+//  already normalised to [0..1] upstream; the line count is derived HERE,
+//  because only the render system knows the rain cell's pixel height. Density
+//  travels as lines-per-cell so this conversion is the single place the
+//  viewport's height enters the pass.
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-HRESULT RenderSystem::UploadScanlineConstants (const RenderParams & params)
+HRESULT RenderSystem::UploadScanlineConstants (const RenderParams & params,
+                                               float                viewportHeightPx,
+                                               float                cellHeightPx)
 {
     HRESULT                  hr     = S_OK;
     D3D11_MAPPED_SUBRESOURCE mapped = {};
@@ -955,7 +960,7 @@ HRESULT RenderSystem::UploadScanlineConstants (const RenderParams & params)
     CBRAEx (m_scanlineConstantBuffer != nullptr, E_UNEXPECTED);
 
     cb.intensity      = params.scanlinesIntensity;
-    cb.linesPerHeight = params.scanlinesLineCount;
+    cb.linesPerHeight = ScanlineLineCount (params.scanlinesLinesPerCell, viewportHeightPx, cellHeightPx);
 
     hr = m_context->Map (m_scanlineConstantBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
     CHRA (hr);
@@ -2342,6 +2347,16 @@ Error:
 
 
 
+// Base rain quad dimensions in physical pixels at characterScale == 1.0.
+// These size the drawn quad, which is deliberately taller than the row pitch
+// so glyph quads overlap; the scanline pass anchors to the pitch instead.
+static constexpr float BASE_CHAR_WIDTH  = 24.0f;
+static constexpr float BASE_CHAR_HEIGHT = 36.0f;
+
+
+
+
+
 void RenderSystem::Render (const AnimationSystem & animationSystem, const Viewport & viewport, const RenderParams & params)
 {
     if (!m_device || !m_context || !m_renderTargetView)
@@ -2351,6 +2366,48 @@ void RenderSystem::Render (const AnimationSystem & animationSystem, const Viewpo
 
     // Clear render target
     ClearRenderTarget();
+
+    // Character scale is computed before the cbuffer map because the scanline
+    // pass needs the rain cell's pixel height too — it anchors its line count
+    // to the cell so one Style setting looks the same on every monitor.
+    //
+    // DPI scaling: The base character size (32×48 in the shader) is in physical
+    // pixels. We multiply by m_dpiScale so characters maintain a consistent
+    // logical size regardless of the monitor's DPI setting. The reference
+    // viewport height (1080) is also DPI-adjusted so that the same logical
+    // viewport produces the same scale across DPI levels.
+    float characterScale = 1.0f;
+
+    if (m_characterScaleOverride.has_value())
+    {
+        // Use explicit override (e.g., UsageDialog forcing full-size characters)
+        // UsageDialog handles its own DPI scaling — do NOT multiply by m_dpiScale
+        characterScale = m_characterScaleOverride.value();
+    }
+    else
+    {
+        float viewportHeight    = static_cast<float> (viewport.GetHeight());
+        float referenceHeight   = 1080.0f * m_dpiScale;
+        float viewportBaseScale = 1.0f;
+
+        if (viewportHeight < referenceHeight)
+        {
+            // Scale linearly based on viewport height (reference = 1.0)
+            viewportBaseScale = viewportHeight / referenceHeight;
+
+            // Clamp to minimum 0.5 (24px tall from 48px base at 96 DPI)
+            if (viewportBaseScale < 0.5f)
+                viewportBaseScale = 0.5f;
+        }
+
+        characterScale = viewportBaseScale * m_dpiScale;
+    }
+
+    // The scanline pass anchors to the ROW PITCH, not the glyph quad. The
+    // quad is 36px but rows step every 24px (AnimationSystem BASE_SPACING),
+    // so quads overlap and the ink inside one is ~18px. Measuring against
+    // the 36px quad over-counted the visible scanlines per character by 2x.
+    const float rainCellHeightPx = animationSystem.GetCharacterSpacing();
 
     // Update constant buffer with projection matrix
     const Matrix4x4          & projection = viewport.GetProjectionMatrix();
@@ -2365,42 +2422,10 @@ void RenderSystem::Render (const AnimationSystem & animationSystem, const Viewpo
         memcpy (cbData->projection, projection.m, sizeof (projection.m));
 
         // Rain characters use the standard 24x36 base quad dimensions
-        cbData->charWidth  = 24.0f;
-        cbData->charHeight = 36.0f;
+        cbData->charWidth  = BASE_CHAR_WIDTH;
+        cbData->charHeight = BASE_CHAR_HEIGHT;
 
-        // Calculate character scale based on viewport height
-        // Scale down proportionally for preview mode to fit the entire effect
-        // Minimum scale ensures characters remain visible (12px tall minimum)
-        //
-        // DPI scaling: The base character size (32×48 in the shader) is in physical pixels.
-        // We multiply by m_dpiScale so characters maintain a consistent logical size
-        // regardless of the monitor's DPI setting.
-        // The reference viewport height (1080) is also DPI-adjusted so that the
-        // same logical viewport produces the same scale across DPI levels.
-        if (m_characterScaleOverride.has_value())
-        {
-            // Use explicit override (e.g., UsageDialog forcing full-size characters)
-            // UsageDialog handles its own DPI scaling — do NOT multiply by m_dpiScale
-            cbData->characterScale = m_characterScaleOverride.value();
-        }
-        else
-        {
-            float viewportHeight    = static_cast<float> (viewport.GetHeight());
-            float referenceHeight   = 1080.0f * m_dpiScale;
-            float viewportBaseScale = 1.0f;
-
-            if (viewportHeight < referenceHeight)
-            {
-                // Scale linearly based on viewport height (reference = 1.0)
-                viewportBaseScale = viewportHeight / referenceHeight;
-
-                // Clamp to minimum 0.5 (24px tall from 48px base at 96 DPI)
-                if (viewportBaseScale < 0.5f)
-                    viewportBaseScale = 0.5f;
-            }
-
-            cbData->characterScale = viewportBaseScale * m_dpiScale;
-        }
+        cbData->characterScale = characterScale;
 
         m_context->Unmap (m_constantBuffer.Get(), 0);
     }
@@ -2504,9 +2529,10 @@ void RenderSystem::Render (const AnimationSystem & animationSystem, const Viewpo
         if (wantScanlines)
         {
             // Per-frame Map/Unmap of the scanline cbuffer.  Cheap; the
-            // intensity + line-count atomics were resolved upstream in
-            // MonitorRenderContext::BuildRenderParams.
-            (void)UploadScanlineConstants (params);
+            // intensity and lines-per-cell atomics were resolved upstream in
+            // MonitorRenderContext::BuildRenderParams, and the cell height is
+            // converted into the shader's lines-per-height uniform here.
+            (void)UploadScanlineConstants (params, static_cast<float> (viewport.GetHeight()), rainCellHeightPx);
         }
 
         if (ShouldRunBloomPass (params))

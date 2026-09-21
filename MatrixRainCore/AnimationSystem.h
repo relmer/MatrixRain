@@ -173,7 +173,16 @@ public:
     const std::vector<OverlayCharacter> & GetOverlayCharacters()  const { return m_overlayCharacters;  }
     size_t                                GetActiveStreakCount()  const { return m_streaks.size();      }
     size_t                                GetActiveHeadCount()    const;
-    float                                GetZoomVelocity()       const { return m_zoomVelocity;   }
+    float                                 GetZoomVelocity()       const { return m_zoomVelocity;       }
+
+    /// <summary>
+    /// Vertical pitch between consecutive characters in a streak, in physical
+    /// pixels -- the rain's true text cell. Exposed because the scanline pass
+    /// anchors its line count to this, so the raster-to-glyph ratio stays put
+    /// across monitors. Note this is the ROW PITCH (24px base), not the 36px
+    /// glyph quad, which is drawn oversized and overlaps its neighbours.
+    /// </summary>
+    float                                 GetCharacterSpacing()   const { return CalculateCharacterSpacing(); }
 
     void SetZoomVelocity (float velocity) { m_zoomVelocity = velocity; }
 
