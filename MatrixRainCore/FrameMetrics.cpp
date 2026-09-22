@@ -8,17 +8,17 @@
 
 //  Rec.709 luminance weights, the same primaries the rain is authored and
 //  displayed in.
-static constexpr float kLumaR       = 0.2126f;
-static constexpr float kLumaG       = 0.7152f;
-static constexpr float kLumaB       = 0.0722f;
+static constexpr float kLumaR            = 0.2126f;
+static constexpr float kLumaG            = 0.7152f;
+static constexpr float kLumaB            = 0.0722f;
 
-//  Width of the rings the halo profile is averaged over. Half a pixel is fine
-//  enough that the curvature of a glow within one ring is negligible, and wide
-//  enough that every ring past the centre holds several pixels.
-static constexpr float kRingWidthPx = 0.5f;
+//  Full scale for one channel of an 8-bit frame.
+static constexpr float kMaxCodeValue     = 255.0f;
 
-//  The fraction of the peak that defines the reported radius.
-static constexpr float kHalfMaximum = 0.5f;
+//  Percentile reported alongside the mean, chosen so that a change confined to
+//  a small part of the frame -- a ring around every streak head, say -- cannot
+//  be averaged away into nothing.
+static constexpr float kReportedQuantile = 0.99f;
 
 
 
@@ -59,9 +59,9 @@ static float LuminanceAt (std::span<const uint8_t> bgra, size_t pixelIndex) noex
 {
     const size_t offset = pixelIndex * 4;
 
-    const float  blue   = SrgbToLinearLocal (bgra[offset + 0] / 255.0f);
-    const float  green  = SrgbToLinearLocal (bgra[offset + 1] / 255.0f);
-    const float  red    = SrgbToLinearLocal (bgra[offset + 2] / 255.0f);
+    const float  blue   = SrgbToLinearLocal (bgra[offset + 0] / kMaxCodeValue);
+    const float  green  = SrgbToLinearLocal (bgra[offset + 1] / kMaxCodeValue);
+    const float  red    = SrgbToLinearLocal (bgra[offset + 2] / kMaxCodeValue);
 
 
 
@@ -145,167 +145,6 @@ static float MeanLuminanceImpl (std::span<const TSample> samples, UINT width, UI
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-//  BrightestPixelImpl
-//
-////////////////////////////////////////////////////////////////////////////////
-
-template <typename TSample>
-static POINT BrightestPixelImpl (std::span<const TSample> samples,
-                                 UINT                     width,
-                                 UINT                     height,
-                                 float                  * pOutLuminance) noexcept
-{
-    POINT brightest = { 0, 0 };
-    float peak      = -1.0f;
-
-
-    if (HasEnoughSamples (samples, width, height))
-    {
-        for (UINT y = 0; y < height; ++y)
-        {
-            for (UINT x = 0; x < width; ++x)
-            {
-                const float luminance = LuminanceAt (samples, static_cast<size_t> (y) * width + x);
-
-                if (luminance > peak)
-                {
-                    peak        = luminance;
-                    brightest.x = static_cast<LONG> (x);
-                    brightest.y = static_cast<LONG> (y);
-                }
-            }
-        }
-    }
-
-    if (pOutLuminance)
-    {
-        *pOutLuminance = std::max (peak, 0.0f);
-    }
-
-    return brightest;
-}
-
-
-
-
-
-////////////////////////////////////////////////////////////////////////////////
-//
-//  HaloFalloffRadiusImpl
-//
-//  Builds a radial luminance profile in half-pixel rings and reports where it
-//  first crosses half of the centre luminance, interpolated between the two
-//  rings that straddle the crossing.
-//
-////////////////////////////////////////////////////////////////////////////////
-
-template <typename TSample>
-static float HaloFalloffRadiusImpl (std::span<const TSample> samples,
-                                    UINT                     width,
-                                    UINT                     height,
-                                    POINT                    center) noexcept
-{
-    std::vector<double> ringTotal;
-    std::vector<size_t> ringCount;
-    size_t              ringLimit = 0;
-    float               peak      = 0.0f;
-    float               previousR = 0.0f;
-    float               previousL = 0.0f;
-
-
-    if (!HasEnoughSamples (samples, width, height))
-    {
-        return 0.0f;
-    }
-
-    if (center.x < 0 || center.y < 0
-        || static_cast<UINT> (center.x) >= width || static_cast<UINT> (center.y) >= height)
-    {
-        return 0.0f;
-    }
-
-    //  Only rings that fit entirely inside the frame describe the halo; past
-    //  the nearest edge a ring would sample the corners alone.
-    {
-        const LONG toEdgeX = std::min (center.x, static_cast<LONG> (width)  - 1 - center.x);
-        const LONG toEdgeY = std::min (center.y, static_cast<LONG> (height) - 1 - center.y);
-        const LONG toEdge  = std::max<LONG> (std::min (toEdgeX, toEdgeY), 0);
-
-        ringLimit = static_cast<size_t> (static_cast<float> (toEdge) / kRingWidthPx) + 1;
-    }
-
-    ringTotal.assign (ringLimit, 0.0);
-    ringCount.assign (ringLimit, 0);
-
-    for (UINT y = 0; y < height; ++y)
-    {
-        for (UINT x = 0; x < width; ++x)
-        {
-            const float  dx     = static_cast<float> (static_cast<LONG> (x) - center.x);
-            const float  dy     = static_cast<float> (static_cast<LONG> (y) - center.y);
-            const float  radius = std::sqrt (dx * dx + dy * dy);
-            const size_t ring   = static_cast<size_t> (radius / kRingWidthPx + 0.5f);
-
-            if (ring < ringLimit)
-            {
-                ringTotal[ring] += LuminanceAt (samples, static_cast<size_t> (y) * width + x);
-                ringCount[ring] += 1;
-            }
-        }
-    }
-
-    if (ringCount.empty() || ringCount[0] == 0)
-    {
-        return 0.0f;
-    }
-
-    peak      = static_cast<float> (ringTotal[0] / static_cast<double> (ringCount[0]));
-    previousL = peak;
-
-    if (!(peak > 0.0f))
-    {
-        return 0.0f;
-    }
-
-    for (size_t ring = 1; ring < ringLimit; ++ring)
-    {
-        if (ringCount[ring] == 0)
-        {
-            continue;
-        }
-
-        const float radius    = static_cast<float> (ring) * kRingWidthPx;
-        const float luminance = static_cast<float> (ringTotal[ring] / static_cast<double> (ringCount[ring]));
-
-        if (luminance <= peak * kHalfMaximum)
-        {
-            //  Straight-line interpolation between the last ring above half
-            //  and this one, so the radius is not quantised to the ring width.
-            const float span = previousL - luminance;
-
-            if (!(span > 0.0f))
-            {
-                return radius;
-            }
-
-            return previousR + (previousL - peak * kHalfMaximum) / span * (radius - previousR);
-        }
-
-        previousR = radius;
-        previousL = luminance;
-    }
-
-    //  The halo never falls to half inside the frame, so there is no radius to
-    //  report: the frame is too small for the glow being measured.
-    return 0.0f;
-}
-
-
-
-
-
-////////////////////////////////////////////////////////////////////////////////
-//
 //  MeanLuminance
 //
 ////////////////////////////////////////////////////////////////////////////////
@@ -336,56 +175,73 @@ float MeanLuminance (std::span<const float> rgba, UINT width, UINT height) noexc
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-//  BrightestPixel
+//  CompareFrames
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-POINT BrightestPixel (std::span<const uint8_t> bgra, UINT width, UINT height, float * pOutLuminance) noexcept
+FrameDifference CompareFrames (std::span<const uint8_t> baseline,
+                               std::span<const uint8_t> candidate,
+                               UINT                     width,
+                               UINT                     height,
+                               float                    threshold) noexcept
 {
-    return BrightestPixelImpl (bgra, width, height, pOutLuminance);
-}
+    const size_t         pixelCount = static_cast<size_t> (width) * static_cast<size_t> (height);
+    FrameDifference      difference;
+    std::vector<uint8_t> perPixel;
+    double               total      = 0.0;
 
 
+    if (!HasEnoughSamples (baseline, width, height) || !HasEnoughSamples (candidate, width, height))
+    {
+        return difference;
+    }
+
+    //  One byte per pixel holds any difference of 8-bit code values, and keeps
+    //  the percentile sort below cheap even on a 4K frame.
+    perPixel.resize (pixelCount);
+
+    for (size_t pixel = 0; pixel < pixelCount; ++pixel)
+    {
+        const size_t offset  = pixel * 4;
+        int          largest = 0;
 
 
+        //  Alpha is deliberately skipped: nothing displays it.
+        for (size_t channel = 0; channel < 3; ++channel)
+        {
+            const int delta = std::abs (static_cast<int> (baseline[offset + channel])
+                                        - static_cast<int> (candidate[offset + channel]));
 
-////////////////////////////////////////////////////////////////////////////////
-//
-//  BrightestPixel
-//
-////////////////////////////////////////////////////////////////////////////////
+            largest = std::max (largest, delta);
+        }
 
-POINT BrightestPixel (std::span<const float> rgba, UINT width, UINT height, float * pOutLuminance) noexcept
-{
-    return BrightestPixelImpl (rgba, width, height, pOutLuminance);
-}
+        perPixel[pixel] = static_cast<uint8_t> (largest);
+        total          += largest;
 
+        if (static_cast<float> (largest) > difference.m_maxDifference)
+        {
+            difference.m_maxDifference   = static_cast<float> (largest);
+            difference.m_maxDifferenceAt = { static_cast<LONG> (pixel % width),
+                                             static_cast<LONG> (pixel / width) };
+        }
 
+        if (static_cast<float> (largest) > threshold)
+        {
+            difference.m_pixelsOverThreshold += 1;
+        }
+    }
 
+    difference.m_meanDifference = static_cast<float> (total / static_cast<double> (pixelCount));
 
+    {
+        size_t index = static_cast<size_t> (static_cast<double> (pixelCount) * kReportedQuantile);
 
-////////////////////////////////////////////////////////////////////////////////
-//
-//  HaloFalloffRadius
-//
-////////////////////////////////////////////////////////////////////////////////
+        std::sort (perPixel.begin(), perPixel.end());
 
-float HaloFalloffRadius (std::span<const uint8_t> bgra, UINT width, UINT height, POINT center) noexcept
-{
-    return HaloFalloffRadiusImpl (bgra, width, height, center);
-}
+        index = std::min (index, pixelCount - 1);
 
+        difference.m_p99Difference = static_cast<float> (perPixel[index]);
+    }
 
-
-
-
-////////////////////////////////////////////////////////////////////////////////
-//
-//  HaloFalloffRadius
-//
-////////////////////////////////////////////////////////////////////////////////
-
-float HaloFalloffRadius (std::span<const float> rgba, UINT width, UINT height, POINT center) noexcept
-{
-    return HaloFalloffRadiusImpl (rgba, width, height, center);
+    return difference;
 }

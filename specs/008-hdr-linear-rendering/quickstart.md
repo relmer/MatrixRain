@@ -37,7 +37,7 @@ Expected: 0 warnings, all tests pass, including `ColorMathTests` and
 | 4 | Toggle scanlines; sweep Intensity 1→100 | Darkening scales with Intensity; density per glyph unchanged from v1.6 | US1-4, FR-007 |
 | 5 | Cycle every color scheme and a custom color | Hues match v1.6 | US1-5 |
 | 6 | Each quality preset, Performance tab readout | FPS within 5% of v1.6 on the same machine | SC-006, FR-008 |
-| 7 | Calibration harness (research R3) on the reference frame | Mean luminance and halo radius within tolerance of v1.6 | SC-001 |
+| 7 | Calibration harness (research R3) in compare mode | Every case within the difference thresholds in `baseline.md`, and the difference images show only the intended improvements | SC-001 |
 
 ## Phase 2: native HDR at SDR brightness
 

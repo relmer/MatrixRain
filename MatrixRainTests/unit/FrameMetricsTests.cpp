@@ -12,22 +12,13 @@ namespace MatrixRainTests
 
     //  Rec.709 weights, repeated here so the tests state the expected answer
     //  independently of the implementation's own constants.
-    static constexpr float kLumaR        = 0.2126f;
-    static constexpr float kLumaG        = 0.7152f;
-    static constexpr float kLumaB        = 0.0722f;
+    static constexpr float kLumaR    = 0.2126f;
+    static constexpr float kLumaG    = 0.7152f;
+    static constexpr float kLumaB    = 0.0722f;
 
-    //  A synthetic halo big enough that its half-maximum radius sits well
-    //  inside the frame, with the centre in the middle.
-    static constexpr UINT  kHaloWidth    = 129;
-    static constexpr UINT  kHaloHeight   = 129;
-    static constexpr float kHaloSigma    = 12.0f;
-
-    //  A Gaussian exp (-r^2 / 2 sigma^2) reaches half its peak at
-    //  sigma * sqrt (2 ln 2).
-    static constexpr float kHalfMaxScale = 1.1774100f;
-
-    //  The tolerance T003 asks for on the halo radius.
-    static constexpr float kRadiusTolerancePx = 0.5f;
+    //  Frame size used by the comparison tests. Small enough to build by hand,
+    //  large enough that a 99th percentile means something.
+    static constexpr UINT  kDiffSide = 100;
 
 
 
@@ -72,97 +63,6 @@ namespace MatrixRainTests
             frame[pixel * 4 + 1] = green;
             frame[pixel * 4 + 2] = red;
             frame[pixel * 4 + 3] = 255;
-        }
-
-        return frame;
-    }
-
-
-
-
-
-    ////////////////////////////////////////////////////////////////////////////
-    //
-    //  GaussianAt
-    //
-    ////////////////////////////////////////////////////////////////////////////
-
-    static float GaussianAt (UINT x, UINT y, POINT center, float sigma)
-    {
-        const float dx = static_cast<float> (static_cast<LONG> (x) - center.x);
-        const float dy = static_cast<float> (static_cast<LONG> (y) - center.y);
-
-
-
-        return std::exp (-(dx * dx + dy * dy) / (2.0f * sigma * sigma));
-    }
-
-
-
-
-
-    ////////////////////////////////////////////////////////////////////////////
-    //
-    //  MakeGaussianLinear
-    //
-    //  A radially symmetric white halo in linear float RGBA.
-    //
-    ////////////////////////////////////////////////////////////////////////////
-
-    static std::vector<float> MakeGaussianLinear (UINT width, UINT height, POINT center, float sigma)
-    {
-        std::vector<float> frame (static_cast<size_t> (width) * height * 4);
-
-        for (UINT y = 0; y < height; ++y)
-        {
-            for (UINT x = 0; x < width; ++x)
-            {
-                const size_t offset = (static_cast<size_t> (y) * width + x) * 4;
-                const float  value  = GaussianAt (x, y, center, sigma);
-
-                frame[offset + 0] = value;
-                frame[offset + 1] = value;
-                frame[offset + 2] = value;
-                frame[offset + 3] = 1.0f;
-            }
-        }
-
-        return frame;
-    }
-
-
-
-
-
-    ////////////////////////////////////////////////////////////////////////////
-    //
-    //  MakeGaussianBgra
-    //
-    //  The same halo, sRGB-encoded into 8 bits -- what a back-buffer read-back
-    //  of an SDR frame actually looks like.
-    //
-    ////////////////////////////////////////////////////////////////////////////
-
-    static std::vector<uint8_t> MakeGaussianBgra (UINT width, UINT height, POINT center, float sigma)
-    {
-        std::vector<uint8_t> frame (static_cast<size_t> (width) * height * 4);
-
-        for (UINT y = 0; y < height; ++y)
-        {
-            for (UINT x = 0; x < width; ++x)
-            {
-                const size_t offset  = (static_cast<size_t> (y) * width + x) * 4;
-                const float  linear  = GaussianAt (x, y, center, sigma);
-                const float  encoded = (linear <= 0.0031308f)
-                                       ? linear * 12.92f
-                                       : 1.055f * std::pow (linear, 1.0f / 2.4f) - 0.055f;
-                const uint8_t stored = static_cast<uint8_t> (std::lround (encoded * 255.0f));
-
-                frame[offset + 0] = stored;
-                frame[offset + 1] = stored;
-                frame[offset + 2] = stored;
-                frame[offset + 3] = 255;
-            }
         }
 
         return frame;
@@ -258,131 +158,127 @@ namespace MatrixRainTests
 
 
         ////////////////////////////////////////////////////////////////////////
-        // BrightestPixel
+        // CompareFrames
         ////////////////////////////////////////////////////////////////////////
 
-        TEST_METHOD (BrightestPixel_FindsTheHottestPixelAndItsLuminance)
+        TEST_METHOD (CompareFrames_OfIdenticalFrames_ReportsNoDifference)
         {
-            std::vector<uint8_t> frame     = MakeUniformBgra (16, 16, 0, 0, 0);
-            const size_t         hotPixel  = static_cast<size_t> (9) * 16 + 5;
-            float                luminance = 0.0f;
+            const std::vector<uint8_t> frame  = MakeUniformBgra (kDiffSide, kDiffSide, 10, 90, 30);
+            const FrameDifference      result = CompareFrames (frame, frame, kDiffSide, kDiffSide, 0.0f);
 
-            frame[hotPixel * 4 + 0] = 255;
-            frame[hotPixel * 4 + 1] = 255;
-            frame[hotPixel * 4 + 2] = 255;
-
-            const POINT found = BrightestPixel (frame, 16, 16, &luminance);
-
-            Assert::AreEqual (5L, found.x, L"Brightest pixel x");
-            Assert::AreEqual (9L, found.y, L"Brightest pixel y");
-            Assert::AreEqual (1.0f, luminance, 1e-5f, L"Its luminance must come back with it");
+            Assert::AreEqual (0.0f, result.m_maxDifference,  1e-7f, L"Max difference");
+            Assert::AreEqual (0.0f, result.m_meanDifference, 1e-7f, L"Mean difference");
+            Assert::AreEqual (0.0f, result.m_p99Difference,  1e-7f, L"99th percentile");
+            Assert::AreEqual (static_cast<size_t> (0), result.m_pixelsOverThreshold,
+                              L"A frame compared with itself has changed nowhere");
         }
 
 
-        TEST_METHOD (BrightestPixel_OnABlackFrame_ReportsNoLight)
+        TEST_METHOD (CompareFrames_FindsASingleChangedPixelAndItsPlace)
         {
-            const std::vector<uint8_t> frame     = MakeUniformBgra (8, 8, 0, 0, 0);
-            float                      luminance = -1.0f;
+            const std::vector<uint8_t> baseline  = MakeUniformBgra (kDiffSide, kDiffSide, 0, 0, 0);
+            std::vector<uint8_t>       candidate = baseline;
+            const size_t               changed   = static_cast<size_t> (7) * kDiffSide + 3;
 
-            BrightestPixel (frame, 8, 8, &luminance);
+            candidate[changed * 4 + 1] = 40;
 
-            Assert::AreEqual (0.0f, luminance, 1e-7f,
-                              L"A black frame must report no light, so callers can tell nothing was drawn");
+            const FrameDifference result = CompareFrames (baseline, candidate, kDiffSide, kDiffSide, 1.0f);
+
+            Assert::AreEqual (40.0f, result.m_maxDifference, 1e-7f,
+                              L"The largest difference is the one pixel that moved");
+            Assert::AreEqual (3L, result.m_maxDifferenceAt.x, L"Its x, so a reader can go and look");
+            Assert::AreEqual (7L, result.m_maxDifferenceAt.y, L"Its y");
+            Assert::AreEqual (static_cast<size_t> (1), result.m_pixelsOverThreshold,
+                              L"Exactly one pixel is over the threshold");
         }
 
 
-        TEST_METHOD (BrightestPixel_FindsTheCentreOfAGaussian)
+        TEST_METHOD (CompareFrames_TakesTheLargestChannelDifference)
         {
-            const POINT              center = { 40, 70 };
-            const std::vector<float> frame  = MakeGaussianLinear (kHaloWidth, kHaloHeight, center, kHaloSigma);
-            const POINT              found  = BrightestPixel (std::span<const float> (frame),
-                                                              kHaloWidth, kHaloHeight);
+            //  A hue shift can leave overall brightness alone, so the metric
+            //  must look per channel rather than at luminance.
+            const std::vector<uint8_t> baseline  = MakeUniformBgra (kDiffSide, kDiffSide, 100, 100, 100);
+            const std::vector<uint8_t> candidate = MakeUniformBgra (kDiffSide, kDiffSide, 100, 100, 130);
 
-            Assert::AreEqual (center.x, found.x, L"A halo's peak is its centre, x");
-            Assert::AreEqual (center.y, found.y, L"A halo's peak is its centre, y");
+            const FrameDifference result = CompareFrames (baseline, candidate, kDiffSide, kDiffSide, 1.0f);
+
+            Assert::AreEqual (30.0f, result.m_maxDifference,  1e-7f, L"Red moved by 30, so the difference is 30");
+            Assert::AreEqual (30.0f, result.m_meanDifference, 1e-5f, L"Every pixel moved, so the mean matches");
         }
 
 
-        ////////////////////////////////////////////////////////////////////////
-        // HaloFalloffRadius
-        ////////////////////////////////////////////////////////////////////////
-
-        TEST_METHOD (HaloFalloffRadius_OfALinearGaussian_MatchesTheAnalyticHalfMaximum)
+        TEST_METHOD (CompareFrames_MeanAveragesOverTheWholeFrame)
         {
-            const POINT              center   = { static_cast<LONG> (kHaloWidth  / 2),
-                                                  static_cast<LONG> (kHaloHeight / 2) };
-            const std::vector<float> frame    = MakeGaussianLinear (kHaloWidth, kHaloHeight, center, kHaloSigma);
-            const float              expected = kHaloSigma * kHalfMaxScale;
-            const float              measured = HaloFalloffRadius (std::span<const float> (frame),
-                                                                   kHaloWidth,
-                                                                   kHaloHeight,
-                                                                   center);
+            //  A quarter of the frame moves by 40; the mean must be 10.
+            const std::vector<uint8_t> baseline  = MakeUniformBgra (kDiffSide, kDiffSide, 0, 0, 0);
+            std::vector<uint8_t>       candidate = baseline;
+            const size_t               quarter   = static_cast<size_t> (kDiffSide) * kDiffSide / 4;
 
-            Assert::AreEqual (expected, measured, kRadiusTolerancePx,
-                              L"The measured radius must match sigma * sqrt (2 ln 2) within half a pixel");
+            for (size_t pixel = 0; pixel < quarter; ++pixel)
+            {
+                candidate[pixel * 4 + 1] = 40;
+            }
+
+            const FrameDifference result = CompareFrames (baseline, candidate, kDiffSide, kDiffSide, 1.0f);
+
+            Assert::AreEqual (10.0f, result.m_meanDifference, 1e-4f,
+                              L"Mean difference is over every pixel, changed or not");
+            Assert::AreEqual (quarter, result.m_pixelsOverThreshold,
+                              L"Every changed pixel must be counted");
         }
 
 
-        TEST_METHOD (HaloFalloffRadius_OfAnSrgbGaussian_MatchesTheAnalyticHalfMaximum)
+        TEST_METHOD (CompareFrames_P99SurvivesAChangeInASmallPartOfTheFrame)
         {
-            const POINT                center   = { static_cast<LONG> (kHaloWidth  / 2),
-                                                    static_cast<LONG> (kHaloHeight / 2) };
-            const std::vector<uint8_t> frame    = MakeGaussianBgra (kHaloWidth, kHaloHeight, center, kHaloSigma);
-            const float                expected = kHaloSigma * kHalfMaxScale;
-            const float                measured = HaloFalloffRadius (frame, kHaloWidth, kHaloHeight, center);
+            //  The top 2% of pixels move. The mean barely stirs; the 99th
+            //  percentile must see it. This is the case the metric exists for:
+            //  a ring around every streak head is a small fraction of a frame.
+            const std::vector<uint8_t> baseline   = MakeUniformBgra (kDiffSide, kDiffSide, 0, 0, 0);
+            std::vector<uint8_t>       candidate  = baseline;
+            const size_t               pixelCount = static_cast<size_t> (kDiffSide) * kDiffSide;
+            const size_t               changed    = pixelCount * 2 / 100;
 
-            Assert::AreEqual (expected, measured, kRadiusTolerancePx,
-                              L"8-bit input must be decoded before measuring, or the radius comes out wrong");
+            for (size_t pixel = 0; pixel < changed; ++pixel)
+            {
+                candidate[pixel * 4 + 1] = 200;
+            }
+
+            const FrameDifference result = CompareFrames (baseline, candidate, kDiffSide, kDiffSide, 1.0f);
+
+            Assert::AreEqual (200.0f, result.m_p99Difference, 1e-7f,
+                              L"A change in 2% of the frame must show up in the 99th percentile");
+            Assert::IsTrue (result.m_meanDifference < 5.0f,
+                            L"...even though the mean stays near nothing, which is why both are reported");
         }
 
 
-        TEST_METHOD (HaloFalloffRadius_ScalesWithTheHaloWidth)
+        TEST_METHOD (CompareFrames_IgnoresAlpha)
         {
-            const POINT              center = { static_cast<LONG> (kHaloWidth  / 2),
-                                                static_cast<LONG> (kHaloHeight / 2) };
-            const std::vector<float> narrow = MakeGaussianLinear (kHaloWidth, kHaloHeight, center, 6.0f);
-            const std::vector<float> wide   = MakeGaussianLinear (kHaloWidth, kHaloHeight, center, 18.0f);
+            const std::vector<uint8_t> baseline  = MakeUniformBgra (kDiffSide, kDiffSide, 50, 50, 50);
+            std::vector<uint8_t>       candidate = baseline;
 
-            const float narrowRadius = HaloFalloffRadius (std::span<const float> (narrow),
-                                                          kHaloWidth, kHaloHeight, center);
-            const float wideRadius   = HaloFalloffRadius (std::span<const float> (wide),
-                                                          kHaloWidth, kHaloHeight, center);
+            for (size_t pixel = 0; pixel < static_cast<size_t> (kDiffSide) * kDiffSide; ++pixel)
+            {
+                candidate[pixel * 4 + 3] = 0;
+            }
 
-            Assert::AreEqual (6.0f  * kHalfMaxScale, narrowRadius, kRadiusTolerancePx, L"Narrow halo");
-            Assert::AreEqual (18.0f * kHalfMaxScale, wideRadius,   kRadiusTolerancePx, L"Wide halo");
-            Assert::IsTrue (wideRadius > narrowRadius,
-                            L"A wider glow must report a larger radius -- this is the metric's whole job");
+            const FrameDifference result = CompareFrames (baseline, candidate, kDiffSide, kDiffSide, 0.0f);
+
+            Assert::AreEqual (0.0f, result.m_maxDifference, 1e-7f,
+                              L"Alpha is not displayed, so a change in it is not a visible difference");
         }
 
 
-        TEST_METHOD (HaloFalloffRadius_OnABlackFrame_IsZero)
+        TEST_METHOD (CompareFrames_WithAShortBuffer_ReportsNothing)
         {
-            const std::vector<uint8_t> frame  = MakeUniformBgra (32, 32, 0, 0, 0);
-            const POINT                center = { 16, 16 };
+            const std::vector<uint8_t> full  = MakeUniformBgra (kDiffSide, kDiffSide, 255, 255, 255);
+            const std::vector<uint8_t> tooSmall = MakeUniformBgra (4, 4, 0, 0, 0);
 
-            Assert::AreEqual (0.0f, HaloFalloffRadius (frame, 32, 32, center), 1e-7f,
-                              L"With no light at the centre there is no falloff to measure");
-        }
+            const FrameDifference result = CompareFrames (full, tooSmall, kDiffSide, kDiffSide, 1.0f);
 
-
-        TEST_METHOD (HaloFalloffRadius_OnAFlatFrame_IsZero)
-        {
-            const std::vector<uint8_t> frame  = MakeUniformBgra (32, 32, 255, 255, 255);
-            const POINT                center = { 16, 16 };
-
-            Assert::AreEqual (0.0f, HaloFalloffRadius (frame, 32, 32, center), 1e-7f,
-                              L"A frame that never falls to half its peak has no half-maximum radius");
-        }
-
-
-        TEST_METHOD (HaloFalloffRadius_WithACentreOutsideTheFrame_IsZero)
-        {
-            const std::vector<uint8_t> frame = MakeUniformBgra (32, 32, 255, 255, 255);
-
-            Assert::AreEqual (0.0f, HaloFalloffRadius (frame, 32, 32, POINT { -1, 16 }), 1e-7f,
-                              L"A centre left of the frame must be rejected, not sampled");
-            Assert::AreEqual (0.0f, HaloFalloffRadius (frame, 32, 32, POINT { 16, 32 }), 1e-7f,
-                              L"A centre below the frame must be rejected, not sampled");
+            Assert::AreEqual (0.0f, result.m_maxDifference, 1e-7f,
+                              L"A mismatched buffer must be refused, not read past its end");
+            Assert::AreEqual (static_cast<size_t> (0), result.m_pixelsOverThreshold, L"...and count nothing");
         }
     };
 

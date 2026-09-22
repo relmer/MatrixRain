@@ -91,3 +91,6 @@ nCrunchTemp_*/
 *.bak
 *.backup
 *~
+
+# Calibration harness difference images are generated output, not baselines
+specs/008-hdr-linear-rendering/baseline/*.diff.png

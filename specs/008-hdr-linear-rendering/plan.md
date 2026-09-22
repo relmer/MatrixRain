@@ -83,7 +83,7 @@ specs/008-hdr-linear-rendering/
 ```text
 MatrixRainCore/
 ├── RandomSource.h / .cpp                    # NEW  one seedable engine per thread (calibration determinism)
-├── FrameMetrics.h / .cpp                    # NEW  mean luminance, halo falloff radius (calibration)
+├── FrameMetrics.h / .cpp                    # NEW  mean luminance, frame comparison (calibration)
 ├── ColorMath.h / .cpp                       # NEW  sRGB transfer, instance color, luminance, tone map, highlight gain
 ├── OutputModeSelection.h / .cpp             # NEW  SelectOutputMode, OutputMode, HdrMode
 ├── OutputModeTracker.h / .cpp               # NEW  per-monitor mode state machine

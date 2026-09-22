@@ -12,6 +12,11 @@
 #include "..\..\MatrixRainCore\ScreenSaverSettings.h"
 #include "..\..\MatrixRainCore\Viewport.h"
 
+//  WIC is used only by this tool, so the import library is named here rather
+//  than in pch.h, where it would follow MatrixRain.exe into a release build.
+#pragma comment (lib, "windowscodecs.lib")
+#pragma comment (lib, "version.lib")
+
 
 
 
@@ -35,9 +40,20 @@ static constexpr int      kBenchmarkFrames = 600;
 static constexpr uint32_t kReferenceSeed   = 1;
 
 //  Rain is drawn on a black field, so the whole frame's mean luminance is a
-//  small number; printing six decimals keeps the 5% calibration threshold
-//  (SC-001) readable.
+//  small number; printing six decimals keeps a small drift readable.
 static constexpr int      kPrintPrecision  = 6;
+
+//  A pixel counts as changed above this many 8-bit code values. Two is the
+//  point where a difference stops being rounding and starts being something
+//  a viewer could in principle see on a dark field.
+static constexpr float    kDiffThreshold   = 2.0f;
+
+//  Difference images are multiplied by this before being written, because an
+//  honest difference image of a near-match is an entirely black picture.
+static constexpr int      kDiffAmplify     = 16;
+
+//  Where baseline frames live by default, relative to the repository root.
+static constexpr wchar_t  kszDefaultBaselineDir[] = L"specs\\008-hdr-linear-rendering\\baseline";
 
 
 
@@ -103,10 +119,21 @@ static const QualityPreset s_krgPresets[] =
 //
 ////////////////////////////////////////////////////////////////////////////////
 
+enum class RunMode
+{
+    Reference,   // Render each case and write it out as the baseline
+    Compare,     // Render each case and diff it against the baseline
+    Benchmark,   // Time frames per quality preset
+};
+
+
+
+
 struct Options
 {
-    bool m_useWarp   = true;
-    bool m_benchmark = false;
+    bool         m_useWarp     = true;
+    RunMode      m_mode        = RunMode::Reference;
+    std::wstring m_baselineDir = kszDefaultBaselineDir;
 };
 
 
@@ -129,7 +156,8 @@ public:
     HRESULT Initialize (bool useWarp);
     void    Shutdown();
 
-    HRESULT RunReference();
+    HRESULT RunReference (const std::wstring & baselineDir);
+    HRESULT RunCompare   (const std::wstring & baselineDir);
     HRESULT RunBenchmark();
 
 private:
@@ -137,8 +165,8 @@ private:
     HRESULT ReadBackFrame (std::vector<uint8_t> & frame);
     void    ApplyCase     (const SettingsCase & settingsCase, RenderParams & params);
     void    RunFrames     (int frameCount);
-    void    IsolateOneHead();
     HRESULT RenderOnce    (const RenderParams & params);
+    HRESULT RenderCase    (const SettingsCase & settingsCase, std::vector<uint8_t> & frame);
 
     static std::optional<LUID> FindWarpAdapterLuid();
 
@@ -366,42 +394,6 @@ void Harness::RunFrames (int frameCount)
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-//  Harness::IsolateOneHead
-//
-//  Leaves exactly one streak, one character long, parked in the middle of the
-//  frame. A halo radius measured on a full field of rain would be the radius
-//  of whatever the neighbouring streaks happen to add; measured on a lone head
-//  it is the radius of the glow itself.
-//
-////////////////////////////////////////////////////////////////////////////////
-
-void Harness::IsolateOneHead()
-{
-    m_animationSystem->ClearAllStreaks();
-    m_animationSystem->SpawnStreak();
-
-    //  One step past the drop interval gives the streak its first character
-    //  and no trail behind it.
-    m_animationSystem->Update (0.31f);
-
-    const std::vector<CharacterStreak> & streaks = m_animationSystem->GetStreaks();
-
-    if (!streaks.empty())
-    {
-        CharacterStreak * pStreak = const_cast<CharacterStreak *> (&streaks[0]);
-
-        pStreak->SetPosition (Vector3 (static_cast<float> (kFrameWidth)  / 2.0f,
-                                       static_cast<float> (kFrameHeight) / 2.0f,
-                                       0.0f));
-    }
-}
-
-
-
-
-
-////////////////////////////////////////////////////////////////////////////////
-//
 //  Harness::RenderOnce
 //
 ////////////////////////////////////////////////////////////////////////////////
@@ -485,75 +477,318 @@ Error:
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-//  Harness::RunReference
-//
-//  Prints one row per settings case: the mean luminance of a full field of
-//  rain, and the half-maximum radius of the glow around a single isolated
-//  head. Comparing two runs of this is what "the look is unchanged" means in
-//  numbers (FR-006).
+//  BaselinePath
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-HRESULT Harness::RunReference()
+static std::wstring BaselinePath (const std::wstring & directory, const wchar_t * pszCase, const wchar_t * pszSuffix)
+{
+    return directory + L"\\" + pszCase + pszSuffix;
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  WritePng
+//
+//  Writes a BGRA frame losslessly. Lossless matters more than it sounds here:
+//  a baseline that quietly re-encoded its own pixels would report a
+//  difference against itself.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+static HRESULT WritePng (const std::wstring & path, const std::vector<uint8_t> & bgra, UINT width, UINT height)
+{
+    HRESULT                                       hr     = S_OK;
+    ComPtr<IWICImagingFactory>                    pFactory;
+    ComPtr<IWICStream>                            pStream;
+    ComPtr<IWICBitmapEncoder>                     pEncoder;
+    ComPtr<IWICBitmapFrameEncode>                 pFrame;
+    WICPixelFormatGUID                            format = GUID_WICPixelFormat32bppBGRA;
+    const UINT                                    stride = width * 4;
+
+
+    hr = CoCreateInstance (CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS (&pFactory));
+    CHRA (hr);
+
+    hr = pFactory->CreateStream (&pStream);
+    CHRA (hr);
+
+    hr = pStream->InitializeFromFilename (path.c_str(), GENERIC_WRITE);
+    CHRA (hr);
+
+    hr = pFactory->CreateEncoder (GUID_ContainerFormatPng, nullptr, &pEncoder);
+    CHRA (hr);
+
+    hr = pEncoder->Initialize (pStream.Get(), WICBitmapEncoderNoCache);
+    CHRA (hr);
+
+    hr = pEncoder->CreateNewFrame (&pFrame, nullptr);
+    CHRA (hr);
+
+    hr = pFrame->Initialize (nullptr);
+    CHRA (hr);
+
+    hr = pFrame->SetSize (width, height);
+    CHRA (hr);
+
+    hr = pFrame->SetPixelFormat (&format);
+    CHRA (hr);
+
+    CBRAEx (format == GUID_WICPixelFormat32bppBGRA, E_FAIL);
+
+    hr = pFrame->WritePixels (height, stride, static_cast<UINT> (bgra.size()), const_cast<BYTE *> (bgra.data()));
+    CHRA (hr);
+
+    hr = pFrame->Commit();
+    CHRA (hr);
+
+    hr = pEncoder->Commit();
+    CHRA (hr);
+
+Error:
+    return hr;
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  ReadPng
+//
+////////////////////////////////////////////////////////////////////////////////
+
+static HRESULT ReadPng (const std::wstring & path, std::vector<uint8_t> & bgra, UINT width, UINT height)
+{
+    HRESULT                       hr         = S_OK;
+    ComPtr<IWICImagingFactory>    pFactory;
+    ComPtr<IWICBitmapDecoder>     pDecoder;
+    ComPtr<IWICBitmapFrameDecode> pFrame;
+    ComPtr<IWICFormatConverter>   pConverter;
+    UINT                          fileWidth  = 0;
+    UINT                          fileHeight = 0;
+
+
+    hr = CoCreateInstance (CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS (&pFactory));
+    CHRA (hr);
+
+    hr = pFactory->CreateDecoderFromFilename (path.c_str(),
+                                              nullptr,
+                                              GENERIC_READ,
+                                              WICDecodeMetadataCacheOnDemand,
+                                              &pDecoder);
+    CHR (hr);
+
+    hr = pDecoder->GetFrame (0, &pFrame);
+    CHRA (hr);
+
+    hr = pFrame->GetSize (&fileWidth, &fileHeight);
+    CHRA (hr);
+
+    CBRAEx (fileWidth == width && fileHeight == height, E_FAIL);
+
+    hr = pFactory->CreateFormatConverter (&pConverter);
+    CHRA (hr);
+
+    hr = pConverter->Initialize (pFrame.Get(),
+                                 GUID_WICPixelFormat32bppBGRA,
+                                 WICBitmapDitherTypeNone,
+                                 nullptr,
+                                 0.0,
+                                 WICBitmapPaletteTypeCustom);
+    CHRA (hr);
+
+    bgra.resize (static_cast<size_t> (width) * height * 4);
+
+    hr = pConverter->CopyPixels (nullptr, width * 4, static_cast<UINT> (bgra.size()), bgra.data());
+    CHRA (hr);
+
+Error:
+    return hr;
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  WriteDifferenceImage
+//
+//  Writes the per-pixel difference as a picture, amplified so it can actually
+//  be seen. This is the artefact worth looking at: it says WHERE the render
+//  changed, which no summary statistic can.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+static HRESULT WriteDifferenceImage (const std::wstring         & path,
+                                     const std::vector<uint8_t> & baseline,
+                                     const std::vector<uint8_t> & candidate,
+                                     UINT                         width,
+                                     UINT                         height)
+{
+    std::vector<uint8_t> image (static_cast<size_t> (width) * height * 4);
+
+    for (size_t pixel = 0; pixel < static_cast<size_t> (width) * height; ++pixel)
+    {
+        for (size_t channel = 0; channel < 3; ++channel)
+        {
+            const size_t offset = pixel * 4 + channel;
+            const int    delta  = std::abs (static_cast<int> (baseline[offset])
+                                            - static_cast<int> (candidate[offset]));
+
+            image[offset] = static_cast<uint8_t> (std::min (delta * kDiffAmplify, 255));
+        }
+
+        image[pixel * 4 + 3] = 255;
+    }
+
+    return WritePng (path, image, width, height);
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  Harness::RenderCase
+//
+//  Renders one settings case to a finished frame. Every run starts from the
+//  same seed and takes the same number of fixed steps, so two runs of this
+//  differ only where the renderer differs.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+HRESULT Harness::RenderCase (const SettingsCase & settingsCase, std::vector<uint8_t> & frame)
+{
+    HRESULT      hr = S_OK;
+    RenderParams params;
+
+
+    ApplyCase (settingsCase, params);
+
+    RandomSource::Reseed (kReferenceSeed);
+    m_animationSystem->ClearAllStreaks();
+    RunFrames (kWarmupFrames);
+
+    hr = RenderOnce (params);
+    CHR (hr);
+
+    hr = ReadBackFrame (frame);
+    CHR (hr);
+
+Error:
+    return hr;
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  Harness::RunReference
+//
+//  Captures the baseline: one frame per settings case, written out whole.
+//  Keeping the frame rather than a summary of it is the point -- a later run
+//  can be compared against it in ways nobody thought of today (FR-006).
+//
+////////////////////////////////////////////////////////////////////////////////
+
+HRESULT Harness::RunReference (const std::wstring & baselineDir)
 {
     HRESULT              hr = S_OK;
     std::vector<uint8_t> frame;
 
 
-    wprintf (L"case,meanLuminance,haloRadiusPx,headX,headY,headLuminance\n");
+    CreateDirectoryW (baselineDir.c_str(), nullptr);
+
+    wprintf (L"case,meanLuminance,file\n");
 
     for (const SettingsCase & settingsCase : s_krgCases)
     {
-        RenderParams params;
-        float        meanLuminance = 0.0f;
-        float        haloRadius    = 0.0f;
-        float        headLuminance = 0.0f;
-        POINT        head          = {};
+        const std::wstring path = BaselinePath (baselineDir, settingsCase.m_pszName, L".png");
 
-
-        ApplyCase (settingsCase, params);
-
-        //  Field frame: every streak in place, for the exposure number.
-        RandomSource::Reseed (kReferenceSeed);
-        m_animationSystem->ClearAllStreaks();
-        RunFrames (kWarmupFrames);
-
-        hr = RenderOnce (params);
+        hr = RenderCase (settingsCase, frame);
         CHR (hr);
 
-        hr = ReadBackFrame (frame);
+        hr = WritePng (path, frame, kFrameWidth, kFrameHeight);
         CHR (hr);
 
-        meanLuminance = MeanLuminance (frame, kFrameWidth, kFrameHeight);
-
-        //  Lone-head frame: for the glow's width.
-        RandomSource::Reseed (kReferenceSeed);
-        IsolateOneHead();
-
-        hr = RenderOnce (params);
-        CHR (hr);
-
-        hr = ReadBackFrame (frame);
-        CHR (hr);
-
-        //  The head is wherever the renderer actually put it, which is not
-        //  the streak's own coordinate: the glyph quad is drawn around it and
-        //  the ink sits somewhere inside it. Measuring from the brightest
-        //  pixel is both simpler and less likely to drift than re-deriving
-        //  that.
-        head       = BrightestPixel    (frame, kFrameWidth, kFrameHeight, &headLuminance);
-        haloRadius = HaloFalloffRadius (frame, kFrameWidth, kFrameHeight, head);
-
-        wprintf (L"%s,%.*f,%.*f,%ld,%ld,%.*f\n",
+        wprintf (L"%s,%.*f,%s\n",
                  settingsCase.m_pszName,
                  kPrintPrecision,
-                 meanLuminance,
+                 MeanLuminance (frame, kFrameWidth, kFrameHeight),
+                 path.c_str());
+    }
+
+Error:
+    return hr;
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  Harness::RunCompare
+//
+//  Renders each case again and measures how far it has moved from the
+//  baseline. A difference image is written per case, because the numbers say
+//  how much changed and only the picture says what.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+HRESULT Harness::RunCompare (const std::wstring & baselineDir)
+{
+    HRESULT              hr = S_OK;
+    std::vector<uint8_t> frame;
+    std::vector<uint8_t> baseline;
+
+
+    wprintf (L"case,meanLuminance,maxDiff,meanDiff,p99Diff,pixelsOverThreshold,maxDiffAt\n");
+
+    for (const SettingsCase & settingsCase : s_krgCases)
+    {
+        const std::wstring baselinePath = BaselinePath (baselineDir, settingsCase.m_pszName, L".png");
+        const std::wstring diffPath     = BaselinePath (baselineDir, settingsCase.m_pszName, L".diff.png");
+        FrameDifference    difference;
+
+
+        hr = RenderCase (settingsCase, frame);
+        CHR (hr);
+
+        hr = ReadPng (baselinePath, baseline, kFrameWidth, kFrameHeight);
+
+        if (FAILED (hr))
+        {
+            wprintf (L"%s,,,,,,no baseline at %s\n", settingsCase.m_pszName, baselinePath.c_str());
+            hr = S_OK;
+            continue;
+        }
+
+        difference = CompareFrames (baseline, frame, kFrameWidth, kFrameHeight, kDiffThreshold);
+
+        hr = WriteDifferenceImage (diffPath, baseline, frame, kFrameWidth, kFrameHeight);
+        CHR (hr);
+
+        wprintf (L"%s,%.*f,%.0f,%.4f,%.0f,%zu,%ldx%ld\n",
+                 settingsCase.m_pszName,
                  kPrintPrecision,
-                 haloRadius,
-                 head.x,
-                 head.y,
-                 kPrintPrecision,
-                 headLuminance);
+                 MeanLuminance (frame, kFrameWidth, kFrameHeight),
+                 difference.m_maxDifference,
+                 difference.m_meanDifference,
+                 difference.m_p99Difference,
+                 difference.m_pixelsOverThreshold,
+                 difference.m_maxDifferenceAt.x,
+                 difference.m_maxDifferenceAt.y);
     }
 
 Error:
@@ -700,6 +935,76 @@ Error:
 
 ////////////////////////////////////////////////////////////////////////////////
 //
+//  ModeName
+//
+////////////////////////////////////////////////////////////////////////////////
+
+static const wchar_t * ModeName (RunMode mode)
+{
+    switch (mode)
+    {
+        case RunMode::Reference: return L"reference";
+        case RunMode::Compare:   return L"compare";
+        case RunMode::Benchmark: return L"benchmark";
+    }
+
+    return L"unknown";
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  WarpVersion
+//
+//  WARP ships with Windows, so a Windows update can shift its output. Recording
+//  the version alongside a baseline turns "why did the diff light up" from an
+//  afternoon into a glance.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+static std::wstring WarpVersion()
+{
+    const wchar_t * pszModule = L"d3d10warp.dll";
+    DWORD           handle    = 0;
+    DWORD           size      = GetFileVersionInfoSizeW (pszModule, &handle);
+    std::vector<uint8_t> buffer;
+    VS_FIXEDFILEINFO   * pInfo  = nullptr;
+    UINT                 length = 0;
+
+
+    if (size == 0)
+    {
+        return L"unknown";
+    }
+
+    buffer.resize (size);
+
+    if (!GetFileVersionInfoW (pszModule, handle, size, buffer.data()))
+    {
+        return L"unknown";
+    }
+
+    if (!VerQueryValueW (buffer.data(), L"\\", reinterpret_cast<LPVOID *> (&pInfo), &length) || !pInfo)
+    {
+        return L"unknown";
+    }
+
+    return std::format (L"{}.{}.{}.{}",
+                        HIWORD (pInfo->dwFileVersionMS),
+                        LOWORD (pInfo->dwFileVersionMS),
+                        HIWORD (pInfo->dwFileVersionLS),
+                        LOWORD (pInfo->dwFileVersionLS));
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
 //  ParseOptions
 //
 ////////////////////////////////////////////////////////////////////////////////
@@ -733,16 +1038,24 @@ static bool ParseOptions (int argc, wchar_t * argv[], Options & options)
 
             if (value == L"reference")
             {
-                options.m_benchmark = false;
+                options.m_mode = RunMode::Reference;
+            }
+            else if (value == L"compare")
+            {
+                options.m_mode = RunMode::Compare;
             }
             else if (value == L"benchmark")
             {
-                options.m_benchmark = true;
+                options.m_mode = RunMode::Benchmark;
             }
             else
             {
                 return false;
             }
+        }
+        else if (current == L"--baseline-dir" && arg + 1 < argc)
+        {
+            options.m_baselineDir = argv[++arg];
         }
         else
         {
@@ -772,16 +1085,29 @@ int wmain (int argc, wchar_t * argv[])
 
     if (!ParseOptions (argc, argv, options))
     {
-        wprintf (L"usage: HdrCalibration [--adapter warp|hardware] [--mode reference|benchmark]\n");
+        wprintf (L"usage: HdrCalibration [--adapter warp|hardware]"
+                 L" [--mode reference|compare|benchmark] [--baseline-dir <path>]\n");
         return 1;
     }
 
-    wprintf (L"# adapter=%s mode=%s frame=%ux%u seed=%u\n",
+    hr = CoInitializeEx (nullptr, COINIT_APARTMENTTHREADED);
+
+    if (FAILED (hr))
+    {
+        wprintf (L"CoInitializeEx failed: 0x%08X\n", static_cast<unsigned> (hr));
+        return 1;
+    }
+
+    //  The header is part of the record: a baseline is only comparable against
+    //  a run made on the same adapter, and WARP ships with Windows and changes
+    //  with it, so its version belongs next to the numbers.
+    wprintf (L"# adapter=%s mode=%s frame=%ux%u seed=%u warp=%s\n",
              options.m_useWarp ? L"warp" : L"hardware",
-             options.m_benchmark ? L"benchmark" : L"reference",
+             ModeName (options.m_mode),
              kFrameWidth,
              kFrameHeight,
-             kReferenceSeed);
+             kReferenceSeed,
+             WarpVersion().c_str());
 
     hr = harness.Initialize (options.m_useWarp);
 
@@ -789,12 +1115,27 @@ int wmain (int argc, wchar_t * argv[])
     {
         wprintf (L"initialization failed: 0x%08X\n", static_cast<unsigned> (hr));
         harness.Shutdown();
+        CoUninitialize();
         return 1;
     }
 
-    hr = options.m_benchmark ? harness.RunBenchmark() : harness.RunReference();
+    switch (options.m_mode)
+    {
+        case RunMode::Reference:
+            hr = harness.RunReference (options.m_baselineDir);
+            break;
+
+        case RunMode::Compare:
+            hr = harness.RunCompare (options.m_baselineDir);
+            break;
+
+        case RunMode::Benchmark:
+            hr = harness.RunBenchmark();
+            break;
+    }
 
     harness.Shutdown();
+    CoUninitialize();
 
     if (FAILED (hr))
     {

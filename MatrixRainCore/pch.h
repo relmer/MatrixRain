@@ -43,6 +43,7 @@
 #include <ShellApi.h>
 #include <ShellScalingApi.h>
 #include <StrSafe.h>
+#include <wincodec.h>
 
 
 

@@ -79,17 +79,28 @@ Phase 3).
   sums passing 1.0, which float targets and the output transform (R4, R8) now
   handle.
 - **Calibration**: tune the extract thresholds, the soft-saturation constant
-  and the default `bloomIntensity` so that at default settings the mean
-  luminance and glow radius of a fixed reference frame match v1.6 within a
-  small tolerance (SC-001).
+  and the default `bloomIntensity` so that a fixed reference frame matches
+  v1.6 within a small tolerance (SC-001).
 
 **Rationale**: Additive linear bloom is how glow physically combines. The
 v1.6 constants exist to compensate for gamma-space math, so keeping them
 unchanged would break FR-005.
 
 **Calibration method**: A deterministic reference frame (fixed seed, fixed
-time) rendered on the WARP device by a small calibration harness, reporting
-mean luminance and the 50%-falloff radius of an isolated head's halo.
+time) rendered on the WARP device by a small calibration harness, **kept as a
+PNG** and compared pixel by pixel against the same frame rendered by the new
+pipeline.
+
+Comparing the frames replaced an earlier plan to reduce each frame to two
+scalars: mean luminance and the 50%-falloff radius of an isolated head's halo.
+The radius did not survive contact with a real frame. A streak head is a
+saturated glyph, so half of its peak is reached at the edge of the letter's
+own ink about 0.7 px out, and the number reported the stroke width rather than
+the glow. Measured across the glow-size slider from 50% to 200% it moved by 5%,
+in the wrong direction -- it would have certified a plainly visible change as
+"within tolerance". A frame comparison needs no such proxy, and catches glow
+SHAPE, hue shifts, glyph weight and banding as well, none of which anyone
+would have thought to write a statistic for.
 - **Determinism** needs a seam: randomness comes from three independent
   generators seeded by `std::random_device` (`AnimationSystem::m_generator`,
   `CharacterStreak::s_generator`, `CharacterSet`'s `s_gen`). A new
@@ -98,8 +109,21 @@ mean luminance and the 50%-falloff radius of an isolated head's halo.
 - **Reference capture**: v1.6 has neither the seam nor the harness, so the
   reference frame is captured on this branch once both land and *before* any
   pipeline change. At that point rendering is still byte-identical to v1.6.
-- **Metrics** (mean luminance, halo falloff radius) live in a unit-tested core
-  module, `FrameMetrics`. The tool's `main` only wires things together.
+- **Metrics** live in a unit-tested core module, `FrameMetrics`.
+  `CompareFrames` reduces two frames to how far apart they are: max, mean and
+  99th-percentile difference in 8-bit code values, how many pixels moved more
+  than a threshold, and where the worst one is. `MeanLuminance` gives a
+  one-number headline for exposure. Differences are stated in code values
+  rather than in linear light because the question is whether anyone would SEE
+  it, and the sRGB curve is what makes one code value about equally visible at
+  any brightness. The tool's `main` only wires things together, and also
+  writes an amplified difference image per case -- the numbers say how much
+  moved, only the picture says what.
+- **Reproducibility is verified, not assumed**: capturing the baseline and
+  immediately re-running the comparison in a separate process reports zero
+  difference on every case, which exercises determinism, the PNG round trip
+  and WARP's repeatability at once. The WARP version is recorded with the
+  baseline, since WARP ships with Windows and can change under it.
 - **Settings coverage**: the reference set covers defaults plus several
   non-default glow, scanline and color settings (FR-006).
 - **Benchmark mode** (Constitution II): the same harness times N frames per

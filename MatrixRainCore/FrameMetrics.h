@@ -9,18 +9,22 @@
 /// compared across a pipeline change by measurement rather than by eye.
 ///
 /// The calibration harness renders one deterministic frame (see RandomSource)
-/// before and after a change and compares these two metrics per settings case:
-/// MeanLuminance catches an overall shift in exposure, HaloFalloffRadius
-/// catches a change in the size of the glow around a streak head. Both are
-/// computed in LINEAR light, because that is where "twice as bright" means
-/// twice as much light.
+/// before and after a change and compares them. The comparison itself is the
+/// primary signal: CompareFrames reduces two frames of the same scene to how
+/// far apart they are and where. MeanLuminance sits alongside it as a headline
+/// -- one number saying whether the scene as a whole got brighter or darker.
 ///
-/// Each metric takes either a read-back 8-bit BGRA back buffer, whose channels
-/// are decoded from sRGB first, or a buffer that is already linear float RGBA.
+/// An earlier revision also reported the half-maximum radius of the glow
+/// around a streak head. It was retired: a streak head is a saturated glyph,
+/// so half of its peak is reached at the edge of the letter's own ink, and the
+/// radius reported the stroke width rather than the glow. Comparing the frames
+/// directly needs no such proxy, and shows glow SHAPE as well as size.
 /// </summary>
 
 /// <summary>
-/// Average Rec.709 luminance of every pixel in the frame, in linear light.
+/// Average Rec.709 luminance of every pixel in the frame, in linear light --
+/// linear because that is where "twice as bright" means twice as much light,
+/// so averaging is meaningful.
 /// </summary>
 /// <param name="bgra">Frame bytes, 4 per pixel in B, G, R, A order, tightly packed</param>
 /// <param name="width">Frame width in pixels</param>
@@ -43,57 +47,44 @@ float MeanLuminance (std::span<const float> rgba, UINT width, UINT height) noexc
 
 
 /// <summary>
-/// The brightest pixel in the frame, in linear luminance -- the centre a halo
-/// measurement should be taken around, since it is where the light source
-/// actually landed rather than where the caller expected it.
-/// </summary>
-/// <param name="bgra">Frame bytes, 4 per pixel in B, G, R, A order, tightly packed</param>
-/// <param name="width">Frame width in pixels</param>
-/// <param name="height">Frame height in pixels</param>
-/// <param name="pOutLuminance">Optional out parameter receiving that pixel's linear luminance</param>
-/// <returns>Coordinates of the brightest pixel, or { 0, 0 } when the frame is unusable</returns>
-POINT BrightestPixel (std::span<const uint8_t> bgra, UINT width, UINT height, float * pOutLuminance = nullptr) noexcept;
-
-
-/// <summary>
-/// The brightest pixel of a frame that is already in linear light.
-/// </summary>
-/// <param name="rgba">Frame samples, 4 floats per pixel in R, G, B, A order, tightly packed</param>
-/// <param name="width">Frame width in pixels</param>
-/// <param name="height">Frame height in pixels</param>
-/// <param name="pOutLuminance">Optional out parameter receiving that pixel's linear luminance</param>
-/// <returns>Coordinates of the brightest pixel, or { 0, 0 } when the frame is unusable</returns>
-POINT BrightestPixel (std::span<const float> rgba, UINT width, UINT height, float * pOutLuminance = nullptr) noexcept;
-
-
-
-
-
-/// <summary>
-/// Distance from center, in pixels, at which the glow around it has fallen to
-/// half of its peak linear luminance -- the half-maximum radius, the standard
-/// way to state the width of a falloff that never truly ends.
+/// How far two renderings of the same scene have drifted apart.
 ///
-/// Luminance is averaged over thin rings around the center before the crossing
-/// is found, so an asymmetric or slightly noisy halo still yields a stable
-/// radius, and the crossing itself is interpolated between rings so the result
-/// is not quantised to whole pixels.
+/// Differences are stated in 8-bit code values on the 0..255 scale, NOT in
+/// linear light, because the question this answers is "would anyone see it".
+/// The frame being compared is the one the display receives, and the sRGB
+/// curve exists precisely so that a step of one code value is about equally
+/// visible in shadow and in highlight. A difference of 1 or 2 is invisible; 20
+/// is obvious. In linear light the same judgement would need a different
+/// threshold for every brightness level.
 /// </summary>
-/// <param name="bgra">Frame bytes, 4 per pixel in B, G, R, A order, tightly packed</param>
-/// <param name="width">Frame width in pixels</param>
-/// <param name="height">Frame height in pixels</param>
-/// <param name="center">Pixel the halo is centred on, in frame coordinates</param>
-/// <returns>Half-maximum radius in pixels, or 0 when the frame is unusable or never falls to half</returns>
-float HaloFalloffRadius (std::span<const uint8_t> bgra, UINT width, UINT height, POINT center) noexcept;
+struct FrameDifference
+{
+    float  m_maxDifference       = 0.0f;   // Largest single-channel difference anywhere
+    float  m_meanDifference      = 0.0f;   // Mean per-pixel difference over the whole frame
+    float  m_p99Difference       = 0.0f;   // 99th percentile, so a handful of outliers cannot hide
+    size_t m_pixelsOverThreshold = 0;      // Pixels whose difference exceeded the caller's threshold
+    POINT  m_maxDifferenceAt     = { 0, 0 };  // Where the largest difference is, for going and looking
+};
+
+
+
 
 
 /// <summary>
-/// Half-maximum radius of the glow around center, for a frame that is already
-/// in linear light. See the 8-bit overload for what the radius means.
+/// Compares a candidate frame against a baseline frame of the same scene.
+///
+/// Each pixel's difference is the largest absolute difference across its blue,
+/// green and red channels, so a change of hue counts even when overall
+/// brightness holds steady. Alpha is ignored: it is not displayed.
 /// </summary>
-/// <param name="rgba">Frame samples, 4 floats per pixel in R, G, B, A order, tightly packed</param>
+/// <param name="baseline">Baseline frame, 4 bytes per pixel in B, G, R, A order</param>
+/// <param name="candidate">Candidate frame, same size and layout</param>
 /// <param name="width">Frame width in pixels</param>
 /// <param name="height">Frame height in pixels</param>
-/// <param name="center">Pixel the halo is centred on, in frame coordinates</param>
-/// <returns>Half-maximum radius in pixels, or 0 when the frame is unusable or never falls to half</returns>
-float HaloFalloffRadius (std::span<const float> rgba, UINT width, UINT height, POINT center) noexcept;
+/// <param name="threshold">Difference, in code values, above which a pixel is counted as changed</param>
+/// <returns>The difference summary, all zeroes when either buffer is empty or too short</returns>
+FrameDifference CompareFrames (std::span<const uint8_t> baseline,
+                               std::span<const uint8_t> candidate,
+                               UINT                     width,
+                               UINT                     height,
+                               float                    threshold) noexcept;
