@@ -2,6 +2,55 @@
 
 All notable changes to MatrixRain are documented in this file.
 
+## [1.6.0] - 2026-09-21
+
+### Changed
+
+- **Versioning switched to MAJOR.MINOR.PATCH.** Version numbers are now
+  bumped by hand when a release is cut, replacing the auto-incrementing
+  build counter. This release is 1.6.0 rather than 1.5.1 so it sorts
+  above 1.5.2161 and is offered as an update.
+
+### Fixed
+
+- **Scanline density now matches on every monitor.** The Style slider
+  used to set a fixed number of scanlines across the whole screen
+  height, while the rain glyphs are a fixed size. Monitors of different
+  heights therefore showed different scanlines per character: a
+  portrait 3840-pixel-tall panel got barely half as many as a
+  2160-pixel landscape one at the same setting. Style now sets the
+  number of scanlines per character cell, and that ratio is the same on
+  every monitor regardless of size, rotation, or Windows display
+  scaling.
+- **Upper half of the Style slider was unusably coarse.** At high Style
+  values the old mapping dropped to one or two scanlines per glyph,
+  reading as a venetian blind rather than a CRT raster. Style now runs
+  from about 10 scanlines per character cell (Style 1) down to 6
+  (Style 100).
+- **Scanlines aliased into a moire pattern at dense settings.** On
+  1080p and 1440p panels much of the lower half of the Style range fell
+  below two pixels per scanline and resolved into a crawling beat
+  pattern. The scanline shader now area-averages each pixel, so dense
+  settings fade smoothly instead of shimmering.
+- **Scanline sliders didn't respond to Enable scanlines.** Toggling the
+  checkbox on the Performance tab left the Intensity and Style sliders
+  on the Visuals tab in their old state until the settings dialog was
+  reopened. They now enable and disable immediately, including after
+  Reset to defaults.
+- The Scanline Intensity tooltip claimed 0% disables the effect, but the
+  slider's minimum is 1%. It now points at **Enable scanlines** on the
+  Performance tab, which turns the effect off entirely.
+
+### Upgrade migration note
+
+**Your saved Scanline Style value will look different after
+upgrading.** The slider now controls scanlines per character instead of
+scanlines per screen height, so the same number maps to a different
+density. The change is largest on tall or high-resolution monitors,
+which previously rendered far coarser scanlines than smaller ones. If
+the new look isn't to your taste, readjust **Scanline style** on the
+Visuals tab.
+
 ## [1.5.2161] - 2026-06-06
 
 ### Added
@@ -92,7 +141,7 @@ All notable changes to MatrixRain are documented in this file.
 **Visible change on first launch after upgrading from v1.4:** existing
 installs will see scanlines render immediately on the first v1.5 launch,
 because `ScanlinesEnabled` defaults to ON. If you'd prefer the v1.4
-look, open **Visuals → Scanlines** and uncheck **Scanlines Enabled**.
+look, open the **Performance** tab and uncheck **Enable scanlines**.
 The setting persists across runs. All other v1.4 settings (density,
 color scheme, glow intensity, multi-monitor, GPU adapter, quality
 preset, advanced sliders) round-trip unchanged on upgrade.
