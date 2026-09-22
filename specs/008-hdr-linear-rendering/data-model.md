@@ -21,6 +21,7 @@ Per-monitor facts read from the OS, refreshed at 1 Hz and on display changes.
 | Field | Type | Source | Validation |
 |---|---|---|---|
 | `hdrEnabled` | `bool` | DXGI output color space is PQ/BT.2020 | — |
+| `scRgbSupported` | `bool` | swap chain reports present support for scRGB (`RGB_FULL_G10_NONE_P709`) | Checked separately from `hdrEnabled`; both feed `SelectOutputMode` |
 | `sdrWhiteNits` | `float` | DisplayConfig SDR white level (`/1000 * 80`) | Clamp to [80, 480]; default 80 when unavailable |
 | `reportedPeakNits` | `float` | `DXGI_OUTPUT_DESC1::MaxLuminance` | May be 0 or implausible |
 | `deviceName` | `std::wstring` | `DXGI_OUTPUT_DESC1::DeviceName` | Used to pair DXGI and DisplayConfig |
@@ -48,9 +49,11 @@ Cancel rollback and Reset to defaults (FR-023).
 Phase 1 and Phase 2 builds may carry these fields with no UI. They have no
 effect until Phase 3.
 
-## 4. `OutputTransformParams` (per monitor, per frame)
+## 4. `OutputTransformCb` (per monitor, per pass)
 
-The CPU mirror of the output constant buffer consumed by the final pass. See
+The CPU mirror of the output constant buffer (`b1`) read by every pass that
+can be the last one. It is uploaded once per frame, and again whenever
+`isFinalPass` changes between passes. See
 [contracts/output-transform.md](contracts/output-transform.md).
 
 | Field | Type | SDR | HDR, Phase 2 | HDR, Phase 3 |
@@ -58,7 +61,7 @@ The CPU mirror of the output constant buffer consumed by the final pass. See
 | `mode` | `uint` | 0 (sRGB encode) | 1 (scRGB) | 1 |
 | `sdrWhiteScale` | `float` | unused | `sdrWhiteNits / 80` | same |
 | `headroom` | `float` | 1 | 1 (clamp at white) | `DisplayLuminance.headroom` |
-| (padding) | | | | |
+| `isFinalPass` | `uint` | 1 when this pass writes the back buffer; 0 when it writes an intermediate (e.g. the composite ahead of scanlines) | same | same |
 
 `highlightGain` is **not** here: it is applied per instance to streak heads on
 the CPU (research R8), so it can be tested without the GPU and doesn't touch
@@ -102,5 +105,5 @@ never receive it.
 - **Transition action**: in-place reconfiguration (release views → resize
   buffers with the new format → set color space → recreate views and D2D
   bitmap). On failure, fall back to `Sdr` and log once (FR-015).
-- **Invariant**: `OutputTransformParams.mode` always matches the back buffer
+- **Invariant**: `OutputTransformCb.mode` always matches the back buffer
   format actually in use.

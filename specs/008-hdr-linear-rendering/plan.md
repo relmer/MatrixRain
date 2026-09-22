@@ -28,7 +28,7 @@ independently (R13).
 
 **Storage**: Registry, the existing screensaver settings key (two new DWORD values, Phase 3)
 
-**Testing**: Microsoft C++ Native Unit Test Framework (`MatrixRainTests`) for pure logic; a WARP-device calibration harness (developer tool) for Phase 1 look-matching; manual validation on HDR hardware per [quickstart.md](quickstart.md)
+**Testing**: Microsoft C++ Native Unit Test Framework (`MatrixRainTests`) for pure logic; a WARP-device calibration and benchmark harness (developer tool) for Phase 1 look-matching and per-phase performance; manual validation on HDR hardware per [quickstart.md](quickstart.md)
 
 **Target Platform**: Windows 11, feature level 11.0+ GPUs (x64 and ARM64 builds, as today)
 
@@ -38,7 +38,7 @@ independently (R13).
 
 **Constraints**: One `RenderSystem` and render thread per monitor; mixed HDR/SDR monitors; the screensaver preview window stays SDR; device-lost recovery must restore the output mode; no new full-screen passes (the transform folds into the existing last pass).
 
-**Scale/Scope**: ~4 new core modules (color math, output mode selection, display luminance provider and fake, output transform constants), changes to `RenderSystem` (formats, shaders, swap-chain reconfiguration, D2D target), a small `MonitorRenderContext` polling hook, and, in Phase 3, the settings chain plus two dialog controls.
+**Scale/Scope**: ~7 new core modules (random source, frame metrics, color math, output mode selection and tracker, display luminance provider and fake), changes to `RenderSystem` (formats, shaders, swap-chain reconfiguration, D2D target), a small `MonitorRenderContext` polling hook, and, in Phase 3, the settings chain plus two dialog controls.
 
 ## Constitution Check
 
@@ -47,14 +47,14 @@ independently (R13).
 | Principle | Status | How this plan complies |
 |---|---|---|
 | I. TDD (non-negotiable) | ✅ | Every pure function in [contracts/color-math.md](contracts/color-math.md) and the mode-selection table is written test-first. The display provider is a seam (`IDisplayLuminanceProvider` + `InMemory…` fake), so mode transitions are testable without hardware. GPU output is verified via the calibration harness and quickstart, as for all rendering today. |
-| II. Performance-first | ✅ | Format choices are justified by bandwidth (R2: `R11G11B10` for the bloom chain). No new full-screen pass (R4). Detection is rate-limited (R5, R6). Before/after FPS per quality preset is a release gate (SC-006). |
-| III. C++23 / Windows native | ✅ | Windows SDK APIs only; `<dxgi1_6.h>` is already in `pch.h`. |
-| IV. Modular architecture | ✅ | Color math, mode selection and luminance querying are separate modules with one-way dependencies into `RenderSystem`. |
+| II. Performance-first | ✅ | Format choices are justified by bandwidth (R2: `R11G11B10` for the bloom chain). No new full-screen pass (R4). Detection is rate-limited (R5, R6). **Benchmark tests**: the calibration harness's benchmark mode times frames per quality preset (WARP for repeatability, hardware for real numbers). It is recorded before any change and re-run after each phase against a 5% threshold (SC-006). |
+| III. C++23 / Windows native | ✅ | Windows SDK APIs only; `<dxgi1_6.h>` is already in `pch.h`. x64 and ARM64 per constitution 1.2.0. |
+| IV. Modular architecture | ✅ | Color math, mode selection and luminance querying are separate modules with one-way dependencies into `RenderSystem`. Every public declaration in the new headers gets a doc comment (tasks.md conventions; also Development Standards, Documentation). |
 | V. Type safety | ✅ | `enum class OutputMode`, `enum class HdrMode`; `static_assert` on the new constant buffer layout; `noexcept` pure functions. |
-| VI. Library-first | ✅ | All code in `MatrixRainCore`; the dialog changes live in `MatrixRain/ConfigDialog.cpp` alongside the existing controls, as today. |
+| VI. Library-first | ✅ | All code in `MatrixRainCore`; the dialog changes live in `MatrixRain/ConfigDialog.cpp` alongside the existing controls, as today. The calibration tool's logic (`FrameMetrics`, `RandomSource`) is in the core library and unit-tested; its `main` only wires them up. |
 | VII. PCH | ✅ | No new system headers needed. |
 | VIII. Formatting | ✅ | Follows `.github/copilot-instructions.md` (5/3 blank lines, column alignment, 80-column headers). |
-| IX. Commit discipline | ✅ | One task, one commit, each building and passing tests. |
+| IX. Commit discipline | ✅ | One task, one commit, each building and passing tests. Test-first tasks write the failing test *and* the implementation, and commit once green (Red→Green inside the task), so no commit leaves a failing or non-compiling test. |
 
 **Post-design re-check**: ✅ No violations. The design adds a seam and pure
 modules and changes no architecture boundaries. Complexity Tracking is empty.
@@ -82,13 +82,17 @@ specs/008-hdr-linear-rendering/
 
 ```text
 MatrixRainCore/
+├── RandomSource.h / .cpp                    # NEW  one seedable engine per thread (calibration determinism)
+├── FrameMetrics.h / .cpp                    # NEW  mean luminance, halo falloff radius (calibration)
 ├── ColorMath.h / .cpp                       # NEW  sRGB transfer, instance color, luminance, tone map, highlight gain
 ├── OutputModeSelection.h / .cpp             # NEW  SelectOutputMode, OutputMode, HdrMode
+├── OutputModeTracker.h / .cpp               # NEW  per-monitor mode state machine
 ├── IDisplayLuminanceProvider.h              # NEW  seam
 ├── WindowsDisplayLuminanceProvider.h / .cpp # NEW  DXGI + DisplayConfig
 ├── InMemoryDisplayLuminanceProvider.h       # NEW  test fake
 ├── RenderSystem.h / .cpp                    # CHANGED  formats, shaders, output cbuffer (b1), swap-chain reconfigure, D2D target format
-├── MonitorRenderContext.cpp                 # CHANGED  1 Hz luminance poll, mode re-selection hook
+├── MonitorRenderContext.h / .cpp            # CHANGED  ScreenSaverMode input, 1 Hz luminance poll, mode re-selection hook
+├── AnimationSystem.h, CharacterStreak.h, CharacterSet.cpp  # CHANGED  use RandomSource
 ├── RenderParams.h                           # CHANGED  (P3) hdrMode, highlightBrightness
 ├── ScreenSaverSettings.h                    # CHANGED  (P3) HdrMode, HighlightBrightness
 ├── RegistrySettingsProvider.cpp             # CHANGED  (P3) two DWORD values
@@ -100,6 +104,8 @@ MatrixRain/
 ├── ConfigDialog.cpp, MatrixRain.rc, resource.h  # CHANGED  (P3) HDR group on Visuals tab
 
 MatrixRainTests/unit/
+├── RandomSourceTests.cpp                    # NEW
+├── FrameMetricsTests.cpp                    # NEW
 ├── ColorMathTests.cpp                       # NEW
 ├── OutputModeSelectionTests.cpp             # NEW
 ├── DisplayLuminanceTests.cpp                # NEW  (derived values, provider fake transitions)
@@ -107,7 +113,7 @@ MatrixRainTests/unit/
 └── RegistrySettingsProviderTests.cpp,
     ConfigDialogControllerTests.cpp          # CHANGED  (P3) new settings round-trip, Cancel, Reset
 
-tools/HdrCalibration/                        # NEW (developer tool, not shipped)  WARP reference-frame metrics (R3)
+tools/HdrCalibration/                        # NEW (developer tool, not shipped)  thin main: reference-frame metrics + benchmark mode (R3)
 ```
 
 **Structure Decision**: Existing three-project layout (core `.lib`, thin

@@ -88,11 +88,24 @@ v1.6 constants exist to compensate for gamma-space math, so keeping them
 unchanged would break FR-005.
 
 **Calibration method**: A deterministic reference frame (fixed seed, fixed
-time, default settings) rendered on the WARP device by a small calibration
-harness, reporting mean luminance and the 50%-falloff radius of an isolated
-head's halo for v1.6 and for the new pipeline. The harness is a developer
-tool, not a CI gate. The existing `IRenderSystem` seam and WARP availability
-make it cheap.
+time) rendered on the WARP device by a small calibration harness, reporting
+mean luminance and the 50%-falloff radius of an isolated head's halo.
+- **Determinism** needs a seam: randomness comes from three independent
+  generators seeded by `std::random_device` (`AnimationSystem::m_generator`,
+  `CharacterStreak::s_generator`, `CharacterSet`'s `s_gen`). A new
+  `RandomSource` module gives one engine per thread that can be reseeded, and
+  all three use it.
+- **Reference capture**: v1.6 has neither the seam nor the harness, so the
+  reference frame is captured on this branch once both land and *before* any
+  pipeline change. At that point rendering is still byte-identical to v1.6.
+- **Metrics** (mean luminance, halo falloff radius) live in a unit-tested core
+  module, `FrameMetrics`. The tool's `main` only wires things together.
+- **Settings coverage**: the reference set covers defaults plus several
+  non-default glow, scanline and color settings (FR-006).
+- **Benchmark mode** (Constitution II): the same harness times N frames per
+  quality preset and reports ms/frame. It runs on WARP for repeatability and
+  on the hardware adapter for real numbers, and results are recorded against
+  a threshold before and after each phase.
 
 **Alternatives considered**: Tuning by eye only (not repeatable). Keeping
 screen-blend composite in linear (still clips; fights Phase 3).
@@ -125,11 +138,12 @@ full-resolution read and write).
 **Decision**: Each `RenderSystem` asks its swap chain for its containing
 output (`IDXGISwapChain::GetContainingOutput`), queries `IDXGIOutput6::GetDesc1`,
 and treats the monitor as HDR when `ColorSpace ==
-DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020`. It records `MaxLuminance`,
-`MaxFullFrameLuminance` and `DeviceName`. It also confirms
+DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020`. It records `MaxLuminance` and
+`DeviceName`. `MaxFullFrameLuminance` is not needed: highlights are small
+features, so the peak (not full-frame) rating is the right ceiling. It also confirms
 `IDXGISwapChain3::CheckColorSpaceSupport(RGB_FULL_G10_NONE_P709)` reports
-present support before choosing HDR, and falls back to SDR on any failure
-(FR-015).
+present support, reported separately as `scRgbSupported`, and falls back to
+SDR on any failure (FR-015).
 
 **Re-detection**: Detection re-runs when the DXGI factory reports it is stale
 (`IDXGIFactory1::IsCurrent() == false`), after `WM_DISPLAYCHANGE` /

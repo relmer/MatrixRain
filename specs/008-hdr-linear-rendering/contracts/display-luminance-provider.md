@@ -18,8 +18,9 @@ public:
     virtual ~IDisplayLuminanceProvider() = default;
 
     // Snapshot for the output that currently contains the swap chain's window.
-    // Never throws; on any failure returns hdrEnabled = false and
-    // sdrWhiteNits = 80 so the caller falls back to SDR (FR-015).
+    // Never throws; on any failure returns hdrEnabled = false,
+    // scRgbSupported = false and sdrWhiteNits = 80 so the caller falls back
+    // to SDR (FR-015).
     virtual DisplayLuminance Query (IDXGISwapChain1 * pSwapChain) noexcept = 0;
 
     // True when the cached DXGI factory no longer reflects the display
@@ -35,9 +36,11 @@ public:
 - DXGI↔DisplayConfig pairing uses `DXGI_OUTPUT_DESC1::DeviceName` against the
   DisplayConfig source GDI device name. If no match is found, `sdrWhiteNits`
   is 80.
-- `hdrEnabled` is true only when the output color space is
-  `RGB_FULL_G2084_NONE_P2020` **and** the swap chain reports present support
-  for `RGB_FULL_G10_NONE_P709`.
+- `hdrEnabled` is true when the output color space is
+  `RGB_FULL_G2084_NONE_P2020` (Windows HDR is on for that monitor).
+- `scRgbSupported` is true when the swap chain reports present support for
+  `RGB_FULL_G10_NONE_P709`. The two are reported separately, and
+  `SelectOutputMode` combines them (see [color-math.md](color-math.md)).
 
 ## Fake for tests
 

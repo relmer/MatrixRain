@@ -6,7 +6,7 @@
 
 **Status**: Draft
 
-**Last Updated**: 2026-09-21 (planning: "glyph compositing" replaces "additive glyph stacking", since glyphs are alpha-composited; FR-011, US2 scenario 3 and SC-004 aligned with the existing all-monitor rebuild on display-topology changes; SC-005 conditioned on SDR brightness, since headroom depends on it)
+**Last Updated**: 2026-09-21 (planning: "glyph compositing" replaces "additive glyph stacking", since glyphs are alpha-composited; FR-011, US2 scenario 3 and SC-004 aligned with the existing all-monitor rebuild on display-topology changes; SC-005 conditioned on SDR brightness, since headroom depends on it; analysis: FR-013 wording, SC-003 scoped to Phase 2 / HDR mode Off, key entity renamed to match the data model)
 
 **Base Branch**: `master` (v1.6.0)
 
@@ -107,7 +107,7 @@ A user with an HDR monitor wants the rain to look like it is made of light. The 
 - **FR-010**: The system MUST support monitors in different modes at the same time (mixed HDR and SDR setups).
 - **FR-011**: When a monitor's HDR state, the set of connected monitors, or a monitor's resolution changes while running, the system MUST reconfigure the affected monitor(s) within 2 seconds without restarting. Where the change is detected per monitor, other monitors MUST NOT be disturbed; where Windows reports it as a display-topology change, other monitors MAY briefly re-initialize, as they do for any display change today.
 - **FR-012**: On HDR monitors, content at SDR white MUST be displayed at the SDR content brightness the user has set for that display in Windows, and MUST follow changes to that setting while running.
-- **FR-013**: In this phase, no rendered content MUST exceed SDR white on any monitor.
+- **FR-013**: In this phase, rendered content MUST NOT exceed SDR white on any monitor.
 - **FR-014**: The help, hotkey reference, usage and statistics overlays MUST render correctly on HDR monitors: sharp, correctly colored, and at the same apparent brightness as on SDR monitors.
 - **FR-015**: Where HDR presentation is unavailable or fails to initialize (display, driver, remote session or insufficient hardware capability), the system MUST fall back silently to the Phase 1 SDR output for that monitor.
 - **FR-016**: Recovery from a lost or reset graphics device MUST restore each monitor to the output mode it was in before the loss.
@@ -133,7 +133,7 @@ A user with an HDR monitor wants the rain to look like it is made of light. The 
 ### Key Entities
 
 - **Display output mode**: Per monitor, whether it is presented as SDR or HDR, derived from Windows' HDR state for that monitor and the user's HDR mode setting.
-- **Display luminance profile**: Per monitor, the user's SDR white level and the display's reported peak brightness, which together define where normal content sits and how much headroom highlights have.
+- **Display luminance** (`DisplayLuminance`): Per monitor, the user's SDR white level and the display's reported peak brightness, which together define where normal content sits and how much headroom highlights have.
 - **HDR settings**: The persisted, user-facing HDR mode (Auto / Off) and highlight brightness, stored and rolled back with the other screensaver settings.
 
 ## Success Criteria *(mandatory)*
@@ -142,7 +142,7 @@ A user with an HDR monitor wants the rain to look like it is made of light. The 
 
 - **SC-001**: At default settings on an SDR monitor, viewers comparing v1.6 and this build side by side cannot reliably tell which is which except by looking for gradient smoothness and bright overlaps.
 - **SC-002**: Fading tails on a black background show zero visible banding steps at normal and close viewing distances, on both SDR and HDR monitors.
-- **SC-003**: On an HDR monitor with HDR mode Off, the rain's measured brightness at SDR white is within 5% of the display's configured SDR content brightness.
+- **SC-003**: On an HDR monitor, with no content above SDR white (Phase 2, or HDR mode Off in Phase 3), the rain's measured brightness at SDR white is within 5% of the display's configured SDR content brightness.
 - **SC-004**: Toggling Windows HDR for a monitor while running results in correct output on that monitor within 2 seconds, in 10 out of 10 attempts, with no crash or freeze on any monitor.
 - **SC-005**: With HDR mode Auto on a display capable of at least 600 nits peak and an SDR content brightness of at most 250 nits, streak heads measure at least 2x the SDR white level at the default highlight brightness.
 - **SC-006**: No monitor, SDR or HDR, drops more than 5% below the frame rate v1.6 achieved at the same quality preset on the same hardware.
