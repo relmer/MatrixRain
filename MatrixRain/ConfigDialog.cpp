@@ -655,26 +655,35 @@ static void ApplyGlowEnabledUI (HWND hSheet, bool enabled)
 //
 //  ApplyScanlinesEnabledUI (T054, FR-028b) — mirror the Scanlines Enabled
 //  checkbox state into EnableWindow on the two scanline sliders + their
-//  labels + info buttons on the Visuals page.  Same shape as the glow
-//  helper above, scoped to one tab.
+//  labels + info buttons on the Visuals page.
+//
+//  Takes the SHEET, like ApplyGlowEnabledUI, because the checkbox lives on
+//  the Performance page while the sliders live on the Visuals page.  Passing
+//  the checkbox's own page made every GetDlgItem below return null, so the
+//  sliders only updated when the Visuals page next re-initialised.
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-static void ApplyScanlinesEnabledUI (HWND hPage, bool enabled)
+static void ApplyScanlinesEnabledUI (HWND hSheet, bool enabled)
 {
-    if (!hPage)
+    if (!hSheet)
     {
         return;
     }
 
 
-    auto enableIfPresent = [hPage, enabled] (int id)
-    {
-        HWND hCtrl = GetDlgItem (hPage, id);
+    HWND hVisuals = PropSheet_IndexToHwnd (hSheet, 0);
 
-        if (hCtrl)
+    auto enableIfPresent = [hVisuals, enabled] (int id)
+    {
+        if (hVisuals)
         {
-            EnableWindow (hCtrl, enabled);
+            HWND hCtrl = GetDlgItem (hVisuals, id);
+
+            if (hCtrl)
+            {
+                EnableWindow (hCtrl, enabled);
+            }
         }
     };
 
@@ -1159,7 +1168,7 @@ static BOOL OnInitDialog (HWND hDlg, LPARAM initParam)
                          pSettings->m_scanlinesEnabled ? BST_CHECKED : BST_UNCHECKED);
 
     // Mirror initial scanlines-enabled state into the slider/info enable flags.
-    ApplyScanlinesEnabledUI (hDlg, pSettings->m_scanlinesEnabled);
+    ApplyScanlinesEnabledUI (GetParent (hDlg), pSettings->m_scanlinesEnabled);
 
     // Start the colour swatch cycle timer if the initial scheme is Cycle
     // (no-op on Performance page, which has no swatch control).
@@ -1799,7 +1808,7 @@ static void ResyncPageFromSettings (HWND hDlg, const ScreenSaverSettings & setti
 
     if (GetDlgItem (hDlg, IDC_SCANLINES_ENABLED_CHECK))
     {
-        ApplyScanlinesEnabledUI (hDlg, settings.m_scanlinesEnabled);
+        ApplyScanlinesEnabledUI (GetParent (hDlg), settings.m_scanlinesEnabled);
     }
 
     // Performance tab — multimon, glow toggle, GPU combo, quality cluster,
@@ -1926,16 +1935,18 @@ static BOOL OnCommand (HWND hDlg, WPARAM wParam)
         {
             // T054 (US3, FR-028b): toggle Scanlines Enabled, mirror into
             // controller, and grey/enable the two scanline sliders + their
-            // info buttons on the same (Visuals) page.
+            // info buttons.  The checkbox is on the Performance page but the
+            // sliders are on the Visuals page, so go through the sheet.
             bool                     enabled = (IsDlgButtonChecked (hDlg, IDC_SCANLINES_ENABLED_CHECK) == BST_CHECKED);
             ConfigDialogController * pCtrl   = GetControllerFromDialog (hDlg);
+            HWND                     hSheet  = GetParent (hDlg);
 
             if (pCtrl)
             {
                 pCtrl->UpdateScanlinesEnabled (enabled);
             }
 
-            ApplyScanlinesEnabledUI (hDlg, enabled);
+            ApplyScanlinesEnabledUI (hSheet, enabled);
             break;
         }
     }
