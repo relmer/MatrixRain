@@ -1073,8 +1073,8 @@ git diff       # Bad - will paginate
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan at
-`specs/007-dialog-tabs-scanlines-glowtoggle/plan.md` and its supporting
+`specs/008-hdr-linear-rendering/plan.md` and its supporting
 research, data model, contracts
-(`specs/007-dialog-tabs-scanlines-glowtoggle/contracts/`), and quickstart
+(`specs/008-hdr-linear-rendering/contracts/`), and quickstart
 documents.
 <!-- SPECKIT END -->

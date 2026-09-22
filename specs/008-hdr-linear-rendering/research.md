@@ -1,0 +1,264 @@
+# Research: HDR Output and Linear-Light Rendering
+
+**Feature**: [spec.md](spec.md) | **Plan**: [plan.md](plan.md) | **Date**: 2026-09-21
+
+Each entry records the decision, why, and what else was considered. File and
+line references are to `master` at v1.6.0 (`cf9bc0c`).
+
+## Current pipeline (baseline)
+
+Read from `MatrixRainCore/RenderSystem.cpp`:
+
+| Stage | Target | Format | Notes |
+|---|---|---|---|
+| Glyphs (instanced) | `m_sceneTexture` | `R8G8B8A8_UNORM` | Blend `SRC_ALPHA / INV_SRC_ALPHA` ("over"), not additive. Pixel shader multiplies `color * atlas * brightness`, then adds a hard-coded `+30% * brightness`. |
+| Help / hotkey / usage overlays | `m_sceneTexture` | same | D3D instanced from a D2D-built `B8G8R8A8` atlas, premultiplied blend, drawn before bloom so they glow. |
+| Bloom extract | `m_bloomTexture` (÷ divisor) | `R8G8B8A8_UNORM` | `smoothstep(0.1, 0.6, max(luma, maxChannel))` on gamma-encoded values. |
+| Blur H/V × passes | `m_blurTemp` ↔ `m_bloom` | `R8G8B8A8_UNORM` | 5/9/13-tap by quality. |
+| Composite | back buffer, or `m_postBloom` when scanlines on | back buffer `B8G8R8A8_UNORM` | `scene + (1 - exp(-bloom*k)) * (1 - scene)`: a screen blend that assumes a [0,1] display-referred range. |
+| Scanlines | back buffer | `B8G8R8A8_UNORM` | Multiplies `darken` into gamma-encoded color. |
+| Statistics (FPS) | back buffer | `B8G8R8A8_UNORM` | Direct2D draws straight onto the swap-chain buffer (`m_d2dBitmap`). The only D2D-on-back-buffer path. |
+
+Swap chain: `FLIP_DISCARD`, 2 buffers, `B8G8R8A8_UNORM`, no `SetColorSpace1`.
+Devices: feature level 11.0 minimum (line 425). Streak heads are recognized by
+being white (`BuildCharacterInstanceData`, `isWhite`).
+
+**Correction to the spec's framing**: glyphs are alpha-composited, not added.
+What is *additive* today is only the bloom composite. The spec wording has been
+adjusted to "glyph compositing".
+
+## R1. Working color space and where gamma is removed
+
+**Decision**: Render in linear light, Rec.709 primaries. Convert each
+instance's final display color to linear **on the CPU, per instance**, after
+applying brightness and the head/trail color choice:
+`linearColor = SrgbToLinear(color_srgb * brightness * (1 + 0.3 * brightness))`.
+The glyph pixel shader then only multiplies by atlas coverage.
+
+**Rationale**: FR-005 requires the look at defaults to be preserved. The fade
+curve (`brightness`) and the `+30%` boost were tuned perceptually in gamma
+space. Converting the *product* keeps every fully covered glyph pixel at
+the same brightness as v1.6 on SDR, before glow is added. Only antialiased edges,
+overlaps and glow change, which are exactly the intended correctness fixes.
+It is also cheaper than a per-pixel `pow`.
+
+**Alternatives considered**:
+- *Convert only the base color and keep `brightness` as a linear multiplier*:
+  physically purer, but tails would fade visibly faster and darker (a 50%
+  gamma-space brightness is ~21% linear), which violates FR-005.
+- *`_SRGB` atlas/texture views for automatic decode*: the atlas holds
+  coverage, not color, so decoding it would thin every glyph.
+
+## R2. Intermediate formats and bandwidth
+
+**Decision**:
+- `m_sceneTexture`: `R16G16B16A16_FLOAT` (full resolution; holds fades on black
+  where precision matters most).
+- `m_bloomTexture`, `m_blurTemp`: `R11G11B10_FLOAT` (blurred content hides the
+  reduced mantissa; half the bytes of FP16; no alpha needed).
+- `m_postBloomTarget`: `R16G16B16A16_FLOAT` (feeds the final output pass).
+
+**Rationale**: FR-003 needs float precision so dark fades don't band and
+bright overlaps don't clip. FL 11.0 guarantees render-target and blend support
+for both formats. Using `R11G11B10` for the bloom chain limits the extra
+bandwidth to the two full-resolution targets. SC-006 / FR-008 require
+performance parity, verified with the existing Performance-tab readout.
+
+**Alternatives considered**: FP16 everywhere (simplest, ~2× bloom-chain
+bandwidth). `R10G10B10A2_UNORM` (not float, still clips above 1.0, useless for
+Phase 3).
+
+## R3. Bloom in linear light
+
+**Decision**: Rework the extract and composite for linear input:
+- Extract: same `max(luma, maxChannel)` metric and smoothstep, with thresholds
+  converted to linear (`0.1 → ~0.010`, `0.6 → ~0.318`) as the starting point.
+- Composite: additive, `out = scene + bloomIntensity * bloom`, with the
+  soft-saturation ceiling applied to the bloom term in linear light. The
+  `(1 - scene)` screen factor is dropped: it only existed to stop gamma-space
+  sums passing 1.0, which float targets and the output transform (R4, R8) now
+  handle.
+- **Calibration**: tune the extract thresholds, the soft-saturation constant
+  and the default `bloomIntensity` so that at default settings the mean
+  luminance and glow radius of a fixed reference frame match v1.6 within a
+  small tolerance (SC-001).
+
+**Rationale**: Additive linear bloom is how glow physically combines. The
+v1.6 constants exist to compensate for gamma-space math, so keeping them
+unchanged would break FR-005.
+
+**Calibration method**: A deterministic reference frame (fixed seed, fixed
+time, default settings) rendered on the WARP device by a small calibration
+harness, reporting mean luminance and the 50%-falloff radius of an isolated
+head's halo for v1.6 and for the new pipeline. The harness is a developer
+tool, not a CI gate. The existing `IRenderSystem` seam and WARP availability
+make it cheap.
+
+**Alternatives considered**: Tuning by eye only (not repeatable). Keeping
+screen-blend composite in linear (still clips; fights Phase 3).
+
+## R4. Final output transform (one place, all modes)
+
+**Decision**: The **last full-screen pass** (the composite when scanlines are
+off, the scanline pass when on) applies a shared `OutputTransform` function
+driven by a small constant buffer:
+
+| Mode | Swap chain | Transform |
+|---|---|---|
+| SDR | `B8G8R8A8_UNORM` | `saturate` → `LinearToSrgb` |
+| HDR (Phase 2) | `R16G16B16A16_FLOAT`, scRGB | `min(x, 1) * (sdrWhiteNits / 80)` |
+| HDR (Phase 3) | same | `ToneMapHighlights(x)` then `* (sdrWhiteNits / 80)` |
+
+The encode is explicit in the shader rather than via an `_SRGB` render-target
+view, so one code path serves both modes and the math has a C++ mirror that
+unit tests can exercise (FR-027).
+
+**Rationale**: Encoding once at output is FR-004. Folding it into the existing
+last pass adds no extra full-screen pass.
+
+**Alternatives considered**: `_SRGB` RTV on the flip-model back buffer (legal,
+but splits SDR and HDR into two paths). A dedicated final pass (costs a
+full-resolution read and write).
+
+## R5. Per-monitor HDR detection
+
+**Decision**: Each `RenderSystem` asks its swap chain for its containing
+output (`IDXGISwapChain::GetContainingOutput`), queries `IDXGIOutput6::GetDesc1`,
+and treats the monitor as HDR when `ColorSpace ==
+DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020`. It records `MaxLuminance`,
+`MaxFullFrameLuminance` and `DeviceName`. It also confirms
+`IDXGISwapChain3::CheckColorSpaceSupport(RGB_FULL_G10_NONE_P709)` reports
+present support before choosing HDR, and falls back to SDR on any failure
+(FR-015).
+
+**Re-detection**: Detection re-runs when the DXGI factory reports it is stale
+(`IDXGIFactory1::IsCurrent() == false`), after `WM_DISPLAYCHANGE` /
+`WM_DPICHANGED`, and at 1 Hz as a safety net. A cached factory is recreated
+when stale, since a stale factory keeps returning old output descriptions.
+
+**Rationale**: This is Microsoft's documented method for Windows Advanced Color
+detection. The containing output tracks the monitor each per-monitor window
+actually sits on.
+
+**Alternatives considered**: `DisplayConfig` advanced-color queries alone
+(don't give peak luminance). Checking only at start-up (fails FR-011).
+
+## R6. Matching the user's SDR content brightness
+
+**Decision**: Read the per-display SDR white level with
+`DisplayConfigGetDeviceInfo(DISPLAYCONFIG_DEVICE_INFO_GET_SDR_WHITE_LEVEL)`,
+matching the DXGI output's `DeviceName` to the DisplayConfig source's GDI
+device name. `SDRWhiteLevel` is in units where 1000 = 80 nits. Poll at 1 Hz
+per monitor (FR-012 requires following the Windows slider live, and Windows
+sends no notification). The call is behind an `IDisplayLuminanceProvider`
+interface so unit tests use a fake.
+
+**Rationale**: The documented source for the SDR slider value. 1 Hz polling
+is ~1 ms/s per monitor, negligible.
+
+**Alternatives considered**: Hard-coding 80 or 200 nits (ignores the user's
+setting; fails SC-003).
+
+## R7. Swap-chain reconfiguration and FR-011
+
+**Decision**: When a monitor's detected mode changes, that monitor's
+`RenderSystem` reconfigures in place: release back-buffer views and the D2D
+bitmap, `ResizeBuffers` with the new format, `SetColorSpace1`, then recreate
+the views and D2D bitmap. This is the same shape as the existing `Resize`
+path. Other monitors are untouched.
+
+**Interaction with the existing rebuild**: `WM_DISPLAYCHANGE` already triggers
+a coalesced rebuild of *all* monitor contexts (`Application.cpp`,
+`WM_APP_REBUILD_CONTEXTS`). Whether toggling HDR raises `WM_DISPLAYCHANGE` is
+not reliably documented and must be verified on hardware. If it does, the
+existing full rebuild handles the change correctly (new swap chains re-run
+detection), at the cost of briefly re-initializing other monitors too, exactly
+as any other display change does today. **Spec FR-011 was relaxed**
+accordingly: the requirement is correct output without restart, consistent
+with how other display changes behave. It no longer promises that other
+monitors are never disturbed.
+
+## R8. Highlight headroom and tone mapping (Phase 3)
+
+**Decision**:
+- **Which content**: streak heads (already recognized as white instances) get
+  their linear color multiplied by `highlightGain`. Their glow inherits it
+  through the bloom extract. Trails, overlays and scanline gaps are unchanged
+  (FR-020).
+- **Gain**: `highlightGain = headroom ^ (highlight / 100)`, where
+  `headroom = effectivePeakNits / sdrWhiteNits` and `highlight` is the 0–100
+  setting (default 80). 0 means no boost; 100 means heads aim at the display's
+  peak. On a 600-nit peak at 240-nit white this gives ~2.1× (SC-005); at 1000
+  nits, ~3.1×.
+- **Roll-off**: identity up to SDR white, then a smooth shoulder (extended
+  Reinhard with the white point at `headroom`) above it, applied to the
+  **maximum channel**. RGB is scaled by `mapped / original` so hue is
+  preserved (FR-019).
+- **Ceiling**: `effectivePeakNits = min(MaxLuminance, …)` with a conservative
+  400-nit default when the value is missing or implausible (< 80 or
+  > 10 000 nits). When `sdrWhiteNits >= effectivePeakNits`, headroom is 1 and
+  the curve is identity (FR-026).
+
+**Rationale**: A max-channel shoulder never clips and never shifts hue. Tying
+the gain to each display's own headroom keeps trail brightness identical
+across monitors while the highlight height follows the hardware (FR-025).
+
+**Alternatives considered**: BT.2390 EETF (designed for PQ mastering; heavier,
+no benefit here). Luminance-based Reinhard (can push saturated channels past
+the peak). A fixed-nits gain (overshoots dim HDR panels).
+
+## R9. Statistics overlay on an FP16 back buffer
+
+**Decision**: Create the D2D target bitmap in the swap chain's current format:
+`B8G8R8A8_UNORM` for SDR and `R16G16B16A16_FLOAT` for HDR, both premultiplied.
+Brush colors go through the same sRGB→linear conversion and are scaled by
+`sdrWhiteNits / 80` in HDR, so the text appears at SDR brightness (FR-014).
+
+**Rationale**: D2D 1.1 supports FP16 targets on FL 10+. Drawing straight to
+the back buffer keeps today's structure.
+
+**Alternatives considered**: Render stats into an 8-bit offscreen and composite
+(extra texture and pass for a debug readout).
+
+## R10. Screensaver preview window
+
+**Decision**: The `/p` preview context never enters HDR. Output-mode selection
+takes the display mode as an input and returns SDR for `ScreenSaverPreview`
+(FR-017), in the same style as `MultiMonitorGate`.
+
+## R11. System-level SDR→HDR processing (Auto HDR)
+
+**Decision**: No action beyond declaring the scRGB color space. Windows Auto
+HDR applies only to SDR swap chains, so presenting natively in HDR removes
+MatrixRain from Auto HDR processing on that monitor. Verify on hardware that
+Auto HDR is not applied twice.
+
+## R12. Settings
+
+**Decision**: Two new persisted settings, following the v1.5 pattern
+(`ScreenSaverSettings` → `RegistrySettingsProvider` → `SharedState` →
+`RenderParams`, live via `ConfigDialogController`, Cancel/Reset aware):
+- `HdrMode`: `enum class HdrMode { Auto, Off }`, default `Auto`.
+- `HighlightBrightness`: int 0–100, default 80.
+
+Both controls go on the **Visuals** tab in an "HDR" group, with an info button
+stating they affect HDR displays only (FR-024). They are disabled when no
+monitor is currently in HDR mode.
+
+## R13. Phase boundaries in code
+
+| Phase | Ships | Gated by |
+|---|---|---|
+| 1 | R1–R4 (SDR mode only), R10 | Always on; no setting. |
+| 2 | R4 HDR mode, R5–R7, R9, R11 | Output mode = HDR when detected; transform capped at SDR white. |
+| 3 | R8, R12 | `HdrMode::Auto` + `HighlightBrightness`. |
+
+Each phase leaves the code shippable: Phase 2 simply never returns a gain
+above 1.
+
+## Resolved unknowns
+
+All Technical Context items are resolved above. Three items **must be verified
+on hardware** during implementation rather than researched further: whether an
+HDR toggle raises `WM_DISPLAYCHANGE` (R7), the Auto HDR interaction (R11), and
+the Phase 1 calibration constants (R3).
