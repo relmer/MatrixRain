@@ -2,6 +2,7 @@
 
 #include "CharacterStreak.h"
 #include "CharacterSet.h"
+#include "RandomSource.h"
 
 
 
@@ -31,7 +32,7 @@ void CharacterStreak::Spawn (const Vector3 & position)
 
     // Random length between 5 and 30
     std::uniform_int_distribution<size_t> lengthDist (MIN_LENGTH, MAX_LENGTH);
-    m_maxLength = lengthDist (s_generator);
+    m_maxLength = lengthDist (RandomSource::Engine());
 
     // Start with no characters - they'll be added as the streak "drops"
     m_characters.clear();
@@ -169,7 +170,7 @@ void CharacterStreak::Update (float deltaTime, float viewportHeight)
     for (CharacterInstance & character : m_characters)
     {
         float mutationChance = MUTATION_PROBABILITY * deltaTime;
-        if (mutationDist (s_generator) < mutationChance)
+        if (mutationDist (RandomSource::Engine()) < mutationChance)
         {
             // Mutate to a new random glyph (keep existing fade state)
             character.glyphIndex = charSet.GetRandomGlyphIndex (charSet.GetGlyphCount());
@@ -214,7 +215,7 @@ void CharacterStreak::RescalePositions (float scaleX, float scaleY)
 
     // Add small random jitter to X to break up banding patterns from scaling
     std::uniform_real_distribution<float> jitterDist (-16.0f, 16.0f);
-    m_position.x += jitterDist (s_generator);
+    m_position.x += jitterDist (RandomSource::Engine());
 
     // Recalculate character positions based on fixed spacing from the new head position
     // Characters are stored back-to-front (tail at [0], head at [size-1])

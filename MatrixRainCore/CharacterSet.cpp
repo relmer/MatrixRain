@@ -3,6 +3,7 @@
 #include "CharacterSet.h"
 #include "CharacterConstants.h"
 #include "GlyphAtlas.h"
+#include "RandomSource.h"
 
 
 
@@ -137,18 +138,13 @@ bool CharacterSet::Initialize()
 
 size_t CharacterSet::GetRandomGlyphIndex (size_t count) const
 {
-    static thread_local std::random_device s_rd;
-    static thread_local std::mt19937       s_gen (s_rd());
-
-
-
     if (count == 0)
     {
         return 0;
     }
 
     std::uniform_int_distribution<size_t> dist (0, count - 1);
-    return dist (s_gen);
+    return dist (RandomSource::Engine());
 }
 
 

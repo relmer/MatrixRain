@@ -202,10 +202,6 @@ private:
     SpawnPositionCallback          m_spawnPositionCallback;               // Optional callback for overriding spawn X position
     std::vector<OverlayCharacter>  m_overlayCharacters;                   // Extra characters rendered alongside streaks
     
-    // Random number generation
-    std::random_device             m_randomDevice;
-    std::mt19937                   m_generator            { m_randomDevice() }; // Seeded from random_device
-
     // Reusable temporary vectors for RemoveExcessStreaks (avoid per-frame heap allocations)
     std::vector<size_t>            m_activeIndices;
     std::vector<size_t>            m_inactiveIndices;

@@ -80,10 +80,6 @@ private:
     bool                           m_isInFadingPhase  { false };// True when head has reached bottom and final fade has started
     uint64_t                       m_id               { 0 };    // Unique ID for debug tracking
 
-    // Random number generator (per-thread to avoid data races between render and UI threads)
-    static inline thread_local std::random_device s_randomDevice;
-    static inline thread_local std::mt19937       s_generator { s_randomDevice() };
-
     // Map depth (Z: 0-100) to velocity scale (1.0 - 6.0)
     // Far streaks (Z=100) move 6x faster than near streaks (Z=0)
     static float GetVelocityScale (float depth);

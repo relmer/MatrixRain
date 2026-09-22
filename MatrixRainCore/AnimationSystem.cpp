@@ -2,6 +2,7 @@
 
 #include "AnimationSystem.h"
 #include "DensityController.h"
+#include "RandomSource.h"
 
 
 
@@ -152,20 +153,20 @@ void AnimationSystem::SpawnStreak()
         SpawnRange range { 0.0f, viewportWidth, -200.0f, 0.0f };
         auto       result = m_spawnPositionCallback (range);
 
-        x = result.value_or (xDist (m_generator));
+        x = result.value_or (xDist (RandomSource::Engine()));
     }
     else
     {
-        x = xDist (m_generator);
+        x = xDist (RandomSource::Engine());
     }
 
     // Random Y position above viewport (between -200 and 0)
     std::uniform_real_distribution<float> yDist (-200.0f, 0.0f);
-    float y = yDist (m_generator);
+    float y = yDist (RandomSource::Engine());
 
     // Random Z depth (0 = near, 100 = far)
     std::uniform_real_distribution<float> zDist (0.0f, MAX_DEPTH);
-    float z = zDist (m_generator);
+    float z = zDist (RandomSource::Engine());
 
     Vector3 position (x, y, z);
 
@@ -204,20 +205,20 @@ void AnimationSystem::SpawnStreakInView()
         SpawnRange range { 0.0f, viewportWidth, 0.0f, viewportHeight };
         auto       result = m_spawnPositionCallback (range);
 
-        x = result.value_or (xDist (m_generator));
+        x = result.value_or (xDist (RandomSource::Engine()));
     }
     else
     {
-        x = xDist (m_generator);
+        x = xDist (RandomSource::Engine());
     }
 
     // Random Y position WITHIN viewport (0 to height) for immediate visibility
     std::uniform_real_distribution<float> yDist (0.0f, viewportHeight);
-    float y = yDist (m_generator);
+    float y = yDist (RandomSource::Engine());
 
     // Random Z depth (0 = near, 100 = far)
     std::uniform_real_distribution<float> zDist (0.0f, MAX_DEPTH);
-    float z = zDist (m_generator);
+    float z = zDist (RandomSource::Engine());
 
     Vector3 position (x, y, z);
 

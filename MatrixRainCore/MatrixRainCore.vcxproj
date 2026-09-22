@@ -294,6 +294,7 @@
     <ClInclude Include="RenderParams.h" />
     <ClInclude Include="RenderSystem.h" />
     <ClInclude Include="RenderThreadInputs.h" />
+    <ClInclude Include="RandomSource.h" />
     <ClInclude Include="ScanlineStyleMapping.h" />
     <ClInclude Include="CommandLine.h" />
     <ClInclude Include="FileSystemProvider.h" />
@@ -333,6 +334,7 @@
     <ClCompile Include="MonitorRenderContext.cpp" />
     <ClCompile Include="MonitorLayout.cpp" />
     <ClCompile Include="RenderThreadInputs.cpp" />
+    <ClCompile Include="RandomSource.cpp" />
     <ClCompile Include="ScanlineStyleMapping.cpp" />
     <ClCompile Include="WindowsMonitorProvider.cpp" />
     <ClCompile Include="WindowsAdapterProvider.cpp" />
