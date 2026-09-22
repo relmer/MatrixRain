@@ -145,6 +145,52 @@ static float MeanLuminanceImpl (std::span<const TSample> samples, UINT width, UI
 
 ////////////////////////////////////////////////////////////////////////////////
 //
+//  BrightestPixelImpl
+//
+////////////////////////////////////////////////////////////////////////////////
+
+template <typename TSample>
+static POINT BrightestPixelImpl (std::span<const TSample> samples,
+                                 UINT                     width,
+                                 UINT                     height,
+                                 float                  * pOutLuminance) noexcept
+{
+    POINT brightest = { 0, 0 };
+    float peak      = -1.0f;
+
+
+    if (HasEnoughSamples (samples, width, height))
+    {
+        for (UINT y = 0; y < height; ++y)
+        {
+            for (UINT x = 0; x < width; ++x)
+            {
+                const float luminance = LuminanceAt (samples, static_cast<size_t> (y) * width + x);
+
+                if (luminance > peak)
+                {
+                    peak        = luminance;
+                    brightest.x = static_cast<LONG> (x);
+                    brightest.y = static_cast<LONG> (y);
+                }
+            }
+        }
+    }
+
+    if (pOutLuminance)
+    {
+        *pOutLuminance = std::max (peak, 0.0f);
+    }
+
+    return brightest;
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
 //  HaloFalloffRadiusImpl
 //
 //  Builds a radial luminance profile in half-pixel rings and reports where it
@@ -282,6 +328,36 @@ float MeanLuminance (std::span<const uint8_t> bgra, UINT width, UINT height) noe
 float MeanLuminance (std::span<const float> rgba, UINT width, UINT height) noexcept
 {
     return MeanLuminanceImpl (rgba, width, height);
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  BrightestPixel
+//
+////////////////////////////////////////////////////////////////////////////////
+
+POINT BrightestPixel (std::span<const uint8_t> bgra, UINT width, UINT height, float * pOutLuminance) noexcept
+{
+    return BrightestPixelImpl (bgra, width, height, pOutLuminance);
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  BrightestPixel
+//
+////////////////////////////////////////////////////////////////////////////////
+
+POINT BrightestPixel (std::span<const float> rgba, UINT width, UINT height, float * pOutLuminance) noexcept
+{
+    return BrightestPixelImpl (rgba, width, height, pOutLuminance);
 }
 
 

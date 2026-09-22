@@ -8,6 +8,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MatrixRain", "MatrixRain\Ma
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MatrixRainTests", "MatrixRainTests\MatrixRainTests.vcxproj", "{760038C6-D6B4-40E3-9FEA-6B1C959DE044}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "HdrCalibration", "tools\HdrCalibration\HdrCalibration.vcxproj", "{3F5A6C71-9D48-4C2B-8E13-7A2B5C4D6E8F}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|ARM64 = Debug|ARM64
@@ -54,6 +56,12 @@ Global
 		{760038C6-D6B4-40E3-9FEA-6B1C959DE044}.Release|ARM64.Build.0 = Release|ARM64
 		{760038C6-D6B4-40E3-9FEA-6B1C959DE044}.Release|x64.ActiveCfg = Release|x64
 		{760038C6-D6B4-40E3-9FEA-6B1C959DE044}.Release|x64.Build.0 = Release|x64
+		{3F5A6C71-9D48-4C2B-8E13-7A2B5C4D6E8F}.Debug|ARM64.ActiveCfg = Calibration|ARM64
+		{3F5A6C71-9D48-4C2B-8E13-7A2B5C4D6E8F}.Debug|x64.ActiveCfg = Calibration|x64
+		{3F5A6C71-9D48-4C2B-8E13-7A2B5C4D6E8F}.Release (PROFILER)|ARM64.ActiveCfg = Calibration|ARM64
+		{3F5A6C71-9D48-4C2B-8E13-7A2B5C4D6E8F}.Release (PROFILER)|x64.ActiveCfg = Calibration|x64
+		{3F5A6C71-9D48-4C2B-8E13-7A2B5C4D6E8F}.Release|ARM64.ActiveCfg = Calibration|ARM64
+		{3F5A6C71-9D48-4C2B-8E13-7A2B5C4D6E8F}.Release|x64.ActiveCfg = Calibration|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

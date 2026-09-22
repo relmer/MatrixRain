@@ -151,6 +151,14 @@ public:
     ID2D1DeviceContext  * GetD2DContext()    const { return m_d2dContext.Get();    }
     IDWriteFactory      * GetDWriteFactory() const { return m_dwriteFactory.Get(); }
 
+    /// <summary>
+    /// The swap chain this system presents through, exposed so the offline
+    /// calibration harness can read a rendered frame back off the back buffer.
+    /// Nothing in the screensaver itself needs it.
+    /// </summary>
+    /// <returns>Non-owning pointer to the swap chain, or null before Initialize</returns>
+    IDXGISwapChain      * GetSwapChain()     const { return m_swapChain.Get();     }
+
 private:
     // Instance data for rendering a single character glyph; packed tightly for
     // GPU upload.

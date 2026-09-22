@@ -258,6 +258,52 @@ namespace MatrixRainTests
 
 
         ////////////////////////////////////////////////////////////////////////
+        // BrightestPixel
+        ////////////////////////////////////////////////////////////////////////
+
+        TEST_METHOD (BrightestPixel_FindsTheHottestPixelAndItsLuminance)
+        {
+            std::vector<uint8_t> frame     = MakeUniformBgra (16, 16, 0, 0, 0);
+            const size_t         hotPixel  = static_cast<size_t> (9) * 16 + 5;
+            float                luminance = 0.0f;
+
+            frame[hotPixel * 4 + 0] = 255;
+            frame[hotPixel * 4 + 1] = 255;
+            frame[hotPixel * 4 + 2] = 255;
+
+            const POINT found = BrightestPixel (frame, 16, 16, &luminance);
+
+            Assert::AreEqual (5L, found.x, L"Brightest pixel x");
+            Assert::AreEqual (9L, found.y, L"Brightest pixel y");
+            Assert::AreEqual (1.0f, luminance, 1e-5f, L"Its luminance must come back with it");
+        }
+
+
+        TEST_METHOD (BrightestPixel_OnABlackFrame_ReportsNoLight)
+        {
+            const std::vector<uint8_t> frame     = MakeUniformBgra (8, 8, 0, 0, 0);
+            float                      luminance = -1.0f;
+
+            BrightestPixel (frame, 8, 8, &luminance);
+
+            Assert::AreEqual (0.0f, luminance, 1e-7f,
+                              L"A black frame must report no light, so callers can tell nothing was drawn");
+        }
+
+
+        TEST_METHOD (BrightestPixel_FindsTheCentreOfAGaussian)
+        {
+            const POINT              center = { 40, 70 };
+            const std::vector<float> frame  = MakeGaussianLinear (kHaloWidth, kHaloHeight, center, kHaloSigma);
+            const POINT              found  = BrightestPixel (std::span<const float> (frame),
+                                                              kHaloWidth, kHaloHeight);
+
+            Assert::AreEqual (center.x, found.x, L"A halo's peak is its centre, x");
+            Assert::AreEqual (center.y, found.y, L"A halo's peak is its centre, y");
+        }
+
+
+        ////////////////////////////////////////////////////////////////////////
         // HaloFalloffRadius
         ////////////////////////////////////////////////////////////////////////
 

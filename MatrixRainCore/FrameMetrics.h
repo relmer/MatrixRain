@@ -43,6 +43,33 @@ float MeanLuminance (std::span<const float> rgba, UINT width, UINT height) noexc
 
 
 /// <summary>
+/// The brightest pixel in the frame, in linear luminance -- the centre a halo
+/// measurement should be taken around, since it is where the light source
+/// actually landed rather than where the caller expected it.
+/// </summary>
+/// <param name="bgra">Frame bytes, 4 per pixel in B, G, R, A order, tightly packed</param>
+/// <param name="width">Frame width in pixels</param>
+/// <param name="height">Frame height in pixels</param>
+/// <param name="pOutLuminance">Optional out parameter receiving that pixel's linear luminance</param>
+/// <returns>Coordinates of the brightest pixel, or { 0, 0 } when the frame is unusable</returns>
+POINT BrightestPixel (std::span<const uint8_t> bgra, UINT width, UINT height, float * pOutLuminance = nullptr) noexcept;
+
+
+/// <summary>
+/// The brightest pixel of a frame that is already in linear light.
+/// </summary>
+/// <param name="rgba">Frame samples, 4 floats per pixel in R, G, B, A order, tightly packed</param>
+/// <param name="width">Frame width in pixels</param>
+/// <param name="height">Frame height in pixels</param>
+/// <param name="pOutLuminance">Optional out parameter receiving that pixel's linear luminance</param>
+/// <returns>Coordinates of the brightest pixel, or { 0, 0 } when the frame is unusable</returns>
+POINT BrightestPixel (std::span<const float> rgba, UINT width, UINT height, float * pOutLuminance = nullptr) noexcept;
+
+
+
+
+
+/// <summary>
 /// Distance from center, in pixels, at which the glow around it has fallen to
 /// half of its peak linear luminance -- the half-maximum radius, the standard
 /// way to state the width of a falloff that never truly ends.
