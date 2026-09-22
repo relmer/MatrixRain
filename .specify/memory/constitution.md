@@ -1,9 +1,11 @@
 <!--
 Sync Impact Report:
-- Version change: 1.1.1 → 1.1.2
-- Modified principles: 
-  * VIII. Code Formatting and Style - Clarified pointer/reference alignment rules in declaration blocks
-- Modified sections: None
+- Version change: 1.1.2 → 1.2.0
+- Modified principles:
+  * III. C++23 and Windows Native Platform - Target architectures broadened from
+    x64-only to x64 and ARM64 (both 64-bit). The project has shipped native ARM64
+    builds since v1.0; the principle had not been updated to match.
+- Modified sections: Technical Platform Requirements (Architecture)
 - Added sections: None
 - Removed sections: None
 - Templates requiring updates:
@@ -50,16 +52,16 @@ Performance is a primary design constraint, not an afterthought. When choosing b
 The project targets modern C++23 features on the Windows 11 platform exclusively using Visual Studio 2026 (version 18.x) as the minimum requirement. All code MUST:
 
 - Compile with C++23 standard (`/std:c++latest`)
-- Target 64-bit x64 architecture only (no 32-bit support)
+- Target 64-bit architectures only: x64 and ARM64 (no 32-bit support)
 - Target Windows 11 with the latest Windows SDK (no Windows 10 or older SDK support)
 - Use Windows API for platform-specific functionality (GUI, threading, file I/O)
 - Leverage C++23 features: modules, ranges, concepts, coroutines, std::expected, etc.
 - Follow Windows-specific conventions (UTF-16 for Win32 APIs, COM where applicable)
 - When choosing between C++23 standard library and Windows API equivalents, select based on measured performance for the specific use case
 
-**Rationale**: Modern C++ provides safety, expressiveness, and performance. Windows API integration is essential for native GUI development. 64-bit removes memory limitations. Windows 11 and the latest SDK provide modern APIs and capabilities. VS 2026 is required for complete C++23 feature support.
+**Rationale**: Modern C++ provides safety, expressiveness, and performance. Windows API integration is essential for native GUI development. 64-bit removes memory limitations; native ARM64 builds serve Windows on Arm devices without emulation. Windows 11 and the latest SDK provide modern APIs and capabilities. VS 2026 is required for complete C++23 feature support.
 
-**Compliance**: All source files must compile with `/std:c++latest`. Platform detection must verify Windows 11 x64 at build time. Performance-critical path choices between C++23 and WinAPI must be documented with benchmark justification.
+**Compliance**: All source files must compile with `/std:c++latest`. Platform detection must verify Windows 11 on x64 or ARM64 at build time. Performance-critical path choices between C++23 and WinAPI must be documented with benchmark justification.
 
 ### IV. Modular Architecture
 
@@ -174,7 +176,7 @@ Each task implementation MUST result in exactly one commit. Commits must be atom
 
 **Language**: C++23  
 **Compiler**: Visual Studio 2026 (version 18.x) minimum - do not target older versions  
-**Architecture**: x86-64 (64-bit) exclusively  
+**Architecture**: x64 and ARM64 (64-bit only)  
 **Target OS**: Windows 11 exclusively with latest Windows SDK - no Windows 10 support  
 **Build System**: Visual Studio solution (.sln) and project files (.vcxproj)  
 **Testing Framework**: Microsoft C++ Native Unit Test Framework (`<CppUnitTest.h>`)  
@@ -287,4 +289,4 @@ This constitution supersedes all other development practices and conventions. Al
 - MINOR: New principles added, significant guidance expansions
 - PATCH: Clarifications, wording improvements, non-semantic refinements
 
-**Version**: 1.1.2 | **Ratified**: 2025-11-05 | **Last Amended**: 2025-11-05
+**Version**: 1.2.0 | **Ratified**: 2025-11-05 | **Last Amended**: 2026-09-21
