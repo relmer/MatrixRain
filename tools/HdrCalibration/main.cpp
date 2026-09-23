@@ -35,6 +35,18 @@ static constexpr int      kWarmupFrames    = 180;
 //  Frames timed per quality preset in benchmark mode.
 static constexpr int      kBenchmarkFrames = 600;
 
+//  Display scales every case is captured at. The rain's row pitch is 24 px
+//  times this, so these are the 24, 30 and 36 px cells of a monitor at 100%,
+//  125% and 150% -- the last two being the machine this was calibrated on.
+//
+//  The sweep earns its storage on the scanline cases. Scanline pitch is
+//  derived from the cell, so at Style 1 a 24 px cell gives a ~2.4 px pitch,
+//  below the 3 px floor where a fractional pitch beats against the pixel grid
+//  and gaps drop out, while a 36 px cell gives a clean ~3.6 px. One scale
+//  would pin the baseline to one side of that boundary and leave the other
+//  side unguarded.
+static constexpr float    kDpiScales[]     = { 1.0f, 1.25f, 1.5f };
+
 //  The seed every run starts from. Any fixed value would do; what matters is
 //  that it never changes, or reference numbers stop being comparable.
 static constexpr uint32_t kReferenceSeed   = 1;
@@ -166,7 +178,8 @@ private:
     void    ApplyCase     (const SettingsCase & settingsCase, RenderParams & params);
     void    RunFrames     (int frameCount);
     HRESULT RenderOnce    (const RenderParams & params);
-    HRESULT RenderCase    (const SettingsCase & settingsCase, std::vector<uint8_t> & frame);
+    HRESULT RenderCase    (const SettingsCase & settingsCase, float dpiScale, std::vector<uint8_t> & frame);
+    void    ApplyDpiScale (float dpiScale);
 
     static std::optional<LUID> FindWarpAdapterLuid();
 
@@ -305,10 +318,9 @@ HRESULT Harness::Initialize (bool useWarp)
     CHR (hr);
 
     //  Pin the glyph size: the run must not depend on the DPI of whatever
-    //  monitor the harness happens to launch on.
-    m_renderSystem->SetCharacterScaleOverride (1.0f);
-    m_animationSystem->SetDpiScale (1.0f);
-    m_densityController->SetDpiScale (1.0f);
+    //  monitor the harness happens to launch on. Each case then re-applies the
+    //  scale it is being captured at.
+    ApplyDpiScale (kDpiScales[0]);
 
 Error:
     return hr;
@@ -341,6 +353,26 @@ void Harness::Shutdown()
         DestroyWindow (m_hwnd);
         m_hwnd = nullptr;
     }
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  Harness::ApplyDpiScale
+//
+//  Sets the display scale exactly as Application does at run time, so a swept
+//  frame is the frame a monitor at that scaling would actually show.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+void Harness::ApplyDpiScale (float dpiScale)
+{
+    m_renderSystem->SetCharacterScaleOverride (dpiScale);
+    m_animationSystem->SetDpiScale            (dpiScale);
+    m_densityController->SetDpiScale          (dpiScale);
 }
 
 
@@ -477,13 +509,33 @@ Error:
 
 ////////////////////////////////////////////////////////////////////////////////
 //
+//  DpiPercent
+//
+//  The scale as the number Windows shows the user, for naming files.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+static int DpiPercent (float dpiScale)
+{
+    return static_cast<int> (dpiScale * 100.0f + 0.5f);
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
 //  BaselinePath
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-static std::wstring BaselinePath (const std::wstring & directory, const wchar_t * pszCase, const wchar_t * pszSuffix)
+static std::wstring BaselinePath (const std::wstring & directory,
+                                  const wchar_t      * pszCase,
+                                  float                dpiScale,
+                                  const wchar_t      * pszSuffix)
 {
-    return directory + L"\\" + pszCase + pszSuffix;
+    return std::format (L"{}\\{}-dpi{}{}", directory, pszCase, DpiPercent (dpiScale), pszSuffix);
 }
 
 
@@ -665,13 +717,14 @@ static HRESULT WriteDifferenceImage (const std::wstring         & path,
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-HRESULT Harness::RenderCase (const SettingsCase & settingsCase, std::vector<uint8_t> & frame)
+HRESULT Harness::RenderCase (const SettingsCase & settingsCase, float dpiScale, std::vector<uint8_t> & frame)
 {
     HRESULT      hr = S_OK;
     RenderParams params;
 
 
-    ApplyCase (settingsCase, params);
+    ApplyDpiScale (dpiScale);
+    ApplyCase     (settingsCase, params);
 
     RandomSource::Reseed (kReferenceSeed);
     m_animationSystem->ClearAllStreaks();
@@ -709,23 +762,27 @@ HRESULT Harness::RunReference (const std::wstring & baselineDir)
 
     CreateDirectoryW (baselineDir.c_str(), nullptr);
 
-    wprintf (L"case,meanLuminance,file\n");
+    wprintf (L"case,dpiPercent,meanLuminance,file\n");
 
-    for (const SettingsCase & settingsCase : s_krgCases)
+    for (float dpiScale : kDpiScales)
     {
-        const std::wstring path = BaselinePath (baselineDir, settingsCase.m_pszName, L".png");
+        for (const SettingsCase & settingsCase : s_krgCases)
+        {
+            const std::wstring path = BaselinePath (baselineDir, settingsCase.m_pszName, dpiScale, L".png");
 
-        hr = RenderCase (settingsCase, frame);
-        CHR (hr);
+            hr = RenderCase (settingsCase, dpiScale, frame);
+            CHR (hr);
 
-        hr = WritePng (path, frame, kFrameWidth, kFrameHeight);
-        CHR (hr);
+            hr = WritePng (path, frame, kFrameWidth, kFrameHeight);
+            CHR (hr);
 
-        wprintf (L"%s,%.*f,%s\n",
-                 settingsCase.m_pszName,
-                 kPrintPrecision,
-                 MeanLuminance (frame, kFrameWidth, kFrameHeight),
-                 path.c_str());
+            wprintf (L"%s,%d,%.*f,%s\n",
+                     settingsCase.m_pszName,
+                     DpiPercent (dpiScale),
+                     kPrintPrecision,
+                     MeanLuminance (frame, kFrameWidth, kFrameHeight),
+                     path.c_str());
+        }
     }
 
 Error:
@@ -753,42 +810,49 @@ HRESULT Harness::RunCompare (const std::wstring & baselineDir)
     std::vector<uint8_t> baseline;
 
 
-    wprintf (L"case,meanLuminance,maxDiff,meanDiff,p99Diff,pixelsOverThreshold,maxDiffAt\n");
+    wprintf (L"case,dpiPercent,meanLuminance,maxDiff,meanDiff,p99Diff,pixelsOverThreshold,maxDiffAt\n");
 
-    for (const SettingsCase & settingsCase : s_krgCases)
+    for (float dpiScale : kDpiScales)
     {
-        const std::wstring baselinePath = BaselinePath (baselineDir, settingsCase.m_pszName, L".png");
-        const std::wstring diffPath     = BaselinePath (baselineDir, settingsCase.m_pszName, L".diff.png");
-        FrameDifference    difference;
-
-
-        hr = RenderCase (settingsCase, frame);
-        CHR (hr);
-
-        hr = ReadPng (baselinePath, baseline, kFrameWidth, kFrameHeight);
-
-        if (FAILED (hr))
+        for (const SettingsCase & settingsCase : s_krgCases)
         {
-            wprintf (L"%s,,,,,,no baseline at %s\n", settingsCase.m_pszName, baselinePath.c_str());
-            hr = S_OK;
-            continue;
+            const std::wstring baselinePath = BaselinePath (baselineDir, settingsCase.m_pszName, dpiScale, L".png");
+            const std::wstring diffPath     = BaselinePath (baselineDir, settingsCase.m_pszName, dpiScale, L".diff.png");
+            FrameDifference    difference;
+
+
+            hr = RenderCase (settingsCase, dpiScale, frame);
+            CHR (hr);
+
+            hr = ReadPng (baselinePath, baseline, kFrameWidth, kFrameHeight);
+
+            if (FAILED (hr))
+            {
+                wprintf (L"%s,%d,,,,,,no baseline at %s\n",
+                         settingsCase.m_pszName,
+                         DpiPercent (dpiScale),
+                         baselinePath.c_str());
+                hr = S_OK;
+                continue;
+            }
+
+            difference = CompareFrames (baseline, frame, kFrameWidth, kFrameHeight, kDiffThreshold);
+
+            hr = WriteDifferenceImage (diffPath, baseline, frame, kFrameWidth, kFrameHeight);
+            CHR (hr);
+
+            wprintf (L"%s,%d,%.*f,%.0f,%.4f,%.0f,%zu,%ldx%ld\n",
+                     settingsCase.m_pszName,
+                     DpiPercent (dpiScale),
+                     kPrintPrecision,
+                     MeanLuminance (frame, kFrameWidth, kFrameHeight),
+                     difference.m_maxDifference,
+                     difference.m_meanDifference,
+                     difference.m_p99Difference,
+                     difference.m_pixelsOverThreshold,
+                     difference.m_maxDifferenceAt.x,
+                     difference.m_maxDifferenceAt.y);
         }
-
-        difference = CompareFrames (baseline, frame, kFrameWidth, kFrameHeight, kDiffThreshold);
-
-        hr = WriteDifferenceImage (diffPath, baseline, frame, kFrameWidth, kFrameHeight);
-        CHR (hr);
-
-        wprintf (L"%s,%.*f,%.0f,%.4f,%.0f,%zu,%ldx%ld\n",
-                 settingsCase.m_pszName,
-                 kPrintPrecision,
-                 MeanLuminance (frame, kFrameWidth, kFrameHeight),
-                 difference.m_maxDifference,
-                 difference.m_meanDifference,
-                 difference.m_p99Difference,
-                 difference.m_pixelsOverThreshold,
-                 difference.m_maxDifferenceAt.x,
-                 difference.m_maxDifferenceAt.y);
     }
 
 Error:
@@ -839,7 +903,10 @@ HRESULT Harness::RunBenchmark()
         std::vector<float>           timings;
 
 
-        ApplyCase (s_krgCases[0], params);
+        //  One scale only: the sweep exists to guard appearance, and tripling
+        //  the benchmark's runtime would buy nothing SC-006 asks for.
+        ApplyDpiScale (kDpiScales[0]);
+        ApplyCase     (s_krgCases[0], params);
 
         m_renderSystem->SetGlowIntensity  (values.m_glowIntensityPercent);
         m_renderSystem->SetBlurPasses     (values.m_blurPasses);

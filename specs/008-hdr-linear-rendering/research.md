@@ -125,7 +125,12 @@ would have thought to write a statistic for.
   and WARP's repeatability at once. The WARP version is recorded with the
   baseline, since WARP ships with Windows and can change under it.
 - **Settings coverage**: the reference set covers defaults plus several
-  non-default glow, scanline and color settings (FR-006).
+  non-default glow, scanline and color settings (FR-006), each captured at
+  display scale 100%, 125% and 150%. The scales matter because scanline pitch
+  is derived from the cell: at Style 1 a 24 px cell gives a ~2.4 px pitch,
+  under the 3 px floor where a fractional pitch beats against the pixel grid,
+  while a 36 px cell gives a clean ~3.6 px. One scale would leave one side of
+  that boundary unguarded.
 - **Benchmark mode** (Constitution II): the same harness times N frames per
   quality preset and reports ms/frame. It runs on WARP for repeatability and
   on the hardware adapter for real numbers, and results are recorded against
