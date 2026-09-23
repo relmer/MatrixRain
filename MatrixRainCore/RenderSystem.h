@@ -243,6 +243,8 @@ private:
     HRESULT CreateScanlineConstantBuffer();
     HRESULT UploadScanlineConstants     (const RenderParams & params, float viewportHeightPx, float cellHeightPx);
 
+    HRESULT CreateOutputConstantBuffer();
+    HRESULT UploadOutputTransformConstants (const OutputTransformCb & cb);
     HRESULT ApplyScanlinePass();
     HRESULT CreateBlendState();
     HRESULT CreateSamplerState();
@@ -328,6 +330,7 @@ private:
     // disabling the user-facing controls (FR-028b: silent bypass).
     ComPtr<ID3D11PixelShader>         m_scanlinePS;
     ComPtr<ID3D11Buffer>              m_scanlineConstantBuffer;
+    ComPtr<ID3D11Buffer>              m_outputConstantBuffer;
     ComPtr<ID3D11Buffer>              m_fullscreenQuadVB;
     ComPtr<ID3D11Buffer>              m_haloConstantBuffer;
     ComPtr<ID3D11Buffer>              m_bloomConstantBuffer;

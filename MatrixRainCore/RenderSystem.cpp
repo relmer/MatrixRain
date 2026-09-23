@@ -4,6 +4,7 @@
 
 #include "CharacterConstants.h"
 #include "CharacterSet.h"
+#include "ColorMath.h"
 #include "ColorScheme.h"
 #include "Overlay.h"
 #include "OverlayColor.h"
@@ -331,6 +332,9 @@ HRESULT RenderSystem::Initialize (HWND hwnd, UINT width, UINT height, std::optio
     CHR (hr);
 
     hr = CreateScanlineConstantBuffer();
+    CHR (hr);
+
+    hr = CreateOutputConstantBuffer();
     CHR (hr);
 
     hr = CreateBlendState();
@@ -927,6 +931,66 @@ HRESULT RenderSystem::CreateScanlineConstantBuffer()
 
     hr = m_device->CreateBuffer (&bufferDesc, nullptr, &m_scanlineConstantBuffer);
     CHRA (hr);
+
+Error:
+    return hr;
+}
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  RenderSystem::CreateOutputConstantBuffer
+//
+//  16-byte dynamic cbuffer bound at b1 by every candidate final pass, holding
+//  the output mode, the SDR white scale, the headroom and whether this pass is
+//  the one writing the back buffer.  See contracts/output-transform.md.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+HRESULT RenderSystem::CreateOutputConstantBuffer()
+{
+    HRESULT           hr         = S_OK;
+    D3D11_BUFFER_DESC bufferDesc = {};
+
+
+
+    bufferDesc.ByteWidth      = sizeof (OutputTransformCb);  // 16 bytes
+    bufferDesc.Usage          = D3D11_USAGE_DYNAMIC;
+    bufferDesc.BindFlags      = D3D11_BIND_CONSTANT_BUFFER;
+    bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+
+    hr = m_device->CreateBuffer (&bufferDesc, nullptr, &m_outputConstantBuffer);
+    CHRA (hr);
+
+Error:
+    return hr;
+}
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  RenderSystem::UploadOutputTransformConstants
+//
+////////////////////////////////////////////////////////////////////////////////
+
+HRESULT RenderSystem::UploadOutputTransformConstants (const OutputTransformCb & cb)
+{
+    HRESULT                  hr     = S_OK;
+    D3D11_MAPPED_SUBRESOURCE mapped = {};
+
+
+
+    CBRAEx (m_outputConstantBuffer != nullptr, E_UNEXPECTED);
+
+    hr = m_context->Map (m_outputConstantBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
+    CHRA (hr);
+
+    memcpy (mapped.pData, &cb, sizeof (cb));
+    m_context->Unmap (m_outputConstantBuffer.Get(), 0);
 
 Error:
     return hr;
@@ -1541,6 +1605,131 @@ static const char * s_kszBloomExtractShaderSource = R"(
         }
     )";
 
+////////////////////////////////////////////////////////////////////////////////
+//
+//  s_kszOutputTransformHlsl
+//
+//  Spliced into every shader that might be the LAST pass of a frame, so that
+//  whichever one ends up writing the back buffer encodes the image exactly
+//  once (FR-004).  Which pass that is depends on the user's settings -- the
+//  bloom composite, the glow-off scene copy, or the scanline pass -- so each
+//  of them carries this and is told at upload time whether it is the one.
+//
+//  LinearToSrgb is a transliteration of the C++ in ColorMath.cpp and MUST stay
+//  one: the constants come from ColorMathConstants via std::format below, so
+//  editing the C++ constants moves the shader with it and the two cannot drift.
+//
+//  The HDR branch is a pass-through until US2 gives it a real transform.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+static const char * s_kszOutputTransformHlslFormat = R"(
+        cbuffer OutputCb : register(b1)
+        {{
+            uint  g_outputMode;
+            float g_sdrWhiteScale;
+            float g_headroom;
+            uint  g_isFinalPass;
+        }};
+
+        // NB: the parameter cannot be called "linear" -- that is an HLSL
+        // interpolation modifier keyword, and naming it so fails to compile.
+        float LinearToSrgbChannel(float linearValue)
+        {{
+            float clamped = saturate(linearValue);
+
+            if (clamped <= {0})
+            {{
+                return clamped * {1};
+            }}
+
+            return {2} * pow(clamped, 1.0 / {3}) - {4};
+        }}
+
+        float3 OutputTransform(float3 linearRgb)
+        {{
+            // An intermediate pass leaves the image in linear light for
+            // whatever comes next.
+            if (g_isFinalPass == 0)
+            {{
+                return linearRgb;
+            }}
+
+            if (g_outputMode == 0)
+            {{
+                return float3(LinearToSrgbChannel(linearRgb.r),
+                              LinearToSrgbChannel(linearRgb.g),
+                              LinearToSrgbChannel(linearRgb.b));
+            }}
+
+            // HDR (scRGB): completed in US2.
+            return linearRgb;
+        }}
+    )";
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  OutputTransformHlsl
+//
+//  Builds the transform source with the shared colour constants baked in.
+//  Built once on first use: the string is identical for the lifetime of the
+//  process and every final-pass shader concatenates the same copy.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+static const std::string & OutputTransformHlsl()
+{
+    //  vformat rather than format: the pattern is a runtime pointer, not a
+    //  literal, so the compile-time checked overload cannot take it.
+    static const std::string s_source = std::vformat (s_kszOutputTransformHlslFormat,
+                                                      std::make_format_args (ColorMathConstants::kLinearKnee,
+                                                                             ColorMathConstants::kLinearSlope,
+                                                                             ColorMathConstants::kCurveScale,
+                                                                             ColorMathConstants::kCurveGamma,
+                                                                             ColorMathConstants::kCurveOffset));
+
+
+
+    return s_source;
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  WithOutputTransform
+//
+//  Prefixes a final-pass shader body with the shared transform.  Each result is
+//  built once and cached for the process, so the returned pointer stays valid
+//  for as long as the shader source it describes.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+static const char * WithOutputTransform (const char * pszShaderBody)
+{
+    static std::map<const char *, std::string> s_sources;
+
+    auto                                       existing = s_sources.find (pszShaderBody);
+
+
+    if (existing == s_sources.end())
+    {
+        existing = s_sources.emplace (pszShaderBody, OutputTransformHlsl() + pszShaderBody).first;
+    }
+
+    return existing->second.c_str();
+}
+
+
+
+
+
 static const char * s_kszBloomCompositeShaderSource = R"(
         cbuffer BloomConstants : register(b0)
         {
@@ -1734,7 +1923,7 @@ HRESULT RenderSystem::CompileBloomShaders()
         { s_kszBlurVerticalShaderSource,           "BlurV13",   "main", "ps_5_0", L"D3DCompile failed for vertical blur 13-tap",       blurVPSBlob.GetAddressOf(),     &m_blurVerticalPS      },
         { s_kszBlurVerticalShader9TapSource,       "BlurV9",    "main", "ps_5_0", L"D3DCompile failed for vertical blur 9-tap",        blurV9PSBlob.GetAddressOf(),    &m_blurVerticalPS9     },
         { s_kszBlurVerticalShader5TapSource,       "BlurV5",    "main", "ps_5_0", L"D3DCompile failed for vertical blur 5-tap",        blurV5PSBlob.GetAddressOf(),    &m_blurVerticalPS5     },
-        { s_kszBloomCompositeShaderSource,         "Composite", "main", "ps_5_0", L"D3DCompile failed for composite shader",           compositePSBlob.GetAddressOf(), &m_compositePS         },
+        { WithOutputTransform (s_kszBloomCompositeShaderSource), "Composite", "main", "ps_5_0", L"D3DCompile failed for composite shader", compositePSBlob.GetAddressOf(), &m_compositePS },
         { s_kszHaloShaderSource,                   "Halo",      "main", "ps_5_0", L"D3DCompile failed for halo shader",                haloPSBlob.GetAddressOf(),      &m_haloPS              }
     };
 
@@ -1786,8 +1975,11 @@ HRESULT RenderSystem::CompileBloomShaders()
         HRESULT           hrScanline = S_OK;
 
 
-        hrScanline = D3DCompile (s_kszScanlineShaderSource,
-                                  strlen (s_kszScanlineShaderSource),
+        const char * pszScanlineSource = WithOutputTransform (s_kszScanlineShaderSource);
+
+
+        hrScanline = D3DCompile (pszScanlineSource,
+                                  strlen (pszScanlineSource),
                                   "Scanlines",
                                   nullptr,
                                   nullptr,
