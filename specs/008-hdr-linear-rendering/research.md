@@ -84,23 +84,39 @@ performance parity, verified with the existing Performance-tab readout.
 bandwidth). `R10G10B10A2_UNORM` (not float, still clips above 1.0, useless for
 Phase 3).
 
-## R3. Bloom in linear light
+## R3. Bloom: v1.6's glow, computed on encoded values
 
-**Decision**: Rework the extract and composite for linear input:
-- Extract: same `max(luma, maxChannel)` metric and smoothstep, with thresholds
-  converted to linear (`0.1 → ~0.010`, `0.6 → ~0.318`) as the starting point.
-- Composite: additive, `out = scene + bloomIntensity * bloom`, with the
-  soft-saturation ceiling applied to the bloom term in linear light. The
-  `(1 - scene)` screen factor is dropped: it only existed to stop gamma-space
-  sums passing 1.0, which float targets and the output transform (R4, R8) now
-  handle.
-- **Calibration**: tune the extract thresholds, the soft-saturation constant
-  and the default `bloomIntensity` so that a fixed reference frame matches
-  v1.6 within a small tolerance (SC-001).
+**Decision** (revised during Phase 1 calibration): the bloom chain -- extract,
+blur, soft saturation and composite -- runs on ENCODED values exactly as
+v1.6's did, held in float textures, and the composited result is converted to
+linear light for the output stage. The extract reads the linear scene and
+encodes each texel before its bilinear average, which is the value v1.6's
+sampler produced from its 8-bit scene. The thresholds, the soft saturation,
+the `(1 - scene)` screen factor and the Glow Intensity mapping are v1.6's own.
+There are no fitted constants.
 
-**Rationale**: Additive linear bloom is how glow physically combines. The
-v1.6 constants exist to compensate for gamma-space math, so keeping them
-unchanged would break FR-005.
+**What changed from the original decision.** The original R3 put the chain in
+linear light, dropped the screen factor as gamma-space compensation, and
+planned to recalibrate the constants. That was tried. It produced, in
+succession, a glow eight times too strong, a halo far wider than v1.6's, a
+halo of the wrong hue, extra glow on every glyph body, and finally glow that
+kept adding where streaks overlap while v1.6's had saturated -- which made the
+dense regions bury the characters generating them. Each was matched by
+computing that one term v1.6's way and converting afterward, until the
+overlap behavior, which Rob judged worse for legibility, made the pattern
+plain: every term of the glow's appearance wants to be v1.6's, so the chain
+should simply be v1.6's. baseline.md records all nine mismatches and the
+measurements.
+
+**Rationale**: FR-005 protects the look, and the glow is most of the look.
+Linear-light addition of overlapping halos is physically right and was the
+one thing the linear chain offered visibly; Rob preferred v1.6's saturation.
+The float textures keep the real benefit -- no 8-bit quantization anywhere in
+the chain -- and the linear output stage keeps what the HDR phases need.
+
+**Phase 3 note**: the extract's encode saturates at white, so a head above SDR
+white blooms as a white head. Highlight bloom needs its own handling then,
+most likely an additive highlight layer blurred in linear light.
 
 **Calibration method**: A deterministic reference frame (fixed seed, fixed
 time) rendered on the WARP device by a small calibration harness, **kept as a

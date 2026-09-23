@@ -1060,12 +1060,6 @@ void RenderSystem::OnDpiChanged (UINT dpi)
 static constexpr DXGI_FORMAT kSceneFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
 static constexpr DXGI_FORMAT kBloomFormat = DXGI_FORMAT_R11G11B10_FLOAT;
 
-//  How much of the Glow Intensity slider's travel above 100% reaches the
-//  bloom shader. Calibrated in T018 so the slider's maximum produces the glow
-//  v1.6's maximum did; see SetGlowIntensity for why the default itself needs
-//  no such correction.
-static constexpr float kGlowIntensityAboveDefaultScale = 0.67f;
-
 //  Rows the halo pass can outline in one draw. MUST match the rowRects[] size
 //  in MatrixRainCore/Shaders/Halo.ps.hlsl.
 static constexpr int MAX_HALO_ROWS = 16;
@@ -3265,24 +3259,9 @@ Error:
 
 void RenderSystem::SetGlowIntensity (int intensityPercent)
 {
-    float unit = intensityPercent / 100.0f;
-
-
-    // Above the default, v1.6's screen blend throttled the glow: it composited
-    // as scene + soft * (1 - scene), and at high intensity enough of the frame
-    // is bright that the (1 - scene) factor took a real bite. Linear addition
-    // has no such throttle, and it is not wanted back -- it is what flattened
-    // overlapping halos -- so the slider is compressed above 100% instead, to
-    // give each position the glow it gave in v1.6. Below the default the
-    // throttle was negligible and the mapping is identity, so the default and
-    // everything under it are untouched.
-    if (unit > 1.0f)
-    {
-        unit = 1.0f + (unit - 1.0f) * kGlowIntensityAboveDefaultScale;
-    }
-
-    // Convert to the multiplier the bloom shader uses: 100% = 2.5.
-    m_glowIntensity = unit * 2.5f;
+    // Convert percentage (0-200) to multiplier (0.0-5.0)
+    // Default is 100% = 2.5 multiplier
+    m_glowIntensity = (intensityPercent / 100.0f) * 2.5f;
 }
 
 
