@@ -285,7 +285,38 @@ void ApplicationState::ApplySettings (const ScreenSaverSettings & settings)
     // Map color scheme key to enum
     m_colorScheme = ParseColorSchemeKey (m_settings.m_colorSchemeKey);
 
-    // Notify registered listeners so renderer-side state (e.g., SharedState) stays in sync
+    // Notify registered listeners so renderer-side state (e.g., SharedState)
+    // stays in sync. Every setting the renderer follows live has to be here:
+    // this is the path the dialog's Reset to defaults and Cancel take, and a
+    // setting left out kept its old value in the running rain while its
+    // slider showed the new one. No SaveSettings: the dialog owns persistence.
+    if (m_densityChangeCallback)
+    {
+        m_densityChangeCallback (m_settings.m_densityPercent);
+    }
+
+    if (m_animationSpeedChangeCallback)
+    {
+        m_animationSpeedChangeCallback (m_settings.m_animationSpeedPercent);
+    }
+
+    // Advanced values before glow intensity: both carry an intensity, and
+    // the slider's own value is the one to end up with.
+    if (m_advancedGraphicsChangeCallback)
+    {
+        m_advancedGraphicsChangeCallback (m_settings.m_advancedValues);
+    }
+
+    if (m_glowIntensityChangeCallback)
+    {
+        m_glowIntensityChangeCallback (m_settings.m_glowIntensityPercent);
+    }
+
+    if (m_glowSizeChangeCallback)
+    {
+        m_glowSizeChangeCallback (m_settings.m_glowSizePercent);
+    }
+
     if (m_colorSchemeChangeCallback)
     {
         m_colorSchemeChangeCallback (m_colorScheme);

@@ -77,6 +77,53 @@ namespace MatrixRainTests
                               static_cast<int>(appState.GetDisplayMode ()),
                               L"Should transition back to Fullscreen mode after second toggle");
         }
+
+
+
+
+
+        // ApplySettings is how the settings dialog's Reset to defaults and
+        // Cancel reach the running rain, so it must announce every setting
+        // the renderer follows live. It used to skip density, speed, glow
+        // intensity, glow size and the advanced graphics values: Reset moved
+        // those sliders back while the rain kept the old values.
+        TEST_METHOD (ApplySettings_NotifiesEveryLiveSetting)
+        {
+            ApplicationState       appState (m_settingsProvider);
+            ScreenSaverSettings    settings;
+            int                    density      = -1;
+            int                    speed        = -1;
+            int                    glowIntensity = -1;
+            int                    glowSize     = -1;
+            AdvancedGraphicsValues advanced     = {};
+            bool                   gotAdvanced  = false;
+
+
+
+            appState.Initialize (nullptr);
+
+            appState.RegisterDensityChangeCallback    ([&] (int value) { density       = value; });
+            appState.RegisterAnimationSpeedCallback   ([&] (int value) { speed         = value; });
+            appState.RegisterGlowIntensityCallback    ([&] (int value) { glowIntensity = value; });
+            appState.RegisterGlowSizeCallback         ([&] (int value) { glowSize      = value; });
+            appState.RegisterAdvancedGraphicsCallback ([&] (const AdvancedGraphicsValues & value) { advanced = value; gotAdvanced = true; });
+
+            settings.m_densityPercent                = 37;
+            settings.m_animationSpeedPercent         = 41;
+            settings.m_glowIntensityPercent          = 150;
+            settings.m_glowSizePercent               = 175;
+            settings.m_advancedValues.m_blurPasses   = 2;
+            settings.m_advancedValues.m_glowIntensityPercent = 150;
+
+            appState.ApplySettings (settings);
+
+            Assert::AreEqual (37,  density,       L"Density must reach the renderer");
+            Assert::AreEqual (41,  speed,         L"Animation speed must reach the renderer");
+            Assert::AreEqual (150, glowIntensity, L"Glow intensity must reach the renderer");
+            Assert::AreEqual (175, glowSize,      L"Glow size must reach the renderer");
+            Assert::IsTrue   (gotAdvanced,        L"Advanced graphics values must reach the renderer");
+            Assert::AreEqual (2,   advanced.m_blurPasses);
+        }
     };
 }  // namespace MatrixRainTests
 
