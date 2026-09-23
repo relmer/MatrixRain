@@ -104,15 +104,21 @@ out. **Revise them in this file when T018 runs**, with the reasoning.
 
 ## Phase 1 calibration result (T018)
 
-`kBloomCeiling` in `Shaders/BloomComposite.ps.hlsl` is **0.116**, measured
-rather than guessed.
+Two constants in `Shaders/BloomComposite.ps.hlsl`, both measured:
 
-**What was tuned, and against what.** Glow is added in linear light and then
-encoded, and the encode curve is steep near black: 0.3 of linear light added to
-a dark gap lands at sRGB 0.58. The same `bloomIntensity` that looked right in
-gamma space produced about eight times too much apparent glow, and dark gaps
-are most of the frame. Before calibration the default case rendered as a green
-fog filling the space between streaks.
+| Constant | Value | What it does |
+|---|---|---|
+| `kBloomFalloff` | 2.4 (`MR_SRGB_CURVE_GAMMA`) | Shapes the halo's falloff |
+| `kBloomCeiling` | 0.571 | Scales the glow's strength |
+
+### Strength: the encode curve makes a little glow look like a lot
+
+Glow is added in linear light and then encoded, and the encode curve is steep
+near black: 0.3 of linear light added to a dark gap lands at sRGB 0.58. The
+same `bloomIntensity` that looked right in gamma space produced about eight
+times too much apparent glow, and dark gaps are most of the frame. Before
+calibration the default case rendered as a green fog filling the space between
+the streaks.
 
 The measurement is the **glow's own contribution**, `defaults` minus
 `glow-min` mean luminance, not total luminance. Total luminance also carries
@@ -122,8 +128,36 @@ against the total would have forced the glow well under v1.6's to compensate.
 | | Glow contribution |
 |---|---|
 | v1.6 baseline | 0.012074 |
-| After calibration | 0.012132 |
+| After calibration | 0.012056 |
 | Ratio | **1.00x** |
+
+### Shape: mean luminance is blind to it
+
+Getting the strength right left the glow visibly wrong in a way no scalar
+metric could see. Rob caught it by eye: the glow was "brighter and more opaque,
+and doesn't hug the chars as tightly... the glow on a streak looks like it's
+the same width the whole way down."
+
+The cause is the same concave encode curve, acting this time on the halo's
+shape rather than its strength. It lifts the dim tail far more than the bright
+core, so a Gaussian blurred in linear light reaches the screen much flatter and
+wider than one blurred in gamma space. For a sigma-8 halo:
+
+| Distance from core | v1.6 showed | Linear, unshaped | Excess |
+|---|---|---|---|
+| 16 px | 13.5% of core | 39.6% | 2.9x |
+| 24 px | 1.1% | 9.5% | 8.6x |
+| 32 px | 0.04% | 0.3% | 9.8x |
+
+Raising the glow to the encode curve's own exponent before adding it cancels
+that lift, so what lands on screen falls off as v1.6's did. This is not gamma
+compensation creeping back into the blending -- light is still added in linear
+light. It shapes the glow's PROFILE, which is art direction rather than
+physics, and v1.6's art direction is what FR-005 protects.
+
+Shaping also made the glow behave consistently across the sliders. Before it,
+the glow cases scattered from -9.6% to +22.9% against baseline; after, they sit
+within a point and a half of each other.
 
 ### Where the frame still differs, and why
 
@@ -131,40 +165,36 @@ Mean luminance against baseline, at 100% scale:
 
 | Case | Baseline | Now | Delta |
 |---|---|---|---|
-| `defaults` | 0.045544 | 0.052866 | +16.1% |
-| `glow-min` | 0.033470 | 0.040734 | +21.7% |
-| `glow-max` | 0.067967 | 0.061414 | -9.6% |
-| `glow-size-min` | 0.047643 | 0.051330 | +7.7% |
-| `glow-size-max` | 0.043832 | 0.053871 | +22.9% |
-| `scanlines-1` | 0.032478 | 0.049429 | +52.2% |
-| `scanlines-100` | 0.032621 | 0.049387 | +51.4% |
-| `custom-color` | 0.024502 | 0.023135 | -5.6% |
+| `defaults` | 0.045544 | 0.052650 | +15.6% |
+| `glow-min` | 0.033470 | 0.040594 | +21.3% |
+| `glow-max` | 0.067967 | 0.078842 | +16.0% |
+| `glow-size-min` | 0.047643 | 0.055090 | +15.6% |
+| `glow-size-max` | 0.043832 | 0.050135 | +14.4% |
+| `scanlines-1` | 0.032478 | 0.049271 | +51.7% |
+| `scanlines-100` | 0.032621 | 0.049231 | +50.9% |
+| `custom-color` | 0.024502 | 0.020135 | -17.8% |
 
 Two of these are **structural**: no constant reaches them, because they are the
 corrections this feature exists to make.
 
-**Trails, about +22%.** The glyph blend is `SRC_ALPHA / INV_SRC_ALPHA`.
+**Trails, about +21%.** The glyph blend is `SRC_ALPHA / INV_SRC_ALPHA`.
 Compositing a half-faded character over black gives `srgb * a` in gamma space
 but `LinearToSrgb(linear(srgb) * a)` in linear light, and because the encode
 curve is concave the second is always brighter for `a < 1`. Every partially
 faded trail character is lighter than it was, most so mid-fade, which is where
 most of a trail lives. The banding this feature set out to remove was a symptom
-of the same wrong arithmetic. There is also a slight hue shift: the rain's
-green is `RGB(0, 255, 100)`, so the blue channel sits mid-range where the curve
-bends most while green is already at maximum, and the difference image is
-correspondingly blue-dominant. Trails read very slightly less saturated.
+of the same wrong arithmetic. There is also a hue shift: the rain's green is
+`RGB(0, 255, 100)`, so blue sits mid-range where the curve bends hardest while
+green is already at maximum. The difference image is correspondingly almost
+entirely blue, and trails read very slightly less saturated. `custom-color` is
+low for the same per-channel reason, its blue being a dominant channel rather
+than a secondary one.
 
-**Scanlines, about +52%.** Darkening now multiplies linear light, so half the
+**Scanlines, about +51%.** Darkening now multiplies linear light, so half the
 darkening means half the light, as a raster does to a phosphor. Applied to
 gamma-encoded values as v1.6 did, the same factor removed considerably more
 light than intended, which is why the effect read as a gray veil over the image
 rather than a raster behind it. This is FR-001 being satisfied.
-
-The remaining two are ordinary tuning residue, left alone deliberately:
-`glow-max` is 9.6% low because the soft-saturation ceiling binds earlier than
-v1.6's screen factor did at the top of the range, and `custom-color` is 5.6%
-low for the per-channel reason described above, its blue being the dominant
-channel rather than a secondary one.
 
 ### What this means for SC-001
 
@@ -178,11 +208,20 @@ The gate is therefore replaced, for Phase 1, by:
 | Measure | Gate |
 |---|---|
 | Glow contribution | within 5% of baseline (met: 1.00x) |
+| Glow falloff shape | matches v1.6 within measurement, and by eye |
 | Trail and scanline changes | explained and expected, judged by eye on hardware (T019) |
 | Everything else | within 25% of baseline, with a stated reason per case |
 
 Recording that here rather than quietly widening a threshold: the original
 number was written before it was clear that alpha compositing was in scope.
+
+### A note on what the metrics missed
+
+The glow shape error was invisible to every number the harness produced. Mean
+luminance was within a few percent of target while the halo was nearly three
+times too wide at 16 px. The difference images showed it plainly once someone
+looked. Worth remembering when the Phase 2 and Phase 3 gates are written: a
+scalar can confirm a suspicion but will not raise one.
 
 ## Performance baseline (T001, T005)
 
