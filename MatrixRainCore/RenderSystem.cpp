@@ -1704,7 +1704,11 @@ void RenderSystem::SortStreaksByDepth (std::vector<const CharacterStreak*>& stre
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-void RenderSystem::BuildCharacterInstanceData (const CharacterInstance & character, const Vector3 & streakPos, const Color4 & schemeColor, RenderSystem::CharacterInstanceData & data)
+void RenderSystem::BuildCharacterInstanceData (const CharacterInstance            & character,
+                                               const Vector3                      & streakPos,
+                                               const Color4                       & schemeColor,
+                                               bool                                 linearizeColors,
+                                               RenderSystem::CharacterInstanceData & data)
 {
     CharacterSet & charSet = CharacterSet::GetInstance();
 
@@ -1746,6 +1750,7 @@ void RenderSystem::BuildCharacterInstanceData (const CharacterInstance & charact
     // color crosses into linear light, which is what keeps the glyph core
     // identical to v1.6 (FR-005) while everything downstream of it blends
     // correctly.
+    if (linearizeColors)
     {
         const Color4 linear = InstanceLinearColor (srgb, character.brightness, 1.0f);
 
@@ -1753,6 +1758,20 @@ void RenderSystem::BuildCharacterInstanceData (const CharacterInstance & charact
         data.color[1] = linear.g;
         data.color[2] = linear.b;
         data.color[3] = linear.a;
+    }
+    else
+    {
+        // The no-scene fallback draws straight to the back buffer, so no
+        // output transform ever runs and nothing would encode a linear value.
+        // Stop one step earlier: apply the same scaling in gamma space and
+        // clamp where the 8-bit target used to, which is exactly the pixel
+        // v1.6 wrote.
+        const float scale = character.brightness * (1.0f + kGlyphSelfGlow * character.brightness);
+
+        data.color[0] = std::min (1.0f, srgb.r * scale);
+        data.color[1] = std::min (1.0f, srgb.g * scale);
+        data.color[2] = std::min (1.0f, srgb.b * scale);
+        data.color[3] = srgb.a;
     }
 
     // Still the raw brightness: the shader applies it to ALPHA only now, which
@@ -1766,7 +1785,11 @@ void RenderSystem::BuildCharacterInstanceData (const CharacterInstance & charact
 
 
 
-HRESULT RenderSystem::UpdateInstanceBuffer (const AnimationSystem& animationSystem, ColorScheme colorScheme, float elapsedTime, COLORREF customColor)
+HRESULT RenderSystem::UpdateInstanceBuffer (const AnimationSystem & animationSystem,
+                                            ColorScheme             colorScheme,
+                                            float                   elapsedTime,
+                                            COLORREF                customColor,
+                                            bool                    linearizeColors)
 {
     HRESULT                  hr             = S_OK;
     Color4                   schemeColor    = GetColorRGB (colorScheme, elapsedTime);
@@ -1810,7 +1833,7 @@ HRESULT RenderSystem::UpdateInstanceBuffer (const AnimationSystem& animationSyst
 
 
 
-            BuildCharacterInstanceData (character, streakPos, schemeColor, data);
+            BuildCharacterInstanceData (character, streakPos, schemeColor, linearizeColors, data);
             m_instanceData.push_back (data);
         }
     }
@@ -1823,7 +1846,7 @@ HRESULT RenderSystem::UpdateInstanceBuffer (const AnimationSystem& animationSyst
 
 
 
-        BuildCharacterInstanceData (overlay.character, overlay.position, schemeColor, data);
+        BuildCharacterInstanceData (overlay.character, overlay.position, schemeColor, linearizeColors, data);
         m_instanceData.push_back (data);
     }
 
@@ -1944,7 +1967,14 @@ void RenderSystem::Render (const AnimationSystem & animationSystem, const Viewpo
     }
 
     // Update instance buffer with character data
-    (void) UpdateInstanceBuffer (animationSystem, params.colorScheme, params.elapsedTime, params.customColor);
+    // Colors go to the GPU in linear light only when a later pass will encode
+    // them. With no scene texture the glyphs land straight in the back buffer,
+    // no output transform runs, and linear values would display far too dark.
+    (void) UpdateInstanceBuffer (animationSystem,
+                                 params.colorScheme,
+                                 params.elapsedTime,
+                                 params.customColor,
+                                 m_sceneRTV != nullptr);
 
     if (m_instanceData.empty())
     {
@@ -2493,9 +2523,14 @@ void RenderSystem::BuildOverlayInstances (std::span<const HintCharacter> chars,
         inst.uvMin[1]    = overlayUV.uvMin.y;
         inst.uvMax[0]    = uvMaxX;
         inst.uvMax[1]    = overlayUV.uvMax.y;
-        inst.color[0]    = ch.colorR;
-        inst.color[1]    = ch.colorG;
-        inst.color[2]    = ch.colorB;
+        // Overlay tints are authored as sRGB, like everything a human picks,
+        // so they need decoding before they meet a linear-light pipeline. No
+        // brightness or self-glow term here: an overlay is flat text, and
+        // inst.brightness carries its fade through the unchanged premultiplied
+        // blend.
+        inst.color[0]    = SrgbToLinear (ch.colorR);
+        inst.color[1]    = SrgbToLinear (ch.colorG);
+        inst.color[2]    = SrgbToLinear (ch.colorB);
         inst.color[3]    = 1.0f;
         inst.brightness  = ch.opacity;
         inst.scaleX      = widthRatio;

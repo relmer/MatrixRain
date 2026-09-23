@@ -255,7 +255,11 @@ private:
 
     // Rendering helpers
     void    SortStreaksByDepth       (std::vector<const CharacterStreak *> & streaks);
-    HRESULT UpdateInstanceBuffer     (const AnimationSystem & animationSystem, ColorScheme colorScheme, float elapsedTime, COLORREF customColor);
+    HRESULT UpdateInstanceBuffer     (const AnimationSystem & animationSystem,
+                                      ColorScheme             colorScheme,
+                                      float                   elapsedTime,
+                                      COLORREF                customColor,
+                                      bool                    linearizeColors);
     void    ClearRenderTarget();
     void    RenderFPSCounter         (float fps, int rainPercentage, int streakCount, int activeHeadCount, double gpuLoadPercent, bool gpuLoadValid);
     void    DrawFeatheredGlow        (const wchar_t * fpsText, UINT32 textLength, const D2D1_RECT_F & textRect);
@@ -270,7 +274,11 @@ private:
     void    SetViewport              (UINT width, UINT height);
     
     static int  CodepointToUtf16                    (uint32_t codepoint, wchar_t * glyphStr);
-    static void BuildCharacterInstanceData          (const CharacterInstance & character, const Vector3 & streakPos, const Color4 & schemeColor, CharacterInstanceData & data);
+    static void BuildCharacterInstanceData          (const CharacterInstance & character,
+                                                     const Vector3           & streakPos,
+                                                     const Color4            & schemeColor,
+                                                     bool                      linearizeColors,
+                                                     CharacterInstanceData   & data);
     void        ComputeOverlayLayout                (std::span<const HintCharacter> chars, int marginCols, int keyColChars, int gapChars, int numRows, float cellHeight, float padding, std::vector<float> & xPositions, D2D1_RECT_F & bounds, float & baseY, float & advanceScale);
     void        CalculateColumnAlignedTextPositions (std::span<const HintCharacter> chars, int marginCols, int keyColChars, int descColStart, float maxKeyWidth, const std::vector<float> & keyColWidths, float gapWidth, float advScaled, std::vector<float> & positions);
 
