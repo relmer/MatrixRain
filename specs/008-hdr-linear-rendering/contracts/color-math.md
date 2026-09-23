@@ -68,6 +68,13 @@ void  ToneMapHighlights (float rgb[3], float headroom) noexcept
 - `HighlightGain` is 1 for `OutputMode::Sdr` or `HdrMode::Off`; otherwise
   `headroom ^ (clamp(highlightBrightness, 0, 100) / 100)`. It is monotonic in
   the brightness setting and equals `headroom` at 100.
+- `float HighlightWeight (bool isHead, float brightness) noexcept` (research
+  R14, option B): 1 for a head; for a trail glyph
+  `kTrailHighlightShare * r^2` with
+  `r = max (0, (brightness - kTrailHighlightFloor) / (1 - kTrailHighlightFloor))`,
+  so 0 at and below the floor, rising to the share at full brightness,
+  monotonic in brightness, never above 1. An instance's gain is
+  `HighlightGain ^ HighlightWeight`.
 - `ToneMapHighlights`:
   - Identity when `max(rgb) <= 1`.
   - For `m = max(rgb) > 1`, maps `m` through a smooth shoulder to

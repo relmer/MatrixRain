@@ -54,7 +54,7 @@ A user with Windows HDR turned on for one or more monitors runs MatrixRain. On e
 
 ### User Story 3 - Glowing Highlights Beyond SDR White (Priority: P3)
 
-A user with an HDR monitor wants the rain to look like it is made of light. The white leading glyphs of each streak, and the brightest parts of their glow, now shine brighter than anything an SDR display can show, up to what that monitor can physically produce, while the green trails stay at the user's normal SDR brightness. Nothing clips harshly: the brightest highlights roll off smoothly as they approach the display's limit. The user can choose how bright the highlights get, or turn the HDR treatment off entirely and keep the SDR look on an HDR monitor.
+A user with an HDR monitor wants the rain to look like it is made of light. The white leading glyph of each streak, the brightest trail glyphs just behind it in the streak's own color, and the brightest parts of their glow, now shine brighter than anything an SDR display can show, up to what that monitor can physically produce, while the rest of each trail fades back to the user's normal SDR brightness. (Revised during Phase 3 design: the original confined headroom to the white heads, which left the rain's color with none.) Nothing clips harshly: the brightest highlights roll off smoothly as they approach the display's limit. The user can choose how bright the highlights get, or turn the HDR treatment off entirely and keep the SDR look on an HDR monitor.
 
 **Why this priority**: This is the visible payoff of the feature, but it is purely additive: Stories 1 and 2 are complete and valuable without it, and it is the part most dependent on subjective tuning on real hardware.
 
@@ -62,7 +62,7 @@ A user with an HDR monitor wants the rain to look like it is made of light. The 
 
 **Acceptance Scenarios**:
 
-1. **Given** an HDR monitor and HDR mode set to Auto, **When** streaks fall, **Then** streak heads and the core of their glow appear brighter than SDR white, while trails remain at the user's SDR content brightness.
+1. **Given** an HDR monitor and HDR mode set to Auto, **When** streaks fall, **Then** streak heads, the brightest trail glyphs just behind them, and the core of their glow appear brighter than SDR white, in their own color, while the dimmer part of each trail remains at the user's SDR content brightness.
 2. **Given** highlights approaching the display's peak brightness, **When** they are rendered, **Then** their brightness rolls off smoothly with no visible hard clip, color shift or flat-topped plateau.
 3. **Given** the user moves the highlight brightness control, **When** the change is made, **Then** highlight brightness changes immediately in the live preview, and the setting persists across runs.
 4. **Given** HDR mode set to Off, **When** MatrixRain runs on an HDR monitor, **Then** no content exceeds SDR white and the result matches User Story 2.
@@ -115,14 +115,14 @@ A user with an HDR monitor wants the rain to look like it is made of light. The 
 
 #### Phase 3 - Highlight headroom (User Story 3)
 
-- **FR-018**: On HDR monitors with HDR mode set to Auto, the brightest content — streak heads and the core of their glow — MUST be allowed to exceed SDR white, up to the display's peak brightness.
+- **FR-018**: On HDR monitors with HDR mode set to Auto, the brightest content — streak heads, the brightest trail glyphs just behind them, and the core of their glow — MUST be allowed to exceed SDR white, up to the display's peak brightness, keeping its color. (Revised during Phase 3 design: heads only, as first written, meant only white ever exceeded SDR white.)
 - **FR-019**: Content approaching the display's brightness ceiling MUST roll off smoothly toward it, with no hard clip, and the roll-off MUST preserve hue.
-- **FR-020**: Trails, background and overlays MUST remain at the user's SDR content brightness; only highlights gain headroom.
+- **FR-020**: Background, overlays and the dimmer part of every trail MUST remain at the user's SDR content brightness. Trail glyphs share the highlight headroom only in proportion to how bright they are, so the share falls to none well before a trail's tail.
 - **FR-021**: The system MUST provide an **HDR mode** setting with the values **Auto** (use highlight headroom on monitors where Windows HDR is on) and **Off** (never exceed SDR white). Default: **Auto**.
 - **FR-022**: The system MUST provide a **highlight brightness** control that sets how far above SDR white highlights may go, bounded by each display's peak. It MUST apply live and persist like other settings.
 - **FR-023**: The HDR mode and highlight brightness settings MUST participate in the settings dialog's live preview, Cancel rollback and Reset to defaults behavior like every existing setting.
 - **FR-024**: The settings dialog MUST make clear that the HDR settings affect only HDR-enabled displays.
-- **FR-025**: Apart from highlight brightness, which depends on each display's physical capability, character appearance — trail brightness relative to SDR white, glyph shape, glow extent, color and scanline density — MUST be identical across monitors.
+- **FR-025**: Apart from highlights (heads and the brightest trail glyphs, whose height depends on each display's physical capability), character appearance — the brightness of the rest of each trail relative to SDR white, glyph shape, glow extent, color and scanline density — MUST be identical across monitors.
 - **FR-026**: When a display's reported peak brightness is missing or implausible, the system MUST assume a conservative ceiling; when the SDR white level exceeds the reported peak, the effective ceiling MUST be the lower of the two.
 
 #### Quality (all phases)
@@ -146,7 +146,7 @@ A user with an HDR monitor wants the rain to look like it is made of light. The 
 - **SC-004**: Toggling Windows HDR for a monitor while running results in correct output on that monitor within 2 seconds, in 10 out of 10 attempts, with no crash or freeze on any monitor.
 - **SC-005**: With HDR mode Auto on a display capable of at least 600 nits peak and an SDR content brightness of at most 250 nits, streak heads measure at least 2x the SDR white level at the default highlight brightness.
 - **SC-006**: No monitor, SDR or HDR, drops more than 5% below the frame rate v1.6 achieved at the same quality preset on the same hardware.
-- **SC-007**: On a mixed HDR/SDR setup, trail brightness, glyph shape, glow extent and scanline density are indistinguishable between monitors when compared side by side.
+- **SC-007**: On a mixed HDR/SDR setup, the brightness of trails away from the highlights, glyph shape, glow extent and scanline density are indistinguishable between monitors when compared side by side.
 - **SC-008**: All overlays are fully legible on HDR monitors in every phase, with no text rendered noticeably brighter or dimmer than on an SDR monitor at the same SDR brightness.
 
 ## Assumptions

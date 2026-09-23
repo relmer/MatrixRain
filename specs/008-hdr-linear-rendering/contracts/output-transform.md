@@ -50,8 +50,9 @@ linear = SrgbToLinear (v16Composite (LinearToSrgb (sdr), glow))
        + highlightGlow * kHighlightGlowStrength * (bloomIntensity / 2.5)
 ```
 
-`excess` and `highlightGlow` are zero wherever no instance has a highlight
-gain above 1, which covers every SDR frame and every HDR frame with mode Off,
+Both `excess` and `highlightGlow` are in color: a boosted trail glyph keeps
+its scheme's color above white. They are zero wherever no instance has a
+highlight gain above 1, which covers every SDR frame and every HDR frame with mode Off,
 so those frames are unchanged.
 
 ## Invariants

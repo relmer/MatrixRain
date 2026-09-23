@@ -306,9 +306,11 @@ monitors are never disturbed.
 ## R8. Highlight headroom and tone mapping (Phase 3)
 
 **Decision**:
-- **Which content**: streak heads (already recognized as white instances) get
-  their linear color multiplied by `highlightGain`. Their glow inherits it
-  through the bloom extract. Trails, overlays and scanline gaps are unchanged
+- **Which content** (revised in R14): streak heads (already recognized as
+  white instances) get the full `highlightGain`; trail glyphs get a share of
+  it that grows with their brightness and is none below a floor, so the
+  bright glyphs just behind a head rise above SDR white in the scheme's
+  color and the tail does not. Overlays and scanline gaps are unchanged
   (FR-020).
 - **Gain**: `highlightGain = headroom ^ (highlight / 100)`, where
   `headroom = effectivePeakNits / sdrWhiteNits` and `highlight` is the 0–100
@@ -406,9 +408,9 @@ excess = scene - sdr             per channel, >= 0; nonzero only on boosted head
   and the composite screens the glow over `encode (sdr)`. Unchanged code.
 - **The excess** skips it:
   - the extract also averages `excess` over its four texels **in linear
-    light** (light adds; there is nothing to match here) and writes its
-    luminance to a second render target, a single-channel `R16_FLOAT`
-    highlight texture at the bloom resolution;
+    light** (light adds; there is nothing to match here) and writes it, in
+    color, to a second render target, an `R11G11B10_FLOAT` highlight texture
+    at the bloom resolution;
   - the existing blur shaders run over that texture with the same kernel and
     passes as the glow (they are generic over `float4`);
   - the composite adds, in linear light, after decoding its v1.6 result:
@@ -419,8 +421,8 @@ linear = SrgbToLinear (v1.6 composite (encode (sdr), glow))
        + highlightGlow * kHighlightGlowStrength * (bloomIntensity / 2.5)
 ```
 
-  `highlightGlow` is the blurred luminance, added as neutral light: heads are
-  white instances (R8), so their glow above white is white too. The
+  `highlightGlow` is the blurred excess, in color: a boosted green trail
+  glyph glows green above white, a white head white. The
   `bloomIntensity / 2.5` term makes the Glow Intensity slider scale the
   highlight glow the way it scales the ordinary glow, with its default at 1.
   `kHighlightGlowStrength` starts at 1 and is tuned by eye on hardware
@@ -436,12 +438,38 @@ all unless this monitor's highlight gain is above 1, so SDR monitors, and
 HDR monitors with mode Off, pay nothing. The calibration baselines therefore
 keep passing unchanged, and they are the regression test for this.
 
+**Which glyphs, and how much** (option B, chosen by Rob over heads only and
+over boosting everything): each instance gets
+
+```text
+gain = G ^ w
+G    = HighlightGain (headroom, highlightBrightness, hdrMode, outputMode)
+w    = 1                                              for a head
+w    = kTrailHighlightShare * r^2,
+       r = max (0, (brightness - kTrailHighlightFloor) / (1 - kTrailHighlightFloor))
+                                                      for a trail glyph
+```
+
+so a head gets the whole gain, a trail glyph near full brightness gets a
+large share of it in its own color, and below the floor a glyph gets none.
+`G ^ w` rather than a linear blend keeps equal steps of `w` equal steps of
+perceived brightness, and makes `w = 0` exactly 1. Starting values
+`kTrailHighlightShare = 0.6` and `kTrailHighlightFloor = 0.5`, tuned on
+hardware in T044; `HighlightWeight (isHead, brightness)` is a pure function
+with tests.
+
+Boosting everything by brightness with no floor (the option not taken) is
+the same as raising the SDR brightness for the rain alone: no extra
+contrast, the glow's above-white part turning into fog, and mixed monitors
+no longer matching (FR-025).
+
 **Where the gain goes**: per instance, as a new `highlightGain` float in
-`CharacterInstanceData` (1 for everything but heads, and for overlays), and the
-glyph shader multiplies by it after it has linearized and clipped the pixel:
-`SrgbToLinear3 (min (X c^2, 1)) * gain`. The self-glow overshoot that v1.6
-clipped (a full-brightness head is 1.3) stays clipped; the gain is the only
-thing that lifts a head above white, so the slider alone sets its height.
+`CharacterInstanceData` (1 for overlays and for every glyph below the floor),
+and the glyph shader multiplies by it after it has linearized and clipped the
+pixel: `SrgbToLinear3 (min (X c^2, 1)) * gain`. The self-glow overshoot that
+v1.6 clipped (a full-brightness head is 1.3) stays clipped; the gain is the
+only thing that lifts a glyph above white, so the slider alone sets its
+height.
 Premultiplied alpha is unaffected: rgb scales, alpha does not, so a boosted
 head still covers what is behind it by its coverage.
 
@@ -465,18 +493,25 @@ scanline shader's `min (c, g_headroom)` clamp where Phase 2 had it; unused in
 SDR.
 
 **Cost**: nothing on SDR monitors or with mode Off. With highlights on: one
-extra render target on the extract (MRT, same pass), one `R16_FLOAT` texture
-pair at the bloom resolution through the same blur passes (2 bytes a pixel
-against the glow chain's 4, so about half the blur chain's bandwidth again),
-and a few ALU operations in the composite. Estimated at about 25
-microseconds a frame at 4K on the desktop card, on top of HDR's 50; T044
-measures it.
+extra render target on the extract (MRT, same pass), one `R11G11B10_FLOAT`
+texture pair at the bloom resolution through the same blur passes (the same
+bytes as the glow chain, so its bandwidth again), and a few ALU operations in
+the composite. Estimated at about 50 microseconds a frame at 4K on the
+desktop card, on top of HDR's 50; T044 measures it. A single-channel texture
+would halve that but could only carry white, and option B puts color above
+white.
+
+**Overlap**: with trail glyphs boosted, dense regions carry more above-white
+light, and the highlight glow adds rather than saturating. If that brings
+back the dense-region fog Rob rejected in Phase 1, the fix is v1.6's own
+soft saturation, `1 - exp (-x)`, applied to the highlight glow before it is
+added. T044 looks for it.
 
 **Alternatives considered**:
 - *A 16-bit float glow chain with the excess in its alpha channel*: no extra
-  passes, but it doubles the bandwidth of the whole glow chain (8 bytes a
-  pixel against 4) where the separate texture adds half, and it would put a
-  different format under the v1.6 color chain in highlight mode.
+  passes, but it carries only one channel above white, so the excess would
+  have no color, and it puts a different format under the v1.6 color chain
+  in highlight mode.
 - *Deriving the highlight glow from the existing glow* (for example by how
   white the blurred glow is): no extra cost, but it cannot tell a head's glow
   from a white custom color's trail glow, and FR-020 says trails do not move.

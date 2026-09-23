@@ -73,10 +73,12 @@ trails.
 - `1` when `outputMode == Sdr`, when `hdrMode == Off`, or in Phase 2.
 - Otherwise `headroom ^ (highlightBrightness / 100)`.
 
-Carried per instance in `CharacterInstanceData::highlightGain` (1 for trails
-and overlays) and applied by the glyph shader after it linearizes and clips
-the pixel; the instance color is gamma-space and cannot carry it (research
-R14). Trails, overlays and scanlines never receive it.
+Each instance carries `highlightGain ^ HighlightWeight (isHead, brightness)`
+in `CharacterInstanceData::highlightGain`: the whole gain for a head, a share
+growing with brightness for a trail glyph, 1 below the floor and for
+overlays (research R14, option B). The glyph shader applies it after it
+linearizes and clips the pixel; the instance color is gamma-space and cannot
+carry it. Overlays and scanlines never receive it.
 
 ## 6. Render-target set (per `RenderSystem`)
 
@@ -84,7 +86,7 @@ R14). Trails, overlays and scanlines never receive it.
 |---|---|---|
 | Scene | `R11G11B10_FLOAT` (research R2, revised in T020) | full |
 | Bloom, blur temp | `R11G11B10_FLOAT` | ÷ resolution divisor |
-| Highlight, highlight blur temp (Phase 3) | `R16_FLOAT`, luminance of the scene above SDR white | ÷ resolution divisor; created only while this monitor's highlight gain is above 1 (research R14) |
+| Highlight, highlight blur temp (Phase 3) | `R11G11B10_FLOAT`, the scene above SDR white, in color | ÷ resolution divisor; created only while this monitor's highlight gain is above 1 (research R14) |
 | Post-bloom | `R11G11B10_FLOAT` | full |
 | Back buffer | `B8G8R8A8_UNORM` (SDR) / `R16G16B16A16_FLOAT` (HDR) | full |
 | D2D target bitmap | matches back buffer | full |
