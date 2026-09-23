@@ -593,6 +593,7 @@ static const D3D11_INPUT_ELEMENT_DESC s_krgInputLayout[] = {
     { "BRIGHTNESS", 0, DXGI_FORMAT_R32_FLOAT,          1, 44, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
     { "SCALEX",     0, DXGI_FORMAT_R32_FLOAT,          1, 48, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
     { "SCALEY",     0, DXGI_FORMAT_R32_FLOAT,          1, 52, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+    { "HIGHLIGHT",  0, DXGI_FORMAT_R32_FLOAT,          1, 56, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
 };
 
 
@@ -1351,6 +1352,15 @@ HRESULT RenderSystem::CreateBloomResources (UINT width, UINT height)
     // Safety check - don't create bloom resources with invalid dimensions
     BAIL_OUT_IF (width == 0 || height == 0, S_OK);  // Return success without creating resources
 
+    // The highlight textures follow the bloom size; drop them so the next
+    // frame that needs them makes them at the new one.
+    m_highlightSRV.Reset();
+    m_highlightRTV.Reset();
+    m_highlightTexture.Reset();
+    m_highlightTempSRV.Reset();
+    m_highlightTempRTV.Reset();
+    m_highlightTempTexture.Reset();
+
     // Create scene render target (full resolution)
     sceneTexDesc.Width             = width;
     sceneTexDesc.Height            = height;
@@ -1558,8 +1568,9 @@ void RenderSystem::SetViewport(UINT width, UINT height)
 HRESULT RenderSystem::ApplyBloom (ID3D11RenderTargetView * pCompositeTarget, bool isFinalPass)
 {
     HRESULT                    hr              = S_OK;
-    ID3D11ShaderResourceView * srvs[2];
+    ID3D11ShaderResourceView * srvs[3];
     ID3D11Buffer             * nullCB          = nullptr;
+    bool                       highlights      = false;
     D3D11_MAPPED_SUBRESOURCE   mappedBloomCB;
     int                        viewportDivisor = 0;
     ID3D11PixelShader        * blurH           = nullptr;
@@ -1586,7 +1597,28 @@ HRESULT RenderSystem::ApplyBloom (ID3D11RenderTargetView * pCompositeTarget, boo
                             nullptr);
     m_context->PSSetSamplers (0, 1, m_samplerState.GetAddressOf());
     
-    RenderFullscreenPass (m_bloomRTV.Get(), m_bloomExtractPS.Get(), m_sceneSRV.GetAddressOf(), 1);
+    // The extract always writes the glow; with highlights on it also writes
+    // the scene above SDR white to the highlight texture (research R14).
+    // With highlights off the second target is simply not bound, and the
+    // shader's second output goes nowhere.
+    highlights = HighlightsActive() && SUCCEEDED (EnsureHighlightResources());
+
+    if (highlights)
+    {
+        ID3D11RenderTargetView   * targets[2] = { m_bloomRTV.Get(), m_highlightRTV.Get() };
+        ID3D11ShaderResourceView * nullSRV    = nullptr;
+
+
+        m_context->OMSetRenderTargets   (2, targets, nullptr);
+        m_context->PSSetShader          (m_bloomExtractPS.Get(), nullptr, 0);
+        m_context->PSSetShaderResources (0, 1, m_sceneSRV.GetAddressOf());
+        m_context->Draw (6, 0);
+        m_context->PSSetShaderResources (0, 1, &nullSRV);
+    }
+    else
+    {
+        RenderFullscreenPass (m_bloomRTV.Get(), m_bloomExtractPS.Get(), m_sceneSRV.GetAddressOf(), 1);
+    }
     
     // Update bloom constant buffer (shared by blur and composite shaders)
     hr = m_context->Map (m_bloomConstantBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedBloomCB);
@@ -1636,6 +1668,24 @@ HRESULT RenderSystem::ApplyBloom (ID3D11RenderTargetView * pCompositeTarget, boo
         // Vertical blur pass (temp → bloom)
         RenderFullscreenPass (m_bloomRTV.Get(), blurV, m_blurTempSRV.GetAddressOf(), 1);
     }
+
+    // The highlight texture is the glow's core, so it gets a short blur: one
+    // pass (MR_HIGHLIGHT_BLUR_PASSES) of the 5-tap kernel whatever the
+    // quality preset. The blur is bound by texture samples, and at half
+    // resolution on a 4K monitor the preset's own 13-tap kernel cost about
+    // 90 microseconds a frame for this texture alone (T041a).
+    if (highlights)
+    {
+        ID3D11PixelShader * coreH = m_blurHorizontalPS5 ? m_blurHorizontalPS5.Get() : blurH;
+        ID3D11PixelShader * coreV = m_blurVerticalPS5   ? m_blurVerticalPS5.Get()   : blurV;
+
+
+        for (int pass = 0; pass < static_cast<int> (MR_HIGHLIGHT_BLUR_PASSES); ++pass)
+        {
+            RenderFullscreenPass (m_highlightTempRTV.Get(), coreH, m_highlightSRV.GetAddressOf(),     1);
+            RenderFullscreenPass (m_highlightRTV.Get(),     coreV, m_highlightTempSRV.GetAddressOf(), 1);
+        }
+    }
     
     // Restore full viewport
     SetViewport (m_renderWidth, m_renderHeight);
@@ -1662,7 +1712,8 @@ HRESULT RenderSystem::ApplyBloom (ID3D11RenderTargetView * pCompositeTarget, boo
 
     srvs[0] = m_sceneSRV.Get();
     srvs[1] = m_bloomSRV.Get();
-    RenderFullscreenPass (pCompositeTarget, m_compositePS.Get(), srvs, 2);
+    srvs[2] = highlights ? m_highlightSRV.Get() : nullptr;
+    RenderFullscreenPass (pCompositeTarget, m_compositePS.Get(), srvs, 3);
     
     // Unbind constant buffer from pixel shader
     m_context->PSSetConstantBuffers (0, 1, &nullCB);
@@ -1728,6 +1779,7 @@ void RenderSystem::SortStreaksByDepth (std::vector<const CharacterStreak*>& stre
 void RenderSystem::BuildCharacterInstanceData (const CharacterInstance            & character,
                                                const Vector3                      & streakPos,
                                                const Color4                       & schemeColor,
+                                               float                                frameHighlightGain,
                                                RenderSystem::CharacterInstanceData & data)
 {
     CharacterSet & charSet = CharacterSet::GetInstance();
@@ -1782,6 +1834,14 @@ void RenderSystem::BuildCharacterInstanceData (const CharacterInstance          
     data.brightness = character.brightness;
     data.scaleX     = character.scale;
     data.scaleY     = character.scale;
+
+    // Spec 008 research R14, option B: a head takes the frame's whole
+    // highlight gain, a bright trail glyph a share of it that grows with its
+    // brightness, and everything else none. Exactly 1 whenever the frame's
+    // gain is 1, which is every SDR frame and every frame with HDR mode Off.
+    data.highlightGain = (frameHighlightGain > 1.0f)
+                         ? std::pow (frameHighlightGain, HighlightWeight (isWhite, character.brightness))
+                         : 1.0f;
 }
 
 
@@ -1835,7 +1895,7 @@ HRESULT RenderSystem::UpdateInstanceBuffer (const AnimationSystem & animationSys
 
 
 
-            BuildCharacterInstanceData (character, streakPos, schemeColor, data);
+            BuildCharacterInstanceData (character, streakPos, schemeColor, m_frameHighlightGain, data);
             m_instanceData.push_back (data);
         }
     }
@@ -1848,7 +1908,7 @@ HRESULT RenderSystem::UpdateInstanceBuffer (const AnimationSystem & animationSys
 
 
 
-        BuildCharacterInstanceData (overlay.character, overlay.position, schemeColor, data);
+        BuildCharacterInstanceData (overlay.character, overlay.position, schemeColor, m_frameHighlightGain, data);
         m_instanceData.push_back (data);
     }
 
@@ -1982,6 +2042,18 @@ void RenderSystem::Render (const AnimationSystem & animationSystem, const Viewpo
 
         m_context->Unmap (m_constantBuffer.Get(), 0);
     }
+
+    // Spec 008 Phase 3: how far above SDR white this frame's highlights may
+    // go. 1 in SDR and with HDR mode Off, which switches the whole highlight
+    // path off (research R14).
+    m_hdrMode            = params.hdrMode;
+    m_frameHighlightGain = HighlightGain (m_headroom, params.highlightBrightness, params.hdrMode, m_outputMode);
+
+    // Spec 008 Phase 3: how far above SDR white this frame's highlights may
+    // go. 1 in SDR and with HDR mode Off, which switches the whole highlight
+    // path off (research R14).
+    m_hdrMode            = params.hdrMode;
+    m_frameHighlightGain = HighlightGain (m_headroom, params.highlightBrightness, params.hdrMode, m_outputMode);
 
     // Update instance buffer with character data
     (void) UpdateInstanceBuffer (animationSystem, params.colorScheme, params.elapsedTime, params.customColor);
@@ -3129,6 +3201,12 @@ void RenderSystem::ReleaseBloomResources()
     m_postBloomSRV.Reset();
     m_postBloomRTV.Reset();
     m_postBloomTexture.Reset();
+    m_highlightSRV.Reset();
+    m_highlightRTV.Reset();
+    m_highlightTexture.Reset();
+    m_highlightTempSRV.Reset();
+    m_highlightTempRTV.Reset();
+    m_highlightTempTexture.Reset();
 }
 
 
@@ -3423,10 +3501,98 @@ Error:
 
 ////////////////////////////////////////////////////////////////////////////////
 //
+//  RenderSystem::HighlightsActive
+//
+//  Whether this frame draws anything above SDR white (research R14): only
+//  when some glyph can be boosted, which needs HDR output, HDR mode Auto,
+//  a nonzero highlight setting and a display with headroom.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+bool RenderSystem::HighlightsActive() const noexcept
+{
+    return m_outputMode == OutputMode::Hdr && m_frameHighlightGain > 1.0f;
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  RenderSystem::EnsureHighlightResources
+//
+//  The highlight texture pair, made on first use at the bloom resolution and
+//  dropped with the bloom resources. The same 11/11/10 float format as the
+//  glow, and for the same reasons (research R2): it is blurred and only ever
+//  added, and it has to carry color.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+HRESULT RenderSystem::EnsureHighlightResources()
+{
+    HRESULT              hr      = S_OK;
+    D3D11_TEXTURE2D_DESC desc    = {};
+    int                  divisor = std::clamp (static_cast<int> (m_bloomResolutionDivisor), 1, 8);
+
+
+
+    BAIL_OUT_IF (m_highlightTexture && m_highlightTempTexture, S_OK);
+    CBRAEx (m_device != nullptr && m_renderWidth > 0 && m_renderHeight > 0, E_UNEXPECTED);
+
+    desc.Width            = std::max (1u, m_renderWidth  / static_cast<UINT> (divisor));
+    desc.Height           = std::max (1u, m_renderHeight / static_cast<UINT> (divisor));
+    desc.MipLevels        = 1;
+    desc.ArraySize        = 1;
+    desc.Format           = kBloomFormat;
+    desc.SampleDesc.Count = 1;
+    desc.Usage            = D3D11_USAGE_DEFAULT;
+    desc.BindFlags        = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
+
+    hr = m_device->CreateTexture2D (&desc, nullptr, &m_highlightTexture);
+    CHRA (hr);
+
+    hr = m_device->CreateRenderTargetView (m_highlightTexture.Get(), nullptr, &m_highlightRTV);
+    CHRA (hr);
+
+    hr = m_device->CreateShaderResourceView (m_highlightTexture.Get(), nullptr, &m_highlightSRV);
+    CHRA (hr);
+
+    hr = m_device->CreateTexture2D (&desc, nullptr, &m_highlightTempTexture);
+    CHRA (hr);
+
+    hr = m_device->CreateRenderTargetView (m_highlightTempTexture.Get(), nullptr, &m_highlightTempRTV);
+    CHRA (hr);
+
+    hr = m_device->CreateShaderResourceView (m_highlightTempTexture.Get(), nullptr, &m_highlightTempSRV);
+    CHRA (hr);
+
+
+Error:
+    if (FAILED (hr))
+    {
+        m_highlightSRV.Reset();
+        m_highlightRTV.Reset();
+        m_highlightTexture.Reset();
+        m_highlightTempSRV.Reset();
+        m_highlightTempRTV.Reset();
+        m_highlightTempTexture.Reset();
+    }
+
+    return hr;
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
 //  RenderSystem::MakeOutputTransformCb
 //
-//  The b1 constants for one pass (data-model §4). Phase 2 caps at SDR white
-//  (headroom 1, FR-013); Phase 3 puts the display's headroom here.
+//  The b1 constants for one pass (data-model §4). The display's headroom in
+//  HDR with HDR mode Auto; 1, which caps at SDR white, with HDR mode Off
+//  (FR-021) and in SDR, where it is unused.
 //
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -3438,7 +3604,7 @@ OutputTransformCb RenderSystem::MakeOutputTransformCb (bool isFinalPass) const n
 
     cb.outputMode    = (m_outputMode == OutputMode::Hdr) ? 1u : 0u;
     cb.sdrWhiteScale = m_sdrWhiteScale;
-    cb.headroom      = 1.0f;
+    cb.headroom      = (m_outputMode == OutputMode::Hdr && m_hdrMode == HdrMode::Auto) ? m_headroom : 1.0f;
     cb.isFinalPass   = isFinalPass ? 1u : 0u;
 
     return cb;
@@ -3487,7 +3653,7 @@ void RenderSystem::SetGlowIntensity (int intensityPercent)
 {
     // Convert percentage (0-200) to multiplier (0.0-5.0)
     // Default is 100% = 2.5 multiplier
-    m_glowIntensity = (intensityPercent / 100.0f) * 2.5f;
+    m_glowIntensity = (intensityPercent / 100.0f) * MR_DEFAULT_BLOOM_INTENSITY;
 }
 
 

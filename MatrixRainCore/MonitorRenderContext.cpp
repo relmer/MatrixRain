@@ -418,6 +418,7 @@ void MonitorRenderContext::RunOutputModeDetection()
     }
 
     m_renderSystem->SetSdrWhiteScale (m_outputModeTracker->SdrWhiteScale());
+    m_renderSystem->SetHeadroom      (m_outputModeTracker->Headroom());
 
     PublishHdrPresence (m_outputModeTracker->CurrentMode() == OutputMode::Hdr);
 

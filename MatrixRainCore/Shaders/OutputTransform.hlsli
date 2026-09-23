@@ -25,23 +25,58 @@ cbuffer OutputCb : register(b1)
     uint  g_isFinalPass;    // 1: this pass writes the back buffer; 0: an intermediate
 };
 
+//
+//  ToneMapHighlights3: a line-for-line transliteration of ToneMapHighlights in
+//  ColorMath.cpp (research R8, R14). Identity up to SDR white; above it an
+//  extended-Reinhard shoulder on the brightest channel, slope 1 at white,
+//  approaching the headroom without reaching it; one factor for all three
+//  channels so the hue does not move. With no headroom it caps at white.
+//
+
+float3 ToneMapHighlights3(float3 rgb, float headroom)
+{
+    float  m      = max(max(rgb.r, rgb.g), rgb.b);
+    float3 result = rgb;
+
+    if (m > 1.0)
+    {
+        float mapped = 1.0;
+
+        if (headroom > 1.0)
+        {
+            float span = headroom - 1.0;
+            float t    = (m - 1.0) / span;
+
+            mapped = 1.0 + span * t / (1.0 + t);
+        }
+
+        result = rgb * (mapped / m);
+    }
+
+    return result;
+}
+
 float3 OutputTransform(float3 linearRgb)
 {
     // An intermediate pass leaves the image in linear light for whatever comes
     // next.
-    if (g_isFinalPass == 0)
+    float3 result = linearRgb;
+
+    if (g_isFinalPass != 0)
     {
-        return linearRgb;
+        if (g_outputMode == 0)
+        {
+            result = LinearToSrgb3(linearRgb);
+        }
+        else
+        {
+            // HDR (scRGB): roll highlights off into the headroom (1 caps at
+            // white), then place SDR white where the user's slider put it.
+            result = ToneMapHighlights3(max(linearRgb, 0.0), g_headroom) * g_sdrWhiteScale;
+        }
     }
 
-    if (g_outputMode == 0)
-    {
-        return LinearToSrgb3(linearRgb);
-    }
-
-    // HDR (scRGB): cap at the headroom, then place SDR white where the
-    // user's slider put it.
-    return min(max(linearRgb, 0.0), g_headroom) * g_sdrWhiteScale;
+    return result;
 }
 
 #endif

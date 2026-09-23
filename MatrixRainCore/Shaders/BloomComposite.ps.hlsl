@@ -28,6 +28,7 @@ cbuffer BloomConstants : register(b0)
 
 Texture2D sceneTexture : register(t0);
 Texture2D bloomTexture : register(t1);
+Texture2D highlightTexture : register(t2);   // Blurred scene above SDR white (research R14); unbound, so 0, unless highlights are on
 SamplerState samplerState : register(s0);
 
 struct PSInput
@@ -47,7 +48,12 @@ float4 main(PSInput input) : SV_TARGET
     float3 bloomContrib = bloom.rgb * bloomIntensity;
     float3 softBloom    = 1.0 - exp(-bloomContrib);
 
-    float3 encodedScene = LinearToSrgb3(scene.rgb);
+    // Split the scene at SDR white (research R14). The part at or below it
+    // gets v1.6's composite exactly; the part above it, zero unless a glyph
+    // was boosted for HDR highlights, is added back in linear light below.
+    float3 sdr          = min(scene.rgb, 1.0);
+    float3 excess       = scene.rgb - sdr;
+    float3 encodedScene = LinearToSrgb3(sdr);
     float3 composited   = encodedScene + softBloom * (1.0 - encodedScene);
 
     // The result is already encoded. When this pass writes the SDR back
@@ -62,5 +68,8 @@ float4 main(PSInput input) : SV_TARGET
         return float4(composited, 1.0);
     }
 
-    return float4(OutputTransform(SrgbToLinear3(composited)), 1.0);
+    float3 highlightGlow = highlightTexture.Sample(samplerState, input.uv).rgb
+                           * (MR_HIGHLIGHT_GLOW_STRENGTH * bloomIntensity / MR_DEFAULT_BLOOM_INTENSITY);
+
+    return float4(OutputTransform(SrgbToLinear3(composited) + excess + highlightGlow), 1.0);
 }

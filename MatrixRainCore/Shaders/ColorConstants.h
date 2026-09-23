@@ -64,4 +64,26 @@
 #define MR_SRGB_ENCODE_C1      1.51799129f
 #define MR_SRGB_ENCODE_C0     -0.0401122508f
 
+//
+//  Highlights above SDR white (spec 008 research R14). The composite adds the
+//  blurred part of the scene above white at this strength times the Glow
+//  Intensity slider's multiplier over its default, so the slider scales the
+//  highlight glow the way it scales the ordinary one and the default leaves
+//  it at 1. Both are used on the GPU; the default is also the C++ slider
+//  mapping's anchor (RenderSystem::SetGlowIntensity).
+//
+
+#define MR_HIGHLIGHT_GLOW_STRENGTH    1.0f
+
+//
+//  Blur passes for the highlight glow. The full glow runs up to four passes
+//  of the quality preset's kernel; the part above white is the glow's core,
+//  and repeating all of that doubled the blur's cost (0.23 ms at 4K High on
+//  the desktop card, T041a). It gets one pass of the 5-tap kernel instead,
+//  which keeps it near the glyph, where the core is. C++ only.
+//
+
+#define MR_HIGHLIGHT_BLUR_PASSES      1
+#define MR_DEFAULT_BLOOM_INTENSITY    2.5f
+
 #endif

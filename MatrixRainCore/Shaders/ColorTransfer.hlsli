@@ -17,44 +17,50 @@
 //  interpolation modifier keyword, and a parameter with that name fails to
 //  compile.
 //
+//  Each function returns in one place: FXC warns (X4000, potentially
+//  uninitialized variable) about an early return ahead of a later one.
+//
 
 float SrgbToLinearChannel(float encoded)
 {
-    if (encoded <= MR_SRGB_ENCODED_KNEE)
+    float result = encoded / MR_SRGB_LINEAR_SLOPE;
+
+    if (encoded > MR_SRGB_ENCODED_KNEE)
     {
-        return encoded / MR_SRGB_LINEAR_SLOPE;
+        float acc = MR_SRGB_DECODE_C5;
+
+        acc = acc * encoded + MR_SRGB_DECODE_C4;
+        acc = acc * encoded + MR_SRGB_DECODE_C3;
+        acc = acc * encoded + MR_SRGB_DECODE_C2;
+        acc = acc * encoded + MR_SRGB_DECODE_C1;
+        acc = acc * encoded + MR_SRGB_DECODE_C0;
+
+        result = acc;
     }
 
-    float acc = MR_SRGB_DECODE_C5;
-
-    acc = acc * encoded + MR_SRGB_DECODE_C4;
-    acc = acc * encoded + MR_SRGB_DECODE_C3;
-    acc = acc * encoded + MR_SRGB_DECODE_C2;
-    acc = acc * encoded + MR_SRGB_DECODE_C1;
-    acc = acc * encoded + MR_SRGB_DECODE_C0;
-
-    return acc;
+    return result;
 }
 
 float LinearToSrgbChannel(float linearValue)
 {
     float clamped = saturate(linearValue);
+    float result  = clamped * MR_SRGB_LINEAR_SLOPE;
 
-    if (clamped <= MR_SRGB_LINEAR_KNEE)
+    if (clamped > MR_SRGB_LINEAR_KNEE)
     {
-        return clamped * MR_SRGB_LINEAR_SLOPE;
+        float root = sqrt(clamped);
+        float acc  = MR_SRGB_ENCODE_C5;
+
+        acc = acc * root + MR_SRGB_ENCODE_C4;
+        acc = acc * root + MR_SRGB_ENCODE_C3;
+        acc = acc * root + MR_SRGB_ENCODE_C2;
+        acc = acc * root + MR_SRGB_ENCODE_C1;
+        acc = acc * root + MR_SRGB_ENCODE_C0;
+
+        result = acc;
     }
 
-    float root = sqrt(clamped);
-    float acc  = MR_SRGB_ENCODE_C5;
-
-    acc = acc * root + MR_SRGB_ENCODE_C4;
-    acc = acc * root + MR_SRGB_ENCODE_C3;
-    acc = acc * root + MR_SRGB_ENCODE_C2;
-    acc = acc * root + MR_SRGB_ENCODE_C1;
-    acc = acc * root + MR_SRGB_ENCODE_C0;
-
-    return acc;
+    return result;
 }
 
 float3 SrgbToLinear3(float3 encoded)

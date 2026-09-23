@@ -411,8 +411,13 @@ excess = scene - sdr             per channel, >= 0; nonzero only on boosted head
     light** (light adds; there is nothing to match here) and writes it, in
     color, to a second render target, an `R11G11B10_FLOAT` highlight texture
     at the bloom resolution;
-  - the existing blur shaders run over that texture with the same kernel and
-    passes as the glow (they are generic over `float4`);
+  - one pass of the existing 5-tap blur runs over that texture (the blur
+    shaders are generic over `float4`). As first designed it took the glow's
+    own kernel and pass count; measured, that cost as much again as the
+    whole glow chain (0.23 ms at 4K High), because the blur is bound by
+    texture samples, not bandwidth. The above-white part is the glow's
+    core, so a short blur that stays near the glyph is also the right
+    shape (T041a);
   - the composite adds, in linear light, after decoding its v1.6 result:
 
 ```text
@@ -494,10 +499,10 @@ SDR.
 
 **Cost**: nothing on SDR monitors or with mode Off. With highlights on: one
 extra render target on the extract (MRT, same pass), one `R11G11B10_FLOAT`
-texture pair at the bloom resolution through the same blur passes (the same
-bytes as the glow chain, so its bandwidth again), and a few ALU operations in
-the composite. Estimated at about 50 microseconds a frame at 4K on the
-desktop card, on top of HDR's 50; T044 measures it. A single-channel texture
+texture pair at the bloom resolution through one 5-tap blur pass, and a few
+ALU operations in the composite. Measured (T041a) at 48 to 51 microseconds a
+frame at 4K Medium and High on the desktop card, 13 to 15 at Low and at
+1080p, on top of HDR output's own cost; see `baseline.md`. A single-channel texture
 would halve that but could only carry white, and option B puts color above
 white.
 

@@ -16,6 +16,7 @@ struct VSInput
     float brightness : BRIGHTNESS;
     float scaleX : SCALEX;
     float scaleY : SCALEY;
+    float highlightGain : HIGHLIGHT;   // Spec 008 R14: linear-light gain above SDR white; 1 for most glyphs
     uint instanceID : SV_InstanceID;
 };
 
@@ -25,6 +26,7 @@ struct PSInput
     float2 uv : TEXCOORD;
     float4 color : COLOR;
     float brightness : BRIGHTNESS;
+    float highlightGain : HIGHLIGHT;   // Last, so Overlay.ps, which does not read it, keeps a matching prefix
 };
 
 // Quad vertices (unit square)
@@ -56,6 +58,7 @@ PSInput main(VSInput input, uint vertexID : SV_VertexID)
     output.uv = lerp(input.uvMin, input.uvMax, quadPos);
     output.color = input.color;
     output.brightness = input.brightness;
+    output.highlightGain = input.highlightGain;
     
     return output;
 }

@@ -195,6 +195,10 @@ public:
     // detection pushes the current one every second. Ignored in SDR.
     void       SetSdrWhiteScale (float scale) noexcept { m_sdrWhiteScale = scale; }
 
+    // How far above SDR white this monitor can go (Headroom); the detection
+    // pushes it with the white scale. Used only in HDR with HDR mode Auto.
+    void       SetHeadroom      (float headroom) noexcept { m_headroom = headroom; }
+
 private:
     // Instance data for rendering a single character glyph; packed tightly for
     // GPU upload.
@@ -209,6 +213,7 @@ private:
         float brightness;       // Brightness multiplier (0-1)
         float scaleX;           // Horizontal scale multiplier
         float scaleY;           // Vertical scale multiplier
+        float highlightGain;    // Spec 008 R14: linear-light gain applied after linearization; 1 for most glyphs
 
         CharacterInstanceData() :
             position   { 0.0f, 0.0f, 0.0f },
@@ -216,8 +221,9 @@ private:
             uvMax      { 1.0f, 1.0f },
             color      { 0.0f, 1.0f, 0.0f, 1.0f },
             brightness ( 1.0f ),
-            scaleX     ( 1.0f ),
-            scaleY     ( 1.0f )
+            scaleX        ( 1.0f ),
+            scaleY        ( 1.0f ),
+            highlightGain ( 1.0f )
         {
         }
     };
@@ -293,6 +299,7 @@ private:
     static void BuildCharacterInstanceData          (const CharacterInstance & character,
                                                      const Vector3           & streakPos,
                                                      const Color4            & schemeColor,
+                                                     float                     frameHighlightGain,
                                                      CharacterInstanceData   & data);
     void        ComputeOverlayLayout                (std::span<const HintCharacter> chars, int marginCols, int keyColChars, int gapChars, int numRows, float cellHeight, float padding, std::vector<float> & xPositions, D2D1_RECT_F & bounds, float & baseY, float & advanceScale);
     void        CalculateColumnAlignedTextPositions (std::span<const HintCharacter> chars, int marginCols, int keyColChars, int descColStart, float maxKeyWidth, const std::vector<float> & keyColWidths, float gapWidth, float advScaled, std::vector<float> & positions);
@@ -412,6 +419,23 @@ private:
 
     OutputMode m_outputMode    { OutputMode::Sdr };
     float      m_sdrWhiteScale { 1.0f };
+
+    // Spec 008 Phase 3 (research R14). The frame's highlight gain is 1
+    // except on a monitor presenting HDR with HDR mode Auto, and while it is
+    // 1 the highlight textures are neither created nor drawn.
+    float      m_headroom           { 1.0f };
+    HdrMode    m_hdrMode            { HdrMode::Auto };
+    float      m_frameHighlightGain { 1.0f };
+
+    bool    HighlightsActive() const noexcept;
+    HRESULT EnsureHighlightResources();
+
+    ComPtr<ID3D11Texture2D>           m_highlightTexture;
+    ComPtr<ID3D11RenderTargetView>    m_highlightRTV;
+    ComPtr<ID3D11ShaderResourceView>  m_highlightSRV;
+    ComPtr<ID3D11Texture2D>           m_highlightTempTexture;
+    ComPtr<ID3D11RenderTargetView>    m_highlightTempRTV;
+    ComPtr<ID3D11ShaderResourceView>  m_highlightTempSRV;
 
     // Glow effect parameters
     float m_glowIntensity { 2.5f };  // Bloom intensity multiplier (100% = 2.5)

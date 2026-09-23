@@ -156,6 +156,7 @@ struct Options
     UINT         m_frameHeight = kFrameHeight;
     float        m_dpiScale    = kDpiScales[0];
     bool         m_hdr         = false;
+    bool         m_highlights  = true;    // With --hdr: draw highlights at the display's real headroom
 };
 
 
@@ -180,7 +181,7 @@ public:
 
     HRESULT RunReference (const std::wstring & baselineDir);
     HRESULT RunCompare   (const std::wstring & baselineDir);
-    HRESULT RunBenchmark (float dpiScale, bool hdr);
+    HRESULT RunBenchmark (float dpiScale, bool hdr, bool highlights);
     HRESULT RunLuminance ();
 
 private:
@@ -895,7 +896,7 @@ Error:
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-HRESULT Harness::RunBenchmark (float dpiScale, bool hdr)
+HRESULT Harness::RunBenchmark (float dpiScale, bool hdr, bool highlights)
 {
     HRESULT                             hr        = S_OK;
     ID3D11Device                      * pDevice   = m_renderSystem->GetDevice();
@@ -932,7 +933,21 @@ HRESULT Harness::RunBenchmark (float dpiScale, bool hdr)
             CHR (FAILED (hr) ? hr : E_FAIL);
         }
 
-        wprintf (L"# output=hdr\n");
+        //  The display's own white level and headroom, as the app's detection
+        //  would push them. With highlights on (the default, HDR mode Auto at
+        //  the default setting) that is what makes the highlight passes run.
+        {
+            WindowsDisplayLuminanceProvider provider;
+            const DisplayLuminance          luminance = provider.Query (m_renderSystem->GetSwapChain());
+            const float                     headroom  = Headroom (EffectivePeakNits (luminance.reportedPeakNits), luminance.sdrWhiteNits);
+
+
+            m_renderSystem->SetSdrWhiteScale (SdrWhiteScale (luminance.sdrWhiteNits));
+            m_renderSystem->SetHeadroom      (highlights ? headroom : 1.0f);
+
+            wprintf (L"# output=hdr sdrWhiteNits=%.0f headroom=%.3f highlights=%s\n",
+                     luminance.sdrWhiteNits, highlights ? headroom : 1.0f, highlights ? L"on" : L"off");
+        }
     }
 
     wprintf (L"preset,frameWidth,frameHeight,dpiPercent,frames,meanGpuMs,p95GpuMs\n");
@@ -1263,6 +1278,10 @@ static bool ParseOptions (int argc, wchar_t * argv[], Options & options)
         {
             options.m_hdr = true;
         }
+        else if (current == L"--no-highlights")
+        {
+            options.m_highlights = false;
+        }
         else if (current == L"--baseline-dir" && arg + 1 < argc)
         {
             options.m_baselineDir = argv[++arg];
@@ -1328,7 +1347,8 @@ int wmain (int argc, wchar_t * argv[])
                  L" [--mode reference|compare|benchmark|luminance] [--baseline-dir <path>]"
                  L" [--frame <W>x<H>] [--dpi <percent>] [--hdr]\n"
                  L"       --frame, --dpi and --hdr apply to benchmark mode only\n"
-                 L"       --hdr presents scRGB; it needs the window on a monitor with Windows HDR on\n");
+                 L"       --hdr presents scRGB; it needs the window on a monitor with Windows HDR on\n"
+                 L"       --no-highlights with --hdr: headroom 1, so nothing is drawn above SDR white\n");
         return 1;
     }
 
@@ -1339,7 +1359,8 @@ int wmain (int argc, wchar_t * argv[])
         && (options.m_frameWidth  != kFrameWidth
             || options.m_frameHeight != kFrameHeight
             || options.m_dpiScale    != kDpiScales[0]
-            || options.m_hdr))
+            || options.m_hdr
+            || !options.m_highlights))
     {
         wprintf (L"--frame and --dpi apply to benchmark mode only;"
                  L" reference and compare sweep fixed sizes and scales\n");
@@ -1387,7 +1408,7 @@ int wmain (int argc, wchar_t * argv[])
             break;
 
         case RunMode::Benchmark:
-            hr = harness.RunBenchmark (options.m_dpiScale, options.m_hdr);
+            hr = harness.RunBenchmark (options.m_dpiScale, options.m_hdr, options.m_highlights);
             break;
 
         case RunMode::Luminance:

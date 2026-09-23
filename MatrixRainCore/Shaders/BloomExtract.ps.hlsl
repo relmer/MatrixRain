@@ -50,7 +50,13 @@ struct PSInput
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-float3 SampleEncodedBilinear(float2 uv)
+struct PSOutput
+{
+    float4 glow      : SV_TARGET0;   // v1.6's extract, on encoded values
+    float4 highlight : SV_TARGET1;   // The scene above SDR white, linear light (research R14); discarded when unbound
+};
+
+float3 SampleEncodedBilinear(float2 uv, out float3 excess)
 {
     uint width;
     uint height;
@@ -62,17 +68,32 @@ float3 SampleEncodedBilinear(float2 uv)
     float2 f     = texel - base;
     int2   p     = int2(base);
 
-    float3 c00 = LinearToSrgb3(inputTexture.Load(int3(p,             0)).rgb);
-    float3 c10 = LinearToSrgb3(inputTexture.Load(int3(p + int2(1, 0), 0)).rgb);
-    float3 c01 = LinearToSrgb3(inputTexture.Load(int3(p + int2(0, 1), 0)).rgb);
-    float3 c11 = LinearToSrgb3(inputTexture.Load(int3(p + int2(1, 1), 0)).rgb);
+    float3 l00 = inputTexture.Load(int3(p,             0)).rgb;
+    float3 l10 = inputTexture.Load(int3(p + int2(1, 0), 0)).rgb;
+    float3 l01 = inputTexture.Load(int3(p + int2(0, 1), 0)).rgb;
+    float3 l11 = inputTexture.Load(int3(p + int2(1, 1), 0)).rgb;
+
+    // The part above SDR white is light, so it averages as light: a plain
+    // bilinear weighting in linear values. Zero wherever nothing was boosted.
+    excess = lerp(lerp(max(l00 - 1.0, 0.0), max(l10 - 1.0, 0.0), f.x),
+                  lerp(max(l01 - 1.0, 0.0), max(l11 - 1.0, 0.0), f.x), f.y);
+
+    // The part at or below white is encoded first and averaged after, the
+    // value v1.6's sampler produced. LinearToSrgb3 saturates, which is the
+    // split at white on this side.
+    float3 c00 = LinearToSrgb3(l00);
+    float3 c10 = LinearToSrgb3(l10);
+    float3 c01 = LinearToSrgb3(l01);
+    float3 c11 = LinearToSrgb3(l11);
 
     return lerp(lerp(c00, c10, f.x), lerp(c01, c11, f.x), f.y);
 }
 
-float4 main(PSInput input) : SV_TARGET
+PSOutput main(PSInput input)
 {
-    float3 encoded = SampleEncodedBilinear(input.uv);
+    PSOutput output;
+    float3   excess;
+    float3   encoded = SampleEncodedBilinear(input.uv, excess);
 
     // Extract only bright pixels (consider luminance and max channel)
     float luminance = dot(encoded, float3(0.2126, 0.7152, 0.0722));
@@ -92,5 +113,8 @@ float4 main(PSInput input) : SV_TARGET
     // Smooth ramp: dim chars get subtle bloom, bright chars get full
     float bloomAmount = smoothstep(threshold, threshold + 0.5, brightness);
 
-    return float4(encoded * bloomAmount, 1.0);
+    output.glow      = float4(encoded * bloomAmount, 1.0);
+    output.highlight = float4(excess, 1.0);
+
+    return output;
 }

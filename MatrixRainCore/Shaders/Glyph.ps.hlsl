@@ -46,6 +46,7 @@ struct PSInput
     float2 uv         : TEXCOORD;
     float4 color      : COLOR;
     float  brightness : BRIGHTNESS;
+    float  highlightGain : HIGHLIGHT;
 };
 
 float4 main(PSInput input) : SV_TARGET
@@ -69,7 +70,11 @@ float4 main(PSInput input) : SV_TARGET
 
     if (linearizeColors > 0.5)
     {
-        displayed = SrgbToLinear3(displayed);
+        // Spec 008 research R14: the highlight gain is linear light, so it
+        // goes on after the conversion. It is 1 unless this glyph is a head
+        // or a bright trail glyph on a monitor presenting HDR highlights,
+        // which is the only way anything in the scene exceeds 1.
+        displayed = SrgbToLinear3(displayed) * input.highlightGain;
     }
 
     return float4(displayed, input.color.a * coverage * input.brightness);

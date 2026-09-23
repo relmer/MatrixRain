@@ -569,3 +569,28 @@ for v1.6.0 in SDR. Windows maps SDR white to 255 when it captures an HDR
 desktop, so matching numbers mean this build puts SDR white where Windows
 does. Not a meter reading; quickstart Phase 2 check 2 is still the real test.
 
+## Phase 3 performance: highlights (T041a)
+
+Fastest of three alternating rounds per configuration (another application
+was using the GPU during this run, so the minimum is the fair figure), mean
+GPU ms. "HDR" is `--hdr --no-highlights` (headroom 1, the Phase 2 path);
+"HDR + highlights" is `--hdr` at the monitor's real headroom (1.5 on the
+landscape monitor) and the default highlight brightness.
+
+| Configuration | Preset | v1.6 (T005) | SDR | HDR | HDR + highlights | Highlights cost |
+|---|---|---|---|---|---|---|
+| 1920x1080 @ 100% | Low | 0.069 | 0.068 | 0.077 | 0.080 | 3 us |
+| 1920x1080 @ 100% | Medium | 0.093 | 0.100 | 0.105 | 0.118 | 13 us |
+| 1920x1080 @ 100% | High | 0.124 | 0.128 | 0.133 | 0.147 | 14 us |
+| 3840x2160 @ 125% | Low | 0.163 | 0.151 | 0.205 | 0.218 | 13 us |
+| 3840x2160 @ 125% | Medium | 0.257 | 0.255 | 0.310 | 0.361 | 51 us |
+| 3840x2160 @ 125% | High | 0.368 | 0.366 | 0.424 | 0.473 | 49 us |
+| 2160x3840 @ 150% | Low | 0.126 | 0.113 | 0.163 | 0.178 | 15 us |
+| 2160x3840 @ 150% | Medium | 0.218 | 0.215 | 0.268 | 0.318 | 50 us |
+| 2160x3840 @ 150% | High | 0.331 | 0.330 | 0.383 | 0.431 | 48 us |
+
+The first version ran the highlight texture through the glow's own blur
+passes and cost 0.23 ms at 4K High; the blur is bound by texture samples.
+One pass of the 5-tap kernel is the change. SDR is unchanged by all of
+Phase 3: the calibration compare matches Phase 2 at every case and scale.
+

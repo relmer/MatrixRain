@@ -86,7 +86,7 @@ carry it. Overlays and scanlines never receive it.
 |---|---|---|
 | Scene | `R11G11B10_FLOAT` (research R2, revised in T020) | full |
 | Bloom, blur temp | `R11G11B10_FLOAT` | ÷ resolution divisor |
-| Highlight, highlight blur temp (Phase 3) | `R11G11B10_FLOAT`, the scene above SDR white, in color | ÷ resolution divisor; created only while this monitor's highlight gain is above 1 (research R14) |
+| Highlight, highlight blur temp (Phase 3) | `R11G11B10_FLOAT`, the scene above SDR white, in color | ÷ resolution divisor; created on the first frame that needs them (this monitor's highlight gain above 1) and dropped with the bloom resources (research R14) |
 | Post-bloom | `R11G11B10_FLOAT` | full |
 | Back buffer | `B8G8R8A8_UNORM` (SDR) / `R16G16B16A16_FLOAT` (HDR) | full |
 | D2D target bitmap | matches back buffer | full |

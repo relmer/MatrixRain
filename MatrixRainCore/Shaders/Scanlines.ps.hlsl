@@ -50,7 +50,13 @@ float4 main (PSInput i) : SV_TARGET
     // white: the raster vanishes over the brightest pixels. Clamp to the
     // display's headroom first. In SDR that is 1.0, exactly v1.6's clip; in
     // HDR it is the real headroom, so Phase 3's highlights keep theirs.
-    c.rgb = min (c.rgb, g_headroom);
+    //  With headroom to spare the tone map rolls highlights off instead, and
+    //  clipping here first would flatten everything above the headroom into
+    //  one plateau.
+    if (g_headroom <= 1.0)
+    {
+        c.rgb = min (c.rgb, 1.0);
+    }
 
     // Match v1.6 on screen. v1.6 multiplied the ENCODED pixel by darken, so
     // the same factor applied to linear light removes visibly less and the
@@ -59,7 +65,9 @@ float4 main (PSInput i) : SV_TARGET
     // glyph coverage and the halo falloff are shaped. Light still combines in
     // linear light everywhere; this only reproduces the strength v1.6 gave
     // the Intensity slider, which is what FR-005 protects.
-    c.rgb *= pow (darken, MR_SRGB_CURVE_GAMMA);
+    // saturate: darken is already in [0, 1], but FXC cannot prove it and
+    // warns (X3571) that pow is undefined for negative bases.
+    c.rgb *= pow (saturate (darken), MR_SRGB_CURVE_GAMMA);
 
     // When this pass runs it is always the last one, so it always encodes.
     return float4 (OutputTransform (c.rgb), c.a);
