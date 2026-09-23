@@ -64,6 +64,6 @@ Expected: 0 warnings, all tests pass, including `ColorMathTests` and
 | 4 | Sweep the highlight brightness slider | Changes live; persists after restart | FR-022 |
 | 5 | HDR mode Off | Identical to Phase 2 | US3-4 |
 | 6 | Change HDR settings, press Cancel; separately press Reset to defaults | Both revert correctly | FR-023 |
-| 7 | Dialog with no HDR monitor present | HDR group grayed with explanatory tooltip | FR-024 |
+| 7 | Dialog with no HDR monitor present | HDR controls grayed, with a status line on the page saying why, and a link to the Windows HDR settings when a monitor supports HDR but has it off | FR-024 |
 | 8 | Two HDR monitors with different peaks | Everything matches except highlight height | FR-025 |
 | 9 | Low-headroom panel (HDR400-class) | Little or no boost, still smooth | FR-026 |
