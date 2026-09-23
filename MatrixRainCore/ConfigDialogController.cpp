@@ -328,6 +328,36 @@ void ConfigDialogController::UpdateGlowEnabled (bool enabled)
 
 
 
+void ConfigDialogController::UpdateHdrMode (HdrMode mode)
+{
+    m_settings.m_hdrMode = (mode == HdrMode::Off) ? HdrMode::Off : HdrMode::Auto;
+
+    if (m_snapshot.isLiveMode && m_snapshot.applicationStateRef)
+    {
+        m_snapshot.applicationStateRef->ApplySettings (m_settings);
+    }
+}
+
+
+
+
+
+void ConfigDialogController::UpdateHighlightBrightness (int brightnessPercent)
+{
+    m_settings.m_highlightBrightness = ScreenSaverSettings::ClampPercent (brightnessPercent,
+                                                                           ScreenSaverSettings::MIN_HIGHLIGHT_BRIGHTNESS,
+                                                                           ScreenSaverSettings::MAX_HIGHLIGHT_BRIGHTNESS);
+
+    if (m_snapshot.isLiveMode && m_snapshot.applicationStateRef)
+    {
+        m_snapshot.applicationStateRef->ApplySettings (m_settings);
+    }
+}
+
+
+
+
+
 void ConfigDialogController::UpdateScanlinesEnabled (bool enabled)
 {
     m_settings.m_scanlinesEnabled = enabled;

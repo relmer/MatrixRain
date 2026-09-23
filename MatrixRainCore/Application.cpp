@@ -353,6 +353,8 @@ void Application::InitializeApplicationState (const ScreenSaverModeContext * pSc
         m_sharedState.liveScanlinesIntensity.store (settings.m_scanlinesIntensity,                             std::memory_order_relaxed);
         m_sharedState.liveScanlinesStyle    .store (settings.m_scanlinesStyle,                                 std::memory_order_relaxed);
         m_sharedState.liveCustomColor       .store (static_cast<DWORD> (settings.m_customColor),               std::memory_order_relaxed);
+        m_sharedState.liveHdrMode           .store (settings.m_hdrMode,                                        std::memory_order_relaxed);
+        m_sharedState.liveHighlightBrightness.store (settings.m_highlightBrightness,                           std::memory_order_relaxed);
     });
 
     // Initialize SharedState from saved settings
@@ -375,6 +377,8 @@ void Application::InitializeApplicationState (const ScreenSaverModeContext * pSc
         m_sharedState.liveScanlinesIntensity.store (settings.m_scanlinesIntensity,                       std::memory_order_relaxed);
         m_sharedState.liveScanlinesStyle    .store (settings.m_scanlinesStyle,                           std::memory_order_relaxed);
         m_sharedState.liveCustomColor       .store (static_cast<DWORD> (settings.m_customColor),         std::memory_order_relaxed);
+        m_sharedState.liveHdrMode           .store (settings.m_hdrMode,                                  std::memory_order_relaxed);
+        m_sharedState.liveHighlightBrightness.store (settings.m_highlightBrightness,                     std::memory_order_relaxed);
     }
 
     // Apply settings to subsystems and bind input once the primary render

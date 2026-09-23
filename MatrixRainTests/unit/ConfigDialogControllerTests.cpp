@@ -496,7 +496,7 @@ namespace MatrixRainTests
 
         // FR-035 regression: Reset-to-defaults MUST preserve the saved
         // custom-color palette (the "unconditional persistence" carve-out
-        // that ApplyChanges/CancelChanges already honour).  Without this
+        // that ApplyChanges/CancelChanges already honor).  Without this
         // guard, ResetToDefaults() would assign a default-constructed
         // ScreenSaverSettings — whose palette is zero-initialised — and
         // a subsequent OK would persist 16 zeroed slots to the registry,
@@ -1135,6 +1135,106 @@ namespace MatrixRainTests
             Assert::AreEqual (static_cast<DWORD> (RGB (0, 255, 0)),
                               static_cast<DWORD> (restored.m_customColor),
                               L"customColor restored");
+        }
+
+
+        ////////////////////////////////////////////////////////////////////////
+        //
+        //  Spec 008 T040 (FR-023): the HDR highlight settings propagate live,
+        //  roll back on Cancel, reset to their defaults and persist on OK.
+        //
+        ////////////////////////////////////////////////////////////////////////
+
+        TEST_METHOD (HdrSettings_PropagateLive_AndClamp)
+        {
+            ConfigDialogController controller (m_settingsProvider);
+            ApplicationState       appState   (m_settingsProvider);
+
+
+
+            Assert::AreEqual (S_OK, controller.Initialize());
+            appState.Initialize (nullptr);
+            Assert::AreEqual (S_OK, controller.InitializeLiveMode (&appState));
+
+            controller.UpdateHdrMode             (HdrMode::Off);
+            controller.UpdateHighlightBrightness (35);
+
+            Assert::IsTrue   (HdrMode::Off == appState.GetSettings().m_hdrMode, L"Mode reaches ApplicationState live");
+            Assert::AreEqual (35, appState.GetSettings().m_highlightBrightness,  L"Brightness reaches ApplicationState live");
+
+            controller.UpdateHighlightBrightness (150);
+            Assert::AreEqual (100, controller.GetSettings().m_highlightBrightness, L"Clamped to 100");
+
+            controller.UpdateHighlightBrightness (-5);
+            Assert::AreEqual (0, controller.GetSettings().m_highlightBrightness, L"Clamped to 0");
+        }
+
+
+        TEST_METHOD (HdrSettings_RollBackOnCancel)
+        {
+            ScreenSaverSettings    initial {};
+            ConfigDialogController controller (m_settingsProvider);
+            ApplicationState       appState   (m_settingsProvider);
+
+
+
+            initial.m_hdrMode             = HdrMode::Auto;
+            initial.m_highlightBrightness = 60;
+            Assert::AreEqual (S_OK, m_settingsProvider.Save (initial));
+
+            Assert::AreEqual (S_OK, controller.Initialize());
+            appState.Initialize (nullptr);
+            Assert::AreEqual (S_OK, controller.InitializeLiveMode (&appState));
+
+            controller.UpdateHdrMode             (HdrMode::Off);
+            controller.UpdateHighlightBrightness (10);
+
+            Assert::AreEqual (S_OK, controller.CancelLiveMode());
+
+            Assert::IsTrue   (HdrMode::Auto == appState.GetSettings().m_hdrMode, L"Mode restored");
+            Assert::AreEqual (60, appState.GetSettings().m_highlightBrightness,   L"Brightness restored");
+        }
+
+
+        TEST_METHOD (HdrSettings_ResetToDefaults)
+        {
+            ConfigDialogController controller (m_settingsProvider);
+            ApplicationState       appState   (m_settingsProvider);
+
+
+
+            Assert::AreEqual (S_OK, controller.Initialize());
+            appState.Initialize (nullptr);
+            Assert::AreEqual (S_OK, controller.InitializeLiveMode (&appState));
+
+            controller.UpdateHdrMode             (HdrMode::Off);
+            controller.UpdateHighlightBrightness (5);
+            controller.ResetToDefaults();
+
+            Assert::IsTrue   (HdrMode::Auto == appState.GetSettings().m_hdrMode, L"Reset restores Auto live");
+            Assert::AreEqual (ScreenSaverSettings::DEFAULT_HIGHLIGHT_BRIGHTNESS,
+                              appState.GetSettings().m_highlightBrightness,       L"Reset restores 80 live");
+        }
+
+
+        TEST_METHOD (HdrSettings_PersistOnCommit)
+        {
+            ConfigDialogController controller (m_settingsProvider);
+            ApplicationState       appState   (m_settingsProvider);
+
+
+
+            Assert::AreEqual (S_OK, controller.Initialize());
+            appState.Initialize (nullptr);
+            Assert::AreEqual (S_OK, controller.InitializeLiveMode (&appState));
+
+            controller.UpdateHdrMode             (HdrMode::Off);
+            controller.UpdateHighlightBrightness (44);
+
+            Assert::AreEqual (S_OK, controller.CommitLiveMode());
+
+            Assert::IsTrue   (HdrMode::Off == m_settingsProvider.GetStored().m_hdrMode, L"Mode persisted");
+            Assert::AreEqual (44, m_settingsProvider.GetStored().m_highlightBrightness,  L"Brightness persisted");
         }
 
 

@@ -31,6 +31,8 @@ private:
     static constexpr LPCWSTR VALUE_SCANLINES_ENABLED      = L"ScanlinesEnabled";     // v1.5 T049 (FR-027, FR-028, FR-038)
     static constexpr LPCWSTR VALUE_SCANLINES_INTENSITY    = L"ScanlinesIntensity";
     static constexpr LPCWSTR VALUE_SCANLINES_STYLE        = L"ScanlinesStyle";
+    static constexpr LPCWSTR VALUE_HDR_MODE               = L"HdrMode";              // Spec 008 T039: DWORD, 0 = Auto, 1 = Off
+    static constexpr LPCWSTR VALUE_HIGHLIGHT_BRIGHTNESS   = L"HighlightBrightness";  // Spec 008 T039: DWORD, 0-100
     static constexpr LPCWSTR VALUE_START_FULLSCREEN       = L"StartFullscreen";
     static constexpr LPCWSTR VALUE_SHOW_DEBUG_STATS       = L"ShowDebugStats";
     static constexpr LPCWSTR VALUE_MULTIMONITOR              = L"MultiMonitor";

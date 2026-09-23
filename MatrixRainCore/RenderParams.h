@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ColorScheme.h"
+#include "OutputModeSelection.h"
 
 
 
@@ -38,7 +39,7 @@ struct RenderParams
     // (dialog thread) simple.
     bool            glowEnabled           = true;
     bool            scanlinesEnabled      = true;
-    float           scanlinesIntensity    = 0.30f;     // normalised [0..1] from settings 1..100
+    float           scanlinesIntensity    = 0.30f;     // normalized [0..1] from settings 1..100
     // Scanline density is carried as lines-per-CHARACTER-CELL, not as the
     // shader's lines-per-render-height uniform. Only the render system knows
     // the cell's pixel height (it owns characterScale), so it performs the
@@ -47,4 +48,9 @@ struct RenderParams
     // identical on monitors of differing heights.
     float           scanlinesLinesPerCell = 7.75f;     // ScanlineLinesPerCell(style); 7.75 at the default Style 50
     COLORREF        customColor           = RGB (0, 255, 0);
+
+    // Spec 008 T041: the HDR highlight settings. Nothing reads them on a
+    // monitor presenting SDR.
+    HdrMode         hdrMode               = HdrMode::Auto;
+    int             highlightBrightness   = 80;        // 0..100; ScreenSaverSettings::DEFAULT_HIGHLIGHT_BRIGHTNESS
 };

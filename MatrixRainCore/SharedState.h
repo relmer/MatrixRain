@@ -86,6 +86,10 @@ struct SharedState
     std::atomic<int>      liveScanlinesStyle     { ScreenSaverSettings::DEFAULT_SCANLINES_STYLE             };
     std::atomic<DWORD>    liveCustomColor        { static_cast<DWORD> (ScreenSaverSettings::DEFAULT_CUSTOM_COLOR) };
 
+    // Spec 008 T040: HDR highlight settings, same path as the fields above.
+    std::atomic<HdrMode>  liveHdrMode             { HdrMode::Auto };
+    std::atomic<int>      liveHighlightBrightness { ScreenSaverSettings::DEFAULT_HIGHLIGHT_BRIGHTNESS };
+
     // v1.5 snapshot mirrors (filled by ConfigDialogController::EnterLiveMode,
     // restored by CancelLiveMode).  Not atomic because they're only touched
     // by the dialog thread under m_sharedState.mutex.
@@ -123,6 +127,8 @@ struct SharedState
         int               scanlinesIntensity     = ScreenSaverSettings::DEFAULT_SCANLINES_INTENSITY_PERCENT;
         int               scanlinesStyle         = ScreenSaverSettings::DEFAULT_SCANLINES_STYLE;
         DWORD             customColor            = static_cast<DWORD> (ScreenSaverSettings::DEFAULT_CUSTOM_COLOR);
+        HdrMode           hdrMode                = HdrMode::Auto;
+        int               highlightBrightness    = ScreenSaverSettings::DEFAULT_HIGHLIGHT_BRIGHTNESS;
     };
 
 
@@ -147,6 +153,8 @@ struct SharedState
             .scanlinesIntensity     = liveScanlinesIntensity.load (std::memory_order_relaxed),
             .scanlinesStyle         = liveScanlinesStyle    .load (std::memory_order_relaxed),
             .customColor            = liveCustomColor       .load (std::memory_order_relaxed),
+            .hdrMode                = liveHdrMode           .load (std::memory_order_relaxed),
+            .highlightBrightness    = liveHighlightBrightness.load (std::memory_order_relaxed),
         };
     }
 };

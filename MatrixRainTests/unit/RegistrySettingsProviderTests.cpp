@@ -670,6 +670,103 @@ namespace MatrixRainTests
         }
 
 
+        ////////////////////////////////////////////////////////////////
+        //
+        //  Spec 008 T039 (contracts/settings-ui.md): HdrMode as a DWORD,
+        //  0 = Auto, 1 = Off, anything else reads as Auto; and
+        //  HighlightBrightness 0-100, default 80, clamped.
+        //
+        ////////////////////////////////////////////////////////////////
+
+        static void WriteTestDword (LPCWSTR name, DWORD value)
+        {
+            HKEY hKey = nullptr;
+
+
+            RegCreateKeyExW (HKEY_CURRENT_USER, TEST_REGISTRY_KEY_PATH, 0, nullptr,
+                             REG_OPTION_NON_VOLATILE, KEY_WRITE, nullptr, &hKey, nullptr);
+            RegSetValueExW (hKey, name, 0, REG_DWORD, (const BYTE *)&value, sizeof (DWORD));
+            RegCloseKey (hKey);
+        }
+
+
+        TEST_METHOD (HdrModeRoundTrip)
+        {
+            DeleteTestRegistryKey();
+
+            ScreenSaverSettings off;
+            off.m_hdrMode = HdrMode::Off;
+            m_provider.Save (off);
+
+            ScreenSaverSettings loadOff;
+            m_provider.Load (loadOff);
+            Assert::IsTrue (HdrMode::Off == loadOff.m_hdrMode, L"Off round-trips");
+
+            ScreenSaverSettings on;
+            on.m_hdrMode = HdrMode::Auto;
+            m_provider.Save (on);
+
+            ScreenSaverSettings loadOn;
+            m_provider.Load (loadOn);
+            Assert::IsTrue (HdrMode::Auto == loadOn.m_hdrMode, L"Auto round-trips");
+        }
+
+
+        TEST_METHOD (HdrModeUnknownValueReadsAsAuto)
+        {
+            DeleteTestRegistryKey();
+            WriteTestDword (L"HdrMode", 7);
+
+            ScreenSaverSettings loaded;
+            m_provider.Load (loaded);
+            Assert::IsTrue (HdrMode::Auto == loaded.m_hdrMode, L"An unknown HdrMode falls back to Auto");
+        }
+
+
+        TEST_METHOD (HighlightBrightnessRoundTrip)
+        {
+            DeleteTestRegistryKey();
+
+            ScreenSaverSettings save;
+            save.m_highlightBrightness = 37;
+            m_provider.Save (save);
+
+            ScreenSaverSettings loaded;
+            m_provider.Load (loaded);
+            Assert::AreEqual (37, loaded.m_highlightBrightness, L"HighlightBrightness round-trips");
+        }
+
+
+        TEST_METHOD (HighlightBrightnessClampedOnRead)
+        {
+            DeleteTestRegistryKey();
+            WriteTestDword (L"HighlightBrightness", 500);
+
+            ScreenSaverSettings high;
+            m_provider.Load (high);
+            Assert::AreEqual (100, high.m_highlightBrightness, L"500 clamps down to 100");
+
+            DeleteTestRegistryKey();
+            WriteTestDword (L"HighlightBrightness", 0xFFFFFFFF);
+
+            ScreenSaverSettings low;
+            m_provider.Load (low);
+            Assert::AreEqual (0, low.m_highlightBrightness, L"-1 clamps up to 0");
+        }
+
+
+        TEST_METHOD (MissingHdrValuesDefaultsAreApplied)
+        {
+            DeleteTestRegistryKey();
+            WriteTestDword (L"Density", 50);
+
+            ScreenSaverSettings settings;
+            m_provider.Load (settings);
+            Assert::IsTrue   (HdrMode::Auto == settings.m_hdrMode,  L"Absent HdrMode defaults to Auto, so v1.6 installs upgrade silently");
+            Assert::AreEqual (80, settings.m_highlightBrightness,   L"Absent HighlightBrightness defaults to 80");
+        }
+
+
         TEST_METHOD (MissingScanlinesValuesDefaultsAreApplied)
         {
             DeleteTestRegistryKey();

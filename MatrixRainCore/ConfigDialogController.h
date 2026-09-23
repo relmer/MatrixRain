@@ -126,6 +126,11 @@ public:
     void UpdateScanlinesStyle      (int      style);
     void UpdateCustomColor         (COLORREF color);
 
+    // Spec 008 T040 (FR-021 to FR-023): the HDR highlight settings, live,
+    // Cancel and Reset aware like the setters above.
+    void UpdateHdrMode             (HdrMode  mode);
+    void UpdateHighlightBrightness (int      brightnessPercent);
+
     /// <summary>
     /// Write the full 16-swatch ChooseColor palette into the settings.
     /// FR-035 carve-out: the palette is INTENTIONALLY OUTSIDE the live-

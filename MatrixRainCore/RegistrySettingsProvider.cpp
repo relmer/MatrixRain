@@ -48,6 +48,21 @@ HRESULT RegistrySettingsProvider::Load (ScreenSaverSettings & settings)
     ReadBool   (hKey, VALUE_SCANLINES_ENABLED,   settings.m_scanlinesEnabled);
     ReadInt    (hKey, VALUE_SCANLINES_INTENSITY, settings.m_scanlinesIntensity);
     ReadInt    (hKey, VALUE_SCANLINES_STYLE,     settings.m_scanlinesStyle);
+
+    // Spec 008 T039 (contracts/settings-ui.md): HDR mode as a DWORD, where
+    // any value but 1 (Off) reads as Auto, so tampered or future values
+    // fall back to the default; highlight brightness clamps in Clamp below.
+    {
+        int hdrMode = 0;
+
+
+        if (ReadInt (hKey, VALUE_HDR_MODE, hdrMode) == S_OK)
+        {
+            settings.m_hdrMode = (hdrMode == 1) ? HdrMode::Off : HdrMode::Auto;
+        }
+    }
+
+    ReadInt    (hKey, VALUE_HIGHLIGHT_BRIGHTNESS, settings.m_highlightBrightness);
     ReadBool   (hKey, VALUE_START_FULLSCREEN, settings.m_startFullscreen);
     ReadBool   (hKey, VALUE_SHOW_DEBUG_STATS, settings.m_showDebugStats);
     ReadBool   (hKey, VALUE_MULTIMONITOR,     settings.m_multiMonitorEnabled);
@@ -242,6 +257,17 @@ HRESULT RegistrySettingsProvider::Save (const ScreenSaverSettings & settings)
                    std::clamp (settings.m_scanlinesStyle,
                                ScreenSaverSettings::MIN_SCANLINES_STYLE,
                                ScreenSaverSettings::MAX_SCANLINES_STYLE));
+    CHR (hr);
+
+    // Spec 008 T039: HDR mode and highlight brightness, clamped on write
+    // like the scanline values.
+    hr = WriteInt (hKey, VALUE_HDR_MODE, (settings.m_hdrMode == HdrMode::Off) ? 1 : 0);
+    CHR (hr);
+
+    hr = WriteInt (hKey, VALUE_HIGHLIGHT_BRIGHTNESS,
+                   std::clamp (settings.m_highlightBrightness,
+                               ScreenSaverSettings::MIN_HIGHLIGHT_BRIGHTNESS,
+                               ScreenSaverSettings::MAX_HIGHLIGHT_BRIGHTNESS));
     CHR (hr);
     
     hr = WriteBool (hKey, VALUE_START_FULLSCREEN, settings.m_startFullscreen);

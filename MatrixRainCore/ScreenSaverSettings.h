@@ -1,5 +1,6 @@
 #pragma once
 
+#include "OutputModeSelection.h"
 #include "QualityPresets.h"
 
 using SystemClockTimePoint = std::chrono::system_clock::time_point;
@@ -39,8 +40,15 @@ struct ScreenSaverSettings
     static constexpr int MAX_SCANLINES_STYLE                 = 100;
     static constexpr int DEFAULT_SCANLINES_STYLE             = 50;
 
+    // HDR highlights (spec 008 FR-021, FR-022; contracts/settings-ui.md).
+    // They change nothing on SDR monitors, and nothing anywhere until a
+    // monitor presents HDR.
+    static constexpr int MIN_HIGHLIGHT_BRIGHTNESS            = 0;
+    static constexpr int MAX_HIGHLIGHT_BRIGHTNESS            = 100;
+    static constexpr int DEFAULT_HIGHLIGHT_BRIGHTNESS        = 80;
+
     // v1.5 (FR-030, FR-033, FR-038): RGB(0,255,0) is the default seed shown
-    // by the colour chooser the first time the user opens it — it is NOT
+    // by the color chooser the first time the user opens it — it is NOT
     // written to the registry until the user actually clicks OK.
     static constexpr COLORREF DEFAULT_CUSTOM_COLOR           = RGB (0, 255, 0);
 
@@ -65,6 +73,12 @@ struct ScreenSaverSettings
     int                                 m_scanlinesIntensity    { DEFAULT_SCANLINES_INTENSITY_PERCENT };
     int                                 m_scanlinesStyle        { DEFAULT_SCANLINES_STYLE };
     COLORREF                            m_customColor           { DEFAULT_CUSTOM_COLOR };
+
+    // Spec 008 (FR-021 to FR-023): take part in live preview, Cancel and
+    // Reset like every setting above, which they get for free by living in
+    // this struct.
+    HdrMode                             m_hdrMode               { HdrMode::Auto };
+    int                                 m_highlightBrightness   { DEFAULT_HIGHLIGHT_BRIGHTNESS };
     std::array<COLORREF, 16>            m_customColorPalette    {};            // FR-035 unconditional persistence; zero-init = "no saved palette"
 
     // User Story 5 - graphics quality preset + advanced control values.
@@ -94,6 +108,12 @@ inline void ScreenSaverSettings::Clamp()
     m_glowSizePercent       = ClampPercent        (m_glowSizePercent, MIN_GLOW_SIZE_PERCENT, MAX_GLOW_SIZE_PERCENT);
     m_scanlinesIntensity    = ClampPercent        (m_scanlinesIntensity, MIN_SCANLINES_INTENSITY_PERCENT, MAX_SCANLINES_INTENSITY_PERCENT);
     m_scanlinesStyle        = ClampPercent        (m_scanlinesStyle,     MIN_SCANLINES_STYLE,             MAX_SCANLINES_STYLE);
+    m_highlightBrightness   = ClampPercent        (m_highlightBrightness, MIN_HIGHLIGHT_BRIGHTNESS,       MAX_HIGHLIGHT_BRIGHTNESS);
+
+    if (m_hdrMode != HdrMode::Auto && m_hdrMode != HdrMode::Off)
+    {
+        m_hdrMode = HdrMode::Auto;
+    }
 }
 
 

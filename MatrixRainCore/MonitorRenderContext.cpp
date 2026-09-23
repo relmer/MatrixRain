@@ -838,6 +838,8 @@ void MonitorRenderContext::Render (const SharedState::Snapshot & snapshot)
         .scanlinesIntensity    = static_cast<float> (snapshot.scanlinesIntensity) / 100.0f,
         .scanlinesLinesPerCell = ScanlineLinesPerCell (snapshot.scanlinesStyle),
         .customColor           = static_cast<COLORREF> (snapshot.customColor),
+        .hdrMode               = snapshot.hdrMode,
+        .highlightBrightness   = snapshot.highlightBrightness,
     };
 
     m_renderSystem->Render (*m_animationSystem, *m_viewport, renderParams);
