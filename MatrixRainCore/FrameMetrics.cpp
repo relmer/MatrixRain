@@ -1,6 +1,7 @@
 #include "pch.h"
 
 #include "FrameMetrics.h"
+#include "ColorMath.h"
 
 
 
@@ -26,29 +27,6 @@ static constexpr float kReportedQuantile = 0.99f;
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-//  SrgbToLinearLocal
-//
-//  IEC 61966-2-1 electro-optical transfer function. Local until ColorMath
-//  lands (task T006), which this then defers to.
-//
-////////////////////////////////////////////////////////////////////////////////
-
-static float SrgbToLinearLocal (float value) noexcept
-{
-    if (value <= 0.04045f)
-    {
-        return value / 12.92f;
-    }
-
-    return std::pow ((value + 0.055f) / 1.055f, 2.4f);
-}
-
-
-
-
-
-////////////////////////////////////////////////////////////////////////////////
-//
 //  LuminanceAt
 //
 //  Linear Rec.709 luminance of one pixel of an 8-bit BGRA frame.
@@ -59,9 +37,9 @@ static float LuminanceAt (std::span<const uint8_t> bgra, size_t pixelIndex) noex
 {
     const size_t offset = pixelIndex * 4;
 
-    const float  blue   = SrgbToLinearLocal (bgra[offset + 0] / kMaxCodeValue);
-    const float  green  = SrgbToLinearLocal (bgra[offset + 1] / kMaxCodeValue);
-    const float  red    = SrgbToLinearLocal (bgra[offset + 2] / kMaxCodeValue);
+    const float  blue   = SrgbToLinear (bgra[offset + 0] / kMaxCodeValue);
+    const float  green  = SrgbToLinear (bgra[offset + 1] / kMaxCodeValue);
+    const float  red    = SrgbToLinear (bgra[offset + 2] / kMaxCodeValue);
 
 
 

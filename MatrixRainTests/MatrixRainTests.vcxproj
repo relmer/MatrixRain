@@ -327,6 +327,7 @@
     <ClCompile Include="unit\MultiMonitorGateTests.cpp" />
     <ClCompile Include="unit\QualityPresetsTests.cpp" />
     <ClCompile Include="unit\RebuildCoalescerTests.cpp" />
+    <ClCompile Include="unit\ColorMathTests.cpp" />
     <ClCompile Include="unit\FrameMetricsTests.cpp" />
     <ClCompile Include="unit\RandomSourceTests.cpp" />
     <ClCompile Include="unit\ScanlineStyleMappingTests.cpp" />

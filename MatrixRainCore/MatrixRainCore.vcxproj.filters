@@ -31,6 +31,9 @@
     <ClCompile Include="ColorScheme.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="ColorMath.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="FrameMetrics.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -136,6 +139,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Viewport.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ColorMath.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="FrameMetrics.h">

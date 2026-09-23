@@ -294,6 +294,7 @@
     <ClInclude Include="RenderParams.h" />
     <ClInclude Include="RenderSystem.h" />
     <ClInclude Include="RenderThreadInputs.h" />
+    <ClInclude Include="ColorMath.h" />
     <ClInclude Include="FrameMetrics.h" />
     <ClInclude Include="RandomSource.h" />
     <ClInclude Include="ScanlineStyleMapping.h" />
@@ -335,6 +336,7 @@
     <ClCompile Include="MonitorRenderContext.cpp" />
     <ClCompile Include="MonitorLayout.cpp" />
     <ClCompile Include="RenderThreadInputs.cpp" />
+    <ClCompile Include="ColorMath.cpp" />
     <ClCompile Include="FrameMetrics.cpp" />
     <ClCompile Include="RandomSource.cpp" />
     <ClCompile Include="ScanlineStyleMapping.cpp" />
