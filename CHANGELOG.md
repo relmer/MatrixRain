@@ -2,6 +2,37 @@
 
 All notable changes to MatrixRain are documented in this file.
 
+## [1.7.0] - Unreleased
+
+### Changed
+
+- **Light is now combined as light.** The renderer composites glyphs
+  and their glow in linear light with float render targets, instead of
+  in the display's gamma-encoded 8-bit values. Fading tails on black are
+  smooth all the way down with no stepped bands, antialiased glyph edges
+  composite as light does, and where two bright heads pass each other
+  the overlap adds instead of plateauing. Everything a user can tune
+  keeps its meaning: the trail fade, the glow's strength, size, hue and
+  behavior where streaks overlap, the Scanlines Intensity and Style
+  sliders, and every color scheme reproduce what 1.6 put on screen, to
+  within a few percent of mean brightness on a fixed test scene and
+  indistinguishable side by side. No settings change. This is the
+  groundwork for native HDR output, which a later release adds.
+- **Shaders are compiled at build time.** A broken shader is now a build
+  error carrying file, line and message, rather than a blank screen at
+  run time. The D3D shader compiler is no longer loaded by the app.
+
+### Fixed
+
+- **Dragging the window across a monitor boundary froze the app.** In
+  windowed mode, moving the window to a monitor with a different scale
+  factor stalled it for five seconds, and sometimes for good, with
+  Windows' translucent "not responding" ghost drawn over rain that was
+  still falling. The window's resize handler was waiting on the render
+  thread while the render thread was waiting on the window to finish
+  resizing. The resize is now applied by the render thread itself, and
+  the window answers at once. Present since windowed mode was added.
+
 ## [1.6.0] - 2026-09-21
 
 ### Changed
@@ -67,7 +98,7 @@ Visuals tab.
 - **Cross-page "Reset to defaults" button.** Lives in the property-sheet
   footer (left of OK/Cancel) and resets every control on both tabs in one
   click; the live preview snaps back instantly.  The persisted 16-swatch
-  custom-colour palette is preserved across Reset (FR-035 carve-out).
+  custom-color palette is preserved across Reset (FR-035 carve-out).
 - **Enable glow checkbox** on the Performance tab. Toggling it OFF
   bypasses the entire bloom pipeline (no extract / blur / composite passes)
   and greys every glow-dependent control on both tabs with an explanatory
@@ -86,7 +117,7 @@ Visuals tab.
   Selecting it opens the standard Win32 `ChooseColor` dialog pre-populated
   with the prior custom RGB (default `RGB(0, 255, 0)`). The 16-swatch
   palette persists across launches (and across Reset).  A clickable
-  owner-draw colour swatch next to the combo previews the selected scheme;
+  owner-draw color swatch next to the combo previews the selected scheme;
   in Cycle mode the swatch animates at 30 Hz in sync with the rain.
   Clicking the swatch opens the chooser regardless of which scheme is
   currently active.
@@ -110,7 +141,7 @@ Visuals tab.
   `Application::RebuildContextsForCurrentMode` so toggling Start In
   Fullscreen no longer hides the dialog behind the freshly-created
   rain window.
-- **Overlay text colour** (Settings/Help/Exit hint, `?` hotkey list,
+- **Overlay text color** (Settings/Help/Exit hint, `?` hotkey list,
   `/?` usage dialog) now resolves `ColorScheme::Custom` from
   `snapshot.customColor` instead of falling through `GetColorRGB`'s
   green fallback.
@@ -124,13 +155,13 @@ Visuals tab.
 
 ### Fixed
 
-- **Reset-to-defaults wiped the saved custom-colour palette.** The 16
+- **Reset-to-defaults wiped the saved custom-color palette.** The 16
   saved swatches now survive Reset and Reset→OK per FR-035.
 - **Glow-off path could sample stale bloom.** The no-glow composite
   branch now binds a null SRV at slot 1 so the composite PS doesn't
   resample whatever bloom texture was left bound by a prior frame.
 - **Window-message ID collision.** Two `WM_APP` messages (Reset-button
-  reposition and custom-colour-chooser open) had been defined with the
+  reposition and custom-color-chooser open) had been defined with the
   same numeric value; separated to distinct IDs.
 - **Modeless `PropertySheetW` failure path.** A `-1` return is now
   recognised as failure instead of being cast to `(HWND)-1` and treated
@@ -162,7 +193,7 @@ preset, advanced sliders) round-trip unchanged on upgrade.
 - **User Story 2 (P1) — Optional multi-monitor spanning.** New "Use all monitors" checkbox in the configuration dialog (default on). Toggling it live applies within 1 second; Cancel reverts.
 - **User Story 3 (P2) — GPU adapter selection.** New "GPU" dropdown in the configuration dialog listing each real adapter name (with "(default)" appended to the system default). Software/WARP adapters are excluded. Selection persists by description string; if the saved adapter is missing at startup, the application silently falls back to the system default. Live device-switch takes effect within 1 second.
 - **User Story 4 (P2) — Frame cap on high-refresh monitors.** Per-monitor `FrameLimiter` engages only when the monitor's native refresh exceeds 60 Hz, capping that monitor's rendering to 60 FPS. At ≤60 Hz the existing vsync path is preserved with no measurable per-frame overhead. Substantially reduces GPU work on 144Hz / 165Hz laptop displays.
-- **User Story 5 (P3) — Graphics quality preset spectrum.** New "Quality" slider (Low / Medium / High / Custom) in a "Graphics quality" group box. Three discrete tuning sliders are always visible — Glow passes (1-4), Glow resolution (Eighth / Quarter / Half / Full), Glow smoothness (Low / Medium / High). Each quality-related control has an "ⓘ" infotip; hovering or tabbing-then-pressing-Space/Enter reveals a tooltip with a description and standardized GPU-performance-impact phrase. First-run heuristic picks a starting preset based on detected GPU class and total monitor pixel count (discrete → High; integrated + modest load → Medium; integrated + heavy load → Low). Custom-drift behaviour: any direct edit of an advanced control auto-flips the preset to Custom and saves the resulting values for restoration when the user later re-selects Custom.
+- **User Story 5 (P3) — Graphics quality preset spectrum.** New "Quality" slider (Low / Medium / High / Custom) in a "Graphics quality" group box. Three discrete tuning sliders are always visible — Glow passes (1-4), Glow resolution (Eighth / Quarter / Half / Full), Glow smoothness (Low / Medium / High). Each quality-related control has an "ⓘ" infotip; hovering or tabbing-then-pressing-Space/Enter reveals a tooltip with a description and standardized GPU-performance-impact phrase. First-run heuristic picks a starting preset based on detected GPU class and total monitor pixel count (discrete → High; integrated + modest load → Medium; integrated + heavy load → Low). Custom-drift behavior: any direct edit of an advanced control auto-flips the preset to Custom and saves the resulting values for restoration when the user later re-selects Custom.
 
 ### Changed
 
