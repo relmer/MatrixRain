@@ -216,8 +216,40 @@ void MonitorRenderContext::Join()
 
 void MonitorRenderContext::Resize (UINT width, UINT height, bool rescaleStreaks)
 {
+    // With the render thread running, hand the change over and return: see
+    // the header for why waiting here deadlocks against Present.
+    if (m_renderThread.joinable())
+    {
+        std::lock_guard<std::mutex> lock (m_pendingMutex);
+
+        m_pending.hasSize        = true;
+        m_pending.width          = width;
+        m_pending.height         = height;
+        m_pending.rescaleStreaks = rescaleStreaks;
+
+        return;
+    }
+
     std::lock_guard<std::mutex> lock (m_renderMutex);
 
+    ApplyResize (width, height, rescaleStreaks);
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  MonitorRenderContext::ApplyResize
+//
+//  The resize itself.  Runs under m_renderMutex, on the render thread once it
+//  is running and on the UI thread before that.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+void MonitorRenderContext::ApplyResize (UINT width, UINT height, bool rescaleStreaks)
+{
     float oldWidth  = m_viewport->GetWidth();
     float oldHeight = m_viewport->GetHeight();
 
@@ -250,14 +282,82 @@ void MonitorRenderContext::Resize (UINT width, UINT height, bool rescaleStreaks)
 
 void MonitorRenderContext::OnDpiChanged (UINT dpi)
 {
+    // Same hand-over as Resize, for the same reason.
+    if (m_renderThread.joinable())
+    {
+        std::lock_guard<std::mutex> lock (m_pendingMutex);
+
+        m_pending.hasDpi = true;
+        m_pending.dpi    = dpi;
+
+        return;
+    }
+
     std::lock_guard<std::mutex> lock (m_renderMutex);
 
+    ApplyDpiChange (dpi);
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  MonitorRenderContext::ApplyDpiChange
+//
+//  The DPI change itself.  Runs under m_renderMutex, on the render thread
+//  once it is running and on the UI thread before that.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+void MonitorRenderContext::ApplyDpiChange (UINT dpi)
+{
     float dpiScale = static_cast<float> (dpi) / 96.0f;
 
 
     m_renderSystem->OnDpiChanged     (dpi);
     m_animationSystem->SetDpiScale   (dpiScale);
     m_densityController->SetDpiScale (dpiScale);
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  MonitorRenderContext::ApplyPendingWindowChanges
+//
+//  Render thread, under m_renderMutex, once per frame: takes whatever the UI
+//  thread has handed over since the last frame and applies it.  DPI first,
+//  because WM_DPICHANGED's SetWindowPos delivers the WM_SIZE for the new
+//  monitor before the handler records the DPI, and the resize wants the
+//  atlas already rebuilt for the scale it is about to draw at.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+void MonitorRenderContext::ApplyPendingWindowChanges()
+{
+    PendingWindowChange pending;
+
+
+    {
+        std::lock_guard<std::mutex> lock (m_pendingMutex);
+
+        pending   = m_pending;
+        m_pending = PendingWindowChange {};
+    }
+
+    if (pending.hasDpi)
+    {
+        ApplyDpiChange (pending.dpi);
+    }
+
+    if (pending.hasSize)
+    {
+        ApplyResize (pending.width, pending.height, pending.rescaleStreaks);
+    }
 }
 
 
@@ -390,6 +490,11 @@ void MonitorRenderContext::RenderThreadProc()
 
         std::lock_guard<std::mutex> renderLock (m_renderMutex);
 
+        // Window size and DPI changes the UI thread handed over since the
+        // last frame.  Applied here, on this thread, so the UI thread never
+        // has to wait for this lock.
+        ApplyPendingWindowChanges();
+
         if (m_fpsCounter)
         {
             m_fpsCounter->Update (deltaTime);
@@ -428,6 +533,8 @@ void MonitorRenderContext::RenderThreadProc()
 
         // Update/Render hold the overlay lock (primary only); Present is kept
         // OUTSIDE it so the UI thread's Show/Dismiss is never blocked by VSync.
+        // Present does stay inside m_renderMutex, which is why nothing on the
+        // UI thread may wait for that lock: see Resize in the header.
         {
             std::unique_lock<std::mutex> overlayLock;
 
@@ -494,7 +601,7 @@ void MonitorRenderContext::Update (const SharedState::Snapshot & snapshot, float
 
         // ColorScheme::Custom isn't in the static palette table; resolve
         // it from snapshot.customColor (COLORREF) so overlay text picks
-        // up the user-chosen colour instead of falling back to green.
+        // up the user-chosen color instead of falling back to green.
         if (snapshot.colorScheme == ColorScheme::Custom)
         {
             COLORREF cc = static_cast<COLORREF> (snapshot.customColor);

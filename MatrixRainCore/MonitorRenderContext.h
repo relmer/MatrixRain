@@ -52,7 +52,14 @@ public:
     void    RequestStop();
     void    Join();
 
-    // UI-thread window events — serialized against the render thread
+    // UI-thread window events.  While the render thread is running these
+    // record the change and return at once; the render thread applies it at
+    // the top of its next frame.  Before the thread starts they apply
+    // immediately.  The UI thread must never wait on the render thread: a
+    // flip-model Present blocks until the window has finished handling a
+    // resize, so a WM_SIZE handler that waits for the render lock while the
+    // render thread sits in Present is a deadlock that only DWM's timeout
+    // breaks -- the drag-across-monitors freeze and its ghost window.
     void    Resize       (UINT width, UINT height, bool rescaleStreaks);
     void    OnDpiChanged (UINT dpi);
 
@@ -97,7 +104,23 @@ public:
     }
 
 private:
+    // A window change the UI thread has handed to the render thread.  The
+    // size and the DPI arrive as separate messages and are kept separately;
+    // a later request of the same kind replaces an earlier unapplied one.
+    struct PendingWindowChange
+    {
+        bool hasSize        { false };
+        UINT width          { 0 };
+        UINT height         { 0 };
+        bool rescaleStreaks { false };
+        bool hasDpi         { false };
+        UINT dpi            { 0 };
+    };
+
     void RenderThreadProc();
+    void ApplyPendingWindowChanges();
+    void ApplyResize       (UINT width, UINT height, bool rescaleStreaks);
+    void ApplyDpiChange    (UINT dpi);
     void Update (const SharedState::Snapshot & snapshot, float deltaTime);
     void Render (const SharedState::Snapshot & snapshot);
 
@@ -114,6 +137,11 @@ private:
     std::mutex        m_renderMutex;
     std::thread       m_renderThread;
     std::atomic<bool> m_shouldStop { false };
+
+    // Guards m_pending only.  Held for a copy in or out, never while waiting
+    // on anything, so neither thread can block on it for long.
+    std::mutex          m_pendingMutex;
+    PendingWindowChange m_pending;
 
     // Observer pointers — valid only while the render thread is running
     SharedState       * m_sharedState  { nullptr };
