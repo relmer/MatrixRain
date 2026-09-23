@@ -389,13 +389,82 @@ reading and writing float textures instead of 8-bit ones. WARP is the fallback
 for a machine with no usable GPU driver (a remote desktop session, some VMs).
 At the Low preset it still renders a 1080p frame in under 8 ms.
 
+### Integrated GPU: Surface Pro 8, Intel Iris Xe (driver 32.0.101.6737)
+
+Measured by a second session on the laptop, same protocol, old and new
+alternated for two rounds, on AC, Balanced power mode. Build `e9c2caa`, the
+state everything above describes. Mean GPU ms:
+
+| Configuration | Preset | T005 | e9c2caa | Delta |
+|---|---|---|---|---|
+| 1920x1080 @ 100% | Low | 1.58 | 1.48 | -6% (noisy: rounds swing 6-12%) |
+| 1920x1080 @ 100% | Medium | 1.77 | 1.89 | **+6.8%** |
+| 1920x1080 @ 100% | High | 2.17 | 2.29 | **+5.9%** |
+| 2880x1920 @ 200% (native) | Low | 1.81 | 1.85 | +2.3% |
+| 2880x1920 @ 200% (native) | Medium | 2.68 | 2.92 | **+8.9%** |
+| 2880x1920 @ 200% (native) | High | 3.70 | 3.90 | **+5.3%** |
+
+Medium and High repeat within 1% between rounds. WARP there: Low +45%,
+Medium and High +104%.
+
+The attribution flipped from the desktop's. With the three transfer-curve
+calls stubbed out (glyph decode, extract encode, composite encode), native
+Medium and High landed back on the old build within noise: on an integrated
+GPU the `pow()` math is essentially the whole regression, and the float
+targets cost nothing measurable. The desktop card has about a hundred
+arithmetic operations of headroom per byte it moves; the Iris Xe has about
+thirty, so a shader that is bandwidth-bound on the desktop is ALU-bound on
+the laptop. WARP, which computes `pow()` in software, is the same story
+further along.
+
+### The transfer curves as polynomials
+
+The fix that pointed at: `ColorTransfer.hlsli` no longer calls `pow()`. The
+decoding curve is a degree-5 polynomial in the encoded value; the encoding
+curve is a degree-5 polynomial in the square root of the linear value, the
+root being what lets a polynomial follow the curve's near-vertical start.
+Both are minimax fits over the curved segment's whole domain, checked in
+32-bit float: the decode lands within 0.013 of an 8-bit code value after an
+exact re-encode, the encode within 0.084. The coefficients live in
+`ColorConstants.h` beside the curve's own constants, `ColorMath.cpp`
+evaluates the same polynomials on the CPU, and four unit tests hold them to
+those bounds, to continuity at the knees, and to monotonicity.
+
+Against the `pow()` render, the polynomial build differs by at most 2 to 3
+code values on a handful of pixels per frame, mean under 0.1, none over the
+calibration threshold. The calibration numbers against v1.6 are unchanged to
+the third decimal.
+
+Hardware, same protocol as the table above, T005 against the polynomial
+build, two rounds averaged:
+
+| Configuration | Preset | T005 | Polynomial | Delta |
+|---|---|---|---|---|
+| 1920x1080 @ 100% | Low | 0.069 | 0.069 | 0% |
+| 1920x1080 @ 100% | Medium | 0.094 | 0.096 | +2.1% |
+| 1920x1080 @ 100% | High | 0.124 | 0.127 | +2.4% |
+| 3840x2160 @ 125% (landscape) | Low | 0.164 | 0.166 | +1.2% |
+| 3840x2160 @ 125% (landscape) | Medium | 0.256 | 0.266 | +3.7% |
+| 3840x2160 @ 125% (landscape) | High | 0.369 | 0.379 | +2.7% |
+| 2160x3840 @ 150% (portrait) | Low | 0.127 | 0.128 | +0.4% |
+| 2160x3840 @ 150% (portrait) | Medium | 0.219 | 0.228 | +3.9% |
+| 2160x3840 @ 150% (portrait) | High | 0.332 | 0.343 | +3.2% |
+
+WARP: 5.2 / 9.2 / 14.5 to 5.9 / 13.7 / 23.1, that is +13% / +48% / +59%,
+down from +30% / +55% / +60% or worse. What remains on WARP is the blur chain
+reading and writing float textures in software.
+
+The laptop has not yet been re-measured with the polynomial build.
+
 ### Verdict
 
-The gate as written is not met at Medium (both monitors) and High (landscape)
-on hardware, by 0.2 to 2.1 points, and not met on WARP by a wide margin. The
-frame rate is pinned to the refresh rate at every preset on this hardware and
-has no headroom in which 14 to 19 microseconds could show. The remaining cost
-is the encode work the v1.6 match requires, plus the float format the HDR
-phases require. Retuning the Medium preset (the remedy tasks.md lists) would
-change what Medium looks like, and was not done without a say-so. Rob decides.
+**On hardware the gate is met at all nine configurations**, with the largest
+delta 3.9% (portrait Medium). The two desktop overages recorded earlier,
+Medium at both monitors and High at 4K, were the same `pow()` cost that the
+laptop made visible, and went with it.
 
+On WARP it is not met, and will not be while the blur chain is float: that is
+a software rasterizer's cost for the precision FR-003 asks for. The Low preset
+still renders a 1080p frame in under 6 ms there.
+
+No preset was retuned.

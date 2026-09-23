@@ -26,6 +26,18 @@ namespace MatrixRainTests
     //  Brightness step for the regression sweep.
     static constexpr float kBrightnessStep      = 0.01f;
 
+    //  The GPU's polynomial curves, measured against the exact ones in 8-bit
+    //  code values (1/255). The bounds are the fits' verified worst cases
+    //  (ColorConstants.h) with a little room for the sweep landing between
+    //  the points the fit was checked at; a coefficient typo blows through
+    //  either by orders of magnitude.
+    static constexpr float kDecodeCodeBound     = 0.02f;
+    static constexpr float kEncodeCodeBound     = 0.10f;
+    static constexpr float kCodeValue           = 255.0f;
+
+    //  Step for the polynomial sweeps: ten thousand points across [0, 1].
+    static constexpr float kFineSweepStep       = 0.0001f;
+
 
 
 
@@ -292,6 +304,95 @@ namespace MatrixRainTests
             }
         }
 
+
+        ////////////////////////////////////////////////////////////////////////
+        // The GPU's polynomial curves
+        ////////////////////////////////////////////////////////////////////////
+
+        TEST_METHOD (SrgbToLinearPolynomial_MatchesTheCurve_ToWellUnderOneCodeValue)
+        {
+            //  Decoding error is judged where it would show: after an exact
+            //  re-encode, in code values. A linear-light error near black is
+            //  worth many more code values than the same error near white.
+            float worst = 0.0f;
+
+
+
+            for (float encoded = 0.0f; encoded <= 1.0f; encoded += kFineSweepStep)
+            {
+                const float back = LinearToSrgb (SrgbToLinearPolynomial (encoded));
+
+
+                worst = std::max (worst, std::abs (back - encoded) * kCodeValue);
+            }
+
+            Assert::IsTrue (worst < kDecodeCodeBound,
+                            (L"Decode polynomial worst error in code values: " + std::to_wstring (worst)).c_str());
+        }
+
+        TEST_METHOD (LinearToSrgbPolynomial_MatchesTheCurve_ToWellUnderOneCodeValue)
+        {
+            float worst = 0.0f;
+
+
+
+            for (float linear = 0.0f; linear <= 1.0f; linear += kFineSweepStep)
+            {
+                const float exact = LinearToSrgb (linear);
+                const float fit   = LinearToSrgbPolynomial (linear);
+
+
+                worst = std::max (worst, std::abs (fit - exact) * kCodeValue);
+            }
+
+            Assert::IsTrue (worst < kEncodeCodeBound,
+                            (L"Encode polynomial worst error in code values: " + std::to_wstring (worst)).c_str());
+        }
+
+        TEST_METHOD (Polynomials_AreContinuousAtTheKnees)
+        {
+            //  The fits were made over the curved segments only; they have to
+            //  meet the straight segments without a step. The sweeps above
+            //  are unlikely to land exactly on a knee, so check both sides.
+            const float encodedKnee = ColorMathConstants::kEncodedKnee;
+            const float linearKnee  = ColorMathConstants::kLinearKnee;
+            const float nudge       = 1e-6f;
+
+
+
+            Assert::AreEqual (LinearToSrgb (SrgbToLinearPolynomial (encodedKnee - nudge)),
+                              LinearToSrgb (SrgbToLinearPolynomial (encodedKnee + nudge)),
+                              kDecodeCodeBound / kCodeValue,
+                              L"Decode polynomial must meet the straight segment at the knee");
+
+            Assert::AreEqual (LinearToSrgbPolynomial (linearKnee - nudge),
+                              LinearToSrgbPolynomial (linearKnee + nudge),
+                              kEncodeCodeBound / kCodeValue,
+                              L"Encode polynomial must meet the straight segment at the knee");
+        }
+
+        TEST_METHOD (Polynomials_AreMonotonicallyIncreasing)
+        {
+            //  A fit that wiggles would put a visible reversal into a smooth
+            //  fade. Neither may ever go down.
+            float previousLinear  = SrgbToLinearPolynomial (0.0f);
+            float previousEncoded = LinearToSrgbPolynomial (0.0f);
+
+
+
+            for (float value = kFineSweepStep; value <= 1.0f; value += kFineSweepStep)
+            {
+                const float currentLinear  = SrgbToLinearPolynomial (value);
+                const float currentEncoded = LinearToSrgbPolynomial (value);
+
+
+                Assert::IsTrue (currentLinear  >= previousLinear,  L"Decode polynomial went down");
+                Assert::IsTrue (currentEncoded >= previousEncoded, L"Encode polynomial went down");
+
+                previousLinear  = currentLinear;
+                previousEncoded = currentEncoded;
+            }
+        }
 
         TEST_METHOD (SrgbToLinear_IsDarkerThanItsInputBelowWhite)
         {

@@ -5,9 +5,13 @@
 
 //
 //  The sRGB transfer function in both directions, per channel and per color.
-//  Transliterations of SrgbToLinear and LinearToSrgb in ColorMath.cpp, and
-//  they MUST stay so; the constants come from the same header, so the two
-//  sides cannot drift apart.
+//
+//  The curved segments are polynomial fits, not pow(): see ColorConstants.h
+//  for why and for how close they are (well under a tenth of an 8-bit code
+//  value). These are transliterations of SrgbToLinearPolynomial and
+//  LinearToSrgbPolynomial in ColorMath.cpp and MUST stay so; the coefficients
+//  come from the same header, so the two sides cannot drift apart, and the
+//  unit tests on the C++ side are the tests of these.
 //
 //  NB: no parameter here may be called "linear" -- that is an HLSL
 //  interpolation modifier keyword, and a parameter with that name fails to
@@ -21,7 +25,15 @@ float SrgbToLinearChannel(float encoded)
         return encoded / MR_SRGB_LINEAR_SLOPE;
     }
 
-    return pow((encoded + MR_SRGB_CURVE_OFFSET) / MR_SRGB_CURVE_SCALE, MR_SRGB_CURVE_GAMMA);
+    float acc = MR_SRGB_DECODE_C5;
+
+    acc = acc * encoded + MR_SRGB_DECODE_C4;
+    acc = acc * encoded + MR_SRGB_DECODE_C3;
+    acc = acc * encoded + MR_SRGB_DECODE_C2;
+    acc = acc * encoded + MR_SRGB_DECODE_C1;
+    acc = acc * encoded + MR_SRGB_DECODE_C0;
+
+    return acc;
 }
 
 float LinearToSrgbChannel(float linearValue)
@@ -33,7 +45,16 @@ float LinearToSrgbChannel(float linearValue)
         return clamped * MR_SRGB_LINEAR_SLOPE;
     }
 
-    return MR_SRGB_CURVE_SCALE * pow(clamped, 1.0 / MR_SRGB_CURVE_GAMMA) - MR_SRGB_CURVE_OFFSET;
+    float root = sqrt(clamped);
+    float acc  = MR_SRGB_ENCODE_C5;
+
+    acc = acc * root + MR_SRGB_ENCODE_C4;
+    acc = acc * root + MR_SRGB_ENCODE_C3;
+    acc = acc * root + MR_SRGB_ENCODE_C2;
+    acc = acc * root + MR_SRGB_ENCODE_C1;
+    acc = acc * root + MR_SRGB_ENCODE_C0;
+
+    return acc;
 }
 
 float3 SrgbToLinear3(float3 encoded)

@@ -119,6 +119,16 @@ spare.
   8 bits would be v1.6's own precision there. Measured gain about 1%, and the
   rounding moved the calibration mean by +1.5%. Not worth it.
 
+**Transfer curves**: `ColorTransfer.hlsli` evaluates both sRGB curves as
+degree-5 polynomial fits (the encode in the square root of its input) rather
+than `pow()`. On the desktop GPU that made no measurable difference; on a
+Surface Pro 8's Iris Xe the `pow()` calls were the whole of a +5% to +9%
+regression, and on WARP most of a +100%. The fits are within 0.013 (decode)
+and 0.084 (encode) of an 8-bit code value, the coefficients sit in
+`ColorConstants.h` beside the curve's constants, and `ColorMath.cpp` mirrors
+them so unit tests can hold the shader's arithmetic to those bounds. Render
+difference against `pow()`: at most 2 to 3 code values on a handful of pixels.
+
 **Phase 2 note**: an HDR swap chain shows 10-bit steps, and a 1.6% to 3.1%
 mantissa could show in a smooth halo at high brightness. Measure it then; if
 it shows, the answer is FP16 only while the swap chain is scRGB, with its own

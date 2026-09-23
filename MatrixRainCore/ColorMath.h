@@ -12,10 +12,11 @@
 /// values.
 ///
 /// Every number here comes from Shaders/ColorConstants.h, which FXC compiles
-/// into OutputTransform.hlsli as well. That indirection is the whole point:
-/// the HLSL output transform has to be a line-for-line transliteration of
-/// LinearToSrgb, and a second copy of a constant is a bug waiting to be
-/// written. Editing the shared header moves both sides at once.
+/// into ColorTransfer.hlsli as well. That indirection is the whole point:
+/// the HLSL curves have to be line-for-line transliterations of
+/// SrgbToLinearPolynomial and LinearToSrgbPolynomial, and a second copy of a
+/// constant is a bug waiting to be written. Editing the shared header moves
+/// both sides at once.
 /// </summary>
 namespace ColorMathConstants
 {
@@ -36,6 +37,14 @@ namespace ColorMathConstants
 
     /// <summary>Exponent of the curved segment, decoding to linear.</summary>
     inline constexpr float kCurveGamma   = MR_SRGB_CURVE_GAMMA;
+
+    /// <summary>The GPU's polynomial for the decoding curve, highest power first.</summary>
+    inline constexpr float kDecodePolynomial[6] = { MR_SRGB_DECODE_C5, MR_SRGB_DECODE_C4, MR_SRGB_DECODE_C3,
+                                                    MR_SRGB_DECODE_C2, MR_SRGB_DECODE_C1, MR_SRGB_DECODE_C0 };
+
+    /// <summary>The GPU's polynomial for the encoding curve, in the square root of the input, highest power first.</summary>
+    inline constexpr float kEncodePolynomial[6] = { MR_SRGB_ENCODE_C5, MR_SRGB_ENCODE_C4, MR_SRGB_ENCODE_C3,
+                                                    MR_SRGB_ENCODE_C2, MR_SRGB_ENCODE_C1, MR_SRGB_ENCODE_C0 };
 }
 
 
@@ -73,6 +82,36 @@ float SrgbToLinear (float encoded) noexcept;
 /// <param name="linear">Linear-light value; values outside [0, 1] are clamped</param>
 /// <returns>sRGB-encoded value in [0, 1]</returns>
 float LinearToSrgb (float linear) noexcept;
+
+
+
+
+
+/// <summary>
+/// SrgbToLinear as the GPU computes it: the same straight segment, then the
+/// polynomial in Shaders/ColorConstants.h instead of pow().
+///
+/// This exists so the shader's arithmetic can be tested. ColorTransfer.hlsli
+/// is a transliteration of this function and takes its coefficients from the
+/// same header, so holding this to its error bound holds the shader to it.
+/// Nothing on the CPU should prefer it over SrgbToLinear.
+/// </summary>
+/// <param name="encoded">sRGB-encoded value in [0, 1]</param>
+/// <returns>Linear-light value, within 0.013 of an 8-bit code value of the exact curve</returns>
+float SrgbToLinearPolynomial (float encoded) noexcept;
+
+
+
+
+
+/// <summary>
+/// LinearToSrgb as the GPU computes it: clamp, the same straight segment,
+/// then the polynomial in the square root from Shaders/ColorConstants.h
+/// instead of pow(). See SrgbToLinearPolynomial for why this exists.
+/// </summary>
+/// <param name="linear">Linear-light value; values outside [0, 1] are clamped</param>
+/// <returns>sRGB-encoded value, within 0.084 of an 8-bit code value of the exact curve</returns>
+float LinearToSrgbPolynomial (float linear) noexcept;
 
 
 

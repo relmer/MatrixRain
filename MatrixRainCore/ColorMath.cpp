@@ -54,6 +54,76 @@ float LinearToSrgb (float linear) noexcept
 
 ////////////////////////////////////////////////////////////////////////////////
 //
+//  EvaluatePolynomial
+//
+//  Horner's rule, highest power first, in the order and precision the shader
+//  uses so the two agree to the last bit that matters.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+static float EvaluatePolynomial (const float (& coefficients)[6], float t) noexcept
+{
+    float acc = coefficients[0];
+
+
+
+    for (size_t i = 1; i < 6; ++i)
+    {
+        acc = acc * t + coefficients[i];
+    }
+
+    return acc;
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  SrgbToLinearPolynomial
+//
+////////////////////////////////////////////////////////////////////////////////
+
+float SrgbToLinearPolynomial (float encoded) noexcept
+{
+    if (encoded <= ColorMathConstants::kEncodedKnee)
+    {
+        return encoded / ColorMathConstants::kLinearSlope;
+    }
+
+    return EvaluatePolynomial (ColorMathConstants::kDecodePolynomial, encoded);
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  LinearToSrgbPolynomial
+//
+////////////////////////////////////////////////////////////////////////////////
+
+float LinearToSrgbPolynomial (float linear) noexcept
+{
+    const float clamped = std::clamp (linear, 0.0f, 1.0f);
+
+
+    if (clamped <= ColorMathConstants::kLinearKnee)
+    {
+        return clamped * ColorMathConstants::kLinearSlope;
+    }
+
+    return EvaluatePolynomial (ColorMathConstants::kEncodePolynomial, std::sqrt (clamped));
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
 //  InstanceDisplayColor
 //
 ////////////////////////////////////////////////////////////////////////////////
