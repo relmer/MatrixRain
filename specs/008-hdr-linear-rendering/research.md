@@ -32,9 +32,14 @@ adjusted to "glyph compositing".
 **Decision**: Render in linear light, Rec.709 primaries. Convert each
 instance's final display color to linear **on the CPU, per instance**, after
 applying brightness and the head/trail color choice:
-`linearColor = SrgbToLinear(color_srgb * brightness * (1 + 0.3 * brightness) * brightness)`.
-The glyph pixel shader then only multiplies by atlas coverage, and its alpha
-is coverage alone.
+the CPU computes v1.6's gamma-space value
+`display = color_srgb * brightness * (1 + 0.3 * brightness) * brightness`
+per instance, and the glyph pixel shader computes
+`SrgbToLinear(min(1, display * coverage * coverage))` per pixel. Coverage is
+squared because the atlas is premultiplied white, so v1.6's `tex.rgb` and
+`tex.a` were both coverage. The conversion happens after coverage and after
+the clip, which is where v1.6's 8-bit target clipped, and that ordering is
+what makes the match exact for every color and every antialiased edge.
 
 The second `brightness` factor was missed in the first implementation. v1.6's
 shader applied brightness both to the color and to the alpha it blended with,

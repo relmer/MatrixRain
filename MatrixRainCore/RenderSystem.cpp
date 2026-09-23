@@ -1060,6 +1060,12 @@ void RenderSystem::OnDpiChanged (UINT dpi)
 static constexpr DXGI_FORMAT kSceneFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
 static constexpr DXGI_FORMAT kBloomFormat = DXGI_FORMAT_R11G11B10_FLOAT;
 
+//  How much of the Glow Intensity slider's travel above 100% reaches the
+//  bloom shader. Calibrated in T018 so the slider's maximum produces the glow
+//  v1.6's maximum did; see SetGlowIntensity for why the default itself needs
+//  no such correction.
+static constexpr float kGlowIntensityAboveDefaultScale = 0.67f;
+
 //  Rows the halo pass can outline in one draw. MUST match the rowRects[] size
 //  in MatrixRainCore/Shaders/Halo.ps.hlsl.
 static constexpr int MAX_HALO_ROWS = 16;
@@ -1736,7 +1742,6 @@ void RenderSystem::SortStreaksByDepth (std::vector<const CharacterStreak*>& stre
 void RenderSystem::BuildCharacterInstanceData (const CharacterInstance            & character,
                                                const Vector3                      & streakPos,
                                                const Color4                       & schemeColor,
-                                               bool                                 linearizeColors,
                                                RenderSystem::CharacterInstanceData & data)
 {
     CharacterSet & charSet = CharacterSet::GetInstance();
@@ -1772,43 +1777,22 @@ void RenderSystem::BuildCharacterInstanceData (const CharacterInstance          
         srgb = Color4 (schemeColor.r, schemeColor.g, schemeColor.b, character.color.a);
     }
 
-    // The brightness and self-glow terms used to live in the glyph pixel
-    // shader, in gamma space. They stay in gamma space -- they are not linear
-    // operations, so redoing them in linear light would change the glyph --
-    // but they move here, onto the CPU, once per instance. Only the finished
-    // color crosses into linear light, which is what keeps the glyph core
-    // identical to v1.6 (FR-005) while everything downstream of it blends
-    // correctly.
-    if (linearizeColors)
+    // The color as v1.6 displayed it at full coverage, in gamma space, with
+    // both brightness factors folded in. The glyph shader applies coverage,
+    // clips at white as the 8-bit target did, and converts the finished pixel
+    // to linear light per pixel -- which is what makes the match exact for
+    // every color and every antialiased edge (FR-005).
     {
-        const Color4 linear = InstanceLinearColor (srgb, character.brightness, 1.0f);
+        const Color4 displayed = InstanceDisplayColor (srgb, character.brightness);
 
-        data.color[0] = linear.r;
-        data.color[1] = linear.g;
-        data.color[2] = linear.b;
-        data.color[3] = linear.a;
-    }
-    else
-    {
-        // The no-scene fallback draws straight to the back buffer, so no
-        // output transform ever runs and nothing would encode a linear value.
-        // Stop one step earlier: apply the same scaling in gamma space and
-        // clamp where the 8-bit target used to, which is exactly the pixel
-        // v1.6 wrote.
-        const float scale = character.brightness
-                            * (1.0f + kGlyphSelfGlow * character.brightness)
-                            * character.brightness;
-
-        data.color[0] = std::min (1.0f, srgb.r * scale);
-        data.color[1] = std::min (1.0f, srgb.g * scale);
-        data.color[2] = std::min (1.0f, srgb.b * scale);
-        data.color[3] = srgb.a;
+        data.color[0] = displayed.r;
+        data.color[1] = displayed.g;
+        data.color[2] = displayed.b;
+        data.color[3] = displayed.a;
     }
 
-    // Uploaded because the instance layout carries it and the overlay shader
-    // reads it as opacity. The glyph shader no longer uses it: the fade is
-    // already inside the color above, and applying it again as linear-light
-    // alpha made every fading trail brighter than v1.6.
+    // v1.6's blend alpha was coverage times brightness; the shader multiplies
+    // this back in so partly covered background attenuates as it did.
     data.brightness = character.brightness;
     data.scaleX     = character.scale;
     data.scaleY     = character.scale;
@@ -1821,8 +1805,7 @@ void RenderSystem::BuildCharacterInstanceData (const CharacterInstance          
 HRESULT RenderSystem::UpdateInstanceBuffer (const AnimationSystem & animationSystem,
                                             ColorScheme             colorScheme,
                                             float                   elapsedTime,
-                                            COLORREF                customColor,
-                                            bool                    linearizeColors)
+                                            COLORREF                customColor)
 {
     HRESULT                  hr             = S_OK;
     Color4                   schemeColor    = GetColorRGB (colorScheme, elapsedTime);
@@ -1866,7 +1849,7 @@ HRESULT RenderSystem::UpdateInstanceBuffer (const AnimationSystem & animationSys
 
 
 
-            BuildCharacterInstanceData (character, streakPos, schemeColor, linearizeColors, data);
+            BuildCharacterInstanceData (character, streakPos, schemeColor, data);
             m_instanceData.push_back (data);
         }
     }
@@ -1879,7 +1862,7 @@ HRESULT RenderSystem::UpdateInstanceBuffer (const AnimationSystem & animationSys
 
 
 
-        BuildCharacterInstanceData (overlay.character, overlay.position, schemeColor, linearizeColors, data);
+        BuildCharacterInstanceData (overlay.character, overlay.position, schemeColor, data);
         m_instanceData.push_back (data);
     }
 
@@ -1996,18 +1979,17 @@ void RenderSystem::Render (const AnimationSystem & animationSystem, const Viewpo
 
         cbData->characterScale = characterScale;
 
+        // The glyph shader converts to linear light only when a later pass
+        // will encode the result. With no scene texture the glyphs land
+        // straight in the 8-bit back buffer, no output transform runs, and a
+        // linear value would display far too dark.
+        cbData->linearizeColors = (m_sceneRTV != nullptr) ? 1.0f : 0.0f;
+
         m_context->Unmap (m_constantBuffer.Get(), 0);
     }
 
     // Update instance buffer with character data
-    // Colors go to the GPU in linear light only when a later pass will encode
-    // them. With no scene texture the glyphs land straight in the back buffer,
-    // no output transform runs, and linear values would display far too dark.
-    (void) UpdateInstanceBuffer (animationSystem,
-                                 params.colorScheme,
-                                 params.elapsedTime,
-                                 params.customColor,
-                                 m_sceneRTV != nullptr);
+    (void) UpdateInstanceBuffer (animationSystem, params.colorScheme, params.elapsedTime, params.customColor);
 
     if (m_instanceData.empty())
     {
@@ -2031,7 +2013,11 @@ void RenderSystem::Render (const AnimationSystem & animationSystem, const Viewpo
 
     m_context->PSSetShader (m_pixelShader.Get(), nullptr, 0);
     m_context->PSSetSamplers (0, 1, m_samplerState.GetAddressOf());
-    
+
+    // The glyph pixel shader reads linearizeColors from the same constant
+    // buffer the vertex shader uses.
+    m_context->PSSetConstantBuffers (0, 1, m_constantBuffer.GetAddressOf());
+
     // Bind this device's rain glyph atlas
     ID3D11ShaderResourceView * srv = m_glyphAtlas.RainResourceView();
     if (srv)
@@ -2039,9 +2025,12 @@ void RenderSystem::Render (const AnimationSystem & animationSystem, const Viewpo
         m_context->PSSetShaderResources (0, 1, &srv);
     }
 
+    // Premultiplied: the glyph shader emits the finished over-black pixel in
+    // rgb and v1.6's blend alpha separately, so the source is added as-is and
+    // only the destination is attenuated.
     float blendFactor[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
-    m_context->OMSetBlendState (m_blendState.Get(), blendFactor, 0xffffffff);
-    
+    m_context->OMSetBlendState (m_premultipliedBlendState.Get(), blendFactor, 0xffffffff);
+
     // Set full viewport for rendering
     D3D11_VIEWPORT fullViewport = {};
     fullViewport.Width    = static_cast<float> (m_renderWidth);
@@ -2683,6 +2672,10 @@ void RenderSystem::RenderOverlayInstances ()
 
         cbData->characterScale = 1.0f;
 
+        // Not read by the overlay pixel shader; set so the buffer holds no
+        // stale value if a glyph draw ever follows without remapping.
+        cbData->linearizeColors = (m_sceneRTV != nullptr) ? 1.0f : 0.0f;
+
         // Exact pixel dimensions for 1:1 texel-to-pixel mapping
         cbData->charWidth      = overlayCW;
         cbData->charHeight     = overlayCH;
@@ -3272,9 +3265,24 @@ Error:
 
 void RenderSystem::SetGlowIntensity (int intensityPercent)
 {
-    // Convert percentage (0-200) to multiplier (0.0-5.0)
-    // Default is 100% = 2.5 multiplier
-    m_glowIntensity = (intensityPercent / 100.0f) * 2.5f;
+    float unit = intensityPercent / 100.0f;
+
+
+    // Above the default, v1.6's screen blend throttled the glow: it composited
+    // as scene + soft * (1 - scene), and at high intensity enough of the frame
+    // is bright that the (1 - scene) factor took a real bite. Linear addition
+    // has no such throttle, and it is not wanted back -- it is what flattened
+    // overlapping halos -- so the slider is compressed above 100% instead, to
+    // give each position the glow it gave in v1.6. Below the default the
+    // throttle was negligible and the mapping is identity, so the default and
+    // everything under it are untouched.
+    if (unit > 1.0f)
+    {
+        unit = 1.0f + (unit - 1.0f) * kGlowIntensityAboveDefaultScale;
+    }
+
+    // Convert to the multiplier the bloom shader uses: 100% = 2.5.
+    m_glowIntensity = unit * 2.5f;
 }
 
 

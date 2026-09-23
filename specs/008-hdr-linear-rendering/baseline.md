@@ -109,15 +109,24 @@ untouched; every change below is to the new pipeline. Where earlier notes in
 this file or in commit messages called v1.6's gamma-space arithmetic "wrong",
 that was a statement about physics, not about the target.
 
+**The principle that reconciles "match v1.6" with "improve the look":** light
+*combines* in linear light -- glyphs composite, the blur runs, and glow adds
+in linear light, which is where overlapping halos add instead of plateauing
+and where float intermediates remove banding. Everything a user can *tune*
+keeps its v1.6 meaning: the trail fade curve, the halo's falloff, glyph edge
+weight, and the strength of each slider are computed as v1.6 computed them
+and converted afterward. FR-001 and FR-005 were revised to say so.
+
 ### Constants
 
 | Where | Constant | Value |
 |---|---|---|
-| `ColorMath.cpp` | fade folded into `InstanceLinearColor` | `b * (1 + 0.3 b) * b` |
-| `Shaders/Glyph.ps.hlsl` | coverage exponent | 2.4 (`MR_SRGB_CURVE_GAMMA`) |
+| `ColorMath.cpp` | `InstanceDisplayColor` | `srgb * b * (1 + 0.3 b) * b`, gamma space |
+| `Shaders/Glyph.ps.hlsl` | per-pixel | `SrgbToLinear(min(1, display * c * c))` |
 | `Shaders/BloomExtract.ps.hlsl` | input clamp | 1.0 |
 | `Shaders/BloomComposite.ps.hlsl` | `kBloomFalloff` | 2.4 (`MR_SRGB_CURVE_GAMMA`) |
-| `Shaders/BloomComposite.ps.hlsl` | `kBloomCeiling` | 0.871 |
+| `Shaders/BloomComposite.ps.hlsl` | `kBloomCeiling` | 1.74 |
+| `RenderSystem.cpp` | `kGlowIntensityAboveDefaultScale` | 0.67 |
 | `Shaders/Scanlines.ps.hlsl` | input clamp, darken exponent | `g_headroom`, 2.4 |
 
 ### Result
@@ -126,118 +135,110 @@ Mean luminance against baseline, at 100% scale:
 
 | Case | Baseline | Now | Delta |
 |---|---|---|---|
-| `defaults` | 0.045544 | 0.046383 | +1.8% |
-| `glow-min` | 0.033470 | 0.034385 | +2.7% |
-| `glow-max` | 0.067967 | 0.075917 | +11.7% |
-| `glow-size-min` | 0.047643 | 0.049602 | +4.1% |
-| `glow-size-max` | 0.043832 | 0.043503 | -0.8% |
-| `scanlines-1` | 0.032478 | 0.031829 | -2.0% |
-| `scanlines-100` | 0.032621 | 0.032013 | -1.9% |
-| `custom-color` | 0.024502 | 0.020842 | -14.9% |
+| `defaults` | 0.045544 | 0.046709 | +2.6% |
+| `glow-min` | 0.033470 | 0.034730 | +3.8% |
+| `glow-max` | 0.067967 | 0.067785 | -0.3% |
+| `glow-size-min` | 0.047643 | 0.050671 | +6.4% |
+| `glow-size-max` | 0.043832 | 0.043543 | -0.7% |
+| `scanlines-1` | 0.032478 | 0.032053 | -1.3% |
+| `scanlines-100` | 0.032621 | 0.032239 | -1.2% |
+| `custom-color` | 0.024502 | 0.022128 | -9.7% |
 
 Glow contribution (`defaults` minus `glow-min`): baseline 0.012074, now
-0.011998, **0.99x**.
+0.011979, **0.99x**.
 
-Six of eight cases are inside SC-001's 5%. The two outside it are explained
-below and are visually close; both are judged on hardware in T019.
+Six of eight cases are inside SC-001's 5%. `glow-size-min` and `custom-color`
+are outside it, visually close, and judged on hardware in T019.
 
-### How it got here: five separate mismatches, one cause
+### How it got here: one cause, found six times
 
-Every mismatch found had the same root: some step that v1.6 performed on
-ENCODED values was being performed on linear light, and the encode curve is
-concave, so the two give different pictures. Each was fixed by reproducing
-v1.6's result on screen rather than its arithmetic. In the order found:
+Every mismatch had the same root: a step v1.6 performed on ENCODED values was
+being performed on linear light, and the encode curve is concave, so the two
+give different pictures. In the order found:
 
-1. **Glow strength.** Glow is added in linear light and then encoded, and the
-   curve is steep near black: 0.3 linear added to a dark gap lands at sRGB
-   0.58. The same `bloomIntensity` produced about 8x too much apparent glow --
-   a green fog between the streaks. Fixed by `kBloomCeiling`.
+1. **Glow strength.** 0.3 of linear light added to a dark gap lands at sRGB
+   0.58, so the same `bloomIntensity` produced about 8x too much apparent glow:
+   a green fog between the streaks. `kBloomCeiling`.
 
-2. **Glow shape.** The same curve lifts a halo's dim tail far more than its
-   core, so a Gaussian blurred in linear light reached the screen much flatter
-   and wider: for a sigma-8 halo, 39.6% of core brightness at 16 px where v1.6
-   showed 13.5%. Rob saw it as glow that no longer hugged the glyphs and was
-   the same width all the way down a streak. Fixed by raising the glow to the
-   curve's exponent before adding it, applied to the magnitude with channel
-   ratios preserved -- an earlier per-channel version shifted the halo's hue.
+2. **Glow shape.** The curve lifts a halo's dim tail far more than its core,
+   so a Gaussian blurred in linear light reached the screen much flatter and
+   wider: 39.6% of core brightness at 16 px where v1.6 showed 13.5%. Rob saw
+   it as glow that no longer hugged the glyphs and was the same width all the
+   way down a streak. `kBloomFalloff`, applied to the magnitude with channel
+   ratios preserved; a per-channel version shifted the halo's hue.
 
-3. **Trail fade.** v1.6's shader applied brightness twice: to the color, with
-   the self-glow, and again as the alpha it blended with. Over the black scene
-   both multiply the displayed pixel. Only the first factor had been moved to
-   the CPU; the second ran as linear-light alpha, and a fade in linear light
-   removes far less light. Every fading trail was about 20% brighter and
-   slightly less saturated. Fixed by folding the second factor into
-   `InstanceLinearColor` and making the shader's alpha coverage alone. The
-   FR-005 regression test had pinned the shader's OUTPUT rather than the
-   screen's, and passed throughout; it now pins the screen.
+3. **Trail fade.** v1.6's shader applied brightness twice, to the color and
+   again as the alpha it blended with; only the first had moved to the CPU and
+   the second ran as linear-light alpha, which removes far less light. Every
+   fading trail was about 20% too bright. Both factors are in
+   `InstanceDisplayColor` now. The FR-005 regression test had pinned the
+   shader's OUTPUT rather than the screen's and passed throughout; it now pins
+   the screen.
 
-4. **Glyph edges.** The atlas is Direct2D-rendered with a white brush into a
-   premultiplied target, so an antialiased edge texel is `(c, c, c, c)` and
-   v1.6 put `color * c * c` on screen, in gamma space. Two coverage factors
-   composited in linear light lifted every edge pixel, and a thin stroke is
-   mostly edge pixels. Fixed by raising coverage to the curve's exponent.
+4. **Glyph edges.** The atlas is Direct2D-rendered white into a premultiplied
+   target, so an edge texel is `(c, c, c, c)` and v1.6 put `color * c * c` on
+   screen in gamma space. Two coverage factors composited in linear light
+   lifted every edge pixel, and a thin stroke is mostly edge pixels. First
+   approximated by raising coverage to the curve's exponent, then done
+   exactly: the glyph shader now computes v1.6's pixel per pixel and converts
+   it afterward, which removed the last approximation and took the custom
+   color from -15% to -10%.
 
-5. **Scanlines.** v1.6 darkened an encoded, clipped 8-bit image. Two things
-   differed: the darkening factor removed less from linear light (fixed by
-   raising it to the curve's exponent), and the float post-bloom target kept
-   overshoot above white that v1.6 had clipped, so darkening a value above
+5. **Scanlines.** The darkening factor removed less from linear light (raised
+   to the curve's exponent), and the float post-bloom target kept overshoot
+   above white that v1.6's 8-bit image had clipped, so darkening a value above
    white and then clipping landed back AT white and the raster vanished over
-   the brightest pixels (fixed by clamping the pass's input to `g_headroom`,
-   which is 1.0 in SDR). Scanlines went from +52% to within 2%.
+   the brightest pixels (input clamped to `g_headroom`). From +52% to within
+   2%.
 
-A sixth, smaller one: the extract now clamps its input to white, because the
-float scene keeps the head overshoot v1.6's 8-bit scene clipped, and the
-unclamped extract gave every head a brighter halo. The scene itself is not
-clamped; Phase 3 needs the overshoot.
+6. **Head halos.** The float scene kept the self-glow overshoot (1.3) that
+   v1.6's 8-bit scene clipped, and the extract runs at half resolution, so its
+   bilinear sample averaged that overshoot into every head's surroundings
+   before any clamp could act on it. Every head bloomed harder than v1.6's.
+   The glyph shader now clips at white where v1.6's target did; the leak
+   stopped and `kBloomCeiling` doubled to compensate for the honest input,
+   having been fitted with the leak in it.
+
+And one slider mapping: v1.6's screen blend, `soft * (1 - scene)`, throttled
+glow at high intensities where much of the frame is bright. Linear addition has
+no such throttle and it is not wanted back -- it is what flattened overlapping
+halos -- so the Glow Intensity slider is compressed above 100% instead
+(`kGlowIntensityAboveDefaultScale`), giving each position the glow it gave in
+v1.6 while leaving the default and everything below it untouched. `glow-max`
+went from +18.8% to -0.3%.
 
 ### The two remaining outliers
 
-**`custom-color` at -14.9%.** The coverage exponent is exact only where the
-transfer function is a pure power law, and sRGB's curved segment carries an
-offset that matters at mid and low values. The default green has its dominant
-channel at 1.0, where the approximation is good; the custom color's dominant
-luma channel is green at 0.5, where it is not, and Rec.709 luma weights green
-at 0.7152, so the metric amplifies a small mid-tone error tenfold. Visually
-the case is close; the difference image shows faint green fringes at glyph
-edges. An exact fix exists -- compute `SrgbToLinear(color * c * c)` per pixel
-in the glyph shader instead of shaping coverage separately -- at the cost of
-moving the linearization back into the shader. Held for a decision.
+**`custom-color` at -9.7%.** The halo's falloff exponent is applied to the
+glow's magnitude with channel ratios preserved, to keep the halo the same hue
+as its glyphs. v1.6's bloom chain and screen blend were per channel, so for a
+color whose dominant channel is blue, v1.6 gave the secondary green channel
+relatively more glow than a ratio-preserving shape does -- and Rec.709 luma
+weights green at 0.7152, so the metric amplifies that. Visually the case is
+close.
 
-**`glow-max` at +11.7%.** At maximum intensity the soft saturation is
-saturated, so the halo is roughly `kBloomCeiling` everywhere, and the ceiling
-that is right for the default intensity is high for the maximum. v1.6's screen
-blend, `soft * (1 - scene)`, limited high intensities in a way linear addition
-does not. The Intensity slider's mapping could absorb this; held for the same
-decision.
-
-### A note on where this is heading
-
-Every fix above is, in substance, "compute what v1.6 computed in gamma space,
-then convert". Five of them exist because the pipeline does the arithmetic in
-linear light first and compensates afterward. That is the right shape for the
-HDR phases, which need linear light at the output and headroom above white,
-but it means every remaining mismatch will need its own compensation. Whether
-to keep compensating case by case or to compute v1.6's SDR image in gamma
-space and linearize once at the end -- exact by construction, with implications
-for how Phase 3 gets its headroom -- is a decision for Rob, not for this file.
+**`glow-size-min` at +6.4%.** At the Glow Size slider's minimum the blur is
+tighter and the falloff shaping fitted at the default size lands slightly
+high. The same slider-mapping treatment as intensity would close it; it is
+marginal and deliberately left for the hardware check rather than fitted
+further.
 
 ### What this means for SC-001
 
-SC-001's 5% mean-luminance gate is met on the default, both scanline cases,
-glow-min and both glow-size cases. It is not met on `glow-max` and
-`custom-color`, for the reasons above. The gate stands; those two are recorded
-as open rather than the threshold being widened.
+SC-001's 5% mean-luminance gate stands. It is met on six of eight cases and
+open on the two above, both explained. Neither threshold nor gate was widened.
 
 ### A note on what the metrics missed
 
-Neither the glow shape error nor the trail fade error was visible to any
-number the harness produced. Mean luminance was within a few percent of target
-while the halo was nearly three times too wide at 16 px, and the FR-005
-regression test passed while every trail was 20% too bright, because it pinned
-the wrong quantity. Both were caught by Rob comparing renders by eye. Worth
-remembering when the Phase 2 and Phase 3 gates are written: a scalar can
-confirm a suspicion but will not raise one, and a regression test is only as
-good as the thing it compares against.
+Neither the glow shape error, the trail fade error nor the head halo leak was
+visible to any number the harness produced. Mean luminance was within a few
+percent of target while the halo was nearly three times too wide at 16 px;
+the FR-005 regression test passed while every trail was 20% too bright, because
+it pinned the wrong quantity; and the head leak hid inside a `kBloomCeiling`
+that had been fitted around it. All three were caught by Rob comparing renders
+by eye. Worth remembering when the Phase 2 and Phase 3 gates are written: a
+scalar can confirm a suspicion but will not raise one, and a fitted constant
+can absorb a defect as easily as correct for one.
 
 ## Performance baseline (T001, T005)
 

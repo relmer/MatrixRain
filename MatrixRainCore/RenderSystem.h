@@ -219,14 +219,16 @@ private:
         float characterScale;   // Global character scale (1.0 = normal, <1.0 for preview)
         float charWidth;        // Base quad width in pixels (24.0 for rain, cell width for overlay)
         float charHeight;       // Base quad height in pixels (36.0 for rain, cell height for overlay)
-        float padding[45];      // Padding to 256 bytes for optimal GPU alignment
+        float linearizeColors;  // 1: glyph PS converts to linear light; 0: leaves v1.6's value (no-scene fallback)
+        float padding[44];      // Padding to 256 bytes for optimal GPU alignment
 
         ConstantBufferData() :
-            projection     { 1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1 },
-            characterScale ( 1.0f ),
-            charWidth      ( 24.0f ),
-            charHeight     ( 36.0f ),
-            padding        {}
+            projection      { 1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1 },
+            characterScale  ( 1.0f ),
+            charWidth       ( 24.0f ),
+            charHeight      ( 36.0f ),
+            linearizeColors ( 1.0f ),
+            padding         {}
         {
         }
     };
@@ -255,11 +257,7 @@ private:
 
     // Rendering helpers
     void    SortStreaksByDepth       (std::vector<const CharacterStreak *> & streaks);
-    HRESULT UpdateInstanceBuffer     (const AnimationSystem & animationSystem,
-                                      ColorScheme             colorScheme,
-                                      float                   elapsedTime,
-                                      COLORREF                customColor,
-                                      bool                    linearizeColors);
+    HRESULT UpdateInstanceBuffer     (const AnimationSystem & animationSystem, ColorScheme colorScheme, float elapsedTime, COLORREF customColor);
     void    ClearRenderTarget();
     void    RenderFPSCounter         (float fps, int rainPercentage, int streakCount, int activeHeadCount, double gpuLoadPercent, bool gpuLoadValid);
     void    DrawFeatheredGlow        (const wchar_t * fpsText, UINT32 textLength, const D2D1_RECT_F & textRect);
@@ -277,7 +275,6 @@ private:
     static void BuildCharacterInstanceData          (const CharacterInstance & character,
                                                      const Vector3           & streakPos,
                                                      const Color4            & schemeColor,
-                                                     bool                      linearizeColors,
                                                      CharacterInstanceData   & data);
     void        ComputeOverlayLayout                (std::span<const HintCharacter> chars, int marginCols, int keyColChars, int gapChars, int numRows, float cellHeight, float padding, std::vector<float> & xPositions, D2D1_RECT_F & bounds, float & baseY, float & advanceScale);
     void        CalculateColumnAlignedTextPositions (std::span<const HintCharacter> chars, int marginCols, int keyColChars, int descColStart, float maxKeyWidth, const std::vector<float> & keyColWidths, float gapWidth, float advScaled, std::vector<float> & positions);

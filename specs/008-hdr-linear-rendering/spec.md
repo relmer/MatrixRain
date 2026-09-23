@@ -14,7 +14,7 @@
 
 ## User Scenarios & Testing *(mandatory)*
 
-### User Story 1 - Physically Correct Light Blending on Every Display (Priority: P1)
+### User Story 1 - Physically Correct Light Blending on Every Display, Same Look as v1.6 (Priority: P1)
 
 A user on any monitor, SDR or HDR, watches the rain. Glow spreads and fades the way light does: halos around bright heads fall off smoothly instead of ending in a hard edge, overlapping halos add up to something brighter rather than flattening into a dull plateau, and glyph edges blend cleanly where streaks cross, and the long fading tails on the black background show no visible banding. Scanline darkening reads as a raster laid over glowing phosphor rather than as a gray veil. At default settings the effect looks like the same MatrixRain the user already knows, just cleaner.
 
@@ -92,11 +92,11 @@ A user with an HDR monitor wants the rain to look like it is made of light. The 
 
 #### Phase 1 - Linear-light rendering (User Story 1)
 
-- **FR-001**: The system MUST perform all light combination — glyph compositing, glow/bloom, and scanline darkening — on values proportional to emitted light (linear light), not on gamma-encoded values.
+- **FR-001**: The system MUST perform all light *combination* — compositing glyphs and overlays into the scene, blurring, and adding glow — on values proportional to emitted light (linear light), not on gamma-encoded values. The *shape and strength* of each effect a user can tune (the trail fade curve, the halo's falloff, the weight of antialiased glyph edges, and the darkening the Scanlines Intensity slider applies) MUST reproduce v1.6's on-screen result, which means those terms are computed in gamma space where they were authored and converted to linear light afterward. Principle: light combines in linear light; everything a user can tune keeps its v1.6 meaning. (Revised during Phase 1 calibration: the original wording put scanline darkening in linear light, which made every saved Intensity value about 50% weaker than the user had set it.)
 - **FR-002**: The system MUST convert all color inputs (built-in schemes, cycling scheme, custom colors, overlay colors) from their authored display encoding to linear light before they are blended.
 - **FR-003**: Intermediate results MUST carry enough precision that smooth fades on a black background show no visible banding, and bright overlaps are not clipped before the final output step.
 - **FR-004**: The system MUST encode the final image for the display only once, at output.
-- **FR-005**: At default settings, the overall brightness, glow extent and color of the rain on an SDR display MUST remain perceptually equivalent to v1.6; default glow and brightness parameters MUST be recalibrated as needed so that the correctness fix does not read as a change of style.
+- **FR-005**: At default settings, the overall brightness, glow extent and color of the rain on an SDR display MUST remain perceptually equivalent to v1.6; default glow and brightness parameters MUST be recalibrated as needed so that the correctness fix does not read as a change of style. Every user-facing slider (Glow Intensity, Glow Size, Scanlines Intensity and Style) MUST produce at each position the result it produced in v1.6, so that saved settings keep their meaning; where linear-light combination changes a slider's effect, the slider's mapping is corrected, not the user's value.
 - **FR-006**: Existing saved settings (glow intensity, glow size, scanline intensity and style, color, quality) MUST keep producing a look close to what they produced in v1.6, so users who tuned their settings do not need to retune them.
 - **FR-007**: Scanline density per character MUST remain as defined in v1.6 (identical on every monitor regardless of size, rotation or display scaling).
 - **FR-008**: Each quality preset MUST keep the frame rate it achieved in v1.6 on the same hardware, or the presets MUST be re-tuned so that it does.

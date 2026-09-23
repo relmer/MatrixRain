@@ -36,13 +36,19 @@ SamplerState samplerState : register(s0);
 // bloomIntensity that looked right in gamma space therefore produced about
 // eight times too much apparent glow, and dark gaps are most of the frame.
 //
-// 0.871 is what brings the glow contribution to 0.99x of v1.6's once
-// kBloomFalloff below has shaped it and the extract's white clamp has removed
-// the head overshoot v1.6 never saw. The measurement is the glow term on its
+// 1.74 is what brings the glow contribution to 0.99x of v1.6's once
+// kBloomFalloff below has shaped it. The measurement is the glow term on its
 // own -- defaults minus glow-min mean luminance -- so that it is not confused
-// with the glyph and trail terms, which are matched separately. See
-// specs/008-hdr-linear-rendering/baseline.md.
-static const float kBloomCeiling = 0.871f;
+// with the glyph and trail terms, which are matched separately.
+//
+// An earlier value of 0.871 was fitted while the glyph shader still let head
+// overshoot (1.3, from the self-glow) into the scene. The extract runs at half
+// resolution, so its bilinear sample averaged that overshoot into every head's
+// surroundings BEFORE the extract's clamp could touch it, and each head bloomed
+// harder than v1.6's clipped scene allowed. The glyph shader now clips at white
+// as v1.6's 8-bit target did, the leak is gone, and the honest input needs
+// twice the ceiling. See specs/008-hdr-linear-rendering/baseline.md.
+static const float kBloomCeiling = 1.74f;
 
 // Exponent applied to the glow before it is added, cancelling the lift the
 // encode curve would otherwise give the halo's tail. It is the transfer

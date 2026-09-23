@@ -189,48 +189,32 @@ namespace MatrixRainTests
         // Instance color
         ////////////////////////////////////////////////////////////////////////
 
-        TEST_METHOD (InstanceLinearColor_MatchesTheDocumentedFormula)
+        TEST_METHOD (InstanceDisplayColor_MatchesTheDocumentedFormula)
         {
             const Color4 srgb       (0.25f, 0.50f, 0.75f, 0.6f);
             const float  brightness = 0.8f;
-            const float  gain       = 1.0f;
             const float  scale      = brightness * (1.0f + 0.3f * brightness) * brightness;
 
-            const Color4 result = InstanceLinearColor (srgb, brightness, gain);
+            const Color4 result = InstanceDisplayColor (srgb, brightness);
 
-            Assert::AreEqual (SrgbToLinear (0.25f * scale), result.r, 1e-6f, L"Red");
-            Assert::AreEqual (SrgbToLinear (0.50f * scale), result.g, 1e-6f, L"Green");
-            Assert::AreEqual (SrgbToLinear (0.75f * scale), result.b, 1e-6f, L"Blue");
+            Assert::AreEqual (0.25f * scale, result.r, 1e-6f, L"Red");
+            Assert::AreEqual (0.50f * scale, result.g, 1e-6f, L"Green");
+            Assert::AreEqual (0.75f * scale, result.b, 1e-6f, L"Blue");
         }
 
 
-        TEST_METHOD (InstanceLinearColor_PassesAlphaThroughUntouched)
+        TEST_METHOD (InstanceDisplayColor_PassesAlphaThroughUntouched)
         {
-            //  Alpha carries the trail fade, which the shader still applies
-            //  exactly where it always did.
             const Color4 srgb (1.0f, 1.0f, 1.0f, 0.42f);
 
-            Assert::AreEqual (0.42f, InstanceLinearColor (srgb, 0.5f, 1.0f).a, 0.0f,
-                              L"Alpha must survive the conversion unchanged");
-            Assert::AreEqual (0.42f, InstanceLinearColor (srgb, 1.0f, 4.0f).a, 0.0f,
-                              L"...including when a highlight gain is applied");
+            Assert::AreEqual (0.42f, InstanceDisplayColor (srgb, 0.5f).a, 0.0f,
+                              L"Alpha must survive unchanged");
         }
 
 
-        TEST_METHOD (InstanceLinearColor_AppliesHighlightGainToRgbOnly)
+        TEST_METHOD (InstanceDisplayColor_AtZeroBrightness_IsBlack)
         {
-            const Color4 srgb   (0.5f, 0.5f, 0.5f, 1.0f);
-            const Color4 plain  = InstanceLinearColor (srgb, 1.0f, 1.0f);
-            const Color4 gained = InstanceLinearColor (srgb, 1.0f, 3.0f);
-
-            Assert::AreEqual (plain.r * 3.0f, gained.r, 1e-6f, L"Gain scales linear light directly");
-            Assert::AreEqual (plain.a,        gained.a, 0.0f,  L"Gain must not touch alpha");
-        }
-
-
-        TEST_METHOD (InstanceLinearColor_AtZeroBrightness_IsBlack)
-        {
-            const Color4 result = InstanceLinearColor (Color4 (1.0f, 1.0f, 1.0f, 1.0f), 0.0f, 1.0f);
+            const Color4 result = InstanceDisplayColor (Color4 (1.0f, 1.0f, 1.0f, 1.0f), 0.0f);
 
             Assert::AreEqual (0.0f, result.r, 0.0f, L"A fully faded character emits no light");
             Assert::AreEqual (0.0f, result.g, 0.0f, L"...green");
@@ -238,16 +222,27 @@ namespace MatrixRainTests
         }
 
 
+        TEST_METHOD (InstanceDisplayColor_IsNotClipped_TheShaderClipsIt)
+        {
+            //  A white head at full brightness is 1.3. The shader clips at
+            //  white exactly where v1.6's 8-bit target did, after coverage;
+            //  clipping here would clip in the wrong place for edge pixels.
+            const Color4 result = InstanceDisplayColor (Color4 (1.0f, 1.0f, 1.0f, 1.0f), 1.0f);
+
+            Assert::AreEqual (1.3f, result.r, 1e-6f, L"Self-glow overshoot must reach the shader intact");
+        }
+
+
         ////////////////////////////////////////////////////////////////////////
-        // FR-005 regression: the displayed color must not move
+        // FR-005 regression: the displayed pixel must not move
         ////////////////////////////////////////////////////////////////////////
 
-        TEST_METHOD (InstanceLinearColor_ReproducesV16Output_ForEveryColorSchemeAndBrightness)
+        TEST_METHOD (InstanceDisplayColor_ReproducesV16Output_ForEveryColorSchemeAndBrightness)
         {
-            //  THE test that pins FR-005. Convert to linear the new way, encode
-            //  back for an SDR display, and the result must be the pixel v1.6
-            //  would have written. If this ever fails, the rain has changed
-            //  color or brightness and a user would see it.
+            //  THE test that pins FR-005. At full coverage the shader displays
+            //  min(1, InstanceDisplayColor), so that clipped value must be the
+            //  pixel v1.6 put on screen. If this ever fails, the rain has
+            //  changed color or brightness and a user would see it.
             const ColorScheme schemes[] = { ColorScheme::Green,
                                             ColorScheme::Blue,
                                             ColorScheme::Red,
@@ -259,20 +254,20 @@ namespace MatrixRainTests
 
                 for (float brightness = 0.0f; brightness <= 1.0f; brightness += kBrightnessStep)
                 {
-                    const Color4 linear = InstanceLinearColor (srgb, brightness, 1.0f);
+                    const Color4 displayed = InstanceDisplayColor (srgb, brightness);
 
-                    Assert::AreEqual (V16ShaderOutput (srgb.r, brightness), LinearToSrgb (linear.r),
+                    Assert::AreEqual (V16ShaderOutput (srgb.r, brightness), std::min (1.0f, displayed.r),
                                       kRegressionTolerance, L"Red channel must match v1.6");
-                    Assert::AreEqual (V16ShaderOutput (srgb.g, brightness), LinearToSrgb (linear.g),
+                    Assert::AreEqual (V16ShaderOutput (srgb.g, brightness), std::min (1.0f, displayed.g),
                                       kRegressionTolerance, L"Green channel must match v1.6");
-                    Assert::AreEqual (V16ShaderOutput (srgb.b, brightness), LinearToSrgb (linear.b),
+                    Assert::AreEqual (V16ShaderOutput (srgb.b, brightness), std::min (1.0f, displayed.b),
                                       kRegressionTolerance, L"Blue channel must match v1.6");
                 }
             }
         }
 
 
-        TEST_METHOD (InstanceLinearColor_ReproducesV16Output_ForWhiteHeadsAndCustomColors)
+        TEST_METHOD (InstanceDisplayColor_ReproducesV16Output_ForWhiteHeadsAndCustomColors)
         {
             //  Heads are drawn white, and a user-picked custom color is not in
             //  the scheme table, so both are checked separately.
@@ -285,31 +280,16 @@ namespace MatrixRainTests
             {
                 for (float brightness = 0.0f; brightness <= 1.0f; brightness += kBrightnessStep)
                 {
-                    const Color4 linear = InstanceLinearColor (srgb, brightness, 1.0f);
+                    const Color4 displayed = InstanceDisplayColor (srgb, brightness);
 
-                    Assert::AreEqual (V16ShaderOutput (srgb.r, brightness), LinearToSrgb (linear.r),
+                    Assert::AreEqual (V16ShaderOutput (srgb.r, brightness), std::min (1.0f, displayed.r),
                                       kRegressionTolerance, L"Red channel must match v1.6");
-                    Assert::AreEqual (V16ShaderOutput (srgb.g, brightness), LinearToSrgb (linear.g),
+                    Assert::AreEqual (V16ShaderOutput (srgb.g, brightness), std::min (1.0f, displayed.g),
                                       kRegressionTolerance, L"Green channel must match v1.6");
-                    Assert::AreEqual (V16ShaderOutput (srgb.b, brightness), LinearToSrgb (linear.b),
+                    Assert::AreEqual (V16ShaderOutput (srgb.b, brightness), std::min (1.0f, displayed.b),
                                       kRegressionTolerance, L"Blue channel must match v1.6");
                 }
             }
-        }
-
-
-        TEST_METHOD (InstanceLinearColor_ClipsAboveWhiteExactlyAsV16Did)
-        {
-            //  At full brightness the self-glow pushes a bright color past
-            //  white. v1.6's 8-bit target clipped it; the new path must clip in
-            //  the same place rather than quietly keeping the overshoot.
-            const Color4 srgb   (1.0f, 1.0f, 1.0f, 1.0f);
-            const Color4 linear = InstanceLinearColor (srgb, 1.0f, 1.0f);
-
-            Assert::IsTrue (linear.r > 1.0f,
-                            L"Linear light keeps the overshoot, so HDR can later use it");
-            Assert::AreEqual (1.0f, LinearToSrgb (linear.r), 1e-6f,
-                              L"...but encoding for SDR clips it to white, as v1.6 did");
         }
 
 

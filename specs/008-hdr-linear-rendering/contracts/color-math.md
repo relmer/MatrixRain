@@ -25,21 +25,29 @@ float LinearToSrgb (float linear)  noexcept   // inverse; input clamped to [0,1]
 ## Instance color (research R1)
 
 ```text
-Color4 InstanceLinearColor (Color4 srgbColor, float brightness, float highlightGain) noexcept
+Color4 InstanceDisplayColor (Color4 srgbColor, float brightness) noexcept
 ```
 
-- Returns `SrgbToLinear(srgb * brightness * (1 + 0.3 * brightness) * brightness) * highlightGain`
-  per RGB channel. Alpha is passed through unchanged.
+- Returns `srgb * brightness * (1 + 0.3 * brightness) * brightness` per RGB
+  channel, in **gamma space, unclipped**. Alpha is passed through unchanged.
 - Brightness appears twice because v1.6's shader applied it twice: to the
   color, with the self-glow, and again as the alpha it blended with. Over the
-  black scene both multiply the displayed pixel. The glyph shader's alpha is
-  therefore **coverage only**; applying brightness there as well, as
-  linear-light alpha, makes every fading trail brighter than v1.6.
-- With `highlightGain == 1` and full atlas coverage, `LinearToSrgb` of the
-  result equals **the pixel v1.6 put on screen** for the same inputs -- shader
-  output times shader alpha, clamped to 1 -- not the shader's output alone.
-  **This is the regression test that pins FR-005.** An earlier version pinned
-  the shader output and passed while the trails visibly drifted.
+  black scene both multiply the displayed pixel.
+- The glyph pixel shader finishes the job per pixel: it multiplies by
+  coverage squared (the atlas is premultiplied white, so v1.6's `tex.rgb` and
+  `tex.a` were both coverage), clips at 1 exactly where v1.6's 8-bit target
+  did, and only then converts to linear light. Doing the conversion after
+  coverage is what makes the match exact for every color and every
+  antialiased edge; converting on the CPU and shaping coverage separately was
+  exact only where the sRGB curve is a pure power law, and read 15% dark on
+  a mid-tone custom color.
+- `min(1, InstanceDisplayColor)` equals **the pixel v1.6 put on screen** at
+  full coverage -- shader output times shader alpha, clamped -- not the
+  shader's output alone. **This is the regression test that pins FR-005.** An
+  earlier version pinned the shader output and passed while the trails
+  visibly drifted.
+- Highlight gain (Phase 3) is applied in the shader after linearization, not
+  here: it is a linear-light multiplier and this value is not linear.
 
 ## Display luminance
 

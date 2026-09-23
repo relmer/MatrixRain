@@ -89,29 +89,27 @@ inline constexpr float kGlyphSelfGlow = 0.3f;
 
 
 /// <summary>
-/// Converts a glyph's final displayed color into the linear-light value the
-/// GPU should blend with.
+/// A glyph's color as v1.6 put it on screen at full coverage, in gamma space,
+/// with both brightness factors folded in.
 ///
 /// This exists to keep v1.6's look exactly (FR-005). The v1.6 glyph pixel
 /// shader wrote
 ///     rgb = color * texture * brightness * (1 + 0.3 * brightness)
 ///     a   = texture.a * brightness
-/// in gamma space and alpha-blended over a black scene, so the pixel a viewer
-/// saw was color * brightness * (1 + 0.3 * brightness) * brightness. Doing
-/// that arithmetic in linear light would change the result, because neither
-/// the brightness terms nor the self-glow are linear operations. So all of it
-/// stays in gamma space, applied to the sRGB color on the CPU once per
-/// instance, and only the FINISHED displayed color is converted. The glyph
-/// therefore comes out identical to v1.6, and linear light governs only what
-/// happens afterwards: the blur and the bloom, which is where it belongs.
+/// and alpha-blended over a black scene, so the pixel a viewer saw was
+/// color * brightness * (1 + 0.3 * brightness) * brightness times coverage
+/// squared. None of that is a linear operation, so it all stays in gamma
+/// space. This function does the per-instance part; the glyph shader applies
+/// coverage, clips at white as the 8-bit target did, and only then converts
+/// the finished pixel to linear light. Linear light governs what happens
+/// afterwards -- the blur and the bloom -- which is where it belongs.
 ///
-/// The shader's alpha is coverage alone as a result. Brightness must NOT be
-/// applied there a second time.
+/// The result may exceed 1 (a white head at full brightness is 1.3); the
+/// shader clips it, exactly where v1.6's render target did.
 ///
-/// Alpha in the returned color is passed through untouched.
+/// Alpha is passed through untouched.
 /// </summary>
-/// <param name="srgbColor">The glyph's color as v1.6 would have displayed it</param>
+/// <param name="srgbColor">The glyph's sRGB color: white for a head, the scheme color for a trail</param>
 /// <param name="brightness">Character brightness in [0, 1]</param>
-/// <param name="highlightGain">Multiplier for HDR highlights; 1 outside HDR (Phase 3)</param>
-/// <returns>Linear-light color, with alpha unchanged</returns>
-Color4 InstanceLinearColor (const Color4 & srgbColor, float brightness, float highlightGain) noexcept;
+/// <returns>Gamma-space displayed color at full coverage, unclipped, with alpha unchanged</returns>
+Color4 InstanceDisplayColor (const Color4 & srgbColor, float brightness) noexcept;

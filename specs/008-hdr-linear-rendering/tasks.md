@@ -24,7 +24,7 @@ description: "Task list for 008 HDR output and linear-light rendering"
 - **Doc-comment every public declaration** in new or changed headers (`///` summary, parameters, return), per Constitution IV and Development Standards.
 - New `.h`/`.cpp` files in `MatrixRainCore/` MUST be added to **both** `MatrixRainCore/MatrixRainCore.vcxproj` (`ClInclude`/`ClCompile`) and `MatrixRainCore/MatrixRainCore.vcxproj.filters`. New test files MUST be added to `MatrixRainTests/MatrixRainTests.vcxproj`. Pattern: `ScanlineStyleMapping.*`.
 - **One task = one commit** (Constitution IX), and every commit builds and passes all tests. Never commit a failing or non-compiling test on its own. Build Debug and Release with `scripts/Invoke-MatrixRainBuild.ps1` and run `scripts/Invoke-MatrixRainTests.ps1` before committing. Conventional Commits, no AI attribution trailers.
-- HLSL lives in raw string literals in `MatrixRainCore/RenderSystem.cpp`. The scanline shader exists twice (the string near line 1645 and `MatrixRainCore/Shaders/scanlines.hlsl`); keep both identical.
+- HLSL lives in `MatrixRainCore/Shaders/*.hlsl`, compiled by FXC at build time (T050); a broken shader is a build error. The shared output transform is `Shaders/OutputTransform.hlsli`, and `Shaders/ColorConstants.h` holds the sRGB constants both C++ and HLSL read.
 - Hardware measurements and validation results go in `specs/008-hdr-linear-rendering/baseline.md`.
 
 ---
@@ -122,7 +122,7 @@ description: "Task list for 008 HDR output and linear-light rendering"
 - [ ] T038 [US3] Transliterate `ToneMapHighlights` into `s_kszOutputTransformHlsl` (same constants) and use it in the HDR branch: `ToneMapHighlights (max (x, 0), g_headroom) * g_sdrWhiteScale`. Upload the monitor's real `Headroom` instead of 1
 - [ ] T039 [US3] **Test-first** — settings and persistence. Tests in `MatrixRainTests/unit/RegistrySettingsProviderTests.cpp` for `HdrMode` ("DWORD 0 = Auto, 1 = Off"; "Unknown → 0") and `HighlightBrightness` ("0–100", default 80, "Clamped"): round-trip, missing-value defaults and clamping ([contracts/settings-ui.md](contracts/settings-ui.md)). Implementation: `HdrMode m_hdrMode { HdrMode::Auto }`, `int m_highlightBrightness { DEFAULT_HIGHLIGHT_BRIGHTNESS }` with `MIN_HIGHLIGHT_BRIGHTNESS = 0`, `MAX_HIGHLIGHT_BRIGHTNESS = 100`, `DEFAULT_HIGHLIGHT_BRIGHTNESS = 80` in `MatrixRainCore/ScreenSaverSettings.h` (clamped in the existing clamp routine), and `VALUE_HDR_MODE = L"HdrMode"` / `VALUE_HIGHLIGHT_BRIGHTNESS = L"HighlightBrightness"` read and write in `MatrixRainCore/RegistrySettingsProvider.cpp`, next to the scanline values
 - [ ] T040 [US3] **Test-first** — live plumbing. Tests in `MatrixRainTests/unit/ConfigDialogControllerTests.cpp` for `UpdateHdrMode` / `UpdateHighlightBrightness`: live propagation to `ApplicationState` and `SharedState`, rollback on Cancel, restoration by `ResetToDefaults` (FR-023). Implementation: `liveHdrMode`, `liveHighlightBrightness`, `snapshotHdrMode`, `snapshotHighlightBrightness` and `Snapshot::hdrMode` / `highlightBrightness` in `MatrixRainCore/SharedState.h`; setters in `MatrixRainCore/ApplicationState.cpp`; `UpdateHdrMode` / `UpdateHighlightBrightness` plus snapshot, Cancel and Reset handling in `MatrixRainCore/ConfigDialogController.h` / `.cpp`, mirroring `scanlinesEnabled`
-- [ ] T041 [US3] Apply the gain to heads only: add `hdrMode` and `highlightBrightness` to `MatrixRainCore/RenderParams.h` (column-aligned), fill them in `MonitorRenderContext::Render`, and in `RenderSystem::BuildCharacterInstanceData` pass `HighlightGain (headroom, highlightBrightness, hdrMode, m_outputMode)` to `InstanceLinearColor` **only** for white (head) instances. Trails and overlays keep gain 1 (FR-018, FR-020)
+- [ ] T041 [US3] Apply the gain to heads only: add `hdrMode` and `highlightBrightness` to `MatrixRainCore/RenderParams.h` (column-aligned), fill them in `MonitorRenderContext::Render`, and in `RenderSystem::BuildCharacterInstanceData` upload `HighlightGain (headroom, highlightBrightness, hdrMode, m_outputMode)` for white (head) instances **only** (trails get 1), and have the glyph shader multiply by it **after** it has linearized the pixel -- `InstanceDisplayColor` is gamma-space and cannot carry a linear gain. Trails and overlays keep gain 1 (FR-018, FR-020)
 - [ ] T042 [US3] Dialog controls in `MatrixRain/MatrixRain.rc` and `MatrixRain/resource.h`: an "HDR" group on the Visuals page below the scanline controls, without growing the dialog, containing `IDC_HDR_MODE_COMBO` ("Auto", "Off"), `IDC_HIGHLIGHT_PROMPT`, `IDC_HIGHLIGHT_SLIDER` (0–100), `IDC_HIGHLIGHT_VALUE` (`NN%`) and `IDC_HDR_INFO` (ⓘ) ([contracts/settings-ui.md](contracts/settings-ui.md))
 - [ ] T043 [US3] Dialog behavior in `MatrixRain/ConfigDialog.cpp`:
   - Initialize both controls from settings; route changes to `UpdateHdrMode` / `UpdateHighlightBrightness`; include them in the reset resync.
@@ -169,7 +169,7 @@ one (plan, "Phase Delivery").
 ### Key task dependencies
 
 - T002, T003 → T004 → T005 (reference captured before T010)
-- T007 → T011 (instance colors need `InstanceLinearColor`)
+- T007 → T011 (instance colors need `InstanceDisplayColor`)
 - T008, T009 → T015, T016, T017 (final passes use `OutputTransformCb` and the HLSL helpers)
 - T010–T017 → T018 → T019, T020, T021
 - T022, T023, T024 → T025; T026, T027, T028, T029 → T032; T031 → T035
