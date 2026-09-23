@@ -29,7 +29,19 @@ Texture2D bloomTexture : register(t1);
 SamplerState samplerState : register(s0);
 
 // How much light the saturated glow may add, in multiples of SDR white.
-static const float kBloomCeiling = 1.0f;
+//
+// Calibrated in T018 against the v1.6 baseline, not guessed. Glow is added in
+// LINEAR light and then encoded, and the encode curve is steep near black:
+// adding 0.3 of linear light to a dark gap lands at sRGB 0.58. The same
+// bloomIntensity that looked right in gamma space therefore produced about
+// eight times too much apparent glow, and dark gaps are most of the frame.
+//
+// 0.116 = 1 / 8.60, the measured ratio of glow contribution to v1.6's. The
+// measurement is the glow term on its own -- defaults minus glow-min mean
+// luminance -- because total luminance also carries the trail change, which is
+// structural and not this constant's business. See specs/008-hdr-linear-
+// rendering/baseline.md.
+static const float kBloomCeiling = 0.116f;
 
 struct PSInput
 {

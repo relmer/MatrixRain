@@ -102,6 +102,88 @@ enough to read as "the glow got bigger" put p99 at 30 and max at 54, so the
 gate sits comfortably below that while leaving room for the fades to smooth
 out. **Revise them in this file when T018 runs**, with the reasoning.
 
+## Phase 1 calibration result (T018)
+
+`kBloomCeiling` in `Shaders/BloomComposite.ps.hlsl` is **0.116**, measured
+rather than guessed.
+
+**What was tuned, and against what.** Glow is added in linear light and then
+encoded, and the encode curve is steep near black: 0.3 of linear light added to
+a dark gap lands at sRGB 0.58. The same `bloomIntensity` that looked right in
+gamma space produced about eight times too much apparent glow, and dark gaps
+are most of the frame. Before calibration the default case rendered as a green
+fog filling the space between streaks.
+
+The measurement is the **glow's own contribution**, `defaults` minus
+`glow-min` mean luminance, not total luminance. Total luminance also carries
+the trail change below, which no bloom constant can or should absorb; tuning
+against the total would have forced the glow well under v1.6's to compensate.
+
+| | Glow contribution |
+|---|---|
+| v1.6 baseline | 0.012074 |
+| After calibration | 0.012132 |
+| Ratio | **1.00x** |
+
+### Where the frame still differs, and why
+
+Mean luminance against baseline, at 100% scale:
+
+| Case | Baseline | Now | Delta |
+|---|---|---|---|
+| `defaults` | 0.045544 | 0.052866 | +16.1% |
+| `glow-min` | 0.033470 | 0.040734 | +21.7% |
+| `glow-max` | 0.067967 | 0.061414 | -9.6% |
+| `glow-size-min` | 0.047643 | 0.051330 | +7.7% |
+| `glow-size-max` | 0.043832 | 0.053871 | +22.9% |
+| `scanlines-1` | 0.032478 | 0.049429 | +52.2% |
+| `scanlines-100` | 0.032621 | 0.049387 | +51.4% |
+| `custom-color` | 0.024502 | 0.023135 | -5.6% |
+
+Two of these are **structural**: no constant reaches them, because they are the
+corrections this feature exists to make.
+
+**Trails, about +22%.** The glyph blend is `SRC_ALPHA / INV_SRC_ALPHA`.
+Compositing a half-faded character over black gives `srgb * a` in gamma space
+but `LinearToSrgb(linear(srgb) * a)` in linear light, and because the encode
+curve is concave the second is always brighter for `a < 1`. Every partially
+faded trail character is lighter than it was, most so mid-fade, which is where
+most of a trail lives. The banding this feature set out to remove was a symptom
+of the same wrong arithmetic. There is also a slight hue shift: the rain's
+green is `RGB(0, 255, 100)`, so the blue channel sits mid-range where the curve
+bends most while green is already at maximum, and the difference image is
+correspondingly blue-dominant. Trails read very slightly less saturated.
+
+**Scanlines, about +52%.** Darkening now multiplies linear light, so half the
+darkening means half the light, as a raster does to a phosphor. Applied to
+gamma-encoded values as v1.6 did, the same factor removed considerably more
+light than intended, which is why the effect read as a gray veil over the image
+rather than a raster behind it. This is FR-001 being satisfied.
+
+The remaining two are ordinary tuning residue, left alone deliberately:
+`glow-max` is 9.6% low because the soft-saturation ceiling binds earlier than
+v1.6's screen factor did at the top of the range, and `custom-color` is 5.6%
+low for the per-channel reason described above, its blue being the dominant
+channel rather than a secondary one.
+
+### What this means for SC-001
+
+**SC-001's 5% mean-luminance gate cannot be met** while alpha blending and
+scanline darkening are correct. The two are mutually exclusive: hitting the
+number requires deliberately reintroducing the gamma-space errors this phase
+removed, which would also restore the fade banding.
+
+The gate is therefore replaced, for Phase 1, by:
+
+| Measure | Gate |
+|---|---|
+| Glow contribution | within 5% of baseline (met: 1.00x) |
+| Trail and scanline changes | explained and expected, judged by eye on hardware (T019) |
+| Everything else | within 25% of baseline, with a stated reason per case |
+
+Recording that here rather than quietly widening a threshold: the original
+number was written before it was clear that alpha compositing was in scope.
+
 ## Performance baseline (T001, T005)
 
 600 frames per preset, timed with D3D11 timestamp queries around the render,
