@@ -1,0 +1,19 @@
+#!/bin/sh
+#
+# Rejects a commit message that uses British spelling or "name" as a verb.
+#
+# This hook exists because the rule was broken repeatedly while it sat, clearly
+# stated, in the instructions both a human and an assistant were reading. A
+# check that runs is worth more than a rule that is read.
+#
+# Install with:  git config core.hooksPath .githooks
+
+repo=$(git rev-parse --show-toplevel)
+
+powershell.exe -NoProfile -ExecutionPolicy Bypass \
+    -File "$repo/scripts/Test-Language.ps1" -Path "$1" || {
+    echo "Commit message rejected. Fix the wording above and commit again."
+    exit 1
+}
+
+exit 0

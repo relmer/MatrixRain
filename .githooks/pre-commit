@@ -1,0 +1,42 @@
+#!/bin/sh
+#
+# Rejects staged changes that introduce British spelling or "name" as a verb.
+#
+# Only the ADDED lines are checked, never whole files, so pre-existing text
+# elsewhere in the repository cannot fail a commit that did not touch it.
+# Cleaning that up is a separate decision.
+#
+# Install with:  git config core.hooksPath .githooks
+# Bypass with:   git commit --no-verify   (the CI step still checks)
+
+repo=$(git rev-parse --show-toplevel)
+added=$(mktemp)
+
+# Added lines only, with the +++ file headers dropped and the leading + removed.
+#
+# The checker itself is excluded: its word list is, necessarily, a list of the
+# very words it rejects. Any other file that legitimately has to quote one can
+# be added here, deliberately and visibly.
+git diff --cached -U0 --diff-filter=ACM -- . ':(exclude)scripts/Test-Language.ps1' |
+    grep '^+' |
+    grep -v '^+++' |
+    sed 's/^+//' > "$added"
+
+if [ ! -s "$added" ]; then
+    rm -f "$added"
+    exit 0
+fi
+
+powershell.exe -NoProfile -ExecutionPolicy Bypass \
+    -File "$repo/scripts/Test-Language.ps1" -Path "$added"
+status=$?
+
+rm -f "$added"
+
+if [ $status -ne 0 ]; then
+    echo "Staged changes rejected. Line numbers above are positions within the"
+    echo "added lines, not within the files; search for the quoted text."
+    exit 1
+fi
+
+exit 0

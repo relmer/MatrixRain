@@ -46,7 +46,7 @@ if (-not $EdgePath) {
 $pageFull = (Resolve-Path $Page).Path
 $outFull = [IO.Path]::GetFullPath($OutputPath)
 
-# The rain's bloom is a compression artefact, and a wanted one: downscaling the
+# The rain's bloom is a compression artifact, and a wanted one: downscaling the
 # still and running it through JPEG smears the saturated green sideways and rings
 # around the bright glyphs. Chromium downscaling the PNG itself looks far crisper.
 # The prepared file sits beside the page so it can be referenced relatively;

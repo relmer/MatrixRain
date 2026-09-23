@@ -25,6 +25,18 @@ jobs:
       - name: Setup VSTest
         uses: darenm/Setup-VSTest@v1.3
 
+      # Backstop under the .githooks pre-commit and commit-msg hooks: catches
+      # anything committed with --no-verify, or from a clone that never ran
+      # "git config core.hooksPath .githooks". The checker itself is skipped
+      # because its word list is a list of the words it rejects.
+      - name: Language check
+        run: |
+          $files = git ls-files '*.hlsl' '*.hlsli' '*.ps1' |
+              Where-Object { $_ -ne 'scripts/Test-Language.ps1' -and
+                             $_ -notlike '.specify/*' }
+          if ($files) { ./scripts/Test-Language.ps1 -Path $files }
+        shell: pwsh
+
       - name: Build
         run: msbuild MatrixRain.sln -p:Configuration=${{ matrix.configuration }} -p:Platform=${{ matrix.platform }}
 
