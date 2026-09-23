@@ -1,37 +1,41 @@
 #pragma once
 
 #include "Math.h"
+#include "Shaders\ColorConstants.h"
 
 
 
 
 
 /// <summary>
-/// The constants of the sRGB transfer function (IEC 61966-2-1), gathered in
-/// one place because they are needed twice: once by this module, and once by
-/// the HLSL output transform, which must be a line-for-line transliteration of
-/// LinearToSrgb. Two copies of a number are a bug waiting to be written, so
-/// the shader source references these by value.
+/// The constants of the sRGB transfer function (IEC 61966-2-1), as typed C++
+/// values.
+///
+/// Every number here comes from Shaders/ColorConstants.h, which FXC compiles
+/// into OutputTransform.hlsli as well. That indirection is the whole point:
+/// the HLSL output transform has to be a line-for-line transliteration of
+/// LinearToSrgb, and a second copy of a constant is a bug waiting to be
+/// written. Editing the shared header moves both sides at once.
 /// </summary>
 namespace ColorMathConstants
 {
     /// <summary>Encoded value below which the transfer function is a straight line.</summary>
-    inline constexpr float kEncodedKnee  = 0.04045f;
+    inline constexpr float kEncodedKnee  = MR_SRGB_ENCODED_KNEE;
 
     /// <summary>Linear value below which the transfer function is a straight line.</summary>
-    inline constexpr float kLinearKnee   = 0.0031308f;
+    inline constexpr float kLinearKnee   = MR_SRGB_LINEAR_KNEE;
 
     /// <summary>Slope of that straight segment.</summary>
-    inline constexpr float kLinearSlope  = 12.92f;
+    inline constexpr float kLinearSlope  = MR_SRGB_LINEAR_SLOPE;
 
     /// <summary>Offset of the curved segment.</summary>
-    inline constexpr float kCurveOffset  = 0.055f;
+    inline constexpr float kCurveOffset  = MR_SRGB_CURVE_OFFSET;
 
     /// <summary>Scale of the curved segment.</summary>
-    inline constexpr float kCurveScale   = 1.055f;
+    inline constexpr float kCurveScale   = MR_SRGB_CURVE_SCALE;
 
     /// <summary>Exponent of the curved segment, decoding to linear.</summary>
-    inline constexpr float kCurveGamma   = 2.4f;
+    inline constexpr float kCurveGamma   = MR_SRGB_CURVE_GAMMA;
 }
 
 

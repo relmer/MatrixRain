@@ -138,7 +138,7 @@
       <ConformanceMode>true</ConformanceMode>
       <TreatWarningAsError>true</TreatWarningAsError>
       <LanguageStandard>stdcpplatest</LanguageStandard>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
     </ClCompile>
     <Link>
@@ -156,7 +156,7 @@
       <ConformanceMode>true</ConformanceMode>
       <TreatWarningAsError>true</TreatWarningAsError>
       <LanguageStandard>stdcpplatest</LanguageStandard>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
     </ClCompile>
     <Link>
@@ -176,7 +176,7 @@
       <ConformanceMode>true</ConformanceMode>
       <TreatWarningAsError>true</TreatWarningAsError>
       <LanguageStandard>stdcpplatest</LanguageStandard>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
     </ClCompile>
     <Link>
@@ -198,7 +198,7 @@
       <ConformanceMode>true</ConformanceMode>
       <TreatWarningAsError>true</TreatWarningAsError>
       <LanguageStandard>stdcpplatest</LanguageStandard>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
     </ClCompile>
     <Link>
@@ -220,7 +220,7 @@
       <ConformanceMode>true</ConformanceMode>
       <TreatWarningAsError>true</TreatWarningAsError>
       <LanguageStandard>stdcpplatest</LanguageStandard>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
     </ClCompile>
     <Link>
@@ -242,7 +242,7 @@
       <ConformanceMode>true</ConformanceMode>
       <TreatWarningAsError>true</TreatWarningAsError>
       <LanguageStandard>stdcpplatest</LanguageStandard>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
     </ClCompile>
     <Link>
@@ -360,6 +360,124 @@
     <ClCompile Include="Overlay.cpp" />
     <ClCompile Include="ScrambleRevealEffect.cpp" />
     <ClCompile Include="OverlayColor.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <FXCompile Include="Shaders\Glyph.vs.hlsl">
+      <ShaderType>Vertex</ShaderType>
+      <ShaderModel>5.0</ShaderModel>
+      <EntryPointName>main</EntryPointName>
+      <ObjectFileOutput></ObjectFileOutput>
+      <HeaderFileOutput>$(IntDir)Shaders\Glyph.vs.h</HeaderFileOutput>
+      <VariableName>g_GlyphVS</VariableName>
+    </FXCompile>
+    <FXCompile Include="Shaders\Glyph.ps.hlsl">
+      <ShaderType>Pixel</ShaderType>
+      <ShaderModel>5.0</ShaderModel>
+      <EntryPointName>main</EntryPointName>
+      <ObjectFileOutput></ObjectFileOutput>
+      <HeaderFileOutput>$(IntDir)Shaders\Glyph.ps.h</HeaderFileOutput>
+      <VariableName>g_GlyphPS</VariableName>
+    </FXCompile>
+    <FXCompile Include="Shaders\Overlay.ps.hlsl">
+      <ShaderType>Pixel</ShaderType>
+      <ShaderModel>5.0</ShaderModel>
+      <EntryPointName>main</EntryPointName>
+      <ObjectFileOutput></ObjectFileOutput>
+      <HeaderFileOutput>$(IntDir)Shaders\Overlay.ps.h</HeaderFileOutput>
+      <VariableName>g_OverlayPS</VariableName>
+    </FXCompile>
+    <FXCompile Include="Shaders\Quad.vs.hlsl">
+      <ShaderType>Vertex</ShaderType>
+      <ShaderModel>5.0</ShaderModel>
+      <EntryPointName>main</EntryPointName>
+      <ObjectFileOutput></ObjectFileOutput>
+      <HeaderFileOutput>$(IntDir)Shaders\Quad.vs.h</HeaderFileOutput>
+      <VariableName>g_QuadVS</VariableName>
+    </FXCompile>
+    <FXCompile Include="Shaders\BloomExtract.ps.hlsl">
+      <ShaderType>Pixel</ShaderType>
+      <ShaderModel>5.0</ShaderModel>
+      <EntryPointName>main</EntryPointName>
+      <ObjectFileOutput></ObjectFileOutput>
+      <HeaderFileOutput>$(IntDir)Shaders\BloomExtract.ps.h</HeaderFileOutput>
+      <VariableName>g_BloomExtractPS</VariableName>
+    </FXCompile>
+    <FXCompile Include="Shaders\BlurH13.ps.hlsl">
+      <ShaderType>Pixel</ShaderType>
+      <ShaderModel>5.0</ShaderModel>
+      <EntryPointName>main</EntryPointName>
+      <ObjectFileOutput></ObjectFileOutput>
+      <HeaderFileOutput>$(IntDir)Shaders\BlurH13.ps.h</HeaderFileOutput>
+      <VariableName>g_BlurH13PS</VariableName>
+    </FXCompile>
+    <FXCompile Include="Shaders\BlurH9.ps.hlsl">
+      <ShaderType>Pixel</ShaderType>
+      <ShaderModel>5.0</ShaderModel>
+      <EntryPointName>main</EntryPointName>
+      <ObjectFileOutput></ObjectFileOutput>
+      <HeaderFileOutput>$(IntDir)Shaders\BlurH9.ps.h</HeaderFileOutput>
+      <VariableName>g_BlurH9PS</VariableName>
+    </FXCompile>
+    <FXCompile Include="Shaders\BlurH5.ps.hlsl">
+      <ShaderType>Pixel</ShaderType>
+      <ShaderModel>5.0</ShaderModel>
+      <EntryPointName>main</EntryPointName>
+      <ObjectFileOutput></ObjectFileOutput>
+      <HeaderFileOutput>$(IntDir)Shaders\BlurH5.ps.h</HeaderFileOutput>
+      <VariableName>g_BlurH5PS</VariableName>
+    </FXCompile>
+    <FXCompile Include="Shaders\BlurV13.ps.hlsl">
+      <ShaderType>Pixel</ShaderType>
+      <ShaderModel>5.0</ShaderModel>
+      <EntryPointName>main</EntryPointName>
+      <ObjectFileOutput></ObjectFileOutput>
+      <HeaderFileOutput>$(IntDir)Shaders\BlurV13.ps.h</HeaderFileOutput>
+      <VariableName>g_BlurV13PS</VariableName>
+    </FXCompile>
+    <FXCompile Include="Shaders\BlurV9.ps.hlsl">
+      <ShaderType>Pixel</ShaderType>
+      <ShaderModel>5.0</ShaderModel>
+      <EntryPointName>main</EntryPointName>
+      <ObjectFileOutput></ObjectFileOutput>
+      <HeaderFileOutput>$(IntDir)Shaders\BlurV9.ps.h</HeaderFileOutput>
+      <VariableName>g_BlurV9PS</VariableName>
+    </FXCompile>
+    <FXCompile Include="Shaders\BlurV5.ps.hlsl">
+      <ShaderType>Pixel</ShaderType>
+      <ShaderModel>5.0</ShaderModel>
+      <EntryPointName>main</EntryPointName>
+      <ObjectFileOutput></ObjectFileOutput>
+      <HeaderFileOutput>$(IntDir)Shaders\BlurV5.ps.h</HeaderFileOutput>
+      <VariableName>g_BlurV5PS</VariableName>
+    </FXCompile>
+    <FXCompile Include="Shaders\BloomComposite.ps.hlsl">
+      <ShaderType>Pixel</ShaderType>
+      <ShaderModel>5.0</ShaderModel>
+      <EntryPointName>main</EntryPointName>
+      <ObjectFileOutput></ObjectFileOutput>
+      <HeaderFileOutput>$(IntDir)Shaders\BloomComposite.ps.h</HeaderFileOutput>
+      <VariableName>g_BloomCompositePS</VariableName>
+    </FXCompile>
+    <FXCompile Include="Shaders\Halo.ps.hlsl">
+      <ShaderType>Pixel</ShaderType>
+      <ShaderModel>5.0</ShaderModel>
+      <EntryPointName>main</EntryPointName>
+      <ObjectFileOutput></ObjectFileOutput>
+      <HeaderFileOutput>$(IntDir)Shaders\Halo.ps.h</HeaderFileOutput>
+      <VariableName>g_HaloPS</VariableName>
+    </FXCompile>
+    <FXCompile Include="Shaders\Scanlines.ps.hlsl">
+      <ShaderType>Pixel</ShaderType>
+      <ShaderModel>5.0</ShaderModel>
+      <EntryPointName>main</EntryPointName>
+      <ObjectFileOutput></ObjectFileOutput>
+      <HeaderFileOutput>$(IntDir)Shaders\Scanlines.ps.h</HeaderFileOutput>
+      <VariableName>g_ScanlinesPS</VariableName>
+    </FXCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Shaders\OutputTransform.hlsli" />
+    <None Include="Shaders\ColorConstants.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

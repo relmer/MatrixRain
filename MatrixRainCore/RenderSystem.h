@@ -284,8 +284,6 @@ private:
     HRESULT RecreateDirect2DBitmap();
 
     // Shader compilation helpers
-    struct ShaderCompileEntry;
-    HRESULT CompileShadersFromTable       (std::span<const ShaderCompileEntry> entries);
 
     // DirectX resources
     ComPtr<ID3D11Device>           m_device;

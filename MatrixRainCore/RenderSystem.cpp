@@ -10,6 +10,24 @@
 #include "OverlayColor.h"
 #include "ScanlineStyleMapping.h"
 
+// Shader bytecode, compiled from MatrixRainCore/Shaders/*.hlsl by FXC at build
+// time and emitted as byte arrays into $(IntDir). A broken shader is now a
+// build error rather than an opaque E_FAIL on somebody's machine.
+#include "Shaders/Glyph.vs.h"
+#include "Shaders/Glyph.ps.h"
+#include "Shaders/Overlay.ps.h"
+#include "Shaders/Quad.vs.h"
+#include "Shaders/BloomExtract.ps.h"
+#include "Shaders/BlurH13.ps.h"
+#include "Shaders/BlurH9.ps.h"
+#include "Shaders/BlurH5.ps.h"
+#include "Shaders/BlurV13.ps.h"
+#include "Shaders/BlurV9.ps.h"
+#include "Shaders/BlurV5.ps.h"
+#include "Shaders/BloomComposite.ps.h"
+#include "Shaders/Halo.ps.h"
+#include "Shaders/Scanlines.ps.h"
+
 #pragma comment(lib, "pdh.lib")
 
 using Microsoft::WRL::ComPtr;
@@ -563,122 +581,8 @@ Error:
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-static const char* s_kszVertexShaderSource = R"(
-        cbuffer Constants : register(b0)
-        {
-            float4x4 projection;
-            float characterScale;  // Global scale for preview mode
-            float charWidth;       // Base quad width in pixels
-            float charHeight;      // Base quad height in pixels
-            float cbPadding;
-        };
 
-        struct VSInput
-        {
-            float3 position : POSITION;
-            float2 uvMin : TEXCOORD0;
-            float2 uvMax : TEXCOORD1;
-            float4 color : COLOR;
-            float brightness : BRIGHTNESS;
-            float scaleX : SCALEX;
-            float scaleY : SCALEY;
-            uint instanceID : SV_InstanceID;
-        };
 
-        struct PSInput
-        {
-            float4 position : SV_POSITION;
-            float2 uv : TEXCOORD;
-            float4 color : COLOR;
-            float brightness : BRIGHTNESS;
-        };
-
-        // Quad vertices (unit square)
-        static const float2 quadVertices[6] = {
-            float2(0.0, 0.0),  // Top-left
-            float2(1.0, 0.0),  // Top-right
-            float2(0.0, 1.0),  // Bottom-left
-            float2(1.0, 0.0),  // Top-right
-            float2(1.0, 1.0),  // Bottom-right
-            float2(0.0, 1.0)   // Bottom-left
-        };
-
-        PSInput main(VSInput input, uint vertexID : SV_VertexID)
-        {
-            PSInput output;
-            
-            // Get quad vertex position
-            float2 quadPos = quadVertices[vertexID % 6];
-            
-            // Character size in world space (scaled for viewport and per-character)
-            float2 charSize = float2(charWidth * input.scaleX, charHeight * input.scaleY) * characterScale;
-            float2 worldPos = input.position.xy + quadPos * charSize;
-            
-            // Apply projection
-            float4 pos = float4(worldPos, input.position.z, 1.0);
-            output.position = mul(projection, pos);
-            
-            // Interpolate UV coordinates
-            output.uv = lerp(input.uvMin, input.uvMax, quadPos);
-            output.color = input.color;
-            output.brightness = input.brightness;
-            
-            return output;
-        }
-    )";
-
-static const char* s_kszPixelShaderSource = R"(
-        Texture2D atlasTexture : register(t0);
-        SamplerState samplerState : register(s0);
-
-        struct PSInput
-        {
-            float4 position : SV_POSITION;
-            float2 uv : TEXCOORD;
-            float4 color : COLOR;
-            float brightness : BRIGHTNESS;
-        };
-
-        float4 main(PSInput input) : SV_TARGET
-        {
-            // Sample texture atlas
-            float4 texColor = atlasTexture.Sample(samplerState, input.uv);
-            
-            // Apply color and brightness
-            float4 finalColor = input.color * texColor * input.brightness;
-            
-            // Add glow effect (brighten the color slightly)
-            finalColor.rgb += finalColor.rgb * 0.3 * input.brightness;
-            
-            return finalColor;
-        }
-    )";
-
-static const char * s_kszOverlayPixelShaderSource = R"(
-        Texture2D    atlasTexture : register(t0);
-        SamplerState samplerState : register(s0);
-
-        struct PSInput
-        {
-            float4 position   : SV_POSITION;
-            float2 uv         : TEXCOORD;
-            float4 color      : COLOR;
-            float  brightness : BRIGHTNESS;
-        };
-
-        float4 main(PSInput input) : SV_TARGET
-        {
-            // Atlas is rendered by D2D with premultiplied alpha.
-            // Tint RGB by instance color and brightness, preserving
-            // the premultiplied relationship so the blend state
-            // (ONE / INV_SRC_ALPHA) composites correctly.
-            float4 texColor  = atlasTexture.Sample(samplerState, input.uv);
-            float3 tintedRGB = texColor.rgb * input.color.rgb * input.brightness;
-            float  tintedA   = texColor.a   * input.brightness;
-
-            return float4(tintedRGB, tintedA);
-        }
-    )";
 
 
 static const D3D11_INPUT_ELEMENT_DESC s_krgInputLayout[] = {
@@ -698,213 +602,6 @@ static const D3D11_INPUT_ELEMENT_DESC s_krgInputLayout[] = {
 //
 //  Shader compilation table structure
 //
-////////////////////////////////////////////////////////////////////////////////
-
-struct RenderSystem::ShaderCompileEntry
-{
-    const char *                 pszSource;
-    const char *                 pszName;
-    const char *                 pszEntryPoint;
-    const char *                 pszTarget;
-    LPCWSTR                      pszErrorMsg;
-    ID3DBlob                  ** ppBlob;
-    ComPtr<ID3D11PixelShader>  * ppPixelShader;   // If non-null, create pixel shader from blob
-};
-
-
-
-
-////////////////////////////////////////////////////////////////////////////////
-//
-//  RenderSystem::CompileShadersFromTable
-//
-////////////////////////////////////////////////////////////////////////////////
-
-HRESULT RenderSystem::CompileShadersFromTable (std::span<const ShaderCompileEntry> entries)
-{
-    HRESULT          hr        = S_OK;
-    ComPtr<ID3DBlob> errorBlob;
-
-
-    for (const auto & entry : entries)
-    {
-
-        errorBlob.Reset();
-
-        hr = D3DCompile (entry.pszSource,
-                         strlen (entry.pszSource),
-                         entry.pszName,
-                         nullptr,
-                         nullptr,
-                         entry.pszEntryPoint,
-                         entry.pszTarget,
-                         D3DCOMPILE_ENABLE_STRICTNESS,
-                         0,
-                         entry.ppBlob,
-                         &errorBlob);
-        if (FAILED (hr) && errorBlob)
-        {
-            OutputDebugStringA ((char *) errorBlob->GetBufferPointer());
-        }
-        CHRLA (hr, entry.pszErrorMsg);
-
-        // Create pixel shader if target pointer is provided
-        if (entry.ppPixelShader)
-        {
-            hr = m_device->CreatePixelShader ((*entry.ppBlob)->GetBufferPointer(),
-                                              (*entry.ppBlob)->GetBufferSize(),
-                                              nullptr,
-                                              entry.ppPixelShader->GetAddressOf());
-            CHRA (hr);
-        }
-    }
-
-Error:
-    return hr;
-}
-
-
-
-
-
-HRESULT RenderSystem::CompileCharacterShaders()
-{
-    HRESULT             hr            = S_OK;
-    ComPtr<ID3DBlob>    vsBlob;
-    ComPtr<ID3DBlob>    psBlob;
-    ComPtr<ID3DBlob>    overlayPsBlob;
-    ShaderCompileEntry  shaderTable[] = {
-        { s_kszVertexShaderSource,        "VS",        "main", "vs_5_0",  L"D3DCompile failed for vertex shader",         vsBlob.GetAddressOf(),        nullptr                },
-        { s_kszPixelShaderSource,         "PS",        "main", "ps_5_0",  L"D3DCompile failed for pixel shader",          psBlob.GetAddressOf(),        &m_pixelShader         },
-        { s_kszOverlayPixelShaderSource,  "OverlayPS", "main", "ps_5_0",  L"D3DCompile failed for overlay pixel shader",  overlayPsBlob.GetAddressOf(), &m_overlayPixelShader  }
-    };
-    
-
-
-    // Compile shaders and create pixel shaders from table
-    hr = CompileShadersFromTable (shaderTable);
-    CHR (hr);
-
-    // Create vertex shader
-    hr = m_device->CreateVertexShader (vsBlob->GetBufferPointer(),
-                                        vsBlob->GetBufferSize(),
-                                        nullptr,
-                                        &m_vertexShader);
-    CHRA (hr);
-
-    // Create input layout using vertex shader blob
-    hr = m_device->CreateInputLayout (s_krgInputLayout,
-                                        _countof (s_krgInputLayout),
-                                        vsBlob->GetBufferPointer(),
-                                        vsBlob->GetBufferSize(),
-                                        &m_inputLayout);
-    CHRA (hr);
-
-
-Error:
-    return hr;
-}
-
-
-
-
-
-HRESULT RenderSystem::CreateDummyVertexBuffer()
-{
-    HRESULT                hr           = S_OK;
-    D3D11_BUFFER_DESC      vbDesc       = {};
-    D3D11_SUBRESOURCE_DATA vbData       = {};
-    float                  dummyData[6] = { 0.0f, 1.0f, 2.0f, 3.0f, 4.0f, 5.0f };  // 6 dummy vertices (4-byte aligned)
-
-
-
-    // Create a dummy vertex buffer with 6 floats (4 bytes each, 24 bytes total)
-    // The shader generates vertices procedurally, but D3D11 requires a valid buffer
-    vbDesc.ByteWidth = sizeof (dummyData);
-    vbDesc.Usage     = D3D11_USAGE_IMMUTABLE;
-    vbDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-
-    vbData.pSysMem = dummyData;
-
-    hr = m_device->CreateBuffer (&vbDesc, &vbData, &m_dummyVertexBuffer);
-    CHRA (hr);
-
-Error:
-    return hr;
-}
-
-
-
-
-
-HRESULT RenderSystem::CreateInstanceBuffer()
-{
-    HRESULT           hr         = S_OK;
-    D3D11_BUFFER_DESC bufferDesc = {};
-
-
-
-    bufferDesc.ByteWidth      = sizeof (CharacterInstanceData) * m_instanceBufferCapacity;
-    bufferDesc.Usage          = D3D11_USAGE_DYNAMIC;
-    bufferDesc.BindFlags      = D3D11_BIND_VERTEX_BUFFER;
-    bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-
-    hr = m_device->CreateBuffer (&bufferDesc, nullptr, &m_instanceBuffer);
-    CHRA (hr);
-
-Error:
-    return hr;
-}
-
-
-
-
-
-HRESULT RenderSystem::CreateConstantBuffer()
-{
-    HRESULT           hr         = S_OK;
-    D3D11_BUFFER_DESC bufferDesc = {};
-
-
-    
-    bufferDesc.ByteWidth      = sizeof (ConstantBufferData);
-    bufferDesc.Usage          = D3D11_USAGE_DYNAMIC;
-    bufferDesc.BindFlags      = D3D11_BIND_CONSTANT_BUFFER;
-    bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-
-    hr = m_device->CreateBuffer (&bufferDesc, nullptr, &m_constantBuffer);
-    CHRA (hr);
-
-Error:
-    return hr;
-}
-
-
-
-
-
-HRESULT RenderSystem::CreateBloomConstantBuffer()
-{
-    HRESULT           hr         = S_OK;
-    D3D11_BUFFER_DESC bufferDesc = {};
-
-
-    
-    bufferDesc.ByteWidth      = 16;  // sizeof(float) * 4 for alignment
-    bufferDesc.Usage          = D3D11_USAGE_DYNAMIC;
-    bufferDesc.BindFlags      = D3D11_BIND_CONSTANT_BUFFER;
-    bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-
-    hr = m_device->CreateBuffer (&bufferDesc, nullptr, &m_bloomConstantBuffer);
-    CHRA (hr);
-
-Error:
-    return hr;
-}
-
-
-
-
 ////////////////////////////////////////////////////////////////////////////////
 //
 //  RenderSystem::CreateScanlineConstantBuffer (T051, T052)
@@ -1312,298 +1009,25 @@ void RenderSystem::OnDpiChanged (UINT dpi)
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-static const char * s_kszQuadVertexShaderSource = R"(
-        struct VSInput
-        {
-            float3 position : POSITION;
-            float2 uv : TEXCOORD;
-        };
-
-        struct PSInput
-        {
-            float4 position : SV_POSITION;
-            float2 uv : TEXCOORD;
-        };
-
-        PSInput main(VSInput input)
-        {
-            PSInput output;
-            output.position = float4(input.position, 1.0);
-            output.uv = input.uv;
-            return output;
-        }
-    )";
-
-static const char * s_kszBlurHorizontalShaderSource = R"(
-        cbuffer BloomConstants : register(b0)
-        {
-            float bloomIntensity;
-            float glowSize;
-            float2 padding;
-        };
-
-        Texture2D inputTexture : register(t0);
-        SamplerState samplerState : register(s0);
-
-        struct PSInput
-        {
-            float4 position : SV_POSITION;
-            float2 uv : TEXCOORD;
-        };
-
-        float4 main(PSInput input) : SV_TARGET
-        {
-            uint width, height;
-            inputTexture.GetDimensions(width, height);
-            float texelX = glowSize / width;
-            
-            float4 color = float4(0, 0, 0, 0);
-            
-            // 13-tap Gaussian blur (horizontal), spread scaled by glowSize.
-            // High-smoothness variant; see ..._Tap5 / ..._Tap9 below for the
-            // cheaper Low/Medium quality variants selected at bind time.
-            float weights[13] = { 0.02, 0.04, 0.06, 0.08, 0.10, 0.12, 0.16, 0.12, 0.10, 0.08, 0.06, 0.04, 0.02 };
-            for (int i = -6; i <= 6; i++)
-            {
-                float2 offset = float2(i * texelX, 0);
-                color += inputTexture.Sample(samplerState, input.uv + offset) * weights[i + 6];
-            }
-            
-            return color;
-        }
-    )";
 
 
 
 
-static const char * s_kszBlurHorizontalShader9TapSource = R"(
-        cbuffer BloomConstants : register(b0)
-        {
-            float bloomIntensity;
-            float glowSize;
-            float2 padding;
-        };
-
-        Texture2D inputTexture : register(t0);
-        SamplerState samplerState : register(s0);
-
-        struct PSInput
-        {
-            float4 position : SV_POSITION;
-            float2 uv : TEXCOORD;
-        };
-
-        float4 main(PSInput input) : SV_TARGET
-        {
-            uint width, height;
-            inputTexture.GetDimensions(width, height);
-            float texelX = glowSize / width;
-
-            float4 color = float4(0, 0, 0, 0);
-
-            // 9-tap Gaussian blur (horizontal) - Medium quality variant.
-            float weights[9] = { 0.05, 0.09, 0.12, 0.15, 0.18, 0.15, 0.12, 0.09, 0.05 };
-            for (int i = -4; i <= 4; i++)
-            {
-                float2 offset = float2(i * texelX, 0);
-                color += inputTexture.Sample(samplerState, input.uv + offset) * weights[i + 4];
-            }
-
-            return color;
-        }
-    )";
 
 
 
 
-static const char * s_kszBlurHorizontalShader5TapSource = R"(
-        cbuffer BloomConstants : register(b0)
-        {
-            float bloomIntensity;
-            float glowSize;
-            float2 padding;
-        };
-
-        Texture2D inputTexture : register(t0);
-        SamplerState samplerState : register(s0);
-
-        struct PSInput
-        {
-            float4 position : SV_POSITION;
-            float2 uv : TEXCOORD;
-        };
-
-        float4 main(PSInput input) : SV_TARGET
-        {
-            uint width, height;
-            inputTexture.GetDimensions(width, height);
-            float texelX = glowSize / width;
-
-            float4 color = float4(0, 0, 0, 0);
-
-            // 5-tap Gaussian blur (horizontal) - Low quality variant.
-            float weights[5] = { 0.10, 0.24, 0.32, 0.24, 0.10 };
-            for (int i = -2; i <= 2; i++)
-            {
-                float2 offset = float2(i * texelX, 0);
-                color += inputTexture.Sample(samplerState, input.uv + offset) * weights[i + 2];
-            }
-
-            return color;
-        }
-    )";
-
-static const char * s_kszBlurVerticalShaderSource = R"(
-        cbuffer BloomConstants : register(b0)
-        {
-            float bloomIntensity;
-            float glowSize;
-            float2 padding;
-        };
-
-        Texture2D inputTexture : register(t0);
-        SamplerState samplerState : register(s0);
-
-        struct PSInput
-        {
-            float4 position : SV_POSITION;
-            float2 uv : TEXCOORD;
-        };
-
-        float4 main(PSInput input) : SV_TARGET
-        {
-            uint width, height;
-            inputTexture.GetDimensions(width, height);
-            float texelY = glowSize / height;
-            
-            float4 color = float4(0, 0, 0, 0);
-            
-            // 13-tap Gaussian blur (vertical), spread scaled by glowSize.
-            // High-smoothness variant; see ..._Tap5 / ..._Tap9 below.
-            float weights[13] = { 0.02, 0.04, 0.06, 0.08, 0.10, 0.12, 0.16, 0.12, 0.10, 0.08, 0.06, 0.04, 0.02 };
-            for (int i = -6; i <= 6; i++)
-            {
-                float2 offset = float2(0, i * texelY);
-                color += inputTexture.Sample(samplerState, input.uv + offset) * weights[i + 6];
-            }
-            
-            return color;
-        }
-    )";
 
 
 
 
-static const char * s_kszBlurVerticalShader9TapSource = R"(
-        cbuffer BloomConstants : register(b0)
-        {
-            float bloomIntensity;
-            float glowSize;
-            float2 padding;
-        };
-
-        Texture2D inputTexture : register(t0);
-        SamplerState samplerState : register(s0);
-
-        struct PSInput
-        {
-            float4 position : SV_POSITION;
-            float2 uv : TEXCOORD;
-        };
-
-        float4 main(PSInput input) : SV_TARGET
-        {
-            uint width, height;
-            inputTexture.GetDimensions(width, height);
-            float texelY = glowSize / height;
-
-            float4 color = float4(0, 0, 0, 0);
-
-            float weights[9] = { 0.05, 0.09, 0.12, 0.15, 0.18, 0.15, 0.12, 0.09, 0.05 };
-            for (int i = -4; i <= 4; i++)
-            {
-                float2 offset = float2(0, i * texelY);
-                color += inputTexture.Sample(samplerState, input.uv + offset) * weights[i + 4];
-            }
-
-            return color;
-        }
-    )";
 
 
 
 
-static const char * s_kszBlurVerticalShader5TapSource = R"(
-        cbuffer BloomConstants : register(b0)
-        {
-            float bloomIntensity;
-            float glowSize;
-            float2 padding;
-        };
 
-        Texture2D inputTexture : register(t0);
-        SamplerState samplerState : register(s0);
 
-        struct PSInput
-        {
-            float4 position : SV_POSITION;
-            float2 uv : TEXCOORD;
-        };
 
-        float4 main(PSInput input) : SV_TARGET
-        {
-            uint width, height;
-            inputTexture.GetDimensions(width, height);
-            float texelY = glowSize / height;
-
-            float4 color = float4(0, 0, 0, 0);
-
-            float weights[5] = { 0.10, 0.24, 0.32, 0.24, 0.10 };
-            for (int i = -2; i <= 2; i++)
-            {
-                float2 offset = float2(0, i * texelY);
-                color += inputTexture.Sample(samplerState, input.uv + offset) * weights[i + 2];
-            }
-
-            return color;
-        }
-    )";
-
-static const char * s_kszBloomExtractShaderSource = R"(
-        Texture2D inputTexture : register(t0);
-        SamplerState samplerState : register(s0);
-
-        struct PSInput
-        {
-            float4 position : SV_POSITION;
-            float2 uv : TEXCOORD;
-        };
-
-        float4 main(PSInput input) : SV_TARGET
-        {
-            float4 color = inputTexture.Sample(samplerState, input.uv);
-            
-            // Extract only bright pixels (consider luminance and max channel)
-            float luminance = dot(color.rgb, float3(0.2126, 0.7152, 0.0722));
-
-            // Also consider the max color channel so saturated blues/reds can trigger bloom
-            float maxComp = max(max(color.r, color.g), color.b);
-
-            // Use the higher of luminance or max component as brightness metric
-            float brightness = max(luminance, maxComp);
-
-            // Low threshold so even dim characters get a subtle glow.
-            // The wide smoothstep range (0.1 → 0.6) ensures bright streak
-            // heads bloom strongly while dim tail characters still contribute
-            // a soft halo rather than appearing flat.
-            float threshold = 0.1;
-
-            // Smooth ramp: dim chars get subtle bloom, bright chars get full
-            float bloomAmount = smoothstep(threshold, threshold + 0.5, brightness);
-
-            return float4(color.rgb * bloomAmount, 1.0);
-        }
-    )";
 
 //  Formats of the off-screen render targets (research R2, data-model 6).
 //
@@ -1622,219 +1046,12 @@ static const char * s_kszBloomExtractShaderSource = R"(
 static constexpr DXGI_FORMAT kSceneFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
 static constexpr DXGI_FORMAT kBloomFormat = DXGI_FORMAT_R11G11B10_FLOAT;
 
+//  Rows the halo pass can outline in one draw. MUST match the rowRects[] size
+//  in MatrixRainCore/Shaders/Halo.ps.hlsl.
+static constexpr int MAX_HALO_ROWS = 16;
 
 
 
-
-////////////////////////////////////////////////////////////////////////////////
-//
-//  s_kszOutputTransformHlsl
-//
-//  Spliced into every shader that might be the LAST pass of a frame, so that
-//  whichever one ends up writing the back buffer encodes the image exactly
-//  once (FR-004).  Which pass that is depends on the user's settings -- the
-//  bloom composite, the glow-off scene copy, or the scanline pass -- so each
-//  of them carries this and is told at upload time whether it is the one.
-//
-//  LinearToSrgb is a transliteration of the C++ in ColorMath.cpp and MUST stay
-//  one: the constants come from ColorMathConstants via std::format below, so
-//  editing the C++ constants moves the shader with it and the two cannot drift.
-//
-//  The HDR branch is a pass-through until US2 gives it a real transform.
-//
-////////////////////////////////////////////////////////////////////////////////
-
-static const char * s_kszOutputTransformHlslFormat = R"(
-        cbuffer OutputCb : register(b1)
-        {{
-            uint  g_outputMode;
-            float g_sdrWhiteScale;
-            float g_headroom;
-            uint  g_isFinalPass;
-        }};
-
-        // NB: the parameter cannot be called "linear" -- that is an HLSL
-        // interpolation modifier keyword, and a parameter called that fails to compile.
-        float LinearToSrgbChannel(float linearValue)
-        {{
-            float clamped = saturate(linearValue);
-
-            if (clamped <= {0})
-            {{
-                return clamped * {1};
-            }}
-
-            return {2} * pow(clamped, 1.0 / {3}) - {4};
-        }}
-
-        float3 OutputTransform(float3 linearRgb)
-        {{
-            // An intermediate pass leaves the image in linear light for
-            // whatever comes next.
-            if (g_isFinalPass == 0)
-            {{
-                return linearRgb;
-            }}
-
-            if (g_outputMode == 0)
-            {{
-                return float3(LinearToSrgbChannel(linearRgb.r),
-                              LinearToSrgbChannel(linearRgb.g),
-                              LinearToSrgbChannel(linearRgb.b));
-            }}
-
-            // HDR (scRGB): completed in US2.
-            return linearRgb;
-        }}
-    )";
-
-
-
-
-
-////////////////////////////////////////////////////////////////////////////////
-//
-//  OutputTransformHlsl
-//
-//  Builds the transform source with the shared color constants baked in.
-//  Built once on first use: the string is identical for the lifetime of the
-//  process and every final-pass shader concatenates the same copy.
-//
-////////////////////////////////////////////////////////////////////////////////
-
-static const std::string & OutputTransformHlsl()
-{
-    //  vformat rather than format: the pattern is a runtime pointer, not a
-    //  literal, so the compile-time checked overload cannot take it.
-    static const std::string s_source = std::vformat (s_kszOutputTransformHlslFormat,
-                                                      std::make_format_args (ColorMathConstants::kLinearKnee,
-                                                                             ColorMathConstants::kLinearSlope,
-                                                                             ColorMathConstants::kCurveScale,
-                                                                             ColorMathConstants::kCurveGamma,
-                                                                             ColorMathConstants::kCurveOffset));
-
-
-
-    return s_source;
-}
-
-
-
-
-
-////////////////////////////////////////////////////////////////////////////////
-//
-//  WithOutputTransform
-//
-//  Prefixes a final-pass shader body with the shared transform.  Each result is
-//  built once and cached for the process, so the returned pointer stays valid
-//  for as long as the shader source it describes.
-//
-////////////////////////////////////////////////////////////////////////////////
-
-static const char * WithOutputTransform (const char * pszShaderBody)
-{
-    static std::map<const char *, std::string> s_sources;
-
-    auto                                       existing = s_sources.find (pszShaderBody);
-
-
-    if (existing == s_sources.end())
-    {
-        existing = s_sources.emplace (pszShaderBody, OutputTransformHlsl() + pszShaderBody).first;
-    }
-
-    return existing->second.c_str();
-}
-
-
-
-
-
-static const char * s_kszBloomCompositeShaderSource = R"(
-        cbuffer BloomConstants : register(b0)
-        {
-            float bloomIntensity;
-            float glowSize;
-            float2 padding;
-        };
-
-        Texture2D sceneTexture : register(t0);
-        Texture2D bloomTexture : register(t1);
-        SamplerState samplerState : register(s0);
-
-        struct PSInput
-        {
-            float4 position : SV_POSITION;
-            float2 uv : TEXCOORD;
-        };
-
-        float4 main(PSInput input) : SV_TARGET
-        {
-            float4 scene = sceneTexture.Sample(samplerState, input.uv);
-            float4 bloom = bloomTexture.Sample(samplerState, input.uv);
-            
-            // Exponential soft-saturation: low bloom values pass through
-            // nearly linearly (good glow on isolated streaks) while high
-            // bloom values from dense overlapping areas hit a ceiling.
-            // This lets the user crank up bloomIntensity without dense
-            // regions becoming a solid wall of glow.
-            float3 bloomContrib = bloom.rgb * bloomIntensity;
-            float3 softBloom   = 1.0 - exp(-bloomContrib);
-
-            return float4(scene.rgb + softBloom * (1.0 - scene.rgb), 1.0);
-        }
-    )";
-
-static constexpr int MAX_HALO_ROWS = 16;  // Must match rowRects[] size in halo shader
-
-static const char * s_kszHaloShaderSource = R"(
-        cbuffer HaloConstants : register(b0)
-        {
-            float4 rowRects[16];    // (left, top, right, bottom) per row — must match MAX_HALO_ROWS
-            float  cornerRadius;
-            float  maxExpand;
-            float  maxOpacity;
-            int    numRows;
-        };
-
-        struct PSInput
-        {
-            float4 position : SV_POSITION;
-            float2 uv : TEXCOORD;
-        };
-
-        // Signed distance to a rounded rectangle (negative = inside)
-        float sdRoundedRect(float2 p, float2 center, float2 halfSize, float radius)
-        {
-            float2 d = abs(p - center) - halfSize + float2(radius, radius);
-            return length(max(d, 0.0)) + min(max(d.x, d.y), 0.0) - radius;
-        }
-
-        float4 main(PSInput input) : SV_TARGET
-        {
-            float2 pixelPos = input.position.xy;
-
-            // Find minimum distance to any row's rounded rect
-            float minDist = 1e9;
-
-            for (int i = 0; i < numRows; i++)
-            {
-                float4 r = rowRects[i];
-                float2 center   = float2((r.x + r.z) * 0.5, (r.y + r.w) * 0.5);
-                float2 halfSize = float2((r.z - r.x) * 0.5, (r.w - r.y) * 0.5);
-
-                float d = sdRoundedRect(pixelPos, center, halfSize, cornerRadius);
-                minDist = min(minDist, d);
-            }
-
-            // Map distance to opacity: inside = maxOpacity, feather over maxExpand
-            float t = saturate(minDist / maxExpand);
-            float opacity = maxOpacity * (1.0 - t * t);  // Quadratic falloff
-
-            return float4(0, 0, 0, opacity);
-        }
-    )";
 
 static const D3D11_INPUT_ELEMENT_DESC s_krgQuadInputLayout[] = {
     { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0,  D3D11_INPUT_PER_VERTEX_DATA, 0 },
@@ -1842,60 +1059,11 @@ static const D3D11_INPUT_ELEMENT_DESC s_krgQuadInputLayout[] = {
 };
 
 
-////////////////////////////////////////////////////////////////////////////////
-//
-//  s_kszScanlineShaderSource (T051, contracts/scanline-shader.md, R6)
-//
-//  Inline copy of MatrixRainCore/Shaders/scanlines.hlsl.  The .hlsl file
-//  on disk is the source of truth + documentation; this string is what
-//  D3DCompile actually consumes at runtime (matching the existing pattern
-//  for every other shader in this file).  Keep the two in sync.
-//
-//  ATTRIBUTION: Adapted from crt-pi by Davide Berra (MIT)
-//  Upstream URL:
-//    https://github.com/libretro/glsl-shaders/blob/master/crt/shaders/crt-pi.glsl
-//  SPDX-License-Identifier: MIT
-//
-//  MatrixRain modifications (v1.5):
-//   - line count uploaded per-frame from CPU via g_linesPerHeight
-//   - source-luminance gating removed (FR-024a); darkening is uniform
-//   - the kernel is AREA-AVERAGED over the pixel rather than point sampled,
-//     which is what keeps the Style slider usable below 4K (see below)
-//
+
+
+
 ////////////////////////////////////////////////////////////////////////////////
 
-static const char * s_kszScanlineShaderSource = R"(
-        cbuffer ScanlineCb : register(b0)
-        {
-            float g_intensity;
-            float g_linesPerHeight;
-            float g_padding0;
-            float g_padding1;
-        };
-
-        Texture2D    tex : register(t0);
-        SamplerState sam : register(s0);
-
-        struct PSInput
-        {
-            float4 pos : SV_POSITION;
-            float2 uv  : TEXCOORD;
-        };
-
-        static const float kPi = 3.14159265;
-
-        float4 main (PSInput i) : SV_TARGET
-        {
-            float4 c       = tex.Sample (sam, i.uv);
-            float  linePos = i.uv.y * g_linesPerHeight;
-            float  perPix  = max (abs (ddy (linePos)), 1e-6);
-            float  rolloff = max (sin (kPi * perPix) / (kPi * perPix), 0.0);
-            float  bright  = 0.5 - 0.5 * cos (2.0 * kPi * linePos) * rolloff;
-            float  darken  = lerp (1.0 - g_intensity, 1.0, bright);
-            c.rgb *= darken;
-            return c;
-        }
-    )";
 
 
 
@@ -1904,6 +1072,142 @@ static const char * s_kszScanlineShaderSource = R"(
 //
 //  RenderSystem::CompileBloomShaders
 //
+////////////////////////////////////////////////////////////////////////////////
+//
+//  RenderSystem::CompileCharacterShaders
+//
+//  Creates the glyph and overlay shaders from bytecode that FXC produced at
+//  build time. Nothing is compiled here any more.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+HRESULT RenderSystem::CompileCharacterShaders()
+{
+    HRESULT hr = S_OK;
+
+
+
+    hr = m_device->CreateVertexShader (g_GlyphVS, sizeof (g_GlyphVS), nullptr, &m_vertexShader);
+    CHRA (hr);
+
+    hr = m_device->CreateInputLayout (s_krgInputLayout,
+                                      _countof (s_krgInputLayout),
+                                      g_GlyphVS,
+                                      sizeof (g_GlyphVS),
+                                      &m_inputLayout);
+    CHRA (hr);
+
+    hr = m_device->CreatePixelShader (g_GlyphPS, sizeof (g_GlyphPS), nullptr, &m_pixelShader);
+    CHRA (hr);
+
+    hr = m_device->CreatePixelShader (g_OverlayPS, sizeof (g_OverlayPS), nullptr, &m_overlayPixelShader);
+    CHRA (hr);
+
+Error:
+    return hr;
+}
+
+
+
+
+
+HRESULT RenderSystem::CreateDummyVertexBuffer()
+{
+    HRESULT                hr           = S_OK;
+    D3D11_BUFFER_DESC      vbDesc       = {};
+    D3D11_SUBRESOURCE_DATA vbData       = {};
+    float                  dummyData[6] = { 0.0f, 1.0f, 2.0f, 3.0f, 4.0f, 5.0f };  // 6 dummy vertices (4-byte aligned)
+
+
+
+    // Create a dummy vertex buffer with 6 floats (4 bytes each, 24 bytes total)
+    // The shader generates vertices procedurally, but D3D11 requires a valid buffer
+    vbDesc.ByteWidth = sizeof (dummyData);
+    vbDesc.Usage     = D3D11_USAGE_IMMUTABLE;
+    vbDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+
+    vbData.pSysMem = dummyData;
+
+    hr = m_device->CreateBuffer (&vbDesc, &vbData, &m_dummyVertexBuffer);
+    CHRA (hr);
+
+Error:
+    return hr;
+}
+
+
+
+
+
+HRESULT RenderSystem::CreateInstanceBuffer()
+{
+    HRESULT           hr         = S_OK;
+    D3D11_BUFFER_DESC bufferDesc = {};
+
+
+
+    bufferDesc.ByteWidth      = sizeof (CharacterInstanceData) * m_instanceBufferCapacity;
+    bufferDesc.Usage          = D3D11_USAGE_DYNAMIC;
+    bufferDesc.BindFlags      = D3D11_BIND_VERTEX_BUFFER;
+    bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+
+    hr = m_device->CreateBuffer (&bufferDesc, nullptr, &m_instanceBuffer);
+    CHRA (hr);
+
+Error:
+    return hr;
+}
+
+
+
+
+
+HRESULT RenderSystem::CreateConstantBuffer()
+{
+    HRESULT           hr         = S_OK;
+    D3D11_BUFFER_DESC bufferDesc = {};
+
+
+    
+    bufferDesc.ByteWidth      = sizeof (ConstantBufferData);
+    bufferDesc.Usage          = D3D11_USAGE_DYNAMIC;
+    bufferDesc.BindFlags      = D3D11_BIND_CONSTANT_BUFFER;
+    bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+
+    hr = m_device->CreateBuffer (&bufferDesc, nullptr, &m_constantBuffer);
+    CHRA (hr);
+
+Error:
+    return hr;
+}
+
+
+
+
+
+HRESULT RenderSystem::CreateBloomConstantBuffer()
+{
+    HRESULT           hr         = S_OK;
+    D3D11_BUFFER_DESC bufferDesc = {};
+
+
+    
+    bufferDesc.ByteWidth      = 16;  // sizeof(float) * 4 for alignment
+    bufferDesc.Usage          = D3D11_USAGE_DYNAMIC;
+    bufferDesc.BindFlags      = D3D11_BIND_CONSTANT_BUFFER;
+    bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+
+    hr = m_device->CreateBuffer (&bufferDesc, nullptr, &m_bloomConstantBuffer);
+    CHRA (hr);
+
+Error:
+    return hr;
+}
+
+
+
+
+
 ////////////////////////////////////////////////////////////////////////////////
 
 HRESULT RenderSystem::CompileBloomShaders()
@@ -1914,18 +1218,8 @@ HRESULT RenderSystem::CompileBloomShaders()
         float uv[2];
     };
 
-    HRESULT                hr                 = S_OK;
-    ComPtr<ID3DBlob>       quadVSBlob;
-    ComPtr<ID3DBlob>       extractPSBlob;
-    ComPtr<ID3DBlob>       blurHPSBlob;
-    ComPtr<ID3DBlob>       blurH9PSBlob;
-    ComPtr<ID3DBlob>       blurH5PSBlob;
-    ComPtr<ID3DBlob>       blurVPSBlob;
-    ComPtr<ID3DBlob>       blurV9PSBlob;
-    ComPtr<ID3DBlob>       blurV5PSBlob;
-    ComPtr<ID3DBlob>       compositePSBlob;
-    ComPtr<ID3DBlob>       haloPSBlob;
-    QuadVertex             quadVertices[]     = {
+    HRESULT                hr             = S_OK;
+    QuadVertex             quadVertices[] = {
         { {-1, -1, 0}, {0, 1} },
         { {-1,  1, 0}, {0, 0} },
         { { 1,  1, 0}, {1, 0} },
@@ -1933,31 +1227,46 @@ HRESULT RenderSystem::CompileBloomShaders()
         { { 1,  1, 0}, {1, 0} },
         { { 1, -1, 0}, {1, 1} }
     };
-    D3D11_BUFFER_DESC      vbDesc             = { };
-    D3D11_SUBRESOURCE_DATA vbData             = { };
-    ShaderCompileEntry     bloomShaderTable[] = {
-        { s_kszQuadVertexShaderSource,             "QuadVS",    "main", "vs_5_0", L"D3DCompile failed for quad vertex shader",         quadVSBlob.GetAddressOf(),      nullptr                },
-        { s_kszBloomExtractShaderSource,           "Extract",   "main", "ps_5_0", L"D3DCompile failed for bloom extract shader",       extractPSBlob.GetAddressOf(),   &m_bloomExtractPS      },
-        { s_kszBlurHorizontalShaderSource,         "BlurH13",   "main", "ps_5_0", L"D3DCompile failed for horizontal blur 13-tap",     blurHPSBlob.GetAddressOf(),     &m_blurHorizontalPS    },
-        { s_kszBlurHorizontalShader9TapSource,     "BlurH9",    "main", "ps_5_0", L"D3DCompile failed for horizontal blur 9-tap",      blurH9PSBlob.GetAddressOf(),    &m_blurHorizontalPS9   },
-        { s_kszBlurHorizontalShader5TapSource,     "BlurH5",    "main", "ps_5_0", L"D3DCompile failed for horizontal blur 5-tap",      blurH5PSBlob.GetAddressOf(),    &m_blurHorizontalPS5   },
-        { s_kszBlurVerticalShaderSource,           "BlurV13",   "main", "ps_5_0", L"D3DCompile failed for vertical blur 13-tap",       blurVPSBlob.GetAddressOf(),     &m_blurVerticalPS      },
-        { s_kszBlurVerticalShader9TapSource,       "BlurV9",    "main", "ps_5_0", L"D3DCompile failed for vertical blur 9-tap",        blurV9PSBlob.GetAddressOf(),    &m_blurVerticalPS9     },
-        { s_kszBlurVerticalShader5TapSource,       "BlurV5",    "main", "ps_5_0", L"D3DCompile failed for vertical blur 5-tap",        blurV5PSBlob.GetAddressOf(),    &m_blurVerticalPS5     },
-        { WithOutputTransform (s_kszBloomCompositeShaderSource), "Composite", "main", "ps_5_0", L"D3DCompile failed for composite shader", compositePSBlob.GetAddressOf(), &m_compositePS },
-        { s_kszHaloShaderSource,                   "Halo",      "main", "ps_5_0", L"D3DCompile failed for halo shader",                haloPSBlob.GetAddressOf(),      &m_haloPS              }
-    };
+    D3D11_BUFFER_DESC      vbDesc         = { };
+    D3D11_SUBRESOURCE_DATA vbData         = { };
 
 
-    // Compile shaders and create pixel shaders from table
-    hr = CompileShadersFromTable (bloomShaderTable);
-    CHR (hr);
-    
-    hr = m_device->CreateVertexShader (quadVSBlob->GetBufferPointer(), quadVSBlob->GetBufferSize(), nullptr, &m_fullscreenQuadVS);
+
+    hr = m_device->CreateVertexShader (g_QuadVS, sizeof (g_QuadVS), nullptr, &m_fullscreenQuadVS);
     CHRA (hr);
-    
-    hr = m_device->CreateInputLayout (s_krgQuadInputLayout, _countof (s_krgQuadInputLayout), 
-                                      quadVSBlob->GetBufferPointer(), quadVSBlob->GetBufferSize(), &m_fullscreenQuadInputLayout);
+
+    hr = m_device->CreateInputLayout (s_krgQuadInputLayout,
+                                      _countof (s_krgQuadInputLayout),
+                                      g_QuadVS,
+                                      sizeof (g_QuadVS),
+                                      &m_fullscreenQuadInputLayout);
+    CHRA (hr);
+
+    hr = m_device->CreatePixelShader (g_BloomExtractPS, sizeof (g_BloomExtractPS), nullptr, &m_bloomExtractPS);
+    CHRA (hr);
+
+    hr = m_device->CreatePixelShader (g_BlurH13PS, sizeof (g_BlurH13PS), nullptr, &m_blurHorizontalPS);
+    CHRA (hr);
+
+    hr = m_device->CreatePixelShader (g_BlurH9PS, sizeof (g_BlurH9PS), nullptr, &m_blurHorizontalPS9);
+    CHRA (hr);
+
+    hr = m_device->CreatePixelShader (g_BlurH5PS, sizeof (g_BlurH5PS), nullptr, &m_blurHorizontalPS5);
+    CHRA (hr);
+
+    hr = m_device->CreatePixelShader (g_BlurV13PS, sizeof (g_BlurV13PS), nullptr, &m_blurVerticalPS);
+    CHRA (hr);
+
+    hr = m_device->CreatePixelShader (g_BlurV9PS, sizeof (g_BlurV9PS), nullptr, &m_blurVerticalPS9);
+    CHRA (hr);
+
+    hr = m_device->CreatePixelShader (g_BlurV5PS, sizeof (g_BlurV5PS), nullptr, &m_blurVerticalPS5);
+    CHRA (hr);
+
+    hr = m_device->CreatePixelShader (g_BloomCompositePS, sizeof (g_BloomCompositePS), nullptr, &m_compositePS);
+    CHRA (hr);
+
+    hr = m_device->CreatePixelShader (g_HaloPS, sizeof (g_HaloPS), nullptr, &m_haloPS);
     CHRA (hr);
 
     // Create fullscreen quad vertex buffer
@@ -1984,48 +1293,24 @@ HRESULT RenderSystem::CompileBloomShaders()
         CHRA (hr);
     }
 
-    // v1.5 (T051, FR-028b): compile the scanline post-pass shader.  Soft-
-    // bypass on failure — we log + clear m_scanlinePS and return S_OK so
-    // the rest of the pipeline boots normally.  Render-time checks fall
-    // through to skipping the scanline pass entirely.  Per the analyze
-    // decision, the dialog's Scanline controls stay enabled and there's
-    // no UI surface for this error (user just doesn't see scanlines).
+    // v1.5 (T051, FR-028b): the scanline post-pass shader soft-bypasses on
+    // failure -- log, clear m_scanlinePS and carry on, so the rest of the
+    // pipeline boots normally and render-time checks skip the pass. Per the
+    // analyze decision the dialog's Scanline controls stay enabled and there
+    // is no UI surface for this error; the user simply sees no scanlines.
+    //
+    // Since the move to build-time compilation this can only fail if the
+    // device rejects otherwise valid bytecode, which is far less likely than
+    // the compile failure it originally guarded. It is kept because the
+    // consequence of losing it is a black screen instead of a missing effect.
     {
-        ComPtr<ID3DBlob>  scanlinePSBlob;
-        ComPtr<ID3DBlob>  scanlineErrorBlob;
-        HRESULT           hrScanline = S_OK;
-
-
-        const char * pszScanlineSource = WithOutputTransform (s_kszScanlineShaderSource);
-
-
-        hrScanline = D3DCompile (pszScanlineSource,
-                                  strlen (pszScanlineSource),
-                                  "Scanlines",
-                                  nullptr,
-                                  nullptr,
-                                  "main",
-                                  "ps_5_0",
-                                  D3DCOMPILE_ENABLE_STRICTNESS,
-                                  0,
-                                  &scanlinePSBlob,
-                                  &scanlineErrorBlob);
-
-        if (SUCCEEDED (hrScanline))
-        {
-            hrScanline = m_device->CreatePixelShader (scanlinePSBlob->GetBufferPointer(),
-                                                      scanlinePSBlob->GetBufferSize(),
-                                                      nullptr,
-                                                      &m_scanlinePS);
-        }
+        HRESULT hrScanline = m_device->CreatePixelShader (g_ScanlinesPS,
+                                                          sizeof (g_ScanlinesPS),
+                                                          nullptr,
+                                                          &m_scanlinePS);
 
         if (FAILED (hrScanline))
         {
-            if (scanlineErrorBlob)
-            {
-                OutputDebugStringA (static_cast<char *> (scanlineErrorBlob->GetBufferPointer()));
-            }
-
             OutputDebugStringW (L"MatrixRain: scanline shader init failed; scanlines bypassed for this session.\n");
             m_scanlinePS.Reset();
         }
