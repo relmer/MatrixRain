@@ -60,7 +60,7 @@ can be the last one. It is uploaded once per frame, and again whenever
 |---|---|---|---|---|
 | `mode` | `uint` | 0 (sRGB encode) | 1 (scRGB) | 1 |
 | `sdrWhiteScale` | `float` | unused | `sdrWhiteNits / 80` | same |
-| `headroom` | `float` | 1 | 1 (clamp at white) | `DisplayLuminance.headroom` |
+| `headroom` | `float` | 1 | 1 (clamp at white) | `DisplayLuminance.headroom` with HDR mode Auto; 1 with Off (research R14) |
 | `isFinalPass` | `uint` | 1 when this pass writes the back buffer; 0 when it writes an intermediate (e.g. the composite ahead of scanlines) | same | same |
 
 `highlightGain` is **not** here: it is applied per instance to streak heads on
@@ -73,8 +73,10 @@ trails.
 - `1` when `outputMode == Sdr`, when `hdrMode == Off`, or in Phase 2.
 - Otherwise `headroom ^ (highlightBrightness / 100)`.
 
-Applied to linear head color before upload. Trails, overlays and scanlines
-never receive it.
+Carried per instance in `CharacterInstanceData::highlightGain` (1 for trails
+and overlays) and applied by the glyph shader after it linearizes and clips
+the pixel; the instance color is gamma-space and cannot carry it (research
+R14). Trails, overlays and scanlines never receive it.
 
 ## 6. Render-target set (per `RenderSystem`)
 
@@ -82,6 +84,7 @@ never receive it.
 |---|---|---|
 | Scene | `R11G11B10_FLOAT` (research R2, revised in T020) | full |
 | Bloom, blur temp | `R11G11B10_FLOAT` | ÷ resolution divisor |
+| Highlight, highlight blur temp (Phase 3) | `R16_FLOAT`, luminance of the scene above SDR white | ÷ resolution divisor; created only while this monitor's highlight gain is above 1 (research R14) |
 | Post-bloom | `R11G11B10_FLOAT` | full |
 | Back buffer | `B8G8R8A8_UNORM` (SDR) / `R16G16B16A16_FLOAT` (HDR) | full |
 | D2D target bitmap | matches back buffer | full |

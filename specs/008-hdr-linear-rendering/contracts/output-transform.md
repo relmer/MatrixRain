@@ -36,6 +36,24 @@ float3 OutputTransform (float3 linearRgb)
 `LinearToSrgb` and `ToneMapHighlights` are transliterations of the C++
 functions in [color-math.md](color-math.md), with the same constants.
 
+## Highlights above SDR white (Phase 3, research R14)
+
+The composite that feeds this function splits the scene at SDR white. The
+part at or below white goes through v1.6's glow composite unchanged; the part
+above, and its separately blurred glow, are added in linear light afterward:
+
+```text
+sdr    = min (scene, 1)
+excess = scene - sdr
+linear = SrgbToLinear (v16Composite (LinearToSrgb (sdr), glow))
+       + excess
+       + highlightGlow * kHighlightGlowStrength * (bloomIntensity / 2.5)
+```
+
+`excess` and `highlightGlow` are zero wherever no instance has a highlight
+gain above 1, which covers every SDR frame and every HDR frame with mode Off,
+so those frames are unchanged.
+
 ## Invariants
 
 - Inputs are linear light, ≥ 0, where 1.0 is SDR white.

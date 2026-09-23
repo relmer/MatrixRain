@@ -74,6 +74,8 @@ void  ToneMapHighlights (float rgb[3], float headroom) noexcept
     `m' < headroom`, with `m' → headroom` as `m → ∞`, and scales all channels
     by `m' / m` (hue preserved: channel ratios unchanged within 1e-5).
   - C¹-continuous at `m = 1` (no visible kink).
+  - The curve (research R14): for `m > 1`, `t = (m - 1) / (h - 1)` and
+    `m' = 1 + (h - 1) * t / (1 + t)`; `f(1) = 1`, `f'(1) = 1`, `f -> h`.
   - `headroom == 1` → output capped at 1 (the Phase 2 behavior).
 
 ## Output mode selection

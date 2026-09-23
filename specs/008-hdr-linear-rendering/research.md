@@ -165,8 +165,8 @@ The float textures keep the real benefit -- no 8-bit quantization anywhere in
 the chain -- and the linear output stage keeps what the HDR phases need.
 
 **Phase 3 note**: the extract's encode saturates at white, so a head above SDR
-white blooms as a white head. Highlight bloom needs its own handling then,
-most likely an additive highlight layer blurred in linear light.
+white blooms as a white head. Highlight bloom needs its own handling then;
+research R14 is that design.
 
 **Calibration method**: A deterministic reference frame (fixed seed, fixed
 time) rendered on the WARP device by a small calibration harness, **kept as a
@@ -318,7 +318,8 @@ monitors are never disturbed.
 - **Roll-off**: identity up to SDR white, then a smooth shoulder (extended
   Reinhard with the white point at `headroom`) above it, applied to the
   **maximum channel**. RGB is scaled by `mapped / original` so hue is
-  preserved (FR-019).
+  preserved (FR-019). The exact curve, and how the part above white reaches
+  the output past a glow chain that stops at white, are in R14.
 - **Ceiling**: `effectivePeakNits = min(MaxLuminance, …)` with a conservative
   400-nit default when the value is missing or implausible (< 80 or
   > 10 000 nits). When `sdrWhiteNits >= effectivePeakNits`, headroom is 1 and
@@ -380,6 +381,110 @@ monitor is currently in HDR mode.
 
 Each phase leaves the code shippable: Phase 2 simply never returns a gain
 above 1.
+
+## R14. Phase 3 design revision: highlights over a glow chain that stops at white
+
+Phase 1 settled that the glow is v1.6's, computed on encoded values (R3), and
+the composite converts the scene to encoded values to screen the glow over
+it. Both conversions saturate at 1. So as Phase 1 left it, a head brightened
+past SDR white loses its excess **twice**: the extract clips it before the
+blur, so its glow is only a white head's glow, and the composite clips the
+scene itself, so the head is not brighter either. The gain of R8 would have
+no visible effect. This revision keeps every pixel Phase 1 and Phase 2 produce
+bit for bit, and carries the part above white around the v1.6 chain instead
+of through it.
+
+**Decision**: split the scene at SDR white.
+
+```text
+sdr    = min (scene, 1)          per channel
+excess = scene - sdr             per channel, >= 0; nonzero only on boosted heads
+```
+
+- **The SDR part** goes through the v1.6 glow chain exactly as today. The
+  extract encodes `sdr` (which is what `LinearToSrgb`'s saturate already did),
+  and the composite screens the glow over `encode (sdr)`. Unchanged code.
+- **The excess** skips it:
+  - the extract also averages `excess` over its four texels **in linear
+    light** (light adds; there is nothing to match here) and writes its
+    luminance to a second render target, a single-channel `R16_FLOAT`
+    highlight texture at the bloom resolution;
+  - the existing blur shaders run over that texture with the same kernel and
+    passes as the glow (they are generic over `float4`);
+  - the composite adds, in linear light, after decoding its v1.6 result:
+
+```text
+linear = SrgbToLinear (v1.6 composite (encode (sdr), glow))
+       + excess                                   the head above white
+       + highlightGlow * kHighlightGlowStrength * (bloomIntensity / 2.5)
+```
+
+  `highlightGlow` is the blurred luminance, added as neutral light: heads are
+  white instances (R8), so their glow above white is white too. The
+  `bloomIntensity / 2.5` term makes the Glow Intensity slider scale the
+  highlight glow the way it scales the ordinary glow, with its default at 1.
+  `kHighlightGlowStrength` starts at 1 and is tuned by eye on hardware
+  (T044), like the highlight brightness default.
+- **Then `OutputTransform`** tone-maps into the display's headroom (R8).
+
+**Why the SDR paths do not move**: in SDR, and in HDR with mode Off or a
+highlight gain of 1, the glyph shader clips at 1 before it linearizes (Phase 1
+item 6), alpha compositing of values in [0, 1] stays in [0, 1], so `excess` is
+exactly 0 everywhere, `sdr` is the scene, and the composite reduces to
+today's. The highlight texture and its blur passes are not created or run at
+all unless this monitor's highlight gain is above 1, so SDR monitors, and
+HDR monitors with mode Off, pay nothing. The calibration baselines therefore
+keep passing unchanged, and they are the regression test for this.
+
+**Where the gain goes**: per instance, as a new `highlightGain` float in
+`CharacterInstanceData` (1 for everything but heads, and for overlays), and the
+glyph shader multiplies by it after it has linearized and clipped the pixel:
+`SrgbToLinear3 (min (X c^2, 1)) * gain`. The self-glow overshoot that v1.6
+clipped (a full-brightness head is 1.3) stays clipped; the gain is the only
+thing that lifts a head above white, so the slider alone sets its height.
+Premultiplied alpha is unaffected: rgb scales, alpha does not, so a boosted
+head still covers what is behind it by its coverage.
+
+**Tone mapping** (R8, made concrete): on the maximum channel `m`, with
+`h = headroom`:
+
+```text
+m <= 1:  f(m) = m
+m >  1:  t = (m - 1) / (h - 1);   f(m) = 1 + (h - 1) * t / (1 + t)
+h <= 1:  f(m) = min (m, 1)
+rgb *= f(m) / m
+```
+
+`f(1) = 1`, `f'(1) = 1` (C1 at white, so no kink where heads cross it), and
+`f -> h` as `m -> infinity`, so nothing clips and the peak is approached, not
+hit. Scaling all three channels by one factor preserves hue (FR-019).
+
+**Headroom per mode**: the monitor's real headroom in HDR with mode Auto; 1
+in HDR with mode Off ("never exceed SDR white", FR-021), which also keeps the
+scanline shader's `min (c, g_headroom)` clamp where Phase 2 had it; unused in
+SDR.
+
+**Cost**: nothing on SDR monitors or with mode Off. With highlights on: one
+extra render target on the extract (MRT, same pass), one `R16_FLOAT` texture
+pair at the bloom resolution through the same blur passes (2 bytes a pixel
+against the glow chain's 4, so about half the blur chain's bandwidth again),
+and a few ALU operations in the composite. Estimated at about 25
+microseconds a frame at 4K on the desktop card, on top of HDR's 50; T044
+measures it.
+
+**Alternatives considered**:
+- *A 16-bit float glow chain with the excess in its alpha channel*: no extra
+  passes, but it doubles the bandwidth of the whole glow chain (8 bytes a
+  pixel against 4) where the separate texture adds half, and it would put a
+  different format under the v1.6 color chain in highlight mode.
+- *Deriving the highlight glow from the existing glow* (for example by how
+  white the blurred glow is): no extra cost, but it cannot tell a head's glow
+  from a white custom color's trail glow, and FR-020 says trails do not move.
+- *Running the whole glow chain in linear light in HDR*: the R3 history is the
+  reason not to; every step of it changed the look.
+- *Applying the gain on the CPU to the instance color* (data-model §5 as first
+  written): the instance color is gamma-space and clipped per pixel after
+  coverage, so a linear gain cannot ride on it (T041 already records this).
 
 ## Resolved unknowns
 
