@@ -124,6 +124,99 @@ float LinearToSrgbPolynomial (float linear) noexcept
 
 ////////////////////////////////////////////////////////////////////////////////
 //
+//  ClampSdrWhiteNits
+//
+////////////////////////////////////////////////////////////////////////////////
+
+static float ClampSdrWhiteNits (float sdrWhiteNits) noexcept
+{
+    return std::clamp (sdrWhiteNits,
+                       DisplayLuminanceConstants::kMinSdrWhiteNits,
+                       DisplayLuminanceConstants::kMaxSdrWhiteNits);
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  EffectivePeakNits
+//
+////////////////////////////////////////////////////////////////////////////////
+
+float EffectivePeakNits (float reportedPeakNits) noexcept
+{
+    if (reportedPeakNits < DisplayLuminanceConstants::kMinPlausiblePeakNits
+        || reportedPeakNits > DisplayLuminanceConstants::kMaxPlausiblePeakNits)
+    {
+        return DisplayLuminanceConstants::kDefaultPeakNits;
+    }
+
+    return reportedPeakNits;
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  Headroom
+//
+////////////////////////////////////////////////////////////////////////////////
+
+float Headroom (float effectivePeakNits, float sdrWhiteNits) noexcept
+{
+    const float white = ClampSdrWhiteNits (sdrWhiteNits);
+
+
+
+    return std::max (1.0f, effectivePeakNits / white);
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  SdrWhiteScale
+//
+////////////////////////////////////////////////////////////////////////////////
+
+float SdrWhiteScale (float sdrWhiteNits) noexcept
+{
+    return ClampSdrWhiteNits (sdrWhiteNits) / DisplayLuminanceConstants::kScRgbWhiteNits;
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  SdrWhiteNitsFromDisplayConfig
+//
+////////////////////////////////////////////////////////////////////////////////
+
+float SdrWhiteNitsFromDisplayConfig (uint32_t sdrWhiteLevel) noexcept
+{
+    const float nits = static_cast<float> (sdrWhiteLevel)
+                       / static_cast<float> (DisplayLuminanceConstants::kDisplayConfigWhiteLevelUnit)
+                       * DisplayLuminanceConstants::kScRgbWhiteNits;
+
+
+
+    return ClampSdrWhiteNits (nits);
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
 //  InstanceDisplayColor
 //
 ////////////////////////////////////////////////////////////////////////////////

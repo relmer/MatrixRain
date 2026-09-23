@@ -128,6 +128,104 @@ inline constexpr float kGlyphSelfGlow = 0.3f;
 
 
 /// <summary>
+/// The numbers behind the display luminance math (data-model §2).
+/// </summary>
+namespace DisplayLuminanceConstants
+{
+    /// <summary>scRGB's reference white: 1.0 in a scRGB back buffer is 80 nits.</summary>
+    inline constexpr float    kScRgbWhiteNits              = 80.0f;
+
+    /// <summary>Peak the math assumes when the display reports none, or nonsense.</summary>
+    inline constexpr float    kDefaultPeakNits             = 400.0f;
+
+    /// <summary>A reported peak outside this range is treated as unknown.</summary>
+    inline constexpr float    kMinPlausiblePeakNits        = 80.0f;
+    inline constexpr float    kMaxPlausiblePeakNits        = 10000.0f;
+
+    /// <summary>The SDR white level is held to this range, whatever DisplayConfig says.</summary>
+    inline constexpr float    kMinSdrWhiteNits             = 80.0f;
+    inline constexpr float    kMaxSdrWhiteNits             = 480.0f;
+
+    /// <summary>DisplayConfig reports the SDR white level in units where 1000 is 80 nits.</summary>
+    inline constexpr uint32_t kDisplayConfigWhiteLevelUnit = 1000;
+}
+
+
+
+
+
+/// <summary>
+/// What the OS says about the monitor a window sits on, refreshed at 1 Hz and
+/// on display changes (data-model §2). Read through IDisplayLuminanceProvider.
+/// </summary>
+struct DisplayLuminance
+{
+    bool         hdrEnabled       { false };   // Windows HDR is on for this monitor (output color space is PQ / BT.2020)
+    bool         scRgbSupported   { false };   // The swap chain reports present support for scRGB
+    float        sdrWhiteNits     { 80.0f };   // The Windows SDR brightness slider, in nits; 80 when unavailable
+    float        reportedPeakNits { 0.0f  };   // DXGI_OUTPUT_DESC1::MaxLuminance; may be 0 or implausible
+    std::wstring deviceName;                   // DXGI_OUTPUT_DESC1::DeviceName, used to pair DXGI with DisplayConfig
+};
+
+
+
+
+
+/// <summary>
+/// The peak brightness the math should trust: the reported one when it is
+/// plausible, otherwise 400 nits. Displays report 0 when they do not know,
+/// and some report numbers no panel can make.
+/// </summary>
+/// <param name="reportedPeakNits">DXGI_OUTPUT_DESC1::MaxLuminance</param>
+/// <returns>A peak in [80, 10 000] nits</returns>
+float EffectivePeakNits (float reportedPeakNits) noexcept;
+
+
+
+
+
+/// <summary>
+/// How far above SDR white the display can go, as a multiplier: peak over
+/// white, never below 1 (FR-026). Phase 3 spends it on highlights; Phase 2
+/// ignores it and caps at white. A white level at or above the peak gives 1,
+/// and a white level outside [80, 480] is clamped first.
+/// </summary>
+/// <param name="effectivePeakNits">From EffectivePeakNits</param>
+/// <param name="sdrWhiteNits">The SDR white level</param>
+/// <returns>A multiplier of at least 1</returns>
+float Headroom (float effectivePeakNits, float sdrWhiteNits) noexcept;
+
+
+
+
+
+/// <summary>
+/// The scRGB value of SDR white: the white level over 80 nits, so the rain
+/// lands at the brightness the user set for SDR content (SC-003). The white
+/// level is clamped to [80, 480] first, so a missing or absurd reading can
+/// neither black the screen nor blind the viewer.
+/// </summary>
+/// <param name="sdrWhiteNits">The SDR white level</param>
+/// <returns>A multiplier in [1, 6]</returns>
+float SdrWhiteScale (float sdrWhiteNits) noexcept;
+
+
+
+
+
+/// <summary>
+/// Converts DisplayConfig's SDR white level to nits: level / 1000 * 80,
+/// clamped to [80, 480].
+/// </summary>
+/// <param name="sdrWhiteLevel">DISPLAYCONFIG_SDR_WHITE_LEVEL::SDRWhiteLevel</param>
+/// <returns>Nits in [80, 480]</returns>
+float SdrWhiteNitsFromDisplayConfig (uint32_t sdrWhiteLevel) noexcept;
+
+
+
+
+
+/// <summary>
 /// A glyph's color as v1.6 put it on screen at full coverage, in gamma space,
 /// with both brightness factors folded in.
 ///
