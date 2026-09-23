@@ -1654,7 +1654,7 @@ static const char * s_kszOutputTransformHlslFormat = R"(
         }};
 
         // NB: the parameter cannot be called "linear" -- that is an HLSL
-        // interpolation modifier keyword, and naming it so fails to compile.
+        // interpolation modifier keyword, and a parameter called that fails to compile.
         float LinearToSrgbChannel(float linearValue)
         {{
             float clamped = saturate(linearValue);
@@ -1696,7 +1696,7 @@ static const char * s_kszOutputTransformHlslFormat = R"(
 //
 //  OutputTransformHlsl
 //
-//  Builds the transform source with the shared colour constants baked in.
+//  Builds the transform source with the shared color constants baked in.
 //  Built once on first use: the string is identical for the lifetime of the
 //  process and every final-pass shader concatenates the same copy.
 //

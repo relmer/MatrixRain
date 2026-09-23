@@ -180,7 +180,7 @@ public:
     /// pixels -- the rain's true text cell. Exposed because the scanline pass
     /// anchors its line count to this, so the raster-to-glyph ratio stays put
     /// across monitors. Note this is the ROW PITCH (24px base), not the 36px
-    /// glyph quad, which is drawn oversized and overlaps its neighbours.
+    /// glyph quad, which is drawn oversized and overlaps its neighbors.
     /// </summary>
     float                                 GetCharacterSpacing()   const { return CalculateCharacterSpacing(); }
 

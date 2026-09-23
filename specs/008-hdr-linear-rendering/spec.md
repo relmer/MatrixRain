@@ -16,7 +16,7 @@
 
 ### User Story 1 - Physically Correct Light Blending on Every Display (Priority: P1)
 
-A user on any monitor, SDR or HDR, watches the rain. Glow spreads and fades the way light does: halos around bright heads fall off smoothly instead of ending in a hard edge, overlapping halos add up to something brighter rather than flattening into a dull plateau, and glyph edges blend cleanly where streaks cross, and the long fading tails on the black background show no visible banding. Scanline darkening reads as a raster laid over glowing phosphor rather than as a grey veil. At default settings the effect looks like the same MatrixRain the user already knows, just cleaner.
+A user on any monitor, SDR or HDR, watches the rain. Glow spreads and fades the way light does: halos around bright heads fall off smoothly instead of ending in a hard edge, overlapping halos add up to something brighter rather than flattening into a dull plateau, and glyph edges blend cleanly where streaks cross, and the long fading tails on the black background show no visible banding. Scanline darkening reads as a raster laid over glowing phosphor rather than as a gray veil. At default settings the effect looks like the same MatrixRain the user already knows, just cleaner.
 
 **Why this priority**: This fixes a correctness problem that affects every user, not just HDR owners, and it is the foundation the HDR phases build on: HDR output is only meaningful once the image is computed in light-linear terms. It ships on its own without any HDR hardware.
 

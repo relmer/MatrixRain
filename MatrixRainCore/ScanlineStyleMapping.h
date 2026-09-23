@@ -11,7 +11,7 @@
 /// "Cell" means the ROW PITCH -- AnimationSystem's BASE_SPACING, 24px at
 /// characterScale 1.0 -- which is the rain's true text cell, exactly like the
 /// 16-row cell of VGA text mode. It is NOT the 36px glyph quad: the quad is
-/// drawn oversized so neighbours overlap, and the glyph ink inside it measures
+/// drawn oversized so neighbors overlap, and the glyph ink inside it measures
 /// only ~18px. Anchoring to the quad over-counts the scanlines a viewer
 /// actually sees crossing a character by roughly 2x.
 ///

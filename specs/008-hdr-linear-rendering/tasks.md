@@ -127,8 +127,8 @@ description: "Task list for 008 HDR output and linear-light rendering"
 - [ ] T043 [US3] Dialog behavior in `MatrixRain/ConfigDialog.cpp`:
   - Initialize both controls from settings; route changes to `UpdateHdrMode` / `UpdateHighlightBrightness`; include them in the reset resync.
   - Info tooltip: "Affects monitors with Windows HDR turned on. Other monitors are unchanged."
-  - Grey the slider while mode is Off.
-  - Grey the whole group, with tooltip "No monitor has HDR turned on in Windows.", while `SharedState::hdrMonitorCount == 0`, re-evaluated on the existing 1 s dialog timer.
+  - Gray the slider while mode is Off.
+  - Gray the whole group, with tooltip "No monitor has HDR turned on in Windows.", while `SharedState::hdrMonitorCount == 0`, re-evaluated on the existing 1 s dialog timer.
   - Resolve the Visuals page through the sheet, like `ApplyScanlinesEnabledUI` (FR-021–024).
 - [ ] T044 [US3] Tune and validate on hardware: confirm the default highlight brightness of 80 is comfortable in a dim room (if not, adjust `DEFAULT_HIGHLIGHT_BRIGHTNESS` and T036's expectation together). Run [quickstart.md](quickstart.md) Phase 3 checks 1–9. Re-run the benchmark and manual FPS readings with HDR mode Auto on an HDR monitor against the 5% threshold (SC-006). Record the results
 

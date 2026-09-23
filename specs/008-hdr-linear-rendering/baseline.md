@@ -32,7 +32,7 @@ before suspecting the renderer.
 
 **Display scales**: every case is captured at 100%, 125% and 150%, giving row
 pitches (cells) of 24, 30 and 36 px. 24 frames in total, in
-[baseline/](baseline/), named `<case>-dpi<percent>.png`, lossless.
+[baseline/](baseline/), with file names of the form `<case>-dpi<percent>.png`, lossless.
 
 The sweep is not decoration. Scanline pitch is derived from the cell, so at
 Style 1 a 24 px cell gives a **~2.4 px pitch** — below the 3 px floor where a

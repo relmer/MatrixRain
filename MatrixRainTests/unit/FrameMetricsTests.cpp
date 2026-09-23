@@ -88,7 +88,7 @@ namespace MatrixRainTests
                                                 + kLumaB * SrgbToLinearReference (40.0f  / 255.0f);
 
             Assert::AreEqual (expected, MeanLuminance (frame, 16, 16), 1e-5f,
-                              L"A uniform frame's mean luminance is that colour's linear Rec.709 luma");
+                              L"A uniform frame's mean luminance is that color's linear Rec.709 luma");
         }
 
 

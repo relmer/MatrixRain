@@ -12,7 +12,7 @@
 #include "..\..\MatrixRainCore\ScreenSaverSettings.h"
 #include "..\..\MatrixRainCore\Viewport.h"
 
-//  WIC is used only by this tool, so the import library is named here rather
+//  WIC is used only by this tool, so the import library is listed here rather
 //  than in pch.h, where it would follow MatrixRain.exe into a release build.
 #pragma comment (lib, "windowscodecs.lib")
 #pragma comment (lib, "version.lib")
@@ -75,7 +75,7 @@ static constexpr wchar_t  kszDefaultBaselineDir[] = L"specs\\008-hdr-linear-rend
 //
 //  SettingsCase
 //
-//  One named point in the settings space that calibration must preserve.
+//  One fixed point in the settings space that calibration must preserve.
 //
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -95,7 +95,7 @@ struct SettingsCase
 
 
 //  The cases task T004 pins: the defaults, both ends of each glow slider,
-//  scanlines at both ends of the Style range, and a custom colour, so a
+//  scanlines at both ends of the Style range, and a custom color, so a
 //  calibration that only happens to match at the defaults is caught.
 static const SettingsCase s_krgCases[] =
 {
@@ -523,7 +523,7 @@ Error:
 //
 //  DpiPercent
 //
-//  The scale as the number Windows shows the user, for naming files.
+//  The scale as the number Windows shows the user, to build file names.
 //
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -685,7 +685,7 @@ Error:
 //  WriteDifferenceImage
 //
 //  Writes the per-pixel difference as a picture, amplified so it can actually
-//  be seen. This is the artefact worth looking at: it says WHERE the render
+//  be seen. This is the artifact worth looking at: it says WHERE the render
 //  changed, which no summary statistic can.
 //
 ////////////////////////////////////////////////////////////////////////////////

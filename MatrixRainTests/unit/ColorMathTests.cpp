@@ -19,7 +19,7 @@ namespace MatrixRainTests
     static constexpr float kSweepStep          = 0.001f;
 
     //  Tolerance for the FR-005 regression: the rebuilt pipeline must land on
-    //  the same displayed colour v1.6 produced, to well inside one 8-bit code
+    //  the same displayed color v1.6 produced, to well inside one 8-bit code
     //  value (1/255 = 0.0039).
     static constexpr float kRegressionTolerance = 1e-4f;
 
@@ -40,7 +40,7 @@ namespace MatrixRainTests
     //      rgb += rgb * 0.3 * brightness;
     //  clamped by the 8-bit render target. Written out longhand, from the
     //  shader rather than from ColorMath, so the regression test compares the
-    //  new pipeline against the OLD behaviour and not against itself.
+    //  new pipeline against the OLD behavior and not against itself.
     //
     ////////////////////////////////////////////////////////////////////////////
 
@@ -79,7 +79,7 @@ namespace MatrixRainTests
         }
 
 
-        TEST_METHOD (SrgbToLinear_AtMidGrey_IsAboutPoint214)
+        TEST_METHOD (SrgbToLinear_AtMidGray_IsAboutPoint214)
         {
             //  The number that makes the whole feature necessary: half-way up
             //  the encoded scale is barely a fifth of the light.
@@ -177,7 +177,7 @@ namespace MatrixRainTests
 
 
         ////////////////////////////////////////////////////////////////////////
-        // Instance colour
+        // Instance color
         ////////////////////////////////////////////////////////////////////////
 
         TEST_METHOD (InstanceLinearColor_MatchesTheDocumentedFormula)
@@ -230,7 +230,7 @@ namespace MatrixRainTests
 
 
         ////////////////////////////////////////////////////////////////////////
-        // FR-005 regression: the displayed colour must not move
+        // FR-005 regression: the displayed color must not move
         ////////////////////////////////////////////////////////////////////////
 
         TEST_METHOD (InstanceLinearColor_ReproducesV16Output_ForEveryColorSchemeAndBrightness)
@@ -238,7 +238,7 @@ namespace MatrixRainTests
             //  THE test that pins FR-005. Convert to linear the new way, encode
             //  back for an SDR display, and the result must be the pixel v1.6
             //  would have written. If this ever fails, the rain has changed
-            //  colour or brightness and a user would see it.
+            //  color or brightness and a user would see it.
             const ColorScheme schemes[] = { ColorScheme::Green,
                                             ColorScheme::Blue,
                                             ColorScheme::Red,
@@ -265,10 +265,10 @@ namespace MatrixRainTests
 
         TEST_METHOD (InstanceLinearColor_ReproducesV16Output_ForWhiteHeadsAndCustomColors)
         {
-            //  Heads are drawn white, and a user-picked custom colour is not in
+            //  Heads are drawn white, and a user-picked custom color is not in
             //  the scheme table, so both are checked separately.
             const Color4 colors[] = { Color4 (1.0f, 1.0f, 1.0f, 1.0f),   // head
-                                      Color4 (0.0f, 0.5f, 1.0f, 1.0f),   // the harness custom colour
+                                      Color4 (0.0f, 0.5f, 1.0f, 1.0f),   // the harness custom color
                                       Color4 (1.0f, 0.0f, 0.0f, 1.0f),
                                       Color4 (0.0f, 0.0f, 0.0f, 1.0f) };
 
@@ -291,7 +291,7 @@ namespace MatrixRainTests
 
         TEST_METHOD (InstanceLinearColor_ClipsAboveWhiteExactlyAsV16Did)
         {
-            //  At full brightness the self-glow pushes a bright colour past
+            //  At full brightness the self-glow pushes a bright color past
             //  white. v1.6's 8-bit target clipped it; the new path must clip in
             //  the same place rather than quietly keeping the overshoot.
             const Color4 srgb   (1.0f, 1.0f, 1.0f, 1.0f);
