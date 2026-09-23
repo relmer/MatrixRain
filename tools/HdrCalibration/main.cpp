@@ -155,6 +155,7 @@ struct Options
     UINT         m_frameWidth  = kFrameWidth;
     UINT         m_frameHeight = kFrameHeight;
     float        m_dpiScale    = kDpiScales[0];
+    bool         m_hdr         = false;
 };
 
 
@@ -179,7 +180,7 @@ public:
 
     HRESULT RunReference (const std::wstring & baselineDir);
     HRESULT RunCompare   (const std::wstring & baselineDir);
-    HRESULT RunBenchmark (float dpiScale);
+    HRESULT RunBenchmark (float dpiScale, bool hdr);
     HRESULT RunLuminance ();
 
 private:
@@ -894,7 +895,7 @@ Error:
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-HRESULT Harness::RunBenchmark (float dpiScale)
+HRESULT Harness::RunBenchmark (float dpiScale, bool hdr)
 {
     HRESULT                             hr        = S_OK;
     ID3D11Device                      * pDevice   = m_renderSystem->GetDevice();
@@ -914,6 +915,25 @@ HRESULT Harness::RunBenchmark (float dpiScale)
 
     hr = pDevice->CreateQuery (&timestampDesc, &pEnd);
     CHRA (hr);
+
+    //  --hdr: the same frames with a scRGB back buffer, which is what an HDR
+    //  monitor costs (T035). The window is created at the origin, so it sits
+    //  on the primary monitor; that monitor needs Windows HDR on, or the
+    //  switch is refused and the run stops rather than timing SDR under an
+    //  HDR label.
+    if (hdr)
+    {
+        hr = m_renderSystem->ReconfigureOutputMode (OutputMode::Hdr);
+
+        if (FAILED (hr) || m_renderSystem->GetOutputMode() != OutputMode::Hdr)
+        {
+            wprintf (L"--hdr: the swap chain would not switch to scRGB (hr=0x%08X);"
+                     L" is Windows HDR on for the primary monitor?\n", static_cast<unsigned> (hr));
+            CHR (FAILED (hr) ? hr : E_FAIL);
+        }
+
+        wprintf (L"# output=hdr\n");
+    }
 
     wprintf (L"preset,frameWidth,frameHeight,dpiPercent,frames,meanGpuMs,p95GpuMs\n");
 
@@ -1239,6 +1259,10 @@ static bool ParseOptions (int argc, wchar_t * argv[], Options & options)
                 return false;
             }
         }
+        else if (current == L"--hdr")
+        {
+            options.m_hdr = true;
+        }
         else if (current == L"--baseline-dir" && arg + 1 < argc)
         {
             options.m_baselineDir = argv[++arg];
@@ -1302,8 +1326,9 @@ int wmain (int argc, wchar_t * argv[])
     {
         wprintf (L"usage: HdrCalibration [--adapter warp|hardware]"
                  L" [--mode reference|compare|benchmark|luminance] [--baseline-dir <path>]"
-                 L" [--frame <W>x<H>] [--dpi <percent>]\n"
-                 L"       --frame and --dpi apply to benchmark mode only\n");
+                 L" [--frame <W>x<H>] [--dpi <percent>] [--hdr]\n"
+                 L"       --frame, --dpi and --hdr apply to benchmark mode only\n"
+                 L"       --hdr presents scRGB; it needs the window on a monitor with Windows HDR on\n");
         return 1;
     }
 
@@ -1313,7 +1338,8 @@ int wmain (int argc, wchar_t * argv[])
     if (options.m_mode != RunMode::Benchmark
         && (options.m_frameWidth  != kFrameWidth
             || options.m_frameHeight != kFrameHeight
-            || options.m_dpiScale    != kDpiScales[0]))
+            || options.m_dpiScale    != kDpiScales[0]
+            || options.m_hdr))
     {
         wprintf (L"--frame and --dpi apply to benchmark mode only;"
                  L" reference and compare sweep fixed sizes and scales\n");
@@ -1361,7 +1387,7 @@ int wmain (int argc, wchar_t * argv[])
             break;
 
         case RunMode::Benchmark:
-            hr = harness.RunBenchmark (options.m_dpiScale);
+            hr = harness.RunBenchmark (options.m_dpiScale, options.m_hdr);
             break;
 
         case RunMode::Luminance:

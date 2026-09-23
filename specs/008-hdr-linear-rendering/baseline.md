@@ -507,7 +507,7 @@ with the window on the landscape monitor, which has Windows HDR on:
 
 | Field | Value |
 |---|---|
-| device | `\.\DISPLAY2` |
+| device | `\\.\DISPLAY2` |
 | hdrEnabled | true |
 | scRgbSupported | true (once the buffers are float; see the contract note) |
 | sdrWhiteNits | 240 (the Windows SDR brightness slider) |
@@ -524,4 +524,48 @@ The first run of this mode found `scRgbSupported` false on this same
 monitor: `CheckColorSpaceSupport` answers for the swap chain's current back
 buffer format, which was still 8-bit. The definitive check now happens
 inside the switch, after the buffers are float.
+
+## Phase 2 performance: HDR output (T035)
+
+Same protocol as T020: the T005 build and this one alternated, two rounds,
+600 frames per preset, mean GPU ms. "HDR" is `--hdr`: the same frames with
+the swap chain switched to 16-bit float scRGB, on the landscape monitor with
+Windows HDR on. The same commit also stopped clearing the back buffer every
+frame; the last full-screen pass writes every pixel, so that clear was a
+full-screen write thrown away, and twice the bytes in HDR.
+
+| Configuration | Preset | T005 (v1.6, SDR) | SDR | HDR | SDR delta | HDR delta |
+|---|---|---|---|---|---|---|
+| 1920x1080 @ 100% | Low | 0.069 | 0.070 | 0.075 | +2.2% | +10.2% |
+| 1920x1080 @ 100% | Medium | 0.093 | 0.097 | 0.102 | +3.8% | +9.7% |
+| 1920x1080 @ 100% | High | 0.124 | 0.128 | 0.132 | +2.8% | +6.0% |
+| 3840x2160 @ 125% | Low | 0.162 | 0.151 | 0.202 | -6.5% | +24.4% |
+| 3840x2160 @ 125% | Medium | 0.254 | 0.251 | 0.304 | -1.2% | +20.1% |
+| 3840x2160 @ 125% | High | 0.365 | 0.363 | 0.417 | -0.7% | +14.1% |
+| 2160x3840 @ 150% | Low | 0.126 | 0.111 | 0.159 | -11.9% | +25.8% |
+| 2160x3840 @ 150% | Medium | 0.217 | 0.210 | 0.261 | -3.2% | +20.0% |
+| 2160x3840 @ 150% | High | 0.330 | 0.324 | 0.376 | -1.8% | +14.0% |
+
+**SDR is now at or below v1.6 on both real monitors**, the clear having paid
+back more than the float pipeline's remaining cost.
+
+**HDR costs about 50 microseconds a frame at 4K, 5 to 8 at 1080p**, a flat
+amount per resolution, which is bandwidth: scRGB requires a 16-bit float
+back buffer, eight bytes a pixel where SDR writes four, and the final pass
+writes all of them. Against v1.6's SDR cost that is +14% to +26% at 4K. It is
+0.3% of a 60 Hz frame.
+
+The alternative that keeps four bytes a pixel is HDR10 (`R10G10B10A2_UNORM`
+with the PQ curve and BT.2020 primaries). It moves the cost from bandwidth to
+arithmetic: a PQ encode is several `pow()` per pixel at full resolution plus a
+color matrix, which the Surface Pro 8 measurements say is exactly what an
+integrated GPU cannot hide. Microsoft recommends scRGB for this kind of
+content, and the pipeline is already linear light, which scRGB takes as is.
+Not changed; recorded as the known cost of HDR output.
+
+Brightness check: screen captures of the windowed app on the HDR monitor,
+mean over ten frames each, came out 29.87 for this build in HDR against 29.86
+for v1.6.0 in SDR. Windows maps SDR white to 255 when it captures an HDR
+desktop, so matching numbers mean this build puts SDR white where Windows
+does. Not a meter reading; quickstart Phase 2 check 2 is still the real test.
 

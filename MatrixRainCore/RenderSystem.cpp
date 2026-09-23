@@ -1902,8 +1902,17 @@ void RenderSystem::Render (const AnimationSystem & animationSystem, const Viewpo
         return;
     }
 
-    // Clear render target
-    ClearRenderTarget();
+    // The back buffer is cleared only on the fallback path that draws glyphs
+    // straight into it. Otherwise the last full-screen pass (the composite,
+    // the glow-off copy or the scanline pass) writes every pixel, so a clear
+    // is a full-screen write that is thrown away: measured at 14 microseconds
+    // a frame at 3840x2160 in SDR, and 63 in HDR, where the back buffer is
+    // 16-bit float and twice the bytes (T035). Flip-model DISCARD leaves the
+    // buffer's old contents undefined, which is fine when nothing reads them.
+    if (!m_sceneRTV)
+    {
+        ClearRenderTarget();
+    }
 
     // Character scale is computed before the cbuffer map because the scanline
     // pass needs the rain cell's pixel height too — it anchors its line count
