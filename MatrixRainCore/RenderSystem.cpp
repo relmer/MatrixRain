@@ -1605,6 +1605,27 @@ static const char * s_kszBloomExtractShaderSource = R"(
         }
     )";
 
+//  Formats of the off-screen render targets (research R2, data-model 6).
+//
+//  Linear light needs more than 8 bits. The sRGB curve exists precisely to
+//  make 8 bits enough for DISPLAY, by spending codes where the eye is
+//  sensitive; store linear values in the same 8 bits and the darks band
+//  visibly, which is most of what the fading trails are made of.
+//
+//  The scene and post-bloom targets carry the image itself, so they get full
+//  16-bit float per channel. The bloom chain is blurred, downsampled and only
+//  ever added to the scene, so the smaller 11/11/10 float format is enough for
+//  it and costs a third less bandwidth -- which matters, because the blur
+//  passes read and write it repeatedly.
+//
+//  R11G11B10 has no alpha. The bloom chain never needed one.
+static constexpr DXGI_FORMAT kSceneFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
+static constexpr DXGI_FORMAT kBloomFormat = DXGI_FORMAT_R11G11B10_FLOAT;
+
+
+
+
+
 ////////////////////////////////////////////////////////////////////////////////
 //
 //  s_kszOutputTransformHlsl
@@ -2037,7 +2058,7 @@ HRESULT RenderSystem::CreateBloomResources (UINT width, UINT height)
     sceneTexDesc.Height            = height;
     sceneTexDesc.MipLevels         = 1;
     sceneTexDesc.ArraySize         = 1;
-    sceneTexDesc.Format            = DXGI_FORMAT_R8G8B8A8_UNORM;
+    sceneTexDesc.Format            = kSceneFormat;
     sceneTexDesc.SampleDesc.Count  = 1;
     sceneTexDesc.Usage             = D3D11_USAGE_DEFAULT;
     sceneTexDesc.BindFlags         = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
@@ -2062,7 +2083,7 @@ HRESULT RenderSystem::CreateBloomResources (UINT width, UINT height)
     texDesc.Height           = bloomHeight;
     texDesc.MipLevels        = 1;
     texDesc.ArraySize        = 1;
-    texDesc.Format           = DXGI_FORMAT_R8G8B8A8_UNORM;
+    texDesc.Format           = kBloomFormat;
     texDesc.SampleDesc.Count = 1;
     texDesc.Usage            = D3D11_USAGE_DEFAULT;
     texDesc.BindFlags        = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
@@ -2105,7 +2126,7 @@ HRESULT RenderSystem::CreateBloomResources (UINT width, UINT height)
         postBloomDesc.Height            = height;
         postBloomDesc.MipLevels         = 1;
         postBloomDesc.ArraySize         = 1;
-        postBloomDesc.Format            = DXGI_FORMAT_R8G8B8A8_UNORM;
+        postBloomDesc.Format            = kSceneFormat;
         postBloomDesc.SampleDesc.Count  = 1;
         postBloomDesc.Usage             = D3D11_USAGE_DEFAULT;
         postBloomDesc.BindFlags         = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
