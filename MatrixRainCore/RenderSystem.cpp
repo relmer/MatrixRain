@@ -1724,24 +1724,39 @@ void RenderSystem::BuildCharacterInstanceData (const CharacterInstance & charact
 
     // Color and brightness - apply color scheme to trailing characters
     // White characters (lead) should stay white regardless of color scheme
-    bool isWhite = (character.color.r > 0.9f && character.color.g > 0.9f && character.color.b > 0.9f);
-    
+    bool   isWhite = (character.color.r > 0.9f && character.color.g > 0.9f && character.color.b > 0.9f);
+    Color4 srgb;
+
+
     if (isWhite)
     {
         // Keep white characters white (lead character)
-        data.color[0] = character.color.r;
-        data.color[1] = character.color.g;
-        data.color[2] = character.color.b;
+        srgb = Color4 (character.color.r, character.color.g, character.color.b, character.color.a);
     }
     else
     {
         // Replace trail color with current color scheme
-        data.color[0] = schemeColor.r;
-        data.color[1] = schemeColor.g;
-        data.color[2] = schemeColor.b;
+        srgb = Color4 (schemeColor.r, schemeColor.g, schemeColor.b, character.color.a);
     }
-    
-    data.color[3]   = character.color.a;
+
+    // The brightness and self-glow terms used to live in the glyph pixel
+    // shader, in gamma space. They stay in gamma space -- they are not linear
+    // operations, so redoing them in linear light would change the glyph --
+    // but they move here, onto the CPU, once per instance. Only the finished
+    // color crosses into linear light, which is what keeps the glyph core
+    // identical to v1.6 (FR-005) while everything downstream of it blends
+    // correctly.
+    {
+        const Color4 linear = InstanceLinearColor (srgb, character.brightness, 1.0f);
+
+        data.color[0] = linear.r;
+        data.color[1] = linear.g;
+        data.color[2] = linear.b;
+        data.color[3] = linear.a;
+    }
+
+    // Still the raw brightness: the shader applies it to ALPHA only now, which
+    // is the one place it was always a linear operation.
     data.brightness = character.brightness;
     data.scaleX     = character.scale;
     data.scaleY     = character.scale;
