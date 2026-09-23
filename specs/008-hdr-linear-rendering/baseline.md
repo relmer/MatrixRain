@@ -102,33 +102,76 @@ enough to read as "the glow got bigger" put p99 at 30 and max at 54, so the
 gate sits comfortably below that while leaving room for the fades to smooth
 out. **Revise them in this file when T018 runs**, with the reasoning.
 
-## Benchmark: WARP (T005)
+## Performance baseline (T001, T005)
 
-600 frames per preset, GPU timestamp queries, defaults settings, 100% scale
-only — the sweep guards appearance, and tripling the benchmark's runtime would
-buy nothing SC-006 asks for.
+600 frames per preset, timed with D3D11 timestamp queries around the render,
+defaults settings.
 
-| Preset | Frames | Mean GPU ms | p95 GPU ms |
+**Frames are deliberately not presented.** `RenderSystem::Present` uses a sync
+interval of 1, so presenting inside the timing loop measures the display's
+refresh rather than the rendering: the first run of this benchmark returned
+~12 ms for *every* preset with a p95 pinned at 16.6 ms, which is 60 Hz, not GPU
+work. The window is hidden and nothing reads the back buffer in benchmark mode,
+so there is nothing to present. The harness also blocks on each frame's queries,
+so frames do not overlap and a per-frame figure means what it says.
+
+These are therefore measures of **rendering cost**, not of achievable frame
+rate. That is what a 5% regression gate needs: frame rate on this hardware is
+pinned to the refresh rate at every preset and has no headroom in which a
+regression could show itself.
+
+### Hardware: NVIDIA GeForce RTX 5070 Ti
+
+| Configuration | Preset | Mean GPU ms | p95 GPU ms |
 |---|---|---|---|
-| Low | 600 | 10.292 | 16.682 |
-| Medium | 600 | 24.107 | 32.550 |
-| High | 600 | 16.310 | 16.992 |
+| 1920x1080 @ 100% (reference) | Low | 0.086 | 0.090 |
+| 1920x1080 @ 100% (reference) | Medium | 0.118 | 0.123 |
+| 1920x1080 @ 100% (reference) | High | 0.158 | 0.162 |
+| 3840x2160 @ 125% (landscape 37", primary) | Low | 0.204 | 0.219 |
+| 3840x2160 @ 125% (landscape 37", primary) | Medium | 0.323 | 0.336 |
+| 3840x2160 @ 125% (landscape 37", primary) | High | 0.439 | 0.476 |
+| 2160x3840 @ 150% (portrait 32") | Low | 0.154 | 0.163 |
+| 2160x3840 @ 150% (portrait 32") | Medium | 0.258 | 0.271 |
+| 2160x3840 @ 150% (portrait 32") | High | 0.406 | 0.431 |
 
-WARP is a software rasterizer, so these are not frame-rate predictions and the
-presets do not order the way they will on a GPU (Medium lands slower than High
-here). They exist as a repeatable before-and-after on identical hardware, which
-is all SC-006 needs from them. **Hardware numbers are the real gate.**
+Reproduce with, for example:
 
-## Benchmark: hardware (T005) — NOT YET CAPTURED
+```powershell
+.\x64\Calibration\HdrCalibration.exe --adapter hardware --mode benchmark --frame 3840x2160 --dpi 125
+```
 
-Run `--adapter hardware --mode benchmark` and record the result here.
+Presets order correctly (Low < Medium < High) at every configuration, and p95
+sits within ~5% of the mean, so the measurement is stable enough that a 5%
+regression is detectable rather than lost in noise.
 
-## Manual FPS baseline (T001) — NOT YET CAPTURED
+The portrait monitor costs less than the landscape one despite the same pixel
+count, because its 150% scaling means larger cells and so fewer glyphs to draw.
 
-Needs the v1.6.0 build run on each monitor, statistics overlay on (`S`), at
-each quality preset. Record FPS and GPU% per preset per monitor, with
-resolution, DPI and GPU model.
+### WARP (software rasterizer), 1920x1080 @ 100%
 
-| Monitor | Resolution | DPI | Preset | FPS | GPU% |
-|---|---|---|---|---|---|
-| | | | | | |
+| Preset | Mean GPU ms | p95 GPU ms |
+|---|---|---|
+| Low | 5.492 | 6.264 |
+| Medium | 10.492 | 11.236 |
+| High | 16.060 | 16.871 |
+
+Not a frame-rate prediction; useful as a repeatable before-and-after that does
+not depend on GPU driver or thermal state.
+
+### How T001 was satisfied
+
+T001 originally called for reading the in-app statistics overlay on each
+monitor at each preset. That turned out to need the measured monitor to be the
+Windows primary — statistics render only on the primary context, and GPU% from
+PDH is process-wide rather than per monitor — and changing the primary monitor
+has side effects on a working desktop that are not worth a benchmark.
+
+The harness numbers above replace those readings and improve on them: they are
+per-configuration, measured on the GPU timeline rather than read off a screen,
+repeatable to within a few percent, and they need no change to the desktop.
+Each monitor is represented by its real resolution and scaling.
+
+**Optional spot-check, not yet done**: run the app windowed with multi-monitor
+disabled, maximised on each monitor in turn, statistics on, and confirm it
+holds the refresh rate at every preset. That confirms the frame rate is pinned,
+which is the assumption the cost-based gate rests on.

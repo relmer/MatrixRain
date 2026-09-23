@@ -146,6 +146,13 @@ struct Options
     bool         m_useWarp     = true;
     RunMode      m_mode        = RunMode::Reference;
     std::wstring m_baselineDir = kszDefaultBaselineDir;
+
+    //  Benchmark mode only. Reference and compare stay pinned to the constants
+    //  above, so nobody can quietly recapture a baseline at a size or scale the
+    //  committed frames cannot be compared against.
+    UINT         m_frameWidth  = kFrameWidth;
+    UINT         m_frameHeight = kFrameHeight;
+    float        m_dpiScale    = kDpiScales[0];
 };
 
 
@@ -165,12 +172,12 @@ struct Options
 class Harness
 {
 public:
-    HRESULT Initialize (bool useWarp);
+    HRESULT Initialize (bool useWarp, UINT frameWidth, UINT frameHeight);
     void    Shutdown();
 
     HRESULT RunReference (const std::wstring & baselineDir);
     HRESULT RunCompare   (const std::wstring & baselineDir);
-    HRESULT RunBenchmark();
+    HRESULT RunBenchmark (float dpiScale);
 
 private:
     HRESULT CreateHiddenWindow();
@@ -183,7 +190,9 @@ private:
 
     static std::optional<LUID> FindWarpAdapterLuid();
 
-    HWND                               m_hwnd = nullptr;
+    HWND                               m_hwnd   = nullptr;
+    UINT                               m_width  = kFrameWidth;
+    UINT                               m_height = kFrameHeight;
     std::unique_ptr<Viewport>          m_viewport;
     std::unique_ptr<DensityController> m_densityController;
     std::unique_ptr<AnimationSystem>   m_animationSystem;
@@ -261,8 +270,8 @@ HRESULT Harness::CreateHiddenWindow()
                               WS_OVERLAPPEDWINDOW,
                               0,
                               0,
-                              static_cast<int> (kFrameWidth),
-                              static_cast<int> (kFrameHeight),
+                              static_cast<int> (m_width),
+                              static_cast<int> (m_height),
                               nullptr,
                               nullptr,
                               hInstance,
@@ -284,7 +293,7 @@ Error:
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-HRESULT Harness::Initialize (bool useWarp)
+HRESULT Harness::Initialize (bool useWarp, UINT frameWidth, UINT frameHeight)
 {
     HRESULT             hr          = S_OK;
     std::optional<LUID> adapterLuid = std::nullopt;
@@ -297,17 +306,20 @@ HRESULT Harness::Initialize (bool useWarp)
         CBRAExL (adapterLuid.has_value(), E_FAIL, L"WARP adapter not available");
     }
 
+    m_width  = frameWidth;
+    m_height = frameHeight;
+
     hr = CreateHiddenWindow();
     CHR (hr);
 
     m_viewport = std::make_unique<Viewport>();
-    m_viewport->Resize (static_cast<float> (kFrameWidth), static_cast<float> (kFrameHeight));
+    m_viewport->Resize (static_cast<float> (m_width), static_cast<float> (m_height));
 
     m_densityController = std::make_unique<DensityController> (*m_viewport, 24.0f);
     m_animationSystem   = std::make_unique<AnimationSystem>();
     m_renderSystem      = std::make_unique<RenderSystem>();
 
-    hr = m_renderSystem->Initialize (m_hwnd, kFrameWidth, kFrameHeight, adapterLuid);
+    hr = m_renderSystem->Initialize (m_hwnd, m_width, m_height, adapterLuid);
     CHR (hr);
 
     CBRAExL (charSet.Initialize(), E_FAIL, L"CharacterSet::Initialize failed");
@@ -871,9 +883,15 @@ Error:
 //  frame, and reports the mean and the 95th percentile per quality preset
 //  (Constitution II, SC-006).
 //
+//  Frames are not presented, so the numbers are rendering cost alone and are
+//  not capped by the display's refresh rate. Blocking on each frame's queries
+//  also keeps frames from overlapping, so a per-frame figure means what it
+//  says. Both make this a measure of cost rather than of achievable frame
+//  rate, which is what a 5% regression gate needs.
+//
 ////////////////////////////////////////////////////////////////////////////////
 
-HRESULT Harness::RunBenchmark()
+HRESULT Harness::RunBenchmark (float dpiScale)
 {
     HRESULT                             hr        = S_OK;
     ID3D11Device                      * pDevice   = m_renderSystem->GetDevice();
@@ -894,7 +912,7 @@ HRESULT Harness::RunBenchmark()
     hr = pDevice->CreateQuery (&timestampDesc, &pEnd);
     CHRA (hr);
 
-    wprintf (L"preset,frames,meanGpuMs,p95GpuMs\n");
+    wprintf (L"preset,frameWidth,frameHeight,dpiPercent,frames,meanGpuMs,p95GpuMs\n");
 
     for (QualityPreset preset : s_krgPresets)
     {
@@ -903,9 +921,10 @@ HRESULT Harness::RunBenchmark()
         std::vector<float>           timings;
 
 
-        //  One scale only: the sweep exists to guard appearance, and tripling
-        //  the benchmark's runtime would buy nothing SC-006 asks for.
-        ApplyDpiScale (kDpiScales[0]);
+        //  One configuration per run. Cost is swept by running the benchmark
+        //  once per monitor, at that monitor's own resolution and scaling,
+        //  rather than by sweeping inside a single run.
+        ApplyDpiScale (dpiScale);
         ApplyCase     (s_krgCases[0], params);
 
         m_renderSystem->SetGlowIntensity  (values.m_glowIntensityPercent);
@@ -937,9 +956,13 @@ HRESULT Harness::RunBenchmark()
             pContext->End (pEnd.Get());
             pContext->End (pDisjoint.Get());
 
-            hr = m_renderSystem->Present();
-            CHR (hr);
-
+            //  Deliberately NOT presenting. RenderSystem::Present uses a sync
+            //  interval of 1, so presenting here would stall the frame against
+            //  the display's refresh and the timestamps would measure vsync
+            //  rather than rendering: every preset came back at ~12 ms with a
+            //  p95 pinned to 16.6 ms, which is 60 Hz, not GPU work. The window
+            //  is hidden and nothing reads the back buffer in this mode, so
+            //  there is nothing to present.
             while (pContext->GetData (pDisjoint.Get(), &disjointData, sizeof (disjointData), 0) == S_FALSE)
             {
                 Sleep (0);
@@ -967,7 +990,11 @@ HRESULT Harness::RunBenchmark()
 
         if (timings.empty())
         {
-            wprintf (L"%d,0,,\n", static_cast<int> (preset));
+            wprintf (L"%d,%u,%u,%d,0,,\n",
+                     static_cast<int> (preset),
+                     m_width,
+                     m_height,
+                     DpiPercent (dpiScale));
             continue;
         }
 
@@ -984,8 +1011,11 @@ HRESULT Harness::RunBenchmark()
 
             p95 = std::min (p95, timings.size() - 1);
 
-            wprintf (L"%d,%zu,%.3f,%.3f\n",
+            wprintf (L"%d,%u,%u,%d,%zu,%.3f,%.3f\n",
                      static_cast<int> (preset),
+                     m_width,
+                     m_height,
+                     DpiPercent (dpiScale),
                      timings.size(),
                      static_cast<float> (total / static_cast<double> (timings.size())),
                      timings[p95]);
@@ -1124,6 +1154,35 @@ static bool ParseOptions (int argc, wchar_t * argv[], Options & options)
         {
             options.m_baselineDir = argv[++arg];
         }
+        else if (current == L"--frame" && arg + 1 < argc)
+        {
+            const std::wstring value (argv[++arg]);
+            const size_t       cross = value.find (L'x');
+
+            if (cross == std::wstring::npos)
+            {
+                return false;
+            }
+
+            options.m_frameWidth  = static_cast<UINT> (_wtoi (value.substr (0, cross).c_str()));
+            options.m_frameHeight = static_cast<UINT> (_wtoi (value.substr (cross + 1).c_str()));
+
+            if (options.m_frameWidth == 0 || options.m_frameHeight == 0)
+            {
+                return false;
+            }
+        }
+        else if (current == L"--dpi" && arg + 1 < argc)
+        {
+            const int percent = _wtoi (argv[++arg]);
+
+            if (percent < 100 || percent > 400)
+            {
+                return false;
+            }
+
+            options.m_dpiScale = static_cast<float> (percent) / 100.0f;
+        }
         else
         {
             return false;
@@ -1153,7 +1212,22 @@ int wmain (int argc, wchar_t * argv[])
     if (!ParseOptions (argc, argv, options))
     {
         wprintf (L"usage: HdrCalibration [--adapter warp|hardware]"
-                 L" [--mode reference|compare|benchmark] [--baseline-dir <path>]\n");
+                 L" [--mode reference|compare|benchmark] [--baseline-dir <path>]"
+                 L" [--frame <W>x<H>] [--dpi <percent>]\n"
+                 L"       --frame and --dpi apply to benchmark mode only\n");
+        return 1;
+    }
+
+    //  Refused rather than ignored: a baseline captured at a different size or
+    //  scale would compare against nothing, and silently producing frames that
+    //  look right but match no committed baseline is the worse failure.
+    if (options.m_mode != RunMode::Benchmark
+        && (options.m_frameWidth  != kFrameWidth
+            || options.m_frameHeight != kFrameHeight
+            || options.m_dpiScale    != kDpiScales[0]))
+    {
+        wprintf (L"--frame and --dpi apply to benchmark mode only;"
+                 L" reference and compare sweep fixed sizes and scales\n");
         return 1;
     }
 
@@ -1168,15 +1242,16 @@ int wmain (int argc, wchar_t * argv[])
     //  The header is part of the record: a baseline is only comparable against
     //  a run made on the same adapter, and WARP ships with Windows and changes
     //  with it, so its version belongs next to the numbers.
-    wprintf (L"# adapter=%s mode=%s frame=%ux%u seed=%u warp=%s\n",
+    wprintf (L"# adapter=%s mode=%s frame=%ux%u dpi=%d%% seed=%u warp=%s\n",
              options.m_useWarp ? L"warp" : L"hardware",
              ModeName (options.m_mode),
-             kFrameWidth,
-             kFrameHeight,
+             options.m_frameWidth,
+             options.m_frameHeight,
+             DpiPercent (options.m_dpiScale),
              kReferenceSeed,
              WarpVersion().c_str());
 
-    hr = harness.Initialize (options.m_useWarp);
+    hr = harness.Initialize (options.m_useWarp, options.m_frameWidth, options.m_frameHeight);
 
     if (FAILED (hr))
     {
@@ -1197,7 +1272,7 @@ int wmain (int argc, wchar_t * argv[])
             break;
 
         case RunMode::Benchmark:
-            hr = harness.RunBenchmark();
+            hr = harness.RunBenchmark (options.m_dpiScale);
             break;
     }
 
