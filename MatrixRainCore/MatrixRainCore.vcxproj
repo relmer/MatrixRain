@@ -276,6 +276,7 @@
     <ClInclude Include="FrameLimiter.h" />
     <ClInclude Include="IAdapterProvider.h" />
     <ClInclude Include="IDisplayLuminanceProvider.h" />
+    <ClInclude Include="HdrDisplayInventory.h" />
     <ClInclude Include="InMemoryDisplayLuminanceProvider.h" />
     <ClInclude Include="OutputModeSelection.h" />
     <ClInclude Include="OutputModeTracker.h" />
@@ -343,6 +344,7 @@
     <ClCompile Include="RenderThreadInputs.cpp" />
     <ClCompile Include="ColorMath.cpp" />
     <ClCompile Include="OutputModeSelection.cpp" />
+    <ClCompile Include="HdrDisplayInventory.cpp" />
     <ClCompile Include="OutputModeTracker.cpp" />
     <ClCompile Include="WindowsDisplayLuminanceProvider.cpp" />
     <ClCompile Include="FrameMetrics.cpp" />

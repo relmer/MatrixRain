@@ -11,6 +11,7 @@
 #include "..\MatrixRainCore\ConfigDialogController.h"
 #include "..\MatrixRainCore\ColorScheme.h"
 #include "..\MatrixRainCore\CommandLine.h"
+#include "..\MatrixRainCore\HdrDisplayInventory.h"
 #include "..\MatrixRainCore\MonitorRenderContext.h"
 #include "..\MatrixRainCore\RenderSystem.h"
 #include "..\MatrixRainCore\WindowsAdapterProvider.h"
@@ -249,6 +250,16 @@ static const wchar_t * GetInfoTipText (int infoId)
                    L"\r\n"
                    L"No additional GPU impact.";
 
+        case IDC_HDR_INFO:
+            return L"Lets the streak heads and the brightest characters behind them "
+                   L"shine brighter than normal white, up to what the monitor can show. "
+                   L"Auto uses this on monitors with Windows HDR turned on; Off keeps "
+                   L"everything at normal white. The slider sets how bright the "
+                   L"highlights get. Affects monitors with Windows HDR turned on. "
+                   L"Other monitors are unchanged.\r\n"
+                   L"\r\n"
+                   L"Small GPU performance impact.";
+
         default:
             return L"";
     }
@@ -269,6 +280,7 @@ static bool IsInfoTipControlId (int id)
         case IDC_GLOWSMOOTH_INFO:
         case IDC_SCANLINES_INTENSITY_INFO:
         case IDC_SCANLINES_STYLE_INFO:
+        case IDC_HDR_INFO:
             return true;
         default:
             return false;
@@ -278,15 +290,84 @@ static bool IsInfoTipControlId (int id)
 
 
 
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  IsDisabledHdrTooltipId (spec 008 T043)
+//
+//  The HDR row's controls, which gray out while no monitor has Windows HDR
+//  on (the slider also while HDR mode is Off). Like the glow controls above,
+//  a disabled control gets its tooltip from a rect tool on the page. The
+//  info button stays enabled so what the setting does is always readable.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+static bool IsDisabledHdrTooltipId (int id)
+{
+    switch (id)
+    {
+        case IDC_HIGHLIGHT_PROMPT:
+        case IDC_HDR_MODE_COMBO:
+        case IDC_HIGHLIGHT_SLIDER:
+        case IDC_HIGHLIGHT_VALUE:
+            return true;
+
+        default:
+            return false;
+    }
+}
+
+
+
+//  Why the HDR row is grayed, from the last DescribeHdrControls; nullptr
+//  while it is enabled. String literals, so the pointer never dangles.
+static const wchar_t * s_hdrDisabledReason = nullptr;
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  ApplyHdrControlsUI (spec 008 T043)
+//
+//  Enables or grays the HDR row on the Visuals page from which monitors have
+//  Windows HDR on right now and the current HDR mode. Takes the page itself;
+//  the 1 s dialog timer calls it too, so turning HDR on or off in Windows
+//  while the dialog is open updates the row within a second.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+static void ApplyHdrControlsUI (HWND hVisuals, HdrMode hdrMode)
+{
+    if (!hVisuals || !GetDlgItem (hVisuals, IDC_HDR_MODE_COMBO))
+    {
+        return;
+    }
+
+    const HdrControlsState state = DescribeHdrControls (QueryHdrDisplayInventory(), hdrMode);
+
+
+    s_hdrDisabledReason = state.disabledReason;
+
+    EnableWindow (GetDlgItem (hVisuals, IDC_HIGHLIGHT_PROMPT), state.rowEnabled);
+    EnableWindow (GetDlgItem (hVisuals, IDC_HDR_MODE_COMBO),   state.rowEnabled);
+    EnableWindow (GetDlgItem (hVisuals, IDC_HIGHLIGHT_SLIDER), state.sliderEnabled);
+    EnableWindow (GetDlgItem (hVisuals, IDC_HIGHLIGHT_VALUE),  state.sliderEnabled);
+}
+
+
+
+
 ////////////////////////////////////////////////////////////////////////////////
 //
 //  IsDisabledGlowTooltipId (T043, FR-018, FR-019)
 //
-//  Catalogues every control that goes grey when Glow Enabled is OFF.
+//  Catalogues every control that goes gray when Glow Enabled is OFF.
 //  Used by both `RegisterDisabledGlowTooltipRects` (which registers a
 //  rect-based parent-relative TOOLINFO per control) AND the
 //  TTN_NEEDTEXTW/TTN_GETDISPINFOW branch in `PageDlgProc` (which
-//  recognises the uId as a sentinel and supplies the per-tab text).
+//  recognizes the uId as a sentinel and supplies the per-tab text).
 //  Disabled controls don't fire WM_MOUSEMOVE, so mouse events bubble to
 //  the parent dialog — the rect-based tools on the parent catch the
 //  hover and show the explanatory tip.  When glow is ON, the controls
@@ -374,6 +455,7 @@ static HWND CreateAndRegisterTooltip (HWND hDlg)
         IDC_GLOWSMOOTH_INFO,
         IDC_SCANLINES_INTENSITY_INFO,
         IDC_SCANLINES_STYLE_INFO,
+        IDC_HDR_INFO,
     };
 
 
@@ -433,7 +515,7 @@ static HWND CreateAndRegisterTooltip (HWND hDlg)
 
 
     // T043 (US2, FR-018, FR-019): rect-based tooltip tools on the parent
-    // dialog for every control that goes grey when Glow Enabled is OFF.
+    // dialog for every control that goes gray when Glow Enabled is OFF.
     // Disabled children don't fire WM_MOUSEMOVE, so the events bubble to
     // the parent and the parent-relative rect tool catches them — when
     // glow is ON the controls consume their own mouse events and these
@@ -443,7 +525,7 @@ static HWND CreateAndRegisterTooltip (HWND hDlg)
     // branch can identify which tool fired without an HWND lookup.
     for (int id = 1000; id < 1100; id++)
     {
-        if (!IsDisabledGlowTooltipId (id))
+        if (!IsDisabledGlowTooltipId (id) && !IsDisabledHdrTooltipId (id))
         {
             continue;
         }
@@ -585,13 +667,13 @@ static std::wstring FormatPercentLabel (int sliderId, int value)
 //  Per spec the Visuals-tab Glow Intensity / Glow Size trios disable, plus
 //  the Performance-tab Quality Preset / Glow Passes / Glow Resolution /
 //  Glow Smoothness trios.  Static "Glow intensity:" / "Glow size:" prompt
-//  labels are IDC_STATIC (no individual ID) so they can't be greyed
+//  labels are IDC_STATIC (no individual ID) so they can't be grayed
 //  programmatically; the value labels and info buttons carry the visual
 //  cue instead.
 //
 //  T043 (per-tab tooltip on disabled controls) is deferred — Windows
 //  tooltips don't fire on WS_DISABLED controls without a transparent
-//  parent-relay tooltip per page, and the greyed-out controls already
+//  parent-relay tooltip per page, and the grayed-out controls already
 //  convey "disabled" clearly.  Tracked as follow-up.
 //
 ////////////////////////////////////////////////////////////////////////////////
@@ -877,7 +959,7 @@ static constexpr ColorSchemeEntry s_colorSchemeEntries[] =
 };
 
 // US5 (T064): the index of "Custom" in s_colorSchemeEntries — used by
-// OnColorSchemeChange to recognise the user picked it (opens chooser)
+// OnColorSchemeChange to recognize the user picked it (opens chooser)
 // and by the combo subclass for same-item re-click detection.
 static constexpr int kCustomColorComboIndex = 5;
 
@@ -939,7 +1021,7 @@ static void InitializeColorSchemeCombo (HWND hDlg, const std::wstring & currentS
     // T064 (US5, research.md R4): track the last selected index so the
     // combo subclass can detect same-item re-click on Custom (CBN_SELCHANGE
     // doesn't fire when the user re-commits the already-selected entry,
-    // but we still want to re-open the chooser per the colour-picker UX
+    // but we still want to re-open the chooser per the color-picker UX
     // convention).  Stored +1 so a missing/cleared prop reads as 0 ≠ 0+1.
     SetPropW (hDlg, kLastColorComboIndexProp,
               reinterpret_cast<HANDLE> (static_cast<INT_PTR> (initialIndex + 1)));
@@ -1085,7 +1167,7 @@ static void InitializeGpuCombo (HWND hDlg, DialogContext * pContext, const std::
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-// Forward declarations for the colour swatch helpers (defined after this
+// Forward declarations for the color swatch helpers (defined after this
 // function in the file; OnInitDialog needs them to start the cycle timer
 // when the initial scheme is Cycle).
 static void UpdateCycleTimerForCurrentScheme (HWND hDlg);
@@ -1170,7 +1252,22 @@ static BOOL OnInitDialog (HWND hDlg, LPARAM initParam)
     // Mirror initial scanlines-enabled state into the slider/info enable flags.
     ApplyScanlinesEnabledUI (GetParent (hDlg), pSettings->m_scanlinesEnabled);
 
-    // Start the colour swatch cycle timer if the initial scheme is Cycle
+    // Spec 008 T042/T043: HDR highlights row (Visuals page only).
+    if (GetDlgItem (hDlg, IDC_HDR_MODE_COMBO))
+    {
+        SendDlgItemMessageW (hDlg, IDC_HDR_MODE_COMBO,   CB_ADDSTRING,   0, (LPARAM) L"Auto");
+        SendDlgItemMessageW (hDlg, IDC_HDR_MODE_COMBO,   CB_ADDSTRING,   0, (LPARAM) L"Off");
+        SendDlgItemMessageW (hDlg, IDC_HDR_MODE_COMBO,   CB_SETCURSEL,   (pSettings->m_hdrMode == HdrMode::Off) ? 1 : 0, 0);
+
+        SendDlgItemMessageW (hDlg, IDC_HIGHLIGHT_SLIDER, TBM_SETRANGE,   TRUE, MAKELPARAM (ScreenSaverSettings::MIN_HIGHLIGHT_BRIGHTNESS, ScreenSaverSettings::MAX_HIGHLIGHT_BRIGHTNESS));
+        SendDlgItemMessageW (hDlg, IDC_HIGHLIGHT_SLIDER, TBM_SETTICFREQ, 10, 0);
+        SendDlgItemMessageW (hDlg, IDC_HIGHLIGHT_SLIDER, TBM_SETPOS,     TRUE, pSettings->m_highlightBrightness);
+        SetDlgItemTextW     (hDlg, IDC_HIGHLIGHT_VALUE,  std::format (L"{}%", pSettings->m_highlightBrightness).c_str());
+
+        ApplyHdrControlsUI (hDlg, pSettings->m_hdrMode);
+    }
+
+    // Start the color swatch cycle timer if the initial scheme is Cycle
     // (no-op on Performance page, which has no swatch control).
     UpdateCycleTimerForCurrentScheme (hDlg);
 
@@ -1309,6 +1406,11 @@ static BOOL OnHScroll (HWND hDlg, LPARAM lParam)
             SetDlgItemTextW (hDlg, IDC_SCANLINES_STYLE_VALUE, std::format (L"{}", pos).c_str());
             break;
 
+        case IDC_HIGHLIGHT_SLIDER:
+            pController->UpdateHighlightBrightness (pos);
+            SetDlgItemTextW (hDlg, IDC_HIGHLIGHT_VALUE, std::format (L"{}%", pos).c_str());
+            break;
+
         case IDC_GLOWPASSES_SLIDER:
         {
             AdvancedGraphicsValues v = pController->GetSettings().m_advancedValues;
@@ -1373,7 +1475,7 @@ Error:
 //  ColorSwatch helpers (v1.5)
 //
 //  Paint the owner-draw swatch (IDC_COLOR_SWATCH) on the Visuals page so
-//  it reflects the currently-selected colour scheme.  Cycle mode is
+//  it reflects the currently-selected color scheme.  Cycle mode is
 //  driven by a 30Hz timer (IDT_COLOR_CYCLE_TIMER) that just invalidates
 //  the swatch; the paint code re-queries GetColorRGB with a fresh time.
 //
@@ -1811,6 +1913,16 @@ static void ResyncPageFromSettings (HWND hDlg, const ScreenSaverSettings & setti
         ApplyScanlinesEnabledUI (GetParent (hDlg), settings.m_scanlinesEnabled);
     }
 
+    // Spec 008 T043: HDR highlights row.
+    if (GetDlgItem (hDlg, IDC_HDR_MODE_COMBO))
+    {
+        SendDlgItemMessageW (hDlg, IDC_HDR_MODE_COMBO,   CB_SETCURSEL, (settings.m_hdrMode == HdrMode::Off) ? 1 : 0, 0);
+        SendDlgItemMessageW (hDlg, IDC_HIGHLIGHT_SLIDER, TBM_SETPOS,   TRUE, settings.m_highlightBrightness);
+        SetDlgItemTextW     (hDlg, IDC_HIGHLIGHT_VALUE,  std::format (L"{}%", settings.m_highlightBrightness).c_str());
+
+        ApplyHdrControlsUI (hDlg, settings.m_hdrMode);
+    }
+
     // Performance tab — multimon, glow toggle, GPU combo, quality cluster,
     // show-metrics toggle.
     CheckDlgButton (hDlg, IDC_MULTIMONITOR_CHECK,    settings.m_multiMonitorEnabled ? BST_CHECKED : BST_UNCHECKED);
@@ -1890,12 +2002,26 @@ static BOOL OnCommand (HWND hDlg, WPARAM wParam)
             }
             break;
 
+        case IDC_HDR_MODE_COMBO:
+            if (HIWORD (wParam) == CBN_SELCHANGE)
+            {
+                // Items are in HdrMode order: 0 Auto, 1 Off.
+                const LRESULT sel  = SendDlgItemMessageW (hDlg, IDC_HDR_MODE_COMBO, CB_GETCURSEL, 0, 0);
+                const HdrMode mode = (sel == 1) ? HdrMode::Off : HdrMode::Auto;
+
+
+                pController->UpdateHdrMode (mode);
+                ApplyHdrControlsUI (hDlg, mode);
+            }
+            break;
+
         case IDC_QUALITY_PRESET_INFO:
         case IDC_GLOWINTENSITY_INFO:
         case IDC_GLOWSIZE_INFO:
         case IDC_GLOWPASSES_INFO:
         case IDC_GLOWRES_INFO:
         case IDC_GLOWSMOOTH_INFO:
+        case IDC_HDR_INFO:
             // BN_CLICKED on any info button (mouse click OR Space/Enter on
             // a keyboard-focused button) pops the matching infotip via
             // TTM_TRACKACTIVATE.  Auto-dismisses after 5s.
@@ -1934,7 +2060,7 @@ static BOOL OnCommand (HWND hDlg, WPARAM wParam)
         case IDC_SCANLINES_ENABLED_CHECK:
         {
             // T054 (US3, FR-028b): toggle Scanlines Enabled, mirror into
-            // controller, and grey/enable the two scanline sliders + their
+            // controller, and gray/enable the two scanline sliders + their
             // info buttons.  The checkbox is on the Performance page but the
             // sliders are on the Visuals page, so go through the sheet.
             bool                     enabled = (IsDlgButtonChecked (hDlg, IDC_SCANLINES_ENABLED_CHECK) == BST_CHECKED);
@@ -2027,7 +2153,7 @@ static INT_PTR CALLBACK PageDlgProc (HWND   hDlg,
             LPDRAWITEMSTRUCT pdis = reinterpret_cast<LPDRAWITEMSTRUCT> (lParam);
 
 
-            // Owner-draw paint for the colour swatch next to the scheme combo.
+            // Owner-draw paint for the color swatch next to the scheme combo.
             if (pdis && pdis->CtlType == ODT_BUTTON && pdis->CtlID == IDC_COLOR_SWATCH)
             {
                 DrawColorSwatch (hDlg, pdis);
@@ -2108,6 +2234,18 @@ static INT_PTR CALLBACK PageDlgProc (HWND   hDlg,
                     pdi->lpszText = const_cast<LPWSTR> (isVisualsPage
                                                         ? L"Glow is disabled on the performance tab."
                                                         : L"Glow is disabled.");
+                    result = TRUE;
+                    break;
+                }
+
+                // Spec 008 T043: the grayed HDR row says why. With the row
+                // enabled only the slider can be gray, and that is HDR mode
+                // Off.
+                if (IsDisabledHdrTooltipId (toolId))
+                {
+                    pdi->lpszText = const_cast<LPWSTR> (s_hdrDisabledReason
+                                                        ? s_hdrDisabledReason
+                                                        : L"HDR highlights are Off, so nothing goes above normal white.");
                     result = TRUE;
                     break;
                 }
@@ -2326,6 +2464,14 @@ static VOID CALLBACK PerfTitleTimerProc (HWND hSheet, UINT /*msg*/, UINT_PTR /*i
         return;
     }
 
+    // Spec 008 T043: follow Windows HDR being turned on or off while the
+    // dialog is open. Before the readout below, which returns early when its
+    // text has not changed.
+    if (pContext->m_controller)
+    {
+        ApplyHdrControlsUI (PropSheet_IndexToHwnd (hSheet, 0), pContext->m_controller->GetSettings().m_hdrMode);
+    }
+
     // FPS source — primary monitor's render context (FR-010).
     unsigned fps = 0;
 
@@ -2441,7 +2587,7 @@ static int CALLBACK PropSheetCallback (HWND hSheet, UINT uMsg, LPARAM lParam)
             // the bottom of PSCB_INITIALIZED).  PSCB_INITIALIZED runs
             // BEFORE comctl32 resizes the sheet to fit the pages, so
             // GetWindowRect here would return the small-template size and
-            // mis-centre the dialog.  The posted message fires after
+            // mis-center the dialog.  The posted message fires after
             // PropertySheetW returns to the message loop, by which point
             // the sheet has its real outer dimensions.
 
@@ -2552,7 +2698,7 @@ static void BuildPropSheet (HINSTANCE         hInstance,
 //       broadcast `WM_APP_RESET_RESYNC` to every page so each tab refreshes
 //       its own controls.  Also re-mirrors the glow-enabled state through
 //       `ApplyGlowEnabledUI` since the default value re-enables the
-//       greyed-out glow trios.
+//       grayed-out glow trios.
 //
 //    2. `WM_DESTROY` cleanup: clear `m_pApp->SetConfigDialog(nullptr)`,
 //       post-quit in screensaver-CPL mode, delete the info-tip font, and
@@ -2674,9 +2820,9 @@ LRESULT CALLBACK SheetFrameSubclass (HWND     hSheet,
     {
         RepositionFrameResetButton (hSheet);
 
-        // Centre the sheet now that comctl32 has finalized its outer
+        // Center the sheet now that comctl32 has finalized its outer
         // dimensions to fit the pages.  Centering at PSCB_INITIALIZED
-        // uses pre-resize geometry and lands the dialog off-centre.
+        // uses pre-resize geometry and lands the dialog off-center.
         {
             DialogContext * pContext = static_cast<DialogContext *> (GetPropW (hSheet, kSheetContextProp));
             RECT            sheetRect  = {};
@@ -2724,7 +2870,7 @@ LRESULT CALLBACK SheetFrameSubclass (HWND     hSheet,
             const ScreenSaverSettings & defaults = pContext->m_controller->GetSettings();
 
             // Re-mirror glow-enabled state across both pages' EnableWindow
-            // flags (the default is glow ON, so any greyed-out trios from
+            // flags (the default is glow ON, so any grayed-out trios from
             // a prior glow-off state need to re-enable).
             ApplyGlowEnabledUI (hSheet, defaults.m_glowEnabled);
 

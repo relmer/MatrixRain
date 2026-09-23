@@ -57,7 +57,7 @@
 #define IDC_QUALITY_PRESET_LABEL        1037
 
 // v1.5 new control IDs.
-// Note: existing v1.4 colour combo is IDC_COLORSCHEME_COMBO (1009) — DO NOT
+// Note: existing v1.4 color combo is IDC_COLORSCHEME_COMBO (1009) — DO NOT
 // introduce a new IDC_COLOR_COMBO; the Custom… item is appended to the
 // existing combo per Phase 6.
 #define IDC_GLOW_ENABLED_CHECK              1038
@@ -85,11 +85,19 @@
 // the timer proc can update them uniformly via GetDlgItem on each page.
 #define IDC_FPS_GPU_READOUT                 1052
 
-// v1.5: owner-draw colour swatch shown to the right of IDC_COLORSCHEME_-
+// v1.5: owner-draw color swatch shown to the right of IDC_COLORSCHEME_-
 // COMBO on the Visuals page.  Reflects the currently-selected scheme:
-// fills with the static palette entry, the custom colour, or the
-// animated cycle colour (driven at ~30Hz by IDT_COLOR_CYCLE_TIMER).
+// fills with the static palette entry, the custom color, or the
+// animated cycle color (driven at ~30Hz by IDT_COLOR_CYCLE_TIMER).
 #define IDC_COLOR_SWATCH                    1053
+
+// Spec 008 T042 (contracts/settings-ui.md): the HDR highlights row on the
+// Visuals page.
+#define IDC_HIGHLIGHT_PROMPT                1054
+#define IDC_HDR_INFO                        1055
+#define IDC_HDR_MODE_COMBO                  1056
+#define IDC_HIGHLIGHT_SLIDER                1057
+#define IDC_HIGHLIGHT_VALUE                 1058
 
 // Next default values for new objects
 // 
@@ -97,7 +105,7 @@
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        105
 #define _APS_NEXT_COMMAND_VALUE         40004
-#define _APS_NEXT_CONTROL_VALUE         1054
+#define _APS_NEXT_CONTROL_VALUE         1059
 #define _APS_NEXT_SYMED_VALUE           101
 #endif
 #endif

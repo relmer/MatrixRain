@@ -330,6 +330,7 @@
     <ClCompile Include="unit\RebuildCoalescerTests.cpp" />
     <ClCompile Include="unit\ColorMathTests.cpp" />
     <ClCompile Include="unit\DisplayLuminanceTests.cpp" />
+    <ClCompile Include="unit\HdrDisplayInventoryTests.cpp" />
     <ClCompile Include="unit\OutputModeSelectionTests.cpp" />
     <ClCompile Include="unit\FrameMetricsTests.cpp" />
     <ClCompile Include="unit\RandomSourceTests.cpp" />
