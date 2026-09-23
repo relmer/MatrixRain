@@ -67,22 +67,62 @@ It is also cheaper than a per-pixel `pow`.
 
 ## R2. Intermediate formats and bandwidth
 
-**Decision**:
-- `m_sceneTexture`: `R16G16B16A16_FLOAT` (full resolution; holds fades on black
-  where precision matters most).
-- `m_bloomTexture`, `m_blurTemp`: `R11G11B10_FLOAT` (blurred content hides the
-  reduced mantissa; half the bytes of FP16; no alpha needed).
-- `m_postBloomTarget`: `R16G16B16A16_FLOAT` (feeds the final output pass).
+**Decision** (revised in T020, the performance gate; the original chose
+`R16G16B16A16_FLOAT` for the two full-resolution targets):
+- `m_sceneTexture`: `R11G11B10_FLOAT` (full resolution).
+- `m_bloomTexture`, `m_blurTemp`: `R11G11B10_FLOAT` (÷ resolution divisor).
+- `m_postBloomTarget`: `R11G11B10_FLOAT` (full resolution).
 
-**Rationale**: FR-003 needs float precision so dark fades don't band and
-bright overlaps don't clip. FL 11.0 guarantees render-target and blend support
-for both formats. Using `R11G11B10` for the bloom chain limits the extra
-bandwidth to the two full-resolution targets. SC-006 / FR-008 require
-performance parity, verified with the existing Performance-tab readout.
+Every intermediate is float, so FR-001 and FR-003 hold: nothing is quantized
+to 8 bits before the final encode, and values above 1.0 survive.
 
-**Alternatives considered**: FP16 everywhere (simplest, ~2× bloom-chain
-bandwidth). `R10G10B10A2_UNORM` (not float, still clips above 1.0, useless for
-Phase 3).
+**Rationale**: measured, not assumed. With FP16 for the scene and post-bloom
+targets the frame cost against T005 was +17% to +49% on the two real monitors
+(`baseline.md`, T020). The cost is bandwidth on the two full-resolution
+targets: 8 bytes per pixel where v1.6 wrote 4, paid on the clear and again on
+the composite's read, and it scales with pixel count, not with the shader
+math. Removing every added `pow()` from the glyph, extract and composite
+shaders moved nothing outside run-to-run noise. `R11G11B10_FLOAT` is the same
+4 bytes per pixel v1.6 used and brought the full-screen passes back to v1.6's
+cost.
+
+Its precision is enough. The mantissas are 6, 6 and 5 bits, so a value is held
+to about 1.6% (red, green) or 3.1% (blue) of itself at every brightness. In the
+dark that is far finer than 8-bit sRGB, which is what SC-002 cares about; near
+white a step is about one to three 8-bit code values, and the rain's brightest
+pixels are glyph bodies, not smooth gradients. Rendered against an FP16 build,
+the mean bias is under 0.4 code values in every luminance band and the
+largest per-pixel differences (10 to 13 code values) sit on a few dozen
+antialiased edge pixels out of two million.
+
+Nothing reads the scene's alpha: the glyph blend uses source alpha only and the
+composite writes 1.0. The format has none, and that is fine.
+
+One cost is specific to this format: on the RTX 5070 Ti, blending glyphs into
+an `R11G11B10` target is slower than into 8-bit UNORM when the glyphs are
+large (about 14 µs per frame at 2160x3840 @ 150%, nothing at 3840x2160 @
+125%). Glyph quads are deliberately taller than the row pitch, so most of the
+blended pixels carry zero coverage; the glyph shader now discards those, which
+skips the blend for a bit-identical image and paid that cost back with room to
+spare.
+
+**Alternatives considered**, all measured in T020:
+- *FP16 for the two full-resolution targets* (the original decision): +17% to
+  +49%, bandwidth.
+- *`R8G8B8A8_UNORM` holding linear values*: meets the gate and bands in the
+  dark; `R10G10B10A2_UNORM` likewise (a 10-bit linear step at black is three
+  sRGB code values). Both fail FR-003.
+- *`R8G8B8A8_UNORM_SRGB` (hardware encode on write, linear blend)*: v1.6's
+  exact precision, but the sRGB blend is slower still, +16% at the portrait
+  monitor.
+- *8-bit UNORM for the bloom chain*: the chain holds encoded values now, so
+  8 bits would be v1.6's own precision there. Measured gain about 1%, and the
+  rounding moved the calibration mean by +1.5%. Not worth it.
+
+**Phase 2 note**: an HDR swap chain shows 10-bit steps, and a 1.6% to 3.1%
+mantissa could show in a smooth halo at high brightness. Measure it then; if
+it shows, the answer is FP16 only while the swap chain is scRGB, with its own
+gate, not a change to the SDR path.
 
 ## R3. Bloom: v1.6's glow, computed on encoded values
 

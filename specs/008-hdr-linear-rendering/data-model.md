@@ -80,9 +80,9 @@ never receive it.
 
 | Target | Format after this feature | Size |
 |---|---|---|
-| Scene | `R16G16B16A16_FLOAT` | full |
+| Scene | `R11G11B10_FLOAT` (research R2, revised in T020) | full |
 | Bloom, blur temp | `R11G11B10_FLOAT` | ÷ resolution divisor |
-| Post-bloom | `R16G16B16A16_FLOAT` | full |
+| Post-bloom | `R11G11B10_FLOAT` | full |
 | Back buffer | `B8G8R8A8_UNORM` (SDR) / `R16G16B16A16_FLOAT` (HDR) | full |
 | D2D target bitmap | matches back buffer | full |
 | Glyph and overlay atlases | unchanged (`B8G8R8A8_UNORM`, coverage) | — |

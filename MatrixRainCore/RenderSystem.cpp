@@ -321,7 +321,7 @@ HRESULT RenderSystem::Initialize (HWND hwnd, UINT width, UINT height, std::optio
 
     // Remember the user's chosen adapter (if any) so CreateDevice can route
     // device creation to the matching DXGI adapter.  nullopt = use the
-    // system default (preserves the existing behaviour for callers that
+    // system default (preserves the existing behavior for callers that
     // do not opt in to GPU selection).
     m_requestedAdapterLuid = adapterLuid;
     
@@ -701,7 +701,7 @@ Error:
 //  RenderSystem::UploadScanlineConstants (T052)
 //
 //  Per-frame Map/Unmap of the scanline cbuffer from `params`. Intensity is
-//  already normalised to [0..1] upstream; the line count is derived HERE,
+//  already normalized to [0..1] upstream; the line count is derived HERE,
 //  because only the render system knows the rain cell's pixel height. Density
 //  travels as lines-per-cell so this conversion is the single place the
 //  viewport's height enters the pass.
@@ -1050,14 +1050,20 @@ void RenderSystem::OnDpiChanged (UINT dpi)
 //  sensitive; store linear values in the same 8 bits and the darks band
 //  visibly, which is most of what the fading trails are made of.
 //
-//  The scene and post-bloom targets carry the image itself, so they get full
-//  16-bit float per channel. The bloom chain is blurred, downsampled and only
-//  ever added to the scene, so the smaller 11/11/10 float format is enough for
-//  it and costs a third less bandwidth -- which matters, because the blur
-//  passes read and write it repeatedly.
+//  Every target is 11/11/10 float: the same four bytes per pixel v1.6's 8-bit
+//  targets used, but a float, so a value is held to about 1.6% of itself (3%
+//  in blue) at every brightness. That is far finer than 8-bit sRGB in the
+//  dark and within a few code values of it near white, where the rain has
+//  glyph bodies rather than gradients. The T020 gate measured the 16-bit
+//  float the design first chose for the scene and post-bloom targets at +17%
+//  to +49% frame cost on the real monitors, all of it bandwidth on the clear
+//  and on the composite's read; 11/11/10 brought both back to v1.6's cost.
+//  specs/008-hdr-linear-rendering/baseline.md has the numbers and the
+//  alternatives that were tried.
 //
-//  R11G11B10 has no alpha. The bloom chain never needed one.
-static constexpr DXGI_FORMAT kSceneFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
+//  R11G11B10 has no alpha. Nothing reads one: the glyph blend uses source
+//  alpha only, and the composite writes 1.0.
+static constexpr DXGI_FORMAT kSceneFormat = DXGI_FORMAT_R11G11B10_FLOAT;
 static constexpr DXGI_FORMAT kBloomFormat = DXGI_FORMAT_R11G11B10_FLOAT;
 
 //  Rows the halo pass can outline in one draw. MUST match the rowRects[] size
@@ -1810,7 +1816,7 @@ HRESULT RenderSystem::UpdateInstanceBuffer (const AnimationSystem & animationSys
 
     // v1.5 US5 (T062, FR-033, FR-034): when the user picks ColorScheme::
     // Custom, override the static-palette lookup with their persisted RGB.
-    // COLORREF is 0x00BBGGRR, normalise each channel to [0..1] for Color4.
+    // COLORREF is 0x00BBGGRR, normalize each channel to [0..1] for Color4.
     if (colorScheme == ColorScheme::Custom)
     {
         schemeColor = Color4 (static_cast<float> (GetRValue (customColor)) / 255.0f,

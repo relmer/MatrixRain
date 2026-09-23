@@ -50,5 +50,17 @@ float4 main(PSInput input) : SV_TARGET
     float3 encodedScene = LinearToSrgb3(scene.rgb);
     float3 composited   = encodedScene + softBloom * (1.0 - encodedScene);
 
+    // The result is already encoded. When this pass writes the SDR back
+    // buffer, decoding it only for OutputTransform to encode it again is an
+    // identity that costs six pow() per pixel at full resolution -- which
+    // showed up as a 15-35% frame cost on the Low preset, where the blur is
+    // cheap and this pass dominates. Hand it over directly. Every other case
+    // (an intermediate pass, or HDR output) needs the linear value and takes
+    // the full path.
+    if (g_isFinalPass != 0 && g_outputMode == 0)
+    {
+        return float4(composited, 1.0);
+    }
+
     return float4(OutputTransform(SrgbToLinear3(composited)), 1.0);
 }

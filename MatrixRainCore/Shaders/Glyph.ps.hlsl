@@ -53,6 +53,17 @@ float4 main(PSInput input) : SV_TARGET
     float4 texColor  = atlasTexture.Sample(samplerState, input.uv);
     float  coverage  = texColor.a;
 
+    // Glyph quads are taller than the row pitch on purpose, so most of the
+    // pixels a quad covers carry no ink. A zero-coverage pixel contributes
+    // rgb 0 at alpha 0, which the blend leaves untouched, so dropping it
+    // changes nothing on screen and skips the blend -- which is slower into
+    // a float target than into an 8-bit one when glyphs are large (T020:
+    // 14 microseconds per frame at 2160x3840 @ 150%, bit-identical image).
+    if (coverage <= 0.0)
+    {
+        discard;
+    }
+
     // The pixel v1.6 displayed, clipped where its 8-bit target clipped.
     float3 displayed = min(input.color.rgb * coverage * coverage, 1.0);
 

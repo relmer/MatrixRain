@@ -300,6 +300,102 @@ repeatable to within a few percent, and they need no change to the desktop.
 Each monitor is represented by its real resolution and scaling.
 
 **Optional spot-check, not yet done**: run the app windowed with multi-monitor
-disabled, maximised on each monitor in turn, statistics on, and confirm it
+disabled, maximized on each monitor in turn, statistics on, and confirm it
 holds the refresh rate at every preset. That confirms the frame rate is pinned,
 which is the assumption the cost-based gate rests on.
+
+## Performance gate result (T020)
+
+**Same-session comparison.** The T005 build (commit `4be6023`, built in a
+scratch worktree) and the final Phase 1 build were run alternately, two rounds
+each, 600 frames per preset at defaults, same protocol as above. The
+alternation matters: the T005 table above was recorded in an earlier session,
+when this GPU was running about 20% slower than it did during T020, so
+comparing today's build against that table would have hidden a third of the
+regression. The gate is judged against the same-session numbers only.
+
+### Hardware: NVIDIA GeForce RTX 5070 Ti, mean GPU ms, two rounds averaged
+
+| Configuration | Preset | T005 | Final | Delta |
+|---|---|---|---|---|
+| 1920x1080 @ 100% | Low | 0.069 | 0.069 | 0% |
+| 1920x1080 @ 100% | Medium | 0.095 | 0.097 | +2.1% |
+| 1920x1080 @ 100% | High | 0.124 | 0.128 | +3.6% |
+| 3840x2160 @ 125% (landscape) | Low | 0.163 | 0.166 | +2.2% |
+| 3840x2160 @ 125% (landscape) | Medium | 0.255 | 0.273 | **+7.1%** |
+| 3840x2160 @ 125% (landscape) | High | 0.366 | 0.385 | **+5.2%** |
+| 2160x3840 @ 150% (portrait) | Low | 0.128 | 0.128 | 0% |
+| 2160x3840 @ 150% (portrait) | Medium | 0.218 | 0.232 | **+6.7%** |
+| 2160x3840 @ 150% (portrait) | High | 0.332 | 0.346 | +4.4% |
+
+Run-to-run noise is about 1.5%. Six of nine are inside the 5% gate. Medium on
+both real monitors and High on the landscape one are over it, by 0.2 to 2.1
+points, which is 14 to 19 microseconds per frame.
+
+### Where the cost went, and what came back
+
+The starting point, with `R16G16B16A16_FLOAT` for the scene and post-bloom
+targets as research R2 originally chose, was +6% to +9% at 1080p, +17% to
++34% at 4K landscape and +21% to +49% at portrait. Each step below was a
+timing-only probe with the image checked afterward.
+
+1. **The shader math was not it.** Removing the glyph shader's decode, the
+   extract's per-texel encode and the composite's encode, one at a time, moved
+   nothing outside noise on hardware.
+2. **The format was.** FP16 full-resolution targets are 8 bytes per pixel
+   where v1.6 wrote 4, paid on the clear and on the composite's read, and the
+   cost scaled with pixel count. `R11G11B10_FLOAT` (4 bytes, still float)
+   brought every full-screen pass back to v1.6's cost. `R8G8B8A8_UNORM_SRGB`
+   was tried too, hardware encode on write with a linear blend: v1.6's exact
+   precision, but slower than R11 everywhere (+16% at portrait). Research R2
+   records the precision analysis of R11.
+3. **Blending into R11 costs more than into 8-bit when glyphs are large**: 14
+   microseconds per frame at portrait 150%, nothing at landscape 125%, shown
+   by removing the glyph draw from both builds. Glyph quads are deliberately
+   taller than the row pitch, so most blended pixels carry zero coverage. The
+   glyph shader now discards those. Bit-identical image on all eight cases,
+   and portrait Low went from 0.143 to T005's 0.128.
+4. **The composite's SDR fast path**: when the composite writes the SDR back
+   buffer it now hands over the encoded result directly instead of decoding
+   it for `OutputTransform` to encode again, an identity costing six `pow()`
+   per pixel at full resolution. Pixel-neutral, checked against the
+   calibration numbers.
+5. **What remains is the bloom chain at Medium and High**, 12 to 20
+   microseconds. Its C++ and its blur shaders are identical to T005's (diffed).
+   It is the sum of three things each inside the noise floor on its own: the
+   extract's four loads and twelve `pow()` at bloom resolution (about 4 µs),
+   the composite's encode of the scene at full resolution (about 3 µs), and
+   the R11 chain against v1.6's 8-bit one (3 to 7 µs). The first two are
+   what the v1.6 match requires (calibration item 9 above). An 8-bit chain
+   was measured: about 1% back, and its rounding moved the calibration mean
+   by +1.5%, so it was rejected. Two micro-optimizations, `Load` instead of
+   `Sample` in the composite and the scene size from a constant buffer instead
+   of `GetDimensions`, measured slower and were reverted.
+
+### WARP (software rasterizer), 1920x1080 @ 100%, mean ms
+
+| Preset | T005 | Final | Delta |
+|---|---|---|---|
+| Low | 5.6 | 7.4 to 7.8 | +30% to +40% |
+| Medium | 10.6 | 16.4 to 17.7 | +55% to +67% |
+| High | 15.9 | 25.4 to 28.0 | +60% to +76% |
+
+Two runs of the final build are shown because WARP is noisier than the GPU.
+Attribution by the same probes: removing the three encode/decode steps from
+the shaders takes WARP to 6.0 / 13.8 / 23.7, so the `pow()` math that costs
+nothing on hardware is most of the Low regression on a software rasterizer;
+8-bit scene targets take it to 7.0 / 16.1 / 25.0. The rest is the blur chain
+reading and writing float textures instead of 8-bit ones. WARP is the fallback
+for a machine with no usable GPU driver (a remote desktop session, some VMs).
+At the Low preset it still renders a 1080p frame in under 8 ms.
+
+### Verdict
+
+The gate as written is not met at Medium (both monitors) and High (landscape)
+on hardware, by 0.2 to 2.1 points, and not met on WARP by a wide margin. The
+frame rate is pinned to the refresh rate at every preset on this hardware and
+has no headroom in which 14 to 19 microseconds could show. The remaining cost
+is the encode work the v1.6 match requires, plus the float format the HDR
+phases require. Retuning the Medium preset (the remedy tasks.md lists) would
+change what Medium looks like, and was not done without a say-so. Rob decides.
+
