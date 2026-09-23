@@ -96,16 +96,18 @@ HdrControlsState DescribeHdrControls (const HdrDisplayInventory & inventory, Hdr
 
     if (inventory.hdrOnCount > 0)
     {
-        state.rowEnabled    = true;
+        state.modeEnabled   = true;
         state.sliderEnabled = (hdrMode == HdrMode::Auto);
-
-        return state;
     }
-
-    state.disabledReason = (inventory.hdrCapableOffCount > 0)
-                           ? L"A monitor supports HDR, but it is turned off in Windows. "
-                             L"Turn it on in Settings > System > Display > Use HDR to use these settings."
-                           : L"No monitor has HDR turned on in Windows.";
+    else if (inventory.hdrCapableOffCount > 0)
+    {
+        state.statusText       = L"A monitor supports HDR, but HDR is turned off in Windows.";
+        state.showSettingsLink = true;
+    }
+    else
+    {
+        state.statusText = L"No monitor has HDR turned on, so these settings have no effect.";
+    }
 
     return state;
 }

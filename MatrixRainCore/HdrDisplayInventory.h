@@ -48,9 +48,10 @@ HdrDisplayInventory QueryHdrDisplayInventory() noexcept;
 /// </summary>
 struct HdrControlsState
 {
-    bool            rowEnabled     { false };     // Mode combo and the rest of the row
-    bool            sliderEnabled  { false };     // Highlight brightness; also needs HDR mode Auto
-    const wchar_t * disabledReason { nullptr };   // Tooltip over the grayed row, or nullptr when enabled
+    bool            modeEnabled      { false };     // The HDR mode combo and its prompt
+    bool            sliderEnabled    { false };     // Highlight brightness; also needs HDR mode Auto
+    const wchar_t * statusText       { nullptr };   // Shown on the page under the controls; nullptr hides it
+    bool            showSettingsLink { false };     // Offer to open the Windows HDR settings
 };
 
 

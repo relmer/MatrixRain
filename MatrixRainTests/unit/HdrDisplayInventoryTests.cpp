@@ -16,45 +16,45 @@ namespace MatrixRainTests
     {
         public:
 
-            TEST_METHOD (NoHdrMonitor_GraysTheRow_AndSaysSo)
+            TEST_METHOD (NoHdrMonitor_GraysTheControls_AndSaysSo)
             {
                 const HdrControlsState state = DescribeHdrControls (HdrDisplayInventory { 0, 0 }, HdrMode::Auto);
 
 
 
-                Assert::IsFalse (state.rowEnabled);
-                Assert::IsFalse (state.sliderEnabled);
-                Assert::IsNotNull (state.disabledReason);
-                Assert::AreEqual (std::wstring (L"No monitor has HDR turned on in Windows."), std::wstring (state.disabledReason));
+                Assert::IsFalse   (state.modeEnabled);
+                Assert::IsFalse   (state.sliderEnabled);
+                Assert::IsNotNull (state.statusText);
+                Assert::IsFalse   (state.showSettingsLink, L"Nothing to turn on");
             }
 
 
 
 
-            TEST_METHOD (CapableMonitorWithHdrOff_GraysTheRow_AndSaysWhereToTurnItOn)
+            TEST_METHOD (CapableMonitorWithHdrOff_OffersTheSettingsLink)
             {
                 const HdrControlsState state = DescribeHdrControls (HdrDisplayInventory { 0, 1 }, HdrMode::Auto);
 
 
 
-                Assert::IsFalse   (state.rowEnabled);
-                Assert::IsNotNull (state.disabledReason);
-                Assert::IsTrue    (std::wstring (state.disabledReason).find (L"Settings > System > Display") != std::wstring::npos,
-                                   L"The tip must say where the switch is");
+                Assert::IsFalse   (state.modeEnabled);
+                Assert::IsNotNull (state.statusText);
+                Assert::IsTrue    (state.showSettingsLink, L"HDR can be turned on, so offer the way there");
             }
 
 
 
 
-            TEST_METHOD (HdrMonitor_EnablesTheRow_AndTheSliderInAuto)
+            TEST_METHOD (HdrMonitor_EnablesEverything_AndShowsNoStatus)
             {
                 const HdrControlsState state = DescribeHdrControls (HdrDisplayInventory { 1, 0 }, HdrMode::Auto);
 
 
 
-                Assert::IsTrue (state.rowEnabled);
-                Assert::IsTrue (state.sliderEnabled);
-                Assert::IsNull (state.disabledReason);
+                Assert::IsTrue  (state.modeEnabled);
+                Assert::IsTrue  (state.sliderEnabled);
+                Assert::IsNull  (state.statusText);
+                Assert::IsFalse (state.showSettingsLink);
             }
 
 
@@ -66,8 +66,9 @@ namespace MatrixRainTests
 
 
 
-                Assert::IsTrue  (state.rowEnabled,    L"The mode combo stays usable so Off can be undone");
+                Assert::IsTrue  (state.modeEnabled,   L"The mode combo stays usable so Off can be undone");
                 Assert::IsFalse (state.sliderEnabled, L"Highlight brightness does nothing with HDR mode Off");
+                Assert::IsNull  (state.statusText,    L"One monitor already has HDR on; nothing to report");
             }
     };
 }

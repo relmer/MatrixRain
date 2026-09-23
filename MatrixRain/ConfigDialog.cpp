@@ -2,6 +2,9 @@
 
 #include <commctrl.h>
 #include <prsht.h>
+#include <uxtheme.h>
+
+#pragma comment (lib, "uxtheme.lib")
 #pragma comment(lib, "comctl32.lib")
 
 #include "ConfigDialog.h"
@@ -293,48 +296,14 @@ static bool IsInfoTipControlId (int id)
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-//  IsDisabledHdrTooltipId (spec 008 T043)
-//
-//  The HDR row's controls, which gray out while no monitor has Windows HDR
-//  on (the slider also while HDR mode is Off). Like the glow controls above,
-//  a disabled control gets its tooltip from a rect tool on the page. The
-//  info button stays enabled so what the setting does is always readable.
-//
-////////////////////////////////////////////////////////////////////////////////
-
-static bool IsDisabledHdrTooltipId (int id)
-{
-    switch (id)
-    {
-        case IDC_HIGHLIGHT_PROMPT:
-        case IDC_HDR_MODE_COMBO:
-        case IDC_HIGHLIGHT_SLIDER:
-        case IDC_HIGHLIGHT_VALUE:
-            return true;
-
-        default:
-            return false;
-    }
-}
-
-
-
-//  Why the HDR row is grayed, from the last DescribeHdrControls; nullptr
-//  while it is enabled. String literals, so the pointer never dangles.
-static const wchar_t * s_hdrDisabledReason = nullptr;
-
-
-
-
-
-////////////////////////////////////////////////////////////////////////////////
-//
 //  ApplyHdrControlsUI (spec 008 T043)
 //
-//  Enables or grays the HDR row on the Visuals page from which monitors have
-//  Windows HDR on right now and the current HDR mode. Takes the page itself;
-//  the 1 s dialog timer calls it too, so turning HDR on or off in Windows
-//  while the dialog is open updates the row within a second.
+//  Enables or grays the HDR controls on the Visuals page from which monitors
+//  have Windows HDR on right now and the current HDR mode, and shows or hides
+//  the status line and the settings link under them. The info button stays
+//  enabled so what the setting does is always readable. Takes the page
+//  itself; the 1 s dialog timer calls it too, so turning HDR on or off in
+//  Windows while the dialog is open updates the page within a second.
 //
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -348,12 +317,41 @@ static void ApplyHdrControlsUI (HWND hVisuals, HdrMode hdrMode)
     const HdrControlsState state = DescribeHdrControls (QueryHdrDisplayInventory(), hdrMode);
 
 
-    s_hdrDisabledReason = state.disabledReason;
-
-    EnableWindow (GetDlgItem (hVisuals, IDC_HIGHLIGHT_PROMPT), state.rowEnabled);
-    EnableWindow (GetDlgItem (hVisuals, IDC_HDR_MODE_COMBO),   state.rowEnabled);
+    EnableWindow (GetDlgItem (hVisuals, IDC_HDR_MODE_PROMPT),  state.modeEnabled);
+    EnableWindow (GetDlgItem (hVisuals, IDC_HDR_MODE_COMBO),   state.modeEnabled);
+    EnableWindow (GetDlgItem (hVisuals, IDC_HIGHLIGHT_PROMPT), state.sliderEnabled);
     EnableWindow (GetDlgItem (hVisuals, IDC_HIGHLIGHT_SLIDER), state.sliderEnabled);
     EnableWindow (GetDlgItem (hVisuals, IDC_HIGHLIGHT_VALUE),  state.sliderEnabled);
+
+    SetDlgItemTextW (hVisuals, IDC_HDR_STATUS, state.statusText ? state.statusText : L"");
+    ShowWindow      (GetDlgItem (hVisuals, IDC_HDR_STATUS),        state.statusText       ? SW_SHOW : SW_HIDE);
+    ShowWindow      (GetDlgItem (hVisuals, IDC_HDR_SETTINGS_LINK), state.showSettingsLink ? SW_SHOW : SW_HIDE);
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  OpenWindowsHdrSettings (spec 008 T043)
+//
+//  Opens Windows Settings at the HDR page, where the Use HDR switch is, or
+//  at the Display page if this Windows does not know that address.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+static void OpenWindowsHdrSettings (HWND hDlg)
+{
+    const HINSTANCE result = ShellExecuteW (hDlg, L"open", L"ms-settings:display-hdr", nullptr, nullptr, SW_SHOWNORMAL);
+
+
+
+    // ShellExecute reports success as a value above 32.
+    if (reinterpret_cast<INT_PTR> (result) <= 32)
+    {
+        ShellExecuteW (hDlg, L"open", L"ms-settings:display", nullptr, nullptr, SW_SHOWNORMAL);
+    }
 }
 
 
@@ -525,7 +523,7 @@ static HWND CreateAndRegisterTooltip (HWND hDlg)
     // branch can identify which tool fired without an HWND lookup.
     for (int id = 1000; id < 1100; id++)
     {
-        if (!IsDisabledGlowTooltipId (id) && !IsDisabledHdrTooltipId (id))
+        if (!IsDisabledGlowTooltipId (id))
         {
             continue;
         }
@@ -2171,10 +2169,18 @@ static INT_PTR CALLBACK PageDlgProc (HWND   hDlg,
                 COLORREF        oldTextColor;
                 wchar_t         glyph[]  = L"\u24D8";
 
-                // Erase the entire rect with the dialog's face color so any
-                // previous focus rect (XOR-drawn by the system) is cleared
-                // before we redraw the glyph + optional new focus rect.
-                FillRect (pdis->hDC, &pdis->rcItem, GetSysColorBrush (COLOR_3DFACE));
+                // Erase the entire rect with whatever the page behind the
+                // button shows, so any previous focus rect (XOR-drawn by the
+                // system) is cleared before we redraw the glyph + optional
+                // new focus rect. A themed property-sheet page is not the
+                // classic button face: filling with COLOR_3DFACE left a gray
+                // square behind every glyph. The page draws its own
+                // background here; the face color is only the fallback for
+                // an unthemed page.
+                if (FAILED (DrawThemeParentBackground (pdis->hwndItem, pdis->hDC, &pdis->rcItem)))
+                {
+                    FillRect (pdis->hDC, &pdis->rcItem, GetSysColorBrush (COLOR_3DFACE));
+                }
 
                 if (pContext && pContext->m_hInfoTipFont)
                 {
@@ -2217,6 +2223,15 @@ static INT_PTR CALLBACK PageDlgProc (HWND   hDlg,
                 break;
             }
 
+            // Spec 008 T043: the "Turn on HDR" link, by mouse or keyboard.
+            if (pnmhdr->idFrom == IDC_HDR_SETTINGS_LINK
+                && (pnmhdr->code == NM_CLICK || pnmhdr->code == NM_RETURN))
+            {
+                OpenWindowsHdrSettings (hDlg);
+                result = TRUE;
+                break;
+            }
+
             // Tooltip text callback — supplies the locked infotip string.
             if (pnmhdr->code == TTN_GETDISPINFOW || pnmhdr->code == TTN_NEEDTEXTW)
             {
@@ -2234,18 +2249,6 @@ static INT_PTR CALLBACK PageDlgProc (HWND   hDlg,
                     pdi->lpszText = const_cast<LPWSTR> (isVisualsPage
                                                         ? L"Glow is disabled on the performance tab."
                                                         : L"Glow is disabled.");
-                    result = TRUE;
-                    break;
-                }
-
-                // Spec 008 T043: the grayed HDR row says why. With the row
-                // enabled only the slider can be gray, and that is HDR mode
-                // Off.
-                if (IsDisabledHdrTooltipId (toolId))
-                {
-                    pdi->lpszText = const_cast<LPWSTR> (s_hdrDisabledReason
-                                                        ? s_hdrDisabledReason
-                                                        : L"HDR highlights are Off, so nothing goes above normal white.");
                     result = TRUE;
                     break;
                 }

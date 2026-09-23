@@ -98,6 +98,9 @@
 #define IDC_HDR_MODE_COMBO                  1056
 #define IDC_HIGHLIGHT_SLIDER                1057
 #define IDC_HIGHLIGHT_VALUE                 1058
+#define IDC_HDR_MODE_PROMPT                 1059
+#define IDC_HDR_STATUS                      1060
+#define IDC_HDR_SETTINGS_LINK               1061
 
 // Next default values for new objects
 // 
@@ -105,7 +108,7 @@
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        105
 #define _APS_NEXT_COMMAND_VALUE         40004
-#define _APS_NEXT_CONTROL_VALUE         1059
+#define _APS_NEXT_CONTROL_VALUE         1062
 #define _APS_NEXT_SYMED_VALUE           101
 #endif
 #endif

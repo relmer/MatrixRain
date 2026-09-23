@@ -131,7 +131,7 @@ END
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-IDD_VISUALS_PAGE DIALOGEX 0, 0, 300, 232
+IDD_VISUALS_PAGE DIALOGEX 0, 0, 300, 278
 STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_DISABLED | WS_CAPTION
 CAPTION "Visuals"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
@@ -178,26 +178,31 @@ BEGIN
 
     CONTROL         "Start in fullscreen",IDC_STARTFULLSCREEN_CHECK,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,176,130,10
 
-    // Spec 008 T042: HDR highlights. One row, so the page keeps its size:
-    // the mode combo (Auto / Off) takes the front of the slider column and
-    // the highlight brightness slider the rest. Grayed, with a tooltip that
-    // says why, while no monitor has Windows HDR on.
-    LTEXT           "HDR highlights:",IDC_HIGHLIGHT_PROMPT,15,196,58,8
+    // Spec 008 T042: HDR highlights, the mode on one line and the highlight
+    // brightness on the next, its prompt indented as a child of the mode. Under them a status line says when HDR is not
+    // available, with a link to the Windows HDR settings when a monitor
+    // could use it but has it off; both are hidden when HDR is on.
+    LTEXT           "HDR highlights:",IDC_HDR_MODE_PROMPT,15,196,58,8
     CONTROL         "ⓘ",IDC_HDR_INFO,"Button",BS_OWNERDRAW | WS_TABSTOP,74,194,14,14
-    COMBOBOX        IDC_HDR_MODE_COMBO,90,194,44,40,CBS_DROPDOWNLIST | WS_TABSTOP
-    CONTROL         "",IDC_HIGHLIGHT_SLIDER,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,138,192,114,20
-    LTEXT           "80%",IDC_HIGHLIGHT_VALUE,257,196,28,8
+    COMBOBOX        IDC_HDR_MODE_COMBO,90,194,60,40,CBS_DROPDOWNLIST | WS_TABSTOP
+
+    LTEXT           "Brightness:",IDC_HIGHLIGHT_PROMPT,25,218,58,8
+    CONTROL         "",IDC_HIGHLIGHT_SLIDER,"msctls_trackbar32",TBS_AUTOTICKS | WS_TABSTOP,90,216,162,20
+    LTEXT           "80%",IDC_HIGHLIGHT_VALUE,257,218,28,8
+
+    LTEXT           "",IDC_HDR_STATUS,15,240,270,8
+    CONTROL         "<a>Turn on HDR in Windows Settings</a>",IDC_HDR_SETTINGS_LINK,"SysLink",WS_TABSTOP,15,250,200,10
 
     // Bottom-right live FPS / GPU% readout (1 Hz update from PerfTitle-
     // TimerProc).  Same control id on both pages so the timer can address
     // them uniformly.  Right-aligned text; field right edge matches the
     // trackbar/combo right edge above (x=285 = 155+130).
-    LTEXT           "",IDC_FPS_GPU_READOUT,155,216,130,8,SS_RIGHT
+    LTEXT           "",IDC_FPS_GPU_READOUT,155,262,130,8,SS_RIGHT
 END
 
 
 
-IDD_PERFORMANCE_PAGE DIALOGEX 0, 0, 300, 232
+IDD_PERFORMANCE_PAGE DIALOGEX 0, 0, 300, 278
 STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_DISABLED | WS_CAPTION
 CAPTION "Performance"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
@@ -239,7 +244,7 @@ BEGIN
     CONTROL         "Show performance metrics",IDC_SHOWDEBUG_CHECK,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,198,160,10
 
     // Bottom-right live FPS / GPU% readout — see IDD_VISUALS_PAGE for notes.
-    LTEXT           "",IDC_FPS_GPU_READOUT,155,216,130,8,SS_RIGHT
+    LTEXT           "",IDC_FPS_GPU_READOUT,155,262,130,8,SS_RIGHT
 END
 
 #endif    // English (United States) resources
