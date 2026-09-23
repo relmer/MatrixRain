@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Math.h"
+#include "OutputModeSelection.h"
 #include "Shaders\ColorConstants.h"
 
 
@@ -220,6 +221,79 @@ float SdrWhiteScale (float sdrWhiteNits) noexcept;
 /// <param name="sdrWhiteLevel">DISPLAYCONFIG_SDR_WHITE_LEVEL::SDRWhiteLevel</param>
 /// <returns>Nits in [80, 480]</returns>
 float SdrWhiteNitsFromDisplayConfig (uint32_t sdrWhiteLevel) noexcept;
+
+
+
+
+
+/// <summary>
+/// Which glyphs get highlight headroom, and how much (research R14, option B).
+/// Starting values; T044 tunes them on hardware.
+/// </summary>
+namespace HighlightConstants
+{
+    /// <summary>The share of the highlight gain a trail glyph at full brightness gets.</summary>
+    inline constexpr float kTrailHighlightShare = 0.6f;
+
+    /// <summary>Trail glyphs at or below this brightness get no highlight headroom.</summary>
+    inline constexpr float kTrailHighlightFloor = 0.5f;
+
+    /// <summary>The top of the highlight brightness setting; the setting is a percentage.</summary>
+    inline constexpr int   kMaxHighlightBrightness = 100;
+}
+
+
+
+
+
+/// <summary>
+/// How far above SDR white a head may go on this monitor, as a multiplier
+/// (data-model §5): the display's headroom raised to the highlight
+/// brightness setting over 100, so 0 gives 1 (no boost) and 100 aims at the
+/// display's peak. 1 whenever the monitor presents SDR or the user set HDR
+/// mode Off (FR-021).
+/// </summary>
+/// <param name="headroom">From Headroom; at least 1</param>
+/// <param name="highlightBrightness">The setting, 0 to 100; clamped</param>
+/// <param name="hdrMode">The user's HDR mode</param>
+/// <param name="outputMode">What this monitor presents</param>
+/// <returns>A multiplier in [1, headroom]</returns>
+float HighlightGain (float headroom, int highlightBrightness, HdrMode hdrMode, OutputMode outputMode) noexcept;
+
+
+
+
+
+/// <summary>
+/// The share of the highlight gain one glyph gets (research R14, option B):
+/// all of it for a head; for a trail glyph, a share that is none at and
+/// below kTrailHighlightFloor and rises with the square of the brightness
+/// above it to kTrailHighlightShare at full brightness. The glyph's gain is
+/// HighlightGain ^ HighlightWeight, so a weight of 0 is exactly 1.
+/// </summary>
+/// <param name="isHead">The glyph leads its streak (a white instance)</param>
+/// <param name="brightness">The glyph's brightness, 0 to 1</param>
+/// <returns>A weight in [0, 1]</returns>
+float HighlightWeight (bool isHead, float brightness) noexcept;
+
+
+
+
+
+/// <summary>
+/// Rolls highlights off into the display's headroom without clipping or
+/// changing hue (research R8, R14; FR-019). On the maximum channel m:
+/// identity up to 1 (SDR white), then 1 + (h - 1) t / (1 + t) with
+/// t = (m - 1) / (h - 1), which leaves white where it is, has slope 1 there
+/// (no kink where a head crosses white), and approaches h without reaching
+/// it. All three channels are scaled by one factor, so their ratios, and so
+/// the hue, do not change. With h at or below 1 the result is capped at 1.
+///
+/// OutputTransform.hlsli carries a line-for-line transliteration.
+/// </summary>
+/// <param name="rgb">Linear light, 1 at SDR white; changed in place</param>
+/// <param name="headroom">From Headroom, or 1 with HDR mode Off</param>
+void ToneMapHighlights (float (& rgb)[3], float headroom) noexcept;
 
 
 

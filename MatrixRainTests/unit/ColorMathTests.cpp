@@ -394,6 +394,176 @@ namespace MatrixRainTests
             }
         }
 
+        ////////////////////////////////////////////////////////////////////////
+        // Highlights (T036, T037; research R8, R14)
+        ////////////////////////////////////////////////////////////////////////
+
+        TEST_METHOD (HighlightGain_IsOne_InSdrOrWithHdrModeOff)
+        {
+            Assert::AreEqual (1.0f, HighlightGain (5.0f, 80,  HdrMode::Auto, OutputMode::Sdr), 0.0f, L"SDR monitors never get headroom");
+            Assert::AreEqual (1.0f, HighlightGain (5.0f, 100, HdrMode::Off,  OutputMode::Hdr), 0.0f, L"Off never exceeds SDR white");
+        }
+
+        TEST_METHOD (HighlightGain_RunsFromOneAtZero_ToTheHeadroomAt100)
+        {
+            Assert::AreEqual (1.0f, HighlightGain (4.0f, 0,   HdrMode::Auto, OutputMode::Hdr), 1e-6f);
+            Assert::AreEqual (2.0f, HighlightGain (4.0f, 50,  HdrMode::Auto, OutputMode::Hdr), 1e-5f, L"4 ^ 0.5");
+            Assert::AreEqual (4.0f, HighlightGain (4.0f, 100, HdrMode::Auto, OutputMode::Hdr), 1e-5f);
+        }
+
+        TEST_METHOD (HighlightGain_ClampsTheSetting_AndIsMonotonicInIt)
+        {
+            float previous = 0.0f;
+
+
+
+            Assert::AreEqual (1.0f, HighlightGain (4.0f, -20, HdrMode::Auto, OutputMode::Hdr), 1e-6f, L"Below 0 clamps to 0");
+            Assert::AreEqual (4.0f, HighlightGain (4.0f, 250, HdrMode::Auto, OutputMode::Hdr), 1e-5f, L"Above 100 clamps to 100");
+
+            for (int setting = 0; setting <= 100; ++setting)
+            {
+                const float gain = HighlightGain (3.0f, setting, HdrMode::Auto, OutputMode::Hdr);
+
+
+                Assert::IsTrue (gain >= previous, L"Gain must not fall as the setting rises");
+                previous = gain;
+            }
+        }
+
+        TEST_METHOD (HighlightGain_MeetsSc005_AtTheDefaultSetting)
+        {
+            // SC-005: a 600-nit peak at 240-nit SDR white, default setting 80,
+            // puts heads at least 2x SDR white.
+            const float headroom = Headroom (EffectivePeakNits (600.0f), 240.0f);
+
+
+
+            Assert::IsTrue (HighlightGain (headroom, 80, HdrMode::Auto, OutputMode::Hdr) >= 2.0f);
+        }
+
+        TEST_METHOD (HighlightWeight_IsOne_ForAHead_WhateverItsBrightness)
+        {
+            Assert::AreEqual (1.0f, HighlightWeight (true, 1.0f), 0.0f);
+            Assert::AreEqual (1.0f, HighlightWeight (true, 0.2f), 0.0f);
+        }
+
+        TEST_METHOD (HighlightWeight_IsZero_ForTrailGlyphs_AtOrBelowTheFloor)
+        {
+            Assert::AreEqual (0.0f, HighlightWeight (false, 0.0f), 0.0f);
+            Assert::AreEqual (0.0f, HighlightWeight (false, HighlightConstants::kTrailHighlightFloor), 0.0f);
+        }
+
+        TEST_METHOD (HighlightWeight_RisesToTheShare_ForTrailGlyphs)
+        {
+            float previous = 0.0f;
+
+
+
+            Assert::AreEqual (HighlightConstants::kTrailHighlightShare, HighlightWeight (false, 1.0f), 1e-6f);
+
+            for (float brightness = 0.0f; brightness <= 1.0f; brightness += kSweepStep)
+            {
+                const float weight = HighlightWeight (false, brightness);
+
+
+                Assert::IsTrue (weight >= previous, L"Weight must not fall as brightness rises");
+                Assert::IsTrue (weight <= 1.0f,     L"A trail glyph never gets more than a head");
+                previous = weight;
+            }
+        }
+
+        TEST_METHOD (ToneMapHighlights_IsIdentity_AtOrBelowSdrWhite)
+        {
+            float rgb[3] = { 0.2f, 1.0f, 0.5f };
+
+
+
+            ToneMapHighlights (rgb, 4.0f);
+
+            Assert::AreEqual (0.2f, rgb[0], 0.0f);
+            Assert::AreEqual (1.0f, rgb[1], 0.0f);
+            Assert::AreEqual (0.5f, rgb[2], 0.0f);
+        }
+
+        TEST_METHOD (ToneMapHighlights_StaysUnderTheHeadroom_AndApproachesIt)
+        {
+            const float headroom = 3.0f;
+
+
+
+            for (float m : { 1.5f, 3.0f, 10.0f, 1000.0f })
+            {
+                float rgb[3] = { m, m * 0.5f, 0.0f };
+
+
+                ToneMapHighlights (rgb, headroom);
+                Assert::IsTrue (rgb[0] < headroom, L"Must never reach the peak");
+            }
+
+            {
+                float rgb[3] = { 1.0e6f, 0.0f, 0.0f };
+
+
+                ToneMapHighlights (rgb, headroom);
+                Assert::AreEqual (headroom, rgb[0], 1e-3f, L"Very bright input approaches the peak");
+            }
+        }
+
+        TEST_METHOD (ToneMapHighlights_PreservesChannelRatios)
+        {
+            float rgb[3] = { 0.3f, 2.4f, 0.9f };
+
+
+
+            ToneMapHighlights (rgb, 2.0f);
+
+            Assert::AreEqual (0.3f / 2.4f, rgb[0] / rgb[1], 1e-5f, L"Red to green unchanged");
+            Assert::AreEqual (0.9f / 2.4f, rgb[2] / rgb[1], 1e-5f, L"Blue to green unchanged");
+        }
+
+        TEST_METHOD (ToneMapHighlights_HasSlopeOne_AtSdrWhite)
+        {
+            // C1 continuity where heads cross white: the slope just above 1
+            // matches the identity's slope just below.
+            const float delta = 1e-3f;
+            float       above[3] = { 1.0f + delta, 0.0f, 0.0f };
+
+
+
+            ToneMapHighlights (above, 4.0f);
+
+            Assert::AreEqual (1.0f, (above[0] - 1.0f) / delta, 1e-3f);
+        }
+
+        TEST_METHOD (ToneMapHighlights_IsMonotonic)
+        {
+            float previous = 0.0f;
+
+
+
+            for (float m = 0.0f; m <= 20.0f; m += 0.01f)
+            {
+                float rgb[3] = { m, 0.0f, 0.0f };
+
+
+                ToneMapHighlights (rgb, 2.5f);
+                Assert::IsTrue (rgb[0] >= previous);
+                previous = rgb[0];
+            }
+        }
+
+        TEST_METHOD (ToneMapHighlights_WithNoHeadroom_CapsAtOne)
+        {
+            float rgb[3] = { 3.0f, 1.5f, 0.0f };
+
+
+
+            ToneMapHighlights (rgb, 1.0f);
+
+            Assert::AreEqual (1.0f, rgb[0], 1e-6f, L"Phase 2 / HDR mode Off behavior");
+            Assert::AreEqual (0.5f, rgb[1], 1e-6f, L"Hue kept while capping");
+        }
+
         TEST_METHOD (SrgbToLinear_IsDarkerThanItsInputBelowWhite)
         {
             //  The curve lies below the diagonal everywhere inside the range.

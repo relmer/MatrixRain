@@ -217,6 +217,100 @@ float SdrWhiteNitsFromDisplayConfig (uint32_t sdrWhiteLevel) noexcept
 
 ////////////////////////////////////////////////////////////////////////////////
 //
+//  HighlightGain
+//
+////////////////////////////////////////////////////////////////////////////////
+
+float HighlightGain (float headroom, int highlightBrightness, HdrMode hdrMode, OutputMode outputMode) noexcept
+{
+    if (outputMode != OutputMode::Hdr || hdrMode == HdrMode::Off)
+    {
+        return 1.0f;
+    }
+
+    const int   setting  = std::clamp (highlightBrightness, 0, HighlightConstants::kMaxHighlightBrightness);
+    const float exponent = static_cast<float> (setting) / static_cast<float> (HighlightConstants::kMaxHighlightBrightness);
+
+
+
+    return std::pow (std::max (1.0f, headroom), exponent);
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  HighlightWeight
+//
+////////////////////////////////////////////////////////////////////////////////
+
+float HighlightWeight (bool isHead, float brightness) noexcept
+{
+    if (isHead)
+    {
+        return 1.0f;
+    }
+
+    const float floor = HighlightConstants::kTrailHighlightFloor;
+    const float above = std::clamp ((brightness - floor) / (1.0f - floor), 0.0f, 1.0f);
+
+
+
+    return HighlightConstants::kTrailHighlightShare * above * above;
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  ToneMapHighlights
+//
+////////////////////////////////////////////////////////////////////////////////
+
+void ToneMapHighlights (float (& rgb)[3], float headroom) noexcept
+{
+    const float m = std::max ({ rgb[0], rgb[1], rgb[2] });
+    float       mapped;
+
+
+
+    if (m <= 1.0f)
+    {
+        return;
+    }
+
+    if (headroom <= 1.0f)
+    {
+        mapped = 1.0f;
+    }
+    else
+    {
+        const float span = headroom - 1.0f;
+        const float t    = (m - 1.0f) / span;
+
+
+        mapped = 1.0f + span * t / (1.0f + t);
+    }
+
+    const float scale = mapped / m;
+
+
+
+    rgb[0] *= scale;
+    rgb[1] *= scale;
+    rgb[2] *= scale;
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
 //  InstanceDisplayColor
 //
 ////////////////////////////////////////////////////////////////////////////////
