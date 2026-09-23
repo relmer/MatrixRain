@@ -32,8 +32,19 @@ adjusted to "glyph compositing".
 **Decision**: Render in linear light, Rec.709 primaries. Convert each
 instance's final display color to linear **on the CPU, per instance**, after
 applying brightness and the head/trail color choice:
-`linearColor = SrgbToLinear(color_srgb * brightness * (1 + 0.3 * brightness))`.
-The glyph pixel shader then only multiplies by atlas coverage.
+`linearColor = SrgbToLinear(color_srgb * brightness * (1 + 0.3 * brightness) * brightness)`.
+The glyph pixel shader then only multiplies by atlas coverage, and its alpha
+is coverage alone.
+
+The second `brightness` factor was missed in the first implementation. v1.6's
+shader applied brightness both to the color and to the alpha it blended with,
+so over the black scene the displayed pixel carried it twice. Leaving the
+alpha factor in the shader meant it ran as linear-light alpha, and a fade in
+linear light removes far less light than the same fade applied to encoded
+values: every fading trail rendered visibly brighter, and slightly less
+saturated, than v1.6. Rob spotted it by eye against the baseline; the
+regression test had pinned the shader's output rather than the screen's, and
+passed throughout.
 
 **Rationale**: FR-005 requires the look at defaults to be preserved. The fade
 curve (`brightness`) and the `+30%` boost were tuned perceptually in gamma

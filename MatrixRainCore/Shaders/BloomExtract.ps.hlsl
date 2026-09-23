@@ -34,6 +34,16 @@ float4 main(PSInput input) : SV_TARGET
 {
     float4 color = inputTexture.Sample(samplerState, input.uv);
 
+    // Clamp what the extract SEES at SDR white, without touching the scene.
+    //
+    // The glyph self-glow pushes bright heads past 1.0, and v1.6's 8-bit scene
+    // texture clipped that before the extract ever sampled it. The float scene
+    // keeps the overshoot (Phase 3 needs it), so without this clamp the extract
+    // feeds the blur a stronger head than v1.6 ever had and every head grows a
+    // brighter halo. The scene itself stays unclipped; only this pass's view
+    // of it is limited, which is exactly the input v1.6's extract received.
+    color.rgb = min(color.rgb, 1.0);
+
     // Extract only bright pixels (consider luminance and max channel)
     float luminance = dot(color.rgb, float3(0.2126, 0.7152, 0.0722));
 

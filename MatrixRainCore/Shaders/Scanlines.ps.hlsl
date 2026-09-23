@@ -43,12 +43,23 @@ float4 main (PSInput i) : SV_TARGET
     float  bright  = 0.5 - 0.5 * cos (2.0 * kPi * linePos) * rolloff;
     float  darken  = lerp (1.0 - g_intensity, 1.0, bright);
 
-    // The darkening multiplies LINEAR light, which is what a raster actually
-    // does to a phosphor: half the darkening means half the light. Applied to
-    // gamma-encoded values, as v1.6 did, the same factor removed rather more
-    // light than intended and the effect read as a gray veil over the image
-    // instead of a raster behind it (FR-001).
-    c.rgb *= darken;
+    // v1.6 darkened an 8-bit post-bloom texture, so anything the composite
+    // pushed past white had already been clipped to white before the raster
+    // touched it. Here the post-bloom target is float and keeps the overshoot,
+    // and darkening a value above white then clipping it can land back at
+    // white: the raster vanishes over the brightest pixels. Clamp to the
+    // display's headroom first. In SDR that is 1.0, exactly v1.6's clip; in
+    // HDR it is the real headroom, so Phase 3's highlights keep theirs.
+    c.rgb = min (c.rgb, g_headroom);
+
+    // Match v1.6 on screen. v1.6 multiplied the ENCODED pixel by darken, so
+    // the same factor applied to linear light removes visibly less and the
+    // scanlines came out about a third lighter than the baseline. Raising the
+    // factor to the encode curve's exponent cancels that, the same way the
+    // glyph coverage and the halo falloff are shaped. Light still combines in
+    // linear light everywhere; this only reproduces the strength v1.6 gave
+    // the Intensity slider, which is what FR-005 protects.
+    c.rgb *= pow (darken, MR_SRGB_CURVE_GAMMA);
 
     // When this pass runs it is always the last one, so it always encodes.
     return float4 (OutputTransform (c.rgb), c.a);

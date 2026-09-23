@@ -93,18 +93,22 @@ inline constexpr float kGlyphSelfGlow = 0.3f;
 /// GPU should blend with.
 ///
 /// This exists to keep v1.6's look exactly (FR-005). The v1.6 glyph pixel
-/// shader computed its color as
+/// shader wrote
 ///     rgb = color * texture * brightness * (1 + 0.3 * brightness)
-/// in gamma space. Doing that same arithmetic in linear light would change the
-/// result, because the brightness and self-glow terms are not linear
-/// operations. So the terms stay where they are -- applied to the sRGB color,
-/// on the CPU, once per instance -- and only the FINISHED color is converted.
-/// The glyph core therefore comes out identical to v1.6, and linear light
-/// governs only what happens afterwards: the blending, the blur and the bloom,
-/// which is where it belongs.
+///     a   = texture.a * brightness
+/// in gamma space and alpha-blended over a black scene, so the pixel a viewer
+/// saw was color * brightness * (1 + 0.3 * brightness) * brightness. Doing
+/// that arithmetic in linear light would change the result, because neither
+/// the brightness terms nor the self-glow are linear operations. So all of it
+/// stays in gamma space, applied to the sRGB color on the CPU once per
+/// instance, and only the FINISHED displayed color is converted. The glyph
+/// therefore comes out identical to v1.6, and linear light governs only what
+/// happens afterwards: the blur and the bloom, which is where it belongs.
 ///
-/// Alpha is passed through untouched. It carries the trail's fade, which the
-/// shader still applies in the same place it always did.
+/// The shader's alpha is coverage alone as a result. Brightness must NOT be
+/// applied there a second time.
+///
+/// Alpha in the returned color is passed through untouched.
 /// </summary>
 /// <param name="srgbColor">The glyph's color as v1.6 would have displayed it</param>
 /// <param name="brightness">Character brightness in [0, 1]</param>

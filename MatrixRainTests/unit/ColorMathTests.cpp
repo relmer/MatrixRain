@@ -34,23 +34,32 @@ namespace MatrixRainTests
     //
     //  V16ShaderOutput
     //
-    //  What the v1.6 glyph pixel shader wrote for one channel at full atlas
-    //  coverage:
+    //  What v1.6 put ON SCREEN for one channel at full atlas coverage. The
+    //  shader wrote
     //      rgb = color * texture * brightness;
     //      rgb += rgb * 0.3 * brightness;
-    //  clamped by the 8-bit render target. Written out longhand, from the
+    //      a   = texture.a * brightness;
+    //  and alpha-blended over a black scene, so the displayed pixel was
+    //  rgb * a, clamped by the 8-bit target. Written out longhand, from the
     //  shader rather than from ColorMath, so the regression test compares the
     //  new pipeline against the OLD behavior and not against itself.
+    //
+    //  The earlier version of this helper stopped at the shader's OUTPUT and
+    //  left out the alpha. It passed while every fading trail rendered brighter
+    //  than v1.6, because the missing factor was being applied as linear-light
+    //  alpha instead. The screen is what FR-005 is about, not the shader.
     //
     ////////////////////////////////////////////////////////////////////////////
 
     static float V16ShaderOutput (float srgbChannel, float brightness)
     {
         const float scaled = srgbChannel * brightness;
+        const float rgb    = scaled + scaled * 0.3f * brightness;
+        const float alpha  = brightness;
 
 
 
-        return std::min (1.0f, scaled + scaled * 0.3f * brightness);
+        return std::min (1.0f, rgb * alpha);
     }
 
 
@@ -185,7 +194,7 @@ namespace MatrixRainTests
             const Color4 srgb       (0.25f, 0.50f, 0.75f, 0.6f);
             const float  brightness = 0.8f;
             const float  gain       = 1.0f;
-            const float  scale      = brightness * (1.0f + 0.3f * brightness);
+            const float  scale      = brightness * (1.0f + 0.3f * brightness) * brightness;
 
             const Color4 result = InstanceLinearColor (srgb, brightness, gain);
 

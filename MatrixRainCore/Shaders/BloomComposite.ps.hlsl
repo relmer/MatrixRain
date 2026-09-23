@@ -36,13 +36,13 @@ SamplerState samplerState : register(s0);
 // bloomIntensity that looked right in gamma space therefore produced about
 // eight times too much apparent glow, and dark gaps are most of the frame.
 //
-// 0.571 is what brings the glow contribution back to 1.00x of v1.6's after
-// kBloomFalloff below reduces it. The measurement is the glow term on its
-// own -- defaults minus glow-min mean
-// luminance -- because total luminance also carries the trail change, which is
-// structural and not this constant's business. See specs/008-hdr-linear-
-// rendering/baseline.md.
-static const float kBloomCeiling = 0.571f;
+// 0.871 is what brings the glow contribution to 0.99x of v1.6's once
+// kBloomFalloff below has shaped it and the extract's white clamp has removed
+// the head overshoot v1.6 never saw. The measurement is the glow term on its
+// own -- defaults minus glow-min mean luminance -- so that it is not confused
+// with the glyph and trail terms, which are matched separately. See
+// specs/008-hdr-linear-rendering/baseline.md.
+static const float kBloomCeiling = 0.871f;
 
 // Exponent applied to the glow before it is added, cancelling the lift the
 // encode curve would otherwise give the halo's tail. It is the transfer
@@ -81,7 +81,15 @@ float4 main(PSInput input) : SV_TARGET
     // compensation creeping back into the blending: light is still added in
     // linear light. It shapes the glow's PROFILE, which is art direction
     // rather than physics, and v1.6's art direction is what FR-005 protects.
-    softBloom = pow(softBloom, kBloomFalloff) * kBloomCeiling;
+    //
+    // The exponent is applied to the glow's MAGNITUDE and the channels are
+    // scaled together. Applying it per channel would compress the smaller
+    // channels harder than the dominant one and shift the halo's hue -- for
+    // the default green, blue would collapse relative to green and the glow
+    // would come out a different color from the glyphs it surrounds.
+    float  bloomMax = max(softBloom.r, max(softBloom.g, softBloom.b));
+    float  shaped   = pow(bloomMax, kBloomFalloff);
+    float3 glow     = (bloomMax > 0.0) ? softBloom * (shaped / bloomMax) : 0.0;
 
-    return float4(OutputTransform(scene.rgb + softBloom), 1.0);
+    return float4(OutputTransform(scene.rgb + glow * kBloomCeiling), 1.0);
 }

@@ -28,11 +28,18 @@ float LinearToSrgb (float linear)  noexcept   // inverse; input clamped to [0,1]
 Color4 InstanceLinearColor (Color4 srgbColor, float brightness, float highlightGain) noexcept
 ```
 
-- Returns `SrgbToLinear(srgb * brightness * (1 + 0.3 * brightness)) * highlightGain`
+- Returns `SrgbToLinear(srgb * brightness * (1 + 0.3 * brightness) * brightness) * highlightGain`
   per RGB channel. Alpha is passed through unchanged.
+- Brightness appears twice because v1.6's shader applied it twice: to the
+  color, with the self-glow, and again as the alpha it blended with. Over the
+  black scene both multiply the displayed pixel. The glyph shader's alpha is
+  therefore **coverage only**; applying brightness there as well, as
+  linear-light alpha, makes every fading trail brighter than v1.6.
 - With `highlightGain == 1` and full atlas coverage, `LinearToSrgb` of the
-  result equals the v1.6 shader's output for the same inputs (clamped to 1).
-  **This is the regression test that pins FR-005.**
+  result equals **the pixel v1.6 put on screen** for the same inputs -- shader
+  output times shader alpha, clamped to 1 -- not the shader's output alone.
+  **This is the regression test that pins FR-005.** An earlier version pinned
+  the shader output and passed while the trails visibly drifted.
 
 ## Display luminance
 

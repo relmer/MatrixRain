@@ -1795,7 +1795,9 @@ void RenderSystem::BuildCharacterInstanceData (const CharacterInstance          
         // Stop one step earlier: apply the same scaling in gamma space and
         // clamp where the 8-bit target used to, which is exactly the pixel
         // v1.6 wrote.
-        const float scale = character.brightness * (1.0f + kGlyphSelfGlow * character.brightness);
+        const float scale = character.brightness
+                            * (1.0f + kGlyphSelfGlow * character.brightness)
+                            * character.brightness;
 
         data.color[0] = std::min (1.0f, srgb.r * scale);
         data.color[1] = std::min (1.0f, srgb.g * scale);
@@ -1803,8 +1805,10 @@ void RenderSystem::BuildCharacterInstanceData (const CharacterInstance          
         data.color[3] = srgb.a;
     }
 
-    // Still the raw brightness: the shader applies it to ALPHA only now, which
-    // is the one place it was always a linear operation.
+    // Uploaded because the instance layout carries it and the overlay shader
+    // reads it as opacity. The glyph shader no longer uses it: the fade is
+    // already inside the color above, and applying it again as linear-light
+    // alpha made every fading trail brighter than v1.6.
     data.brightness = character.brightness;
     data.scaleX     = character.scale;
     data.scaleY     = character.scale;
