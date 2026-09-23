@@ -146,6 +146,12 @@ description: "Task list for 008 HDR output and linear-light rendering"
 
 ---
 
+## Follow-up agreed for immediately after this feature
+
+- [ ] T050 **Get the HLSL checked at build time rather than only at run time.** Agreed 2026-09-22, to begin as soon as every task above is done. All ten shaders in `MatrixRainCore/RenderSystem.cpp` are strings compiled by `D3DCompile` at startup, once per monitor, so a broken shader is not a build failure: MSBuild succeeds and the app fails later with an opaque `E_FAIL`, with the compiler's message going to `OutputDebugStringA` where nothing reads it. This happened in T009 -- an HLSL parameter named `linear`, which is an interpolation-modifier keyword, passed the build and surfaced only as `initialization failed: 0x80004005` from the harness. Scope: (1) a unit test that compiles every shader source and reports the compiler's error text, which needs no D3D device and so runs in `MatrixRainTests`; (2) evaluate real build-time compilation -- vcxproj HLSL items, an `.hlsli` for the shared output transform, and how `ColorMathConstants` reaches HLSL without being retyped; (3) resolve `MatrixRainCore/Shaders/scanlines.hlsl`, a copy of a string literal that nothing compiles, by either enforcing the duplication with a test or deleting the file
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase dependencies
