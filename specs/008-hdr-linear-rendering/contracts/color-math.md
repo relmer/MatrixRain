@@ -80,9 +80,11 @@ void  ToneMapHighlights (float rgb[3], float headroom) noexcept
   - For `m = max(rgb) > 1`, maps `m` through a smooth shoulder to
     `m' < headroom`, with `m' → headroom` as `m → ∞`, and scales all channels
     by `m' / m` (hue preserved: channel ratios unchanged within 1e-5).
-  - C¹-continuous at `m = 1` (no visible kink).
-  - The curve (research R14): for `m > 1`, `t = (m - 1) / (h - 1)` and
-    `m' = 1 + (h - 1) * t / (1 + t)`; `f(1) = 1`, `f'(1) = 1`, `f -> h`.
+  - C¹-continuous at the knee (no visible kink).
+  - The curve (research R14, knee revised in T044): with
+    `k = 1 + MR_TONEMAP_KNEE * (h - 1)`, identity up to `k`; above it
+    `t = (m - k) / (h - k)` and `m' = k + (h - k) * t / (1 + t)`; `f'(k) = 1`,
+    `f -> h`. SC-005 is tested through the gain and this curve together.
   - `headroom == 1` → output capped at 1 (the Phase 2 behavior).
 
 ## Output mode selection

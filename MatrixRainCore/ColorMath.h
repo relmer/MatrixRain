@@ -282,12 +282,12 @@ float HighlightWeight (bool isHead, float brightness) noexcept;
 
 /// <summary>
 /// Rolls highlights off into the display's headroom without clipping or
-/// changing hue (research R8, R14; FR-019). On the maximum channel m:
-/// identity up to 1 (SDR white), then 1 + (h - 1) t / (1 + t) with
-/// t = (m - 1) / (h - 1), which leaves white where it is, has slope 1 there
-/// (no kink where a head crosses white), and approaches h without reaching
-/// it. All three channels are scaled by one factor, so their ratios, and so
-/// the hue, do not change. With h at or below 1 the result is capped at 1.
+/// changing hue (research R8, R14; FR-019). On the maximum channel m, with
+/// the knee k = 1 + MR_TONEMAP_KNEE (h - 1): identity up to k, then
+/// k + (h - k) t / (1 + t) with t = (m - k) / (h - k), which has slope 1 at
+/// the knee (no kink) and approaches h without reaching it. All three
+/// channels are scaled by one factor, so their ratios, and so the hue, do
+/// not change. With h at or below 1 the result is capped at 1.
 ///
 /// OutputTransform.hlsli carries a line-for-line transliteration.
 /// </summary>

@@ -76,6 +76,17 @@
 #define MR_HIGHLIGHT_GLOW_STRENGTH    1.0f
 
 //
+//  Where the highlight tone curve starts to bend, as a fraction of the way
+//  from SDR white to the display's peak. Everything below the knee is shown
+//  as rendered; only the last stretch rolls off toward the peak. A shoulder
+//  that started at SDR white itself compressed every highlight by about
+//  half: a head boosted to the peak landed halfway there, and SC-005's 2x
+//  at the default setting came out 1.6x (T044).
+//
+
+#define MR_TONEMAP_KNEE               0.8f
+
+//
 //  Blur passes for the highlight glow. The full glow runs up to four passes
 //  of the quality preset's kernel; the part above white is the glow's core,
 //  and repeating all of that doubled the blur's cost (0.23 ms at 4K High on

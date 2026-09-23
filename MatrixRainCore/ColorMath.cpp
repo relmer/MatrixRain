@@ -289,11 +289,19 @@ void ToneMapHighlights (float (& rgb)[3], float headroom) noexcept
     }
     else
     {
-        const float span = headroom - 1.0f;
-        const float t    = (m - 1.0f) / span;
+        const float knee = 1.0f + MR_TONEMAP_KNEE * (headroom - 1.0f);
 
 
-        mapped = 1.0f + span * t / (1.0f + t);
+        if (m <= knee)
+        {
+            return;
+        }
+
+        const float span = headroom - knee;
+        const float t    = (m - knee) / span;
+
+
+        mapped = knee + span * t / (1.0f + t);
     }
 
     const float scale = mapped / m;

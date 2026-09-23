@@ -433,7 +433,8 @@ namespace MatrixRainTests
         TEST_METHOD (HighlightGain_MeetsSc005_AtTheDefaultSetting)
         {
             // SC-005: a 600-nit peak at 240-nit SDR white, default setting 80,
-            // puts heads at least 2x SDR white.
+            // gives heads a gain of at least 2x SDR white. The test after the
+            // tone curve is HighlightChain_MeetsSc005_AfterToneMapping.
             const float headroom = Headroom (EffectivePeakNits (600.0f), 240.0f);
 
 
@@ -521,18 +522,53 @@ namespace MatrixRainTests
             Assert::AreEqual (0.9f / 2.4f, rgb[2] / rgb[1], 1e-5f, L"Blue to green unchanged");
         }
 
-        TEST_METHOD (ToneMapHighlights_HasSlopeOne_AtSdrWhite)
+        TEST_METHOD (ToneMapHighlights_HasSlopeOne_AtTheKnee)
         {
-            // C1 continuity where heads cross white: the slope just above 1
-            // matches the identity's slope just below.
-            const float delta = 1e-3f;
-            float       above[3] = { 1.0f + delta, 0.0f, 0.0f };
+            // C1 continuity where the shoulder starts: the slope just above
+            // the knee matches the identity's slope below it.
+            const float headroom = 4.0f;
+            const float knee     = 1.0f + MR_TONEMAP_KNEE * (headroom - 1.0f);
+            const float delta    = 1e-3f;
+            float       above[3] = { knee + delta, 0.0f, 0.0f };
 
 
 
-            ToneMapHighlights (above, 4.0f);
+            ToneMapHighlights (above, headroom);
 
-            Assert::AreEqual (1.0f, (above[0] - 1.0f) / delta, 1e-3f);
+            // The shoulder's own slope a step past the knee is 1 - delta / (h - k),
+            // 0.998 here; a kink would be far outside this.
+            Assert::AreEqual (1.0f, (above[0] - knee) / delta, 5e-3f);
+        }
+
+        TEST_METHOD (ToneMapHighlights_IsIdentity_BelowTheKnee)
+        {
+            // A highlight well above white but short of the knee is shown as
+            // rendered: the curve must not eat the boost it is meant to show.
+            float rgb[3] = { 2.0f, 1.0f, 0.5f };
+
+
+
+            ToneMapHighlights (rgb, 4.0f);
+
+            Assert::AreEqual (2.0f, rgb[0], 0.0f);
+            Assert::AreEqual (1.0f, rgb[1], 0.0f);
+        }
+
+        TEST_METHOD (HighlightChain_MeetsSc005_AfterToneMapping)
+        {
+            // SC-005 end to end: a 600-nit peak at a 250-nit SDR white, the
+            // default setting, a head at full gain, through the tone curve,
+            // lands at 2x SDR white or more. Checking the gain alone missed
+            // a curve that compressed it to 1.6x.
+            const float headroom = Headroom (EffectivePeakNits (600.0f), 250.0f);
+            const float gain     = HighlightGain (headroom, 80, HdrMode::Auto, OutputMode::Hdr);
+            float       head[3]  = { gain, gain, gain };
+
+
+
+            ToneMapHighlights (head, headroom);
+
+            Assert::IsTrue (head[0] >= 2.0f, (L"Head after tone mapping: " + std::to_wstring (head[0])).c_str());
         }
 
         TEST_METHOD (ToneMapHighlights_IsMonotonic)

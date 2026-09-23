@@ -482,15 +482,24 @@ head still covers what is behind it by its coverage.
 `h = headroom`:
 
 ```text
-m <= 1:  f(m) = m
-m >  1:  t = (m - 1) / (h - 1);   f(m) = 1 + (h - 1) * t / (1 + t)
+k = 1 + MR_TONEMAP_KNEE * (h - 1)                     MR_TONEMAP_KNEE = 0.8
+m <= k:  f(m) = m
+m >  k:  t = (m - k) / (h - k);   f(m) = k + (h - k) * t / (1 + t)
 h <= 1:  f(m) = min (m, 1)
 rgb *= f(m) / m
 ```
 
-`f(1) = 1`, `f'(1) = 1` (C1 at white, so no kink where heads cross it), and
-`f -> h` as `m -> infinity`, so nothing clips and the peak is approached, not
-hit. Scaling all three channels by one factor preserves hue (FR-019).
+`f(k) = k`, `f'(k) = 1` (C1 at the knee, so no kink), and `f -> h` as
+`m -> infinity`, so nothing clips and the peak is approached, not hit.
+Scaling all three channels by one factor preserves hue (FR-019).
+
+**Revised in T044.** The first version put the shoulder at SDR white
+(`k = 1`). Rob found the highlights subtle, and the arithmetic showed why:
+that curve compressed every highlight by about half. A head boosted to the
+display's peak landed at `1 + (h - 1) / 2`, and SC-005's 2x at the default
+setting on a 600-nit, 250-nit-white display came out 1.6x. The gain and the
+curve had been tested separately, never together; a test now checks SC-005
+through both.
 
 **Headroom per mode**: the monitor's real headroom in HDR with mode Auto; 1
 in HDR with mode Off ("never exceed SDR white", FR-021), which also keeps the

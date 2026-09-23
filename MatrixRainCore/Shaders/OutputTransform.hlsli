@@ -27,10 +27,11 @@ cbuffer OutputCb : register(b1)
 
 //
 //  ToneMapHighlights3: a line-for-line transliteration of ToneMapHighlights in
-//  ColorMath.cpp (research R8, R14). Identity up to SDR white; above it an
-//  extended-Reinhard shoulder on the brightest channel, slope 1 at white,
-//  approaching the headroom without reaching it; one factor for all three
-//  channels so the hue does not move. With no headroom it caps at white.
+//  ColorMath.cpp (research R8, R14). Identity up to a knee most of the way
+//  to the headroom (MR_TONEMAP_KNEE); above it an extended-Reinhard shoulder
+//  on the brightest channel, slope 1 at the knee, approaching the headroom
+//  without reaching it; one factor for all three channels so the hue does
+//  not move. With no headroom it caps at white.
 //
 
 float3 ToneMapHighlights3(float3 rgb, float headroom)
@@ -38,19 +39,25 @@ float3 ToneMapHighlights3(float3 rgb, float headroom)
     float  m      = max(max(rgb.r, rgb.g), rgb.b);
     float3 result = rgb;
 
-    if (m > 1.0)
+    if (headroom <= 1.0)
     {
-        float mapped = 1.0;
-
-        if (headroom > 1.0)
+        if (m > 1.0)
         {
-            float span = headroom - 1.0;
-            float t    = (m - 1.0) / span;
-
-            mapped = 1.0 + span * t / (1.0 + t);
+            result = rgb / m;
         }
+    }
+    else
+    {
+        float knee = 1.0 + MR_TONEMAP_KNEE * (headroom - 1.0);
 
-        result = rgb * (mapped / m);
+        if (m > knee)
+        {
+            float span   = headroom - knee;
+            float t      = (m - knee) / span;
+            float mapped = knee + span * t / (1.0 + t);
+
+            result = rgb * (mapped / m);
+        }
     }
 
     return result;
