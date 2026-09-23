@@ -27,7 +27,7 @@ public:
     {
     }
 
-    DisplayLuminance Query (IDXGISwapChain1 * /* pSwapChain */) noexcept override
+    DisplayLuminance Query (IDXGISwapChain * /* pSwapChain */) noexcept override
     {
         ++m_queryCount;
 

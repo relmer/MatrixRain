@@ -10,7 +10,11 @@
 //  bloom composite, the glow-off scene copy, or the scanline pass -- so each
 //  of them includes this and is told at upload time whether it is the one.
 //
-//  The HDR branch is a pass-through until US2 gives it a real transform.
+//  HDR presents scRGB: linear light with 1.0 at 80 nits, so SDR white is
+//  sdrWhiteNits / 80 (research R4, R6). Phase 2 caps the image at SDR white
+//  first (headroom 1, FR-013), which is what makes an HDR monitor show the
+//  same picture as an SDR one at the brightness the user set; Phase 3 raises
+//  the headroom and tone-maps into it.
 //
 
 cbuffer OutputCb : register(b1)
@@ -35,8 +39,9 @@ float3 OutputTransform(float3 linearRgb)
         return LinearToSrgb3(linearRgb);
     }
 
-    // HDR (scRGB): completed in US2.
-    return linearRgb;
+    // HDR (scRGB): cap at the headroom, then place SDR white where the
+    // user's slider put it.
+    return min(max(linearRgb, 0.0), g_headroom) * g_sdrWhiteScale;
 }
 
 #endif

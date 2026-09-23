@@ -2,6 +2,8 @@
 
 #include "MonitorRenderContext.h"
 
+#include "WindowsDisplayLuminanceProvider.h"
+
 #include "AnimationSystem.h"
 #include "Application.h"
 #include "ApplicationState.h"
@@ -63,15 +65,29 @@ MonitorRenderContext::~MonitorRenderContext()
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-HRESULT MonitorRenderContext::Initialize (HWND hwnd, UINT width, UINT height, std::optional<LUID> adapterLuid)
+HRESULT MonitorRenderContext::Initialize (HWND hwnd, UINT width, UINT height, std::optional<LUID> adapterLuid, ScreenSaverMode displayMode)
 {
     HRESULT hr = S_OK;
 
 
-    m_hwnd = hwnd;
+    m_hwnd        = hwnd;
+    m_displayMode = displayMode;
 
     hr = m_renderSystem->Initialize (hwnd, width, height, adapterLuid);
     CHR (hr);
+
+    // The swap chain comes up in SDR; detection moves it to HDR here, before
+    // the first frame, through the same in-place switch the render thread
+    // uses later. A device-loss rebuild comes back through this path too, so
+    // the mode is re-selected on whatever adapter is current then (FR-016).
+    if (!m_luminanceProvider)
+    {
+        m_luminanceProvider = std::make_unique<WindowsDisplayLuminanceProvider>();
+    }
+
+    m_outputModeTracker.emplace (displayMode);
+
+    RunOutputModeDetection();
 
     // Size the viewport to match the swap chain.  The WM_SIZE fired during
     // window creation is dropped (this context isn't registered yet), so the
@@ -167,6 +183,9 @@ void MonitorRenderContext::StartRenderThread (SharedState      & sharedState,
     m_inTransition = &inTransition;
     m_shouldStop   = false;
 
+    // Initialize ran detection before there was a SharedState to count in.
+    PublishHdrPresence (m_isHdr);
+
     m_renderThread = std::thread (&MonitorRenderContext::RenderThreadProc, this);
 }
 
@@ -181,6 +200,14 @@ void MonitorRenderContext::StartRenderThread (SharedState      & sharedState,
 
 void MonitorRenderContext::RequestStop()
 {
+    // A stopping context no longer presents anything, in HDR or otherwise.
+    // Only while the thread is running: that is the one state in which the
+    // SharedState this counts in is known to be alive.
+    if (m_renderThread.joinable())
+    {
+        PublishHdrPresence (false);
+    }
+
     m_shouldStop = true;
 }
 
@@ -319,6 +346,117 @@ void MonitorRenderContext::ApplyDpiChange (UINT dpi)
     m_renderSystem->OnDpiChanged     (dpi);
     m_animationSystem->SetDpiScale   (dpiScale);
     m_densityController->SetDpiScale (dpiScale);
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  MonitorRenderContext::SetDisplayLuminanceProvider
+//
+////////////////////////////////////////////////////////////////////////////////
+
+void MonitorRenderContext::SetDisplayLuminanceProvider (std::unique_ptr<IDisplayLuminanceProvider> provider)
+{
+    m_luminanceProvider = std::move (provider);
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  MonitorRenderContext::CurrentOutputMode
+//
+////////////////////////////////////////////////////////////////////////////////
+
+OutputMode MonitorRenderContext::CurrentOutputMode() const noexcept
+{
+    return m_outputModeTracker ? m_outputModeTracker->CurrentMode() : OutputMode::Sdr;
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  MonitorRenderContext::RunOutputModeDetection
+//
+//  One round of research R5: ask the provider what the display is, let the
+//  tracker decide, and act. Runs under m_renderMutex: on the UI thread from
+//  Initialize before the thread exists, and on the render thread after.
+//  The tracker is told how the switch went, because a swap chain that
+//  refuses HDR falls back to SDR and the constant buffer has to say so.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+void MonitorRenderContext::RunOutputModeDetection()
+{
+    DisplayLuminance   luminance;
+    OutputModeDecision decision;
+
+
+
+    if (!m_luminanceProvider || !m_outputModeTracker || !m_renderSystem)
+    {
+        return;
+    }
+
+    luminance = m_luminanceProvider->Query (m_renderSystem->GetSwapChain());
+    decision  = m_outputModeTracker->Observe (luminance);
+
+    if (decision.action == OutputModeAction::Reconfigure)
+    {
+        const HRESULT hr = m_renderSystem->ReconfigureOutputMode (decision.mode);
+
+
+        m_outputModeTracker->ReportReconfigureResult (decision.mode, SUCCEEDED (hr));
+    }
+
+    m_renderSystem->SetSdrWhiteScale (m_outputModeTracker->SdrWhiteScale());
+
+    PublishHdrPresence (m_outputModeTracker->CurrentMode() == OutputMode::Hdr);
+
+    m_lastDetection = std::chrono::steady_clock::now();
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  MonitorRenderContext::PublishHdrPresence
+//
+//  Keeps SharedState::hdrMonitorCount including this context exactly when
+//  it presents in HDR (T034). Safe to call before StartRenderThread, when
+//  there is no SharedState yet: the fact is kept and published on start.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+void MonitorRenderContext::PublishHdrPresence (bool isHdr)
+{
+    m_isHdr = isHdr;
+
+    if (m_sharedState == nullptr)
+    {
+        return;
+    }
+
+    if (isHdr && !m_countedAsHdr)
+    {
+        ++m_sharedState->hdrMonitorCount;
+        m_countedAsHdr = true;
+    }
+    else if (!isHdr && m_countedAsHdr)
+    {
+        --m_sharedState->hdrMonitorCount;
+        m_countedAsHdr = false;
+    }
 }
 
 
@@ -494,6 +632,16 @@ void MonitorRenderContext::RenderThreadProc()
         // last frame.  Applied here, on this thread, so the UI thread never
         // has to wait for this lock.
         ApplyPendingWindowChanges();
+
+        // Output mode detection: at 1 Hz, and at once when the display
+        // configuration changed under us (research R5). Windows sends no
+        // notification for the SDR brightness slider, so the poll is what
+        // makes the rain follow it (FR-012).
+        if (m_luminanceProvider
+            && (m_luminanceProvider->IsStale() || currentTime - m_lastDetection >= seconds (1)))
+        {
+            RunOutputModeDetection();
+        }
 
         if (m_fpsCounter)
         {

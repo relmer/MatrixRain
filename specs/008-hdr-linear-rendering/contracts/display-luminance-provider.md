@@ -41,6 +41,14 @@ public:
 - `scRgbSupported` is true when the swap chain reports present support for
   `RGB_FULL_G10_NONE_P709`. The two are reported separately, and
   `SelectOutputMode` combines them (see [color-math.md](color-math.md)).
+  **Found on hardware (T032)**: `CheckColorSpaceSupport` answers for the
+  swap chain's current back buffer format, and scRGB needs 16-bit float, so
+  asked while the buffers are 8-bit it always says no. The provider therefore
+  reports the format-specific answer only when the buffers are already float;
+  otherwise it reports true when `IDXGISwapChain3` exists at all, and
+  `RenderSystem::ResizeBackBuffer` makes the definitive check right after
+  resizing to float, failing the switch (and so falling back to SDR, which the
+  tracker records as a refusal) if the flag is absent.
 
 ## Fake for tests
 

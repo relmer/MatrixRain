@@ -774,14 +774,7 @@ HRESULT RenderSystem::ApplyScanlinePass()
     // The scanline pass only ever runs last, so it always encodes for the
     // display.
     {
-        OutputTransformCb outputCb = {};
-
-        outputCb.outputMode    = 0;
-        outputCb.sdrWhiteScale = 1.0f;
-        outputCb.headroom      = 1.0f;
-        outputCb.isFinalPass   = 1;
-
-        (void) UploadOutputTransformConstants (outputCb);
+        (void) UploadOutputTransformConstants (MakeOutputTransformCb (true));
         m_context->PSSetConstantBuffers (1, 1, m_outputConstantBuffer.GetAddressOf());
     }
 
@@ -1663,14 +1656,7 @@ HRESULT RenderSystem::ApplyBloom (ID3D11RenderTargetView * pCompositeTarget, boo
     // back buffer. When scanlines follow, it is not, and the image stays in
     // linear light for them.
     {
-        OutputTransformCb outputCb = {};
-
-        outputCb.outputMode    = 0;
-        outputCb.sdrWhiteScale = 1.0f;
-        outputCb.headroom      = 1.0f;
-        outputCb.isFinalPass   = isFinalPass ? 1u : 0u;
-
-        (void) UploadOutputTransformConstants (outputCb);
+        (void) UploadOutputTransformConstants (MakeOutputTransformCb (isFinalPass));
         m_context->PSSetConstantBuffers (1, 1, m_outputConstantBuffer.GetAddressOf());
     }
 
@@ -2131,15 +2117,9 @@ void RenderSystem::Render (const AnimationSystem & animationSystem, const Viewpo
             // The bloom SRV is null and bloomIntensity is zeroed below, so the
             // glow term evaluates to nothing and this is a plain scene copy.
             {
-                OutputTransformCb        outputCb      = {};
                 D3D11_MAPPED_SUBRESOURCE mappedBloomCB = {};
 
-                outputCb.outputMode    = 0;
-                outputCb.sdrWhiteScale = 1.0f;
-                outputCb.headroom      = 1.0f;
-                outputCb.isFinalPass   = wantScanlines ? 0u : 1u;
-
-                (void) UploadOutputTransformConstants (outputCb);
+                (void) UploadOutputTransformConstants (MakeOutputTransformCb (!wantScanlines));
                 m_context->PSSetConstantBuffers (1, 1, m_outputConstantBuffer.GetAddressOf());
 
                 if (SUCCEEDED (m_context->Map (m_bloomConstantBuffer.Get(),
@@ -2218,6 +2198,11 @@ void RenderSystem::RenderFPSCounter (float fps, int rainPercentage, int streakCo
 
 
     CBRAEx (m_d2dContext && m_fpsBrush && m_fpsTextFormat && m_fpsGlowBrush, E_UNEXPECTED);
+
+    // White text, in the back buffer's units: plain white in SDR, SDR white
+    // in scRGB when presenting HDR (FR-014). Set every frame because the
+    // white level can move at any second.
+    m_fpsBrush->SetColor (OutputColor (D2D1::ColorF (D2D1::ColorF::White)));
 
     // Begin D2D rendering
     m_d2dContext->BeginDraw();
@@ -3083,6 +3068,9 @@ void RenderSystem::Resize (UINT width, UINT height)
     hr = m_swapChain->ResizeBuffers (0, width, height, DXGI_FORMAT_UNKNOWN, 0);
     CHR (hr);
 
+    // ResizeBuffers keeps the format but not, reliably, the color space.
+    (void) ApplyColorSpace();
+
     // Recreate render target view
     hr = CreateRenderTargetView();
     CHR (hr);
@@ -3239,9 +3227,12 @@ HRESULT RenderSystem::RecreateDirect2DBitmap()
     hr = backBuffer.As (&dxgiSurface);
     CHR (hr);
 
+    // The bitmap wraps the back buffer, so it takes the back buffer's format:
+    // 16-bit float in HDR (research R9). D2D draws into it in whatever units
+    // the brushes carry, which is why OutputColor converts them.
     bitmapProps = D2D1::BitmapProperties1 (
         D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW,
-        D2D1::PixelFormat (DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED)
+        D2D1::PixelFormat (BackBufferFormat (m_outputMode), D2D1_ALPHA_MODE_PREMULTIPLIED)
     );
 
     hr = m_d2dContext->CreateBitmapFromDxgiSurface (dxgiSurface.Get(), &bitmapProps, &m_d2dBitmap);
@@ -3251,6 +3242,226 @@ HRESULT RenderSystem::RecreateDirect2DBitmap()
 
 Error:
     return hr;
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  RenderSystem::BackBufferFormat
+//
+////////////////////////////////////////////////////////////////////////////////
+
+DXGI_FORMAT RenderSystem::BackBufferFormat (OutputMode mode) noexcept
+{
+    return (mode == OutputMode::Hdr) ? DXGI_FORMAT_R16G16B16A16_FLOAT : DXGI_FORMAT_B8G8R8A8_UNORM;
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  RenderSystem::ApplyColorSpace
+//
+//  Tells DXGI how to read the back buffer: scRGB (linear light, 1.0 is
+//  80 nits) when presenting HDR, ordinary sRGB otherwise. Needs
+//  IDXGISwapChain3; on a DXGI too old to have it the SDR default stands,
+//  which is what an old DXGI would do anyway.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+HRESULT RenderSystem::ApplyColorSpace()
+{
+    HRESULT                 hr         = S_OK;
+    ComPtr<IDXGISwapChain3> swapChain3;
+    DXGI_COLOR_SPACE_TYPE   colorSpace = (m_outputMode == OutputMode::Hdr)
+                                         ? DXGI_COLOR_SPACE_RGB_FULL_G10_NONE_P709
+                                         : DXGI_COLOR_SPACE_RGB_FULL_G22_NONE_P709;
+
+
+
+    CBRAEx (m_swapChain != nullptr, E_UNEXPECTED);
+
+    hr = m_swapChain.As (&swapChain3);
+    CHRA (hr);
+
+    hr = swapChain3->SetColorSpace1 (colorSpace);
+    CHRA (hr);
+
+
+Error:
+    return hr;
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  RenderSystem::ResizeBackBuffer
+//
+//  The in-place switch itself: drop the views onto the back buffer, resize
+//  the buffers into the format of the new mode, declare its color space, and
+//  rebuild the views and the D2D bitmap. The same shape as Resize. Leaves
+//  m_outputMode saying which format the buffers now have, whether or not
+//  every later step succeeded, so a caller can always tell what it holds.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+HRESULT RenderSystem::ResizeBackBuffer (OutputMode mode)
+{
+    HRESULT hr = S_OK;
+
+
+
+    CBRAEx (m_swapChain != nullptr, E_UNEXPECTED);
+
+    if (m_d2dContext)
+    {
+        m_d2dContext->SetTarget (nullptr);
+    }
+
+    ReleaseRenderTargetResources();
+
+    m_outputMode = mode;
+
+    hr = m_swapChain->ResizeBuffers (0, m_renderWidth, m_renderHeight, BackBufferFormat (mode), 0);
+    CHRA (hr);
+
+    // Now that the buffers are float the swap chain can say whether it can
+    // present them as scRGB; asked earlier, with 8-bit buffers, it says no
+    // regardless. HDR without its color space would be shown as if it were
+    // sRGB, so a refusal here fails the switch. SDR without an explicit
+    // color space is what every swap chain starts as.
+    if (mode == OutputMode::Hdr)
+    {
+        ComPtr<IDXGISwapChain3> swapChain3;
+        UINT                    supportFlags = 0;
+
+
+        hr = m_swapChain.As (&swapChain3);
+        CHRA (hr);
+
+        hr = swapChain3->CheckColorSpaceSupport (DXGI_COLOR_SPACE_RGB_FULL_G10_NONE_P709, &supportFlags);
+        CHRA (hr);
+
+        CBRAEx ((supportFlags & DXGI_SWAP_CHAIN_COLOR_SPACE_SUPPORT_FLAG_PRESENT) != 0, DXGI_ERROR_UNSUPPORTED);
+
+        hr = ApplyColorSpace();
+        CHRA (hr);
+    }
+    else
+    {
+        (void) ApplyColorSpace();
+    }
+
+    hr = CreateRenderTargetView();
+    CHRA (hr);
+
+    hr = RecreateDirect2DBitmap();
+    CHRA (hr);
+
+
+Error:
+    return hr;
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  RenderSystem::ReconfigureOutputMode
+//
+//  Switches the back buffer between 8-bit sRGB and 16-bit float scRGB in
+//  place (research R7, data-model §7). Runs on the render thread, between
+//  frames. When the display refuses the new mode the swap chain is put back
+//  into SDR before returning, and the failure is returned so the monitor
+//  context's tracker records the refusal and stops asking (FR-015). An SDR
+//  back buffer is the one thing this never gives up on.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+HRESULT RenderSystem::ReconfigureOutputMode (OutputMode mode)
+{
+    HRESULT hr = S_OK;
+
+
+
+    BAIL_OUT_IF (mode == m_outputMode, S_OK);
+
+    hr = ResizeBackBuffer (mode);
+
+    if (FAILED (hr) && mode != OutputMode::Sdr)
+    {
+        (void) ResizeBackBuffer (OutputMode::Sdr);
+    }
+
+
+Error:
+    return hr;
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  RenderSystem::MakeOutputTransformCb
+//
+//  The b1 constants for one pass (data-model §4). Phase 2 caps at SDR white
+//  (headroom 1, FR-013); Phase 3 puts the display's headroom here.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+OutputTransformCb RenderSystem::MakeOutputTransformCb (bool isFinalPass) const noexcept
+{
+    OutputTransformCb cb = {};
+
+
+
+    cb.outputMode    = (m_outputMode == OutputMode::Hdr) ? 1u : 0u;
+    cb.sdrWhiteScale = m_sdrWhiteScale;
+    cb.headroom      = 1.0f;
+    cb.isFinalPass   = isFinalPass ? 1u : 0u;
+
+    return cb;
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  RenderSystem::OutputColor
+//
+//  A Direct2D brush color in the back buffer's units. In SDR the back buffer
+//  is 8-bit sRGB and takes the color as authored. In HDR it is linear scRGB,
+//  so the color is decoded to linear light and placed at SDR white, which
+//  keeps the statistics text at the brightness the user set for SDR content
+//  (research R9, FR-014).
+//
+////////////////////////////////////////////////////////////////////////////////
+
+D2D1_COLOR_F RenderSystem::OutputColor (const D2D1_COLOR_F & srgb) const noexcept
+{
+    if (m_outputMode != OutputMode::Hdr)
+    {
+        return srgb;
+    }
+
+    return D2D1::ColorF (SrgbToLinear (srgb.r) * m_sdrWhiteScale,
+                         SrgbToLinear (srgb.g) * m_sdrWhiteScale,
+                         SrgbToLinear (srgb.b) * m_sdrWhiteScale,
+                         srgb.a);
 }
 
 

@@ -13,6 +13,7 @@
 #include "RenderParams.h"
 #include "Viewport.h"
 #include "ColorScheme.h"
+#include "OutputModeSelection.h"
 
 
 
@@ -36,7 +37,7 @@ class CharacterStreak;
 //  Returns the throttled (~1 Hz internally) process-scoped GPU load
 //  percentage that matches Task Manager's per-process "GPU" column.
 //  Returns -1.0 until the first PDH collection produces data, or if
-//  PDH initialisation has permanently failed.  Wired into the v1.5
+//  PDH initialization has permanently failed.  Wired into the v1.5
 //  property-sheet 1 Hz title timer (T032) alongside the per-frame
 //  FPS publisher.
 //
@@ -184,6 +185,16 @@ public:
     /// <returns>Non-owning pointer to the swap chain, or null before Initialize</returns>
     IDXGISwapChain      * GetSwapChain()     const { return m_swapChain.Get();     }
 
+    // Output mode (research R4, R7). The swap chain starts in SDR; the
+    // monitor context's detection moves it to HDR and back in place. The
+    // mode reported here always matches the back buffer format in use.
+    HRESULT    ReconfigureOutputMode (OutputMode mode);
+    OutputMode GetOutputMode()       const noexcept { return m_outputMode; }
+
+    // The scRGB value of SDR white on this monitor, sdrWhiteNits / 80; the
+    // detection pushes the current one every second. Ignored in SDR.
+    void       SetSdrWhiteScale (float scale) noexcept { m_sdrWhiteScale = scale; }
+
 private:
     // Instance data for rendering a single character glyph; packed tightly for
     // GPU upload.
@@ -236,6 +247,13 @@ private:
     HRESULT CreateDevice();
     HRESULT CreateSwapChain            (HWND hwnd, UINT width, UINT height);
     HRESULT CreateRenderTargetView();
+    HRESULT ResizeBackBuffer (OutputMode mode);
+    HRESULT ApplyColorSpace();
+
+    static DXGI_FORMAT BackBufferFormat (OutputMode mode) noexcept;
+
+    OutputTransformCb MakeOutputTransformCb (bool isFinalPass) const noexcept;
+    D2D1_COLOR_F      OutputColor           (const D2D1_COLOR_F & srgb) const noexcept;
     HRESULT CompileCharacterShaders();
     HRESULT CompileBloomShaders();
     HRESULT CreateDummyVertexBuffer();
@@ -391,6 +409,9 @@ private:
 
     // DPI scale factor (1.0 at 96 DPI / 100%)
     float m_dpiScale { 1.0f };
+
+    OutputMode m_outputMode    { OutputMode::Sdr };
+    float      m_sdrWhiteScale { 1.0f };
 
     // Glow effect parameters
     float m_glowIntensity { 2.5f };  // Bloom intensity multiplier (100% = 2.5)

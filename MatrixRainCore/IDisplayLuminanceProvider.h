@@ -2,7 +2,7 @@
 
 #include "ColorMath.h"
 
-struct IDXGISwapChain1;
+struct IDXGISwapChain;
 
 
 
@@ -30,7 +30,7 @@ public:
     // scRgbSupported = false and sdrWhiteNits = 80, which selects SDR
     // (FR-015). Cheap enough to call at 1 Hz per monitor from the render
     // thread, and it must not wait on the UI thread.
-    virtual DisplayLuminance Query (IDXGISwapChain1 * pSwapChain) noexcept = 0;
+    virtual DisplayLuminance Query (IDXGISwapChain * pSwapChain) noexcept = 0;
 
     // True when the cached DXGI factory no longer reflects the display
     // configuration; the next Query refreshes it.

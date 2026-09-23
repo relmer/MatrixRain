@@ -61,6 +61,13 @@ struct SharedState
     // Debug/statistics display
     bool        showStatistics        = false;
 
+    // How many monitor contexts are presenting in HDR right now (T034). Each
+    // MonitorRenderContext adds itself on entering HDR and removes itself on
+    // leaving or stopping; the configuration dialog reads it to decide
+    // whether the HDR controls apply. Atomic because the render threads
+    // write it and the dialog thread reads it without the mutex.
+    std::atomic<int> hdrMonitorCount { 0 };
+
     // Pause state (spacebar) — broadcast to every monitor so all displays
     // freeze and resume their rain together.  Does not freeze elapsedTime, so
     // color cycling continues while paused.

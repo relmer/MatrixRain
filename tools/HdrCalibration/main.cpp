@@ -11,6 +11,7 @@
 #include "..\..\MatrixRainCore\ScanlineStyleMapping.h"
 #include "..\..\MatrixRainCore\ScreenSaverSettings.h"
 #include "..\..\MatrixRainCore\Viewport.h"
+#include "..\..\MatrixRainCore\WindowsDisplayLuminanceProvider.h"
 
 //  WIC is used only by this tool, so the import library is listed here rather
 //  than in pch.h, where it would follow MatrixRain.exe into a release build.
@@ -136,6 +137,7 @@ enum class RunMode
     Reference,   // Render each case and write it out as the baseline
     Compare,     // Render each case and diff it against the baseline
     Benchmark,   // Time frames per quality preset
+    Luminance,   // Report what the display luminance provider sees, and how long it takes
 };
 
 
@@ -178,6 +180,7 @@ public:
     HRESULT RunReference (const std::wstring & baselineDir);
     HRESULT RunCompare   (const std::wstring & baselineDir);
     HRESULT RunBenchmark (float dpiScale);
+    HRESULT RunLuminance ();
 
 private:
     HRESULT CreateHiddenWindow();
@@ -1032,6 +1035,87 @@ Error:
 
 ////////////////////////////////////////////////////////////////////////////////
 //
+//  Harness::RunLuminance
+//
+//  What WindowsDisplayLuminanceProvider reports for the output this window
+//  sits on, and how long one query takes (T032 asks for under a millisecond,
+//  since it runs at 1 Hz on every render thread). Meaningful on the hardware
+//  adapter only: WARP has no outputs, so it reports the SDR answer at once.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+HRESULT Harness::RunLuminance()
+{
+    using namespace std::chrono;
+
+    HRESULT                         hr        = S_OK;
+    WindowsDisplayLuminanceProvider provider;
+    DisplayLuminance                luminance;
+    constexpr int                   kQueries  = 200;
+    double                          totalUs   = 0.0;
+    double                          worstUs   = 0.0;
+
+
+
+    CBRAEx (m_renderSystem && m_renderSystem->GetSwapChain(), E_UNEXPECTED);
+
+    for (int i = 0; i < kQueries; ++i)
+    {
+        const auto start = steady_clock::now();
+
+
+        luminance = provider.Query (m_renderSystem->GetSwapChain());
+
+        const double us = duration_cast<duration<double, std::micro>> (steady_clock::now() - start).count();
+
+
+        totalUs  += us;
+        worstUs   = std::max (worstUs, us);
+    }
+
+    wprintf (L"device            %s\n", luminance.deviceName.c_str());
+    wprintf (L"hdrEnabled        %s\n", luminance.hdrEnabled     ? L"true" : L"false");
+    wprintf (L"scRgbSupported    %s\n", luminance.scRgbSupported ? L"true" : L"false");
+    wprintf (L"sdrWhiteNits      %.1f\n", luminance.sdrWhiteNits);
+    wprintf (L"reportedPeakNits  %.1f\n", luminance.reportedPeakNits);
+    wprintf (L"effectivePeakNits %.1f\n", EffectivePeakNits (luminance.reportedPeakNits));
+    wprintf (L"sdrWhiteScale     %.3f\n", SdrWhiteScale (luminance.sdrWhiteNits));
+    wprintf (L"headroom          %.3f\n", Headroom (EffectivePeakNits (luminance.reportedPeakNits), luminance.sdrWhiteNits));
+    wprintf (L"selected mode     %s\n", SelectOutputMode (luminance.hdrEnabled, luminance.scRgbSupported, ScreenSaverMode::Normal) == OutputMode::Hdr ? L"Hdr" : L"Sdr");
+    wprintf (L"query time        mean %.1f us, worst %.1f us over %d queries\n", totalUs / kQueries, worstUs, kQueries);
+    wprintf (L"stale after       %s\n", provider.IsStale() ? L"true" : L"false");
+
+    // The switch itself, both ways, on this adapter and output.
+    {
+        const HRESULT toHdr = m_renderSystem->ReconfigureOutputMode (OutputMode::Hdr);
+
+
+        luminance = provider.Query (m_renderSystem->GetSwapChain());
+
+        wprintf (L"switch to HDR     hr=0x%08X, mode now %s, scRgbSupported now %s\n",
+                 static_cast<unsigned> (toHdr),
+                 m_renderSystem->GetOutputMode() == OutputMode::Hdr ? L"Hdr" : L"Sdr",
+                 luminance.scRgbSupported ? L"true" : L"false");
+
+        const HRESULT toSdr = m_renderSystem->ReconfigureOutputMode (OutputMode::Sdr);
+
+
+        wprintf (L"switch to SDR     hr=0x%08X, mode now %s\n",
+                 static_cast<unsigned> (toSdr),
+                 m_renderSystem->GetOutputMode() == OutputMode::Hdr ? L"Hdr" : L"Sdr");
+    }
+
+
+Error:
+    return hr;
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
 //  ModeName
 //
 ////////////////////////////////////////////////////////////////////////////////
@@ -1043,6 +1127,7 @@ static const wchar_t * ModeName (RunMode mode)
         case RunMode::Reference: return L"reference";
         case RunMode::Compare:   return L"compare";
         case RunMode::Benchmark: return L"benchmark";
+        case RunMode::Luminance: return L"luminance";
     }
 
     return L"unknown";
@@ -1145,6 +1230,10 @@ static bool ParseOptions (int argc, wchar_t * argv[], Options & options)
             {
                 options.m_mode = RunMode::Benchmark;
             }
+            else if (value == L"luminance")
+            {
+                options.m_mode = RunMode::Luminance;
+            }
             else
             {
                 return false;
@@ -1212,7 +1301,7 @@ int wmain (int argc, wchar_t * argv[])
     if (!ParseOptions (argc, argv, options))
     {
         wprintf (L"usage: HdrCalibration [--adapter warp|hardware]"
-                 L" [--mode reference|compare|benchmark] [--baseline-dir <path>]"
+                 L" [--mode reference|compare|benchmark|luminance] [--baseline-dir <path>]"
                  L" [--frame <W>x<H>] [--dpi <percent>]\n"
                  L"       --frame and --dpi apply to benchmark mode only\n");
         return 1;
@@ -1273,6 +1362,10 @@ int wmain (int argc, wchar_t * argv[])
 
         case RunMode::Benchmark:
             hr = harness.RunBenchmark (options.m_dpiScale);
+            break;
+
+        case RunMode::Luminance:
+            hr = harness.RunLuminance();
             break;
     }
 

@@ -499,3 +499,29 @@ a software rasterizer's cost for the precision FR-003 asks for. The Low preset
 still renders a 1080p frame in under 6 ms there.
 
 No preset was retuned.
+
+## Display luminance query cost (T032)
+
+`HdrCalibration.exe --adapter hardware --mode luminance`, on the RTX 5070 Ti
+with the window on the landscape monitor, which has Windows HDR on:
+
+| Field | Value |
+|---|---|
+| device | `\.\DISPLAY2` |
+| hdrEnabled | true |
+| scRgbSupported | true (once the buffers are float; see the contract note) |
+| sdrWhiteNits | 240 (the Windows SDR brightness slider) |
+| reportedPeakNits | 360 |
+| sdrWhiteScale | 3.0 |
+| headroom | 1.5 |
+| query time | mean 9.9 µs, worst 219 µs over 200 queries |
+
+The target was under 1 ms per query at 1 Hz per monitor; it is two orders of
+magnitude under. The same run switches the swap chain to HDR and back
+(`ReconfigureOutputMode`), both returning S_OK.
+
+The first run of this mode found `scRgbSupported` false on this same
+monitor: `CheckColorSpaceSupport` answers for the swap chain's current back
+buffer format, which was still 8-bit. The definitive check now happens
+inside the switch, after the buffers are float.
+

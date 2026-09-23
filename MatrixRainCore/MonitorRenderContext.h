@@ -1,6 +1,9 @@
 #pragma once
 
 #include "FrameLimiter.h"
+#include "IDisplayLuminanceProvider.h"
+#include "OutputModeTracker.h"
+#include "ScreenSaverMode.h"
 #include "SharedState.h"
 
 
@@ -39,8 +42,17 @@ public:
     explicit MonitorRenderContext (bool isPrimary);
     ~MonitorRenderContext();
 
-    // Construction — called on the UI thread before the render thread starts
-    HRESULT Initialize         (HWND hwnd, UINT width, UINT height, std::optional<LUID> adapterLuid = std::nullopt);
+    // Construction — called on the UI thread before the render thread starts.
+    // displayMode is how the app was launched; the preview window never
+    // presents in HDR (FR-017), and the mode is chosen here from it.
+    HRESULT Initialize         (HWND hwnd, UINT width, UINT height, std::optional<LUID> adapterLuid, ScreenSaverMode displayMode);
+
+    // Test seam: replaces the OS-backed luminance provider. Call before
+    // Initialize; the default is WindowsDisplayLuminanceProvider.
+    void    SetDisplayLuminanceProvider (std::unique_ptr<IDisplayLuminanceProvider> provider);
+
+    // The mode the swap chain presents in right now.
+    OutputMode CurrentOutputMode() const noexcept;
     void    InitializeAnimation();
     HRESULT BuildGlyphAtlas();
 
@@ -118,14 +130,27 @@ private:
     };
 
     void RenderThreadProc();
+    void RunOutputModeDetection();
+    void PublishHdrPresence (bool isHdr);
     void ApplyPendingWindowChanges();
     void ApplyResize       (UINT width, UINT height, bool rescaleStreaks);
     void ApplyDpiChange    (UINT dpi);
     void Update (const SharedState::Snapshot & snapshot, float deltaTime);
     void Render (const SharedState::Snapshot & snapshot);
 
-    bool m_isPrimary;
-    HWND m_hwnd { nullptr };
+    bool            m_isPrimary;
+    HWND            m_hwnd        { nullptr };
+    ScreenSaverMode m_displayMode { ScreenSaverMode::Normal };
+
+    // Output mode detection (research R5, R6; T032). The provider asks the
+    // OS, the tracker decides, RenderSystem does the switch. Detection runs
+    // on the render thread at 1 Hz and whenever the provider says the display
+    // configuration changed, and once at Initialize before the first frame.
+    std::unique_ptr<IDisplayLuminanceProvider> m_luminanceProvider;
+    std::optional<OutputModeTracker>           m_outputModeTracker;
+    std::chrono::steady_clock::time_point      m_lastDetection {};
+    bool                                       m_isHdr         { false };   // What the last detection concluded
+    bool                                       m_countedAsHdr  { false };   // Whether SharedState::hdrMonitorCount includes this context
 
     std::unique_ptr<Viewport>          m_viewport;
     std::unique_ptr<AnimationSystem>   m_animationSystem;

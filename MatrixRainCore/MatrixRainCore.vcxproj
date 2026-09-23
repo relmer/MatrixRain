@@ -279,6 +279,7 @@
     <ClInclude Include="InMemoryDisplayLuminanceProvider.h" />
     <ClInclude Include="OutputModeSelection.h" />
     <ClInclude Include="OutputModeTracker.h" />
+    <ClInclude Include="WindowsDisplayLuminanceProvider.h" />
     <ClInclude Include="InMemoryAdapterProvider.h" />
     <ClInclude Include="MultiMonitorGate.h" />
     <ClInclude Include="QualityPresets.h" />
@@ -343,6 +344,7 @@
     <ClCompile Include="ColorMath.cpp" />
     <ClCompile Include="OutputModeSelection.cpp" />
     <ClCompile Include="OutputModeTracker.cpp" />
+    <ClCompile Include="WindowsDisplayLuminanceProvider.cpp" />
     <ClCompile Include="FrameMetrics.cpp" />
     <ClCompile Include="RandomSource.cpp" />
     <ClCompile Include="ScanlineStyleMapping.cpp" />

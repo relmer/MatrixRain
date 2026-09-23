@@ -600,7 +600,7 @@ HRESULT Application::AddContext (const POINT & position, const SIZE & size, DWOR
 
     context = std::make_unique<MonitorRenderContext> (isPrimary);
 
-    hr = context->Initialize (hwnd, static_cast<UINT> (size.cx), static_cast<UINT> (size.cy), m_resolvedAdapter);
+    hr = context->Initialize (hwnd, static_cast<UINT> (size.cx), static_cast<UINT> (size.cy), m_resolvedAdapter, GetScreenSaverMode());
     CHR (hr);
 
     if (isPrimary)
@@ -1227,6 +1227,12 @@ LRESULT Application::HandleMessage (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM 
             // Coalesced burst handler — clear the latch so any further
             // topology / device-loss notifications that arrive while we
             // are rebuilding can request a follow-up rebuild.
+            //
+            // The rebuild goes through AddContext and so through
+            // MonitorRenderContext::Initialize, which re-runs output mode
+            // detection on the new device and swap chain. A device-loss
+            // rebuild therefore comes back in HDR where HDR is on, with
+            // nothing to remember across the loss (FR-016, T033).
             m_rebuildCoalescer.Consume();
             RebuildContextsForCurrentMode();
             return 0;
