@@ -26,7 +26,7 @@
 //  at the gamma-space value, which is exactly the pixel v1.6 wrote.
 //
 
-#include "ColorConstants.h"
+#include "ColorTransfer.hlsli"
 
 cbuffer Constants : register(b0)
 {
@@ -48,16 +48,6 @@ struct PSInput
     float  brightness : BRIGHTNESS;
 };
 
-float SrgbToLinearChannel(float encoded)
-{
-    if (encoded <= MR_SRGB_ENCODED_KNEE)
-    {
-        return encoded / MR_SRGB_LINEAR_SLOPE;
-    }
-
-    return pow((encoded + MR_SRGB_CURVE_OFFSET) / MR_SRGB_CURVE_SCALE, MR_SRGB_CURVE_GAMMA);
-}
-
 float4 main(PSInput input) : SV_TARGET
 {
     float4 texColor  = atlasTexture.Sample(samplerState, input.uv);
@@ -68,9 +58,7 @@ float4 main(PSInput input) : SV_TARGET
 
     if (linearizeColors > 0.5)
     {
-        displayed = float3(SrgbToLinearChannel(displayed.r),
-                           SrgbToLinearChannel(displayed.g),
-                           SrgbToLinearChannel(displayed.b));
+        displayed = SrgbToLinear3(displayed);
     }
 
     return float4(displayed, input.color.a * coverage * input.brightness);

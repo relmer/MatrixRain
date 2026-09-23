@@ -126,6 +126,7 @@ and converted afterward. FR-001 and FR-005 were revised to say so.
 | `Shaders/BloomExtract.ps.hlsl` | input clamp | 1.0 |
 | `Shaders/BloomComposite.ps.hlsl` | `kBloomFalloff` | 2.4 (`MR_SRGB_CURVE_GAMMA`) |
 | `Shaders/BloomComposite.ps.hlsl` | `kBloomCeiling` | 1.74 |
+| `Shaders/BloomComposite.ps.hlsl` | glow hue | encoded ratios of the source, at every brightness |
 | `RenderSystem.cpp` | `kGlowIntensityAboveDefaultScale` | 0.67 |
 | `Shaders/Scanlines.ps.hlsl` | input clamp, darken exponent | `g_headroom`, 2.4 |
 
@@ -135,22 +136,22 @@ Mean luminance against baseline, at 100% scale:
 
 | Case | Baseline | Now | Delta |
 |---|---|---|---|
-| `defaults` | 0.045544 | 0.046709 | +2.6% |
+| `defaults` | 0.045544 | 0.046841 | +2.8% |
 | `glow-min` | 0.033470 | 0.034730 | +3.8% |
-| `glow-max` | 0.067967 | 0.067785 | -0.3% |
-| `glow-size-min` | 0.047643 | 0.050671 | +6.4% |
-| `glow-size-max` | 0.043832 | 0.043543 | -0.7% |
-| `scanlines-1` | 0.032478 | 0.032053 | -1.3% |
-| `scanlines-100` | 0.032621 | 0.032239 | -1.2% |
-| `custom-color` | 0.024502 | 0.022128 | -9.7% |
+| `glow-max` | 0.067967 | 0.067974 | 0.0% |
+| `glow-size-min` | 0.047643 | 0.050771 | +6.6% |
+| `glow-size-max` | 0.043832 | 0.043725 | -0.2% |
+| `scanlines-1` | 0.032478 | 0.032144 | -1.0% |
+| `scanlines-100` | 0.032621 | 0.032330 | -0.9% |
+| `custom-color` | 0.024502 | 0.023009 | -6.1% |
 
 Glow contribution (`defaults` minus `glow-min`): baseline 0.012074, now
-0.011979, **0.99x**.
+0.012111, **1.00x**.
 
 Six of eight cases are inside SC-001's 5%. `glow-size-min` and `custom-color`
 are outside it, visually close, and judged on hardware in T019.
 
-### How it got here: one cause, found six times
+### How it got here: one cause, found seven times
 
 Every mismatch had the same root: a step v1.6 performed on ENCODED values was
 being performed on linear light, and the encode curve is concave, so the two
@@ -199,6 +200,20 @@ give different pictures. In the order found:
    stopped and `kBloomCeiling` doubled to compensate for the honest input,
    having been fitted with the leak in it.
 
+7. **Glow hue.** The rain's default green is (0, 255, 100): an encoded
+   blue/green ratio of 0.39 but a linear-light ratio of 0.13. A blur in linear
+   light keeps the 0.13, and out in the dim halo, where the encode curve is
+   nearly straight, that is what reached the screen: a third of the blue v1.6
+   showed, and a glow visibly greener and yellower than its glyphs. Rob saw it
+   as a tint difference between the two builds. The composite now normalizes
+   the bloom to full brightness, encodes it to get the hue's encoded ratios,
+   and splits the shaped magnitude by those ratios before decoding -- the
+   encoded hue of the source at every brightness, as a gamma-space blur gave.
+   The dominant channel is untouched, so the strength calibration holds; the
+   secondary channels rise to v1.6's proportions. This is also most of what
+   was wrong with `custom-color`, whose secondary channel is the one luma
+   weights heaviest: -9.7% to -6.1%.
+
 And one slider mapping: v1.6's screen blend, `soft * (1 - scene)`, throttled
 glow at high intensities where much of the frame is bright. Linear addition has
 no such throttle and it is not wanted back -- it is what flattened overlapping
@@ -209,13 +224,12 @@ went from +18.8% to -0.3%.
 
 ### The two remaining outliers
 
-**`custom-color` at -9.7%.** The halo's falloff exponent is applied to the
-glow's magnitude with channel ratios preserved, to keep the halo the same hue
-as its glyphs. v1.6's bloom chain and screen blend were per channel, so for a
-color whose dominant channel is blue, v1.6 gave the secondary green channel
-relatively more glow than a ratio-preserving shape does -- and Rec.709 luma
-weights green at 0.7152, so the metric amplifies that. Visually the case is
-close.
+**`custom-color` at -6.1%.** What remains after the hue fix. v1.6's soft
+saturation and screen blend were both per channel and both concave, so they
+favored the secondary channel a little more than the encoded-ratio hue does;
+for a color whose secondary channel is green, which Rec.709 luma weights at
+0.7152, the metric amplifies a small remaining difference. Visually the case
+is close, and the difference image shows no color cast.
 
 **`glow-size-min` at +6.4%.** At the Glow Size slider's minimum the blur is
 tighter and the falloff shaping fitted at the default size lands slightly
@@ -230,12 +244,12 @@ open on the two above, both explained. Neither threshold nor gate was widened.
 
 ### A note on what the metrics missed
 
-Neither the glow shape error, the trail fade error nor the head halo leak was
-visible to any number the harness produced. Mean luminance was within a few
+Neither the glow shape error, the trail fade error, the head halo leak nor the
+glow's hue was visible to any number the harness produced. Mean luminance was within a few
 percent of target while the halo was nearly three times too wide at 16 px;
 the FR-005 regression test passed while every trail was 20% too bright, because
 it pinned the wrong quantity; and the head leak hid inside a `kBloomCeiling`
-that had been fitted around it. All three were caught by Rob comparing renders
+that had been fitted around it. All four were caught by Rob comparing renders
 by eye. Worth remembering when the Phase 2 and Phase 3 gates are written: a
 scalar can confirm a suspicion but will not raise one, and a fitted constant
 can absorb a defect as easily as correct for one.

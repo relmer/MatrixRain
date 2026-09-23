@@ -88,14 +88,34 @@ float4 main(PSInput input) : SV_TARGET
     // linear light. It shapes the glow's PROFILE, which is art direction
     // rather than physics, and v1.6's art direction is what FR-005 protects.
     //
-    // The exponent is applied to the glow's MAGNITUDE and the channels are
-    // scaled together. Applying it per channel would compress the smaller
-    // channels harder than the dominant one and shift the halo's hue -- for
-    // the default green, blue would collapse relative to green and the glow
-    // would come out a different color from the glyphs it surrounds.
-    float  bloomMax = max(softBloom.r, max(softBloom.g, softBloom.b));
-    float  shaped   = pow(bloomMax, kBloomFalloff);
-    float3 glow     = (bloomMax > 0.0) ? softBloom * (shaped / bloomMax) : 0.0;
+    // The exponent is applied to the glow's MAGNITUDE only. The hue is set
+    // separately below, so nothing here may change the channel ratios.
+    float bloomMax  = max(softBloom.r, max(softBloom.g, softBloom.b));
+    float magnitude = pow(bloomMax, kBloomFalloff) * kBloomCeiling;
 
-    return float4(OutputTransform(scene.rgb + glow * kBloomCeiling), 1.0);
+    if (bloomMax <= 0.0)
+    {
+        return float4(OutputTransform(scene.rgb), 1.0);
+    }
+
+    // Give the glow the ENCODED hue of its source at every brightness, as
+    // v1.6's gamma-space blur did.
+    //
+    // The rain's default green is (0, 255, 100): an encoded blue/green ratio
+    // of 0.39, but a linear-light ratio of 0.13. A blur in linear light keeps
+    // the 0.13, and out in the dim halo, where the encode curve is nearly
+    // straight, that is also what reaches the screen: a third of the blue
+    // v1.6 showed, and a glow visibly greener and yellower than its glyphs.
+    // Rob saw it as a tint difference between the two builds.
+    //
+    // Normalizing the bloom to full brightness and encoding it gives the hue's
+    // encoded ratios; the shaped magnitude is encoded, split by those ratios,
+    // and decoded again. The dominant channel is untouched, so the strength
+    // calibration above still holds; the secondary channels are lifted to
+    // v1.6's proportions.
+    float3 encodedHue  = LinearToSrgb3(softBloom / bloomMax);
+    float3 encodedGlow = LinearToSrgbChannel(magnitude) * encodedHue;
+    float3 glow        = SrgbToLinear3(encodedGlow);
+
+    return float4(OutputTransform(scene.rgb + glow), 1.0);
 }

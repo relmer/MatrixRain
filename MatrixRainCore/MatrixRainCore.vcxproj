@@ -476,6 +476,7 @@
     </FXCompile>
   </ItemGroup>
   <ItemGroup>
+    <None Include="Shaders\ColorTransfer.hlsli" />
     <None Include="Shaders\OutputTransform.hlsli" />
     <None Include="Shaders\ColorConstants.h" />
   </ItemGroup>
