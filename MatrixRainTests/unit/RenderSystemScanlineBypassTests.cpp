@@ -79,6 +79,44 @@ namespace MatrixRainTests
                                   alignof (ScanlineCb),
                                   L"ScanlineCb must be 16-byte aligned");
             }
+
+
+            // Same check for the output transform's b1 register
+            // (contracts/output-transform.md).
+            TEST_METHOD (OutputTransformCbMatches16ByteB1Layout)
+            {
+                Assert::AreEqual (size_t {16},
+                                  sizeof (OutputTransformCb),
+                                  L"OutputTransformCb must be exactly 16 bytes for HLSL b1 register");
+                Assert::AreEqual (size_t {16},
+                                  alignof (OutputTransformCb),
+                                  L"OutputTransformCb must be 16-byte aligned");
+            }
+
+
+            // Field ORDER is part of the contract too: the shader reads these
+            // by position, not by name, so a reordering compiles cleanly and
+            // then renders nonsense.  Writing one field at a time and reading
+            // back the raw bytes is what catches that.
+            TEST_METHOD (OutputTransformCbFieldsAreInContractOrder)
+            {
+                OutputTransformCb cb    = {};
+                const uint8_t *   bytes = reinterpret_cast<const uint8_t *> (&cb);
+
+                cb.outputMode    = 1;
+                cb.sdrWhiteScale = 2.0f;
+                cb.headroom      = 3.0f;
+                cb.isFinalPass   = 4;
+
+                Assert::AreEqual (uint32_t {1}, *reinterpret_cast<const uint32_t *> (bytes + 0),
+                                  L"outputMode must be first");
+                Assert::AreEqual (2.0f, *reinterpret_cast<const float *> (bytes + 4), 0.0f,
+                                  L"sdrWhiteScale must be second");
+                Assert::AreEqual (3.0f, *reinterpret_cast<const float *> (bytes + 8), 0.0f,
+                                  L"headroom must be third");
+                Assert::AreEqual (uint32_t {4}, *reinterpret_cast<const uint32_t *> (bytes + 12),
+                                  L"isFinalPass must be fourth");
+            }
     };
 
 

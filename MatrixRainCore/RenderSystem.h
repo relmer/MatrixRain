@@ -99,6 +99,31 @@ static_assert (sizeof (ScanlineCb) == 16, "ScanlineCb must match HLSL b0 registe
 
 ////////////////////////////////////////////////////////////////////////////////
 //
+//  OutputTransformCb - CPU mirror of the HLSL `cbuffer OutputCb : register(b1)`
+//  spliced into every candidate final pass.  16 bytes, uploaded once per pass
+//  via Map/Unmap.  See contracts/output-transform.md for the layout contract.
+//
+//  b1 rather than b0 because b0 already carries the bloom and scanline
+//  constants in the passes that need this.
+//
+//  isFinalPass lives HERE rather than in the bloom or scanline buffer because
+//  every candidate final pass binds b1 whatever else is switched on.  The
+//  glow-off composite never uploads the bloom buffer, so a flag kept there
+//  would go stale exactly when it mattered.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+struct alignas (16) OutputTransformCb
+{
+    uint32_t outputMode;     // 0 = SDR (sRGB encode), 1 = HDR (scRGB)
+    float    sdrWhiteScale;  // sdrWhiteNits / 80; ignored in SDR
+    float    headroom;       // >= 1; 1 caps at SDR white (Phase 2)
+    uint32_t isFinalPass;    // 1: this pass writes the back buffer; 0: an intermediate
+};
+static_assert (sizeof (OutputTransformCb) == 16, "OutputTransformCb must match HLSL b1 register size");
+
+////////////////////////////////////////////////////////////////////////////////
+//
 //  RenderSystem
 //
 //  Manages the Direct3D 11 rendering pipeline for the Matrix rain effect:
@@ -217,6 +242,7 @@ private:
     HRESULT CreateBloomConstantBuffer();
     HRESULT CreateScanlineConstantBuffer();
     HRESULT UploadScanlineConstants     (const RenderParams & params, float viewportHeightPx, float cellHeightPx);
+
     HRESULT ApplyScanlinePass();
     HRESULT CreateBlendState();
     HRESULT CreateSamplerState();
