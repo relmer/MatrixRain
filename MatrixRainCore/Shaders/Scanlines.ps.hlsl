@@ -42,6 +42,14 @@ float4 main (PSInput i) : SV_TARGET
     float  rolloff = max (sin (kPi * perPix) / (kPi * perPix), 0.0);
     float  bright  = 0.5 - 0.5 * cos (2.0 * kPi * linePos) * rolloff;
     float  darken  = lerp (1.0 - g_intensity, 1.0, bright);
+
+    // The darkening multiplies LINEAR light, which is what a raster actually
+    // does to a phosphor: half the darkening means half the light. Applied to
+    // gamma-encoded values, as v1.6 did, the same factor removed rather more
+    // light than intended and the effect read as a gray veil over the image
+    // instead of a raster behind it (FR-001).
     c.rgb *= darken;
-    return c;
+
+    // When this pass runs it is always the last one, so it always encodes.
+    return float4 (OutputTransform (c.rgb), c.a);
 }

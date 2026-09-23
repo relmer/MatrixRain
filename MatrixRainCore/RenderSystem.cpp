@@ -771,6 +771,20 @@ HRESULT RenderSystem::ApplyScanlinePass()
                             nullptr,
                             nullptr);
 
+    // The scanline pass only ever runs last, so it always encodes for the
+    // display.
+    {
+        OutputTransformCb outputCb = {};
+
+        outputCb.outputMode    = 0;
+        outputCb.sdrWhiteScale = 1.0f;
+        outputCb.headroom      = 1.0f;
+        outputCb.isFinalPass   = 1;
+
+        (void) UploadOutputTransformConstants (outputCb);
+        m_context->PSSetConstantBuffers (1, 1, m_outputConstantBuffer.GetAddressOf());
+    }
+
     srv[0] = m_postBloomSRV.Get();
     RenderFullscreenPass (m_renderTargetView.Get(), m_scanlinePS.Get(), srv, 1);
 
@@ -1542,7 +1556,7 @@ void RenderSystem::SetViewport(UINT width, UINT height)
 
 
 
-HRESULT RenderSystem::ApplyBloom (ID3D11RenderTargetView * pCompositeTarget)
+HRESULT RenderSystem::ApplyBloom (ID3D11RenderTargetView * pCompositeTarget, bool isFinalPass)
 {
     HRESULT                    hr              = S_OK;
     ID3D11ShaderResourceView * srvs[2];
@@ -1639,6 +1653,21 @@ HRESULT RenderSystem::ApplyBloom (ID3D11RenderTargetView * pCompositeTarget)
     // Bind bloom constant buffer to pixel shader
     m_context->PSSetConstantBuffers (0, 1, m_bloomConstantBuffer.GetAddressOf());
     
+    // b1 tells the shared transform whether this is the pass that writes the
+    // back buffer. When scanlines follow, it is not, and the image stays in
+    // linear light for them.
+    {
+        OutputTransformCb outputCb = {};
+
+        outputCb.outputMode    = 0;
+        outputCb.sdrWhiteScale = 1.0f;
+        outputCb.headroom      = 1.0f;
+        outputCb.isFinalPass   = isFinalPass ? 1u : 0u;
+
+        (void) UploadOutputTransformConstants (outputCb);
+        m_context->PSSetConstantBuffers (1, 1, m_outputConstantBuffer.GetAddressOf());
+    }
+
     srvs[0] = m_sceneSRV.Get();
     srvs[1] = m_bloomSRV.Get();
     RenderFullscreenPass (pCompositeTarget, m_compositePS.Get(), srvs, 2);
@@ -2080,7 +2109,7 @@ void RenderSystem::Render (const AnimationSystem & animationSystem, const Viewpo
 
         if (ShouldRunBloomPass (params))
         {
-            (void)ApplyBloom (pCompositeTarget);
+            (void)ApplyBloom (pCompositeTarget, !wantScanlines);
         }
         else
         {
@@ -2104,6 +2133,41 @@ void RenderSystem::Render (const AnimationSystem & animationSystem, const Viewpo
                                     nullptr,
                                     nullptr);
             m_context->PSSetSamplers (0, 1, m_samplerState.GetAddressOf());
+
+            // The same composite shader runs here, so it needs the same b1.
+            // The bloom SRV is null and bloomIntensity is zeroed below, so the
+            // glow term evaluates to nothing and this is a plain scene copy.
+            {
+                OutputTransformCb        outputCb      = {};
+                D3D11_MAPPED_SUBRESOURCE mappedBloomCB = {};
+
+                outputCb.outputMode    = 0;
+                outputCb.sdrWhiteScale = 1.0f;
+                outputCb.headroom      = 1.0f;
+                outputCb.isFinalPass   = wantScanlines ? 0u : 1u;
+
+                (void) UploadOutputTransformConstants (outputCb);
+                m_context->PSSetConstantBuffers (1, 1, m_outputConstantBuffer.GetAddressOf());
+
+                if (SUCCEEDED (m_context->Map (m_bloomConstantBuffer.Get(),
+                                               0,
+                                               D3D11_MAP_WRITE_DISCARD,
+                                               0,
+                                               &mappedBloomCB)))
+                {
+                    float * bloomData = static_cast<float *> (mappedBloomCB.pData);
+
+                    bloomData[0] = 0.0f;         // No glow: this is a copy
+                    bloomData[1] = m_glowSize;
+                    bloomData[2] = 0.0f;
+                    bloomData[3] = 0.0f;
+
+                    m_context->Unmap (m_bloomConstantBuffer.Get(), 0);
+                }
+
+                m_context->PSSetConstantBuffers (0, 1, m_bloomConstantBuffer.GetAddressOf());
+            }
+
             RenderFullscreenPass (pCompositeTarget, m_compositePS.Get(), srvs, 2);
         }
 
