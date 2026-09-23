@@ -454,7 +454,30 @@ WARP: 5.2 / 9.2 / 14.5 to 5.9 / 13.7 / 23.1, that is +13% / +48% / +59%,
 down from +30% / +55% / +60% or worse. What remains on WARP is the blur chain
 reading and writing float textures in software.
 
-The laptop has not yet been re-measured with the polynomial build.
+**The laptop was re-measured with the polynomial build (`4a1b5d6`), and it
+did not help there.** Same protocol and power settings, old and new alternated
+two rounds, mean GPU ms:
+
+| Configuration | Preset | T005 | 4a1b5d6 | Delta | Spread old / new |
+|---|---|---|---|---|---|
+| 1920x1080 @ 100% | Low | 1.51 | 1.51 | -0.5% | 8.2% / 2.5% |
+| 1920x1080 @ 100% | Medium | 1.84 | 1.94 | **+5.5%** | 2.5% / 0.3% |
+| 1920x1080 @ 100% | High | 2.23 | 2.35 | **+5.5%** | 0.0% / 0.9% |
+| 2880x1920 @ 200% | Low | 1.80 | 1.90 | **+5.6%** | 0.6% / 0.2% |
+| 2880x1920 @ 200% | Medium | 2.73 | 3.02 | **+10.9%** | 1.6% / 0.5% |
+| 2880x1920 @ 200% | High | 3.70 | 3.98 | **+7.7%** | 0.1% / 0.3% |
+
+WARP there: +14% / +76% / +91%.
+
+The reading: on the Iris Xe a degree-5 Horner chain plus a square root costs
+about what `pow()` does. NVIDIA runs transcendentals at a quarter of the ALU
+rate, so five full-rate multiply-adds beat a `log2` and an `exp2`; Intel's
+extended-math unit is closer to full rate, so they do not. The polynomial
+stays because it helps the desktop and WARP and costs the laptop nothing, but
+on Intel the lever is not the cost of a conversion, it is the COUNT: about
+42 million per frame at native resolution (the extract's twelve per bloom
+pixel, the composite's three per screen pixel, the glyph's three per covered
+pixel), and the probe that removed all of them recovered all of the cost.
 
 ### Verdict
 
@@ -462,6 +485,14 @@ The laptop has not yet been re-measured with the polynomial build.
 delta 3.9% (portrait Medium). The two desktop overages recorded earlier,
 Medium at both monitors and High at 4K, were the same `pow()` cost that the
 laptop made visible, and went with it.
+
+On the integrated GPU it is over by 0.5 to 6 points at Medium and High.
+Two designs would bring that down by cutting the number of conversions (an
+encode pass feeding the extract and composite, or an sRGB-8 scene target for
+SDR output with a non-sRGB view for the chain), and Rob decided neither is
+worth it: on the same laptop, v1.5 reads 65% GPU in the statistics overlay
+and this build reads 67-68%, which is the difference as anyone would ever
+meet it. Accepted as the cost of the v1.6 match on that class of hardware.
 
 On WARP it is not met, and will not be while the blur chain is float: that is
 a software rasterizer's cost for the precision FR-003 asks for. The Low preset
