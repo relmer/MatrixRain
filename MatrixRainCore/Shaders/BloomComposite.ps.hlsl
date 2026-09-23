@@ -1,18 +1,19 @@
 //
-//  Bloom composite, in linear light, and usually the last pass of a frame.
+//  Bloom composite, usually the last pass of a frame.
 //
-//  v1.6 combined glow with a screen blend, scene + soft * (1 - scene). That
-//  factor exists to stop gamma-space addition blowing out, and it is exactly
-//  the kind of compensation linear light removes the need for: light adds.
-//  Dropping it is what makes two overlapping halos come out brighter than
-//  either alone instead of flattening into a plateau.
+//  The blur chain feeding this runs in linear light, so overlapping halos add
+//  as light does. This pass then puts the glow on screen exactly as v1.6 did:
+//  the halo's strength, falloff shape, hue and the way it lands on glyph
+//  bodies are all computed in encoded space, where v1.6 authored them, and the
+//  result is decoded to linear light for the output transform. Each of those
+//  four terms was found to differ visibly when done in linear light and
+//  matched one at a time; the comments below record why.
 //
-//  The soft saturation stays. It is not gamma compensation; it is a deliberate
-//  ceiling so a dense field of streaks does not become a wall of glow when the
-//  user raises Glow Intensity.
+//  The soft saturation is a deliberate ceiling so a dense field of streaks does
+//  not become a wall of glow when the user raises Glow Intensity.
 //
-//  kBloomCeiling is a starting value that T018 calibrates against the
-//  baseline.
+//  kBloomCeiling and kBloomFalloff are calibrated in T018 against the
+//  baseline; see specs/008-hdr-linear-rendering/baseline.md.
 //
 
 #include "OutputTransform.hlsli"
@@ -36,10 +37,13 @@ SamplerState samplerState : register(s0);
 // bloomIntensity that looked right in gamma space therefore produced about
 // eight times too much apparent glow, and dark gaps are most of the frame.
 //
-// 1.74 is what brings the glow contribution to 0.99x of v1.6's once
-// kBloomFalloff below has shaped it. The measurement is the glow term on its
-// own -- defaults minus glow-min mean luminance -- so that it is not confused
-// with the glyph and trail terms, which are matched separately.
+// 1.60 is what brings the glow contribution to 1.00x of v1.6's once
+// kBloomFalloff below has shaped it and the composite adds it in encoded
+// space. The measurement is the glow term on its own -- defaults minus
+// glow-min mean luminance -- so that it is not confused with the glyph and
+// trail terms, which are matched separately. (1.74 was the fit before the
+// encoded-space composite; addition in encoded space is brighter over dim
+// trail pixels than addition in linear light, so the ceiling came down.)
 //
 // An earlier value of 0.871 was fitted while the glyph shader still let head
 // overshoot (1.3, from the self-glow) into the scene. The extract runs at half
@@ -48,7 +52,7 @@ SamplerState samplerState : register(s0);
 // harder than v1.6's clipped scene allowed. The glyph shader now clips at white
 // as v1.6's 8-bit target did, the leak is gone, and the honest input needs
 // twice the ceiling. See specs/008-hdr-linear-rendering/baseline.md.
-static const float kBloomCeiling = 1.74f;
+static const float kBloomCeiling = 1.60f;
 
 // Exponent applied to the glow before it is added, cancelling the lift the
 // encode curve would otherwise give the halo's tail. It is the transfer
@@ -115,7 +119,18 @@ float4 main(PSInput input) : SV_TARGET
     // v1.6's proportions.
     float3 encodedHue  = LinearToSrgb3(softBloom / bloomMax);
     float3 encodedGlow = LinearToSrgbChannel(magnitude) * encodedHue;
-    float3 glow        = SrgbToLinear3(encodedGlow);
 
-    return float4(OutputTransform(scene.rgb + glow), 1.0);
+    // Composite as v1.6 did, in encoded space: scene + glow * (1 - scene),
+    // per channel. Where the scene is dark, (1 - scene) is 1 and this is plain
+    // addition -- the gaps, where halos overlap, still add in linear light
+    // once decoded below. Where the scene is bright the factor attenuates the
+    // glow landing ON the glyph, per channel: on a green glyph, v1.6 added no
+    // green glow and only 60% of the blue. Adding the full glow there instead
+    // made every glyph body carry extra blue, which showed in the difference
+    // images as a blue silhouette of each character. The factor changes
+    // nothing in the gaps and so costs none of the linear-light improvement.
+    float3 encodedScene = LinearToSrgb3(scene.rgb);
+    float3 composited   = encodedScene + encodedGlow * (1.0 - encodedScene);
+
+    return float4(OutputTransform(SrgbToLinear3(composited)), 1.0);
 }

@@ -125,8 +125,9 @@ and converted afterward. FR-001 and FR-005 were revised to say so.
 | `Shaders/Glyph.ps.hlsl` | per-pixel | `SrgbToLinear(min(1, display * c * c))` |
 | `Shaders/BloomExtract.ps.hlsl` | input clamp | 1.0 |
 | `Shaders/BloomComposite.ps.hlsl` | `kBloomFalloff` | 2.4 (`MR_SRGB_CURVE_GAMMA`) |
-| `Shaders/BloomComposite.ps.hlsl` | `kBloomCeiling` | 1.74 |
+| `Shaders/BloomComposite.ps.hlsl` | `kBloomCeiling` | 1.60 |
 | `Shaders/BloomComposite.ps.hlsl` | glow hue | encoded ratios of the source, at every brightness |
+| `Shaders/BloomComposite.ps.hlsl` | composite | `scene + glow * (1 - scene)` in encoded space, per channel |
 | `RenderSystem.cpp` | `kGlowIntensityAboveDefaultScale` | 0.67 |
 | `Shaders/Scanlines.ps.hlsl` | input clamp, darken exponent | `g_headroom`, 2.4 |
 
@@ -136,22 +137,22 @@ Mean luminance against baseline, at 100% scale:
 
 | Case | Baseline | Now | Delta |
 |---|---|---|---|
-| `defaults` | 0.045544 | 0.046841 | +2.8% |
+| `defaults` | 0.045544 | 0.046863 | +2.9% |
 | `glow-min` | 0.033470 | 0.034730 | +3.8% |
-| `glow-max` | 0.067967 | 0.067974 | 0.0% |
-| `glow-size-min` | 0.047643 | 0.050771 | +6.6% |
-| `glow-size-max` | 0.043832 | 0.043725 | -0.2% |
-| `scanlines-1` | 0.032478 | 0.032144 | -1.0% |
-| `scanlines-100` | 0.032621 | 0.032330 | -0.9% |
-| `custom-color` | 0.024502 | 0.023009 | -6.1% |
+| `glow-max` | 0.067967 | 0.066478 | -2.2% |
+| `glow-size-min` | 0.047643 | 0.050544 | +6.1% |
+| `glow-size-max` | 0.043832 | 0.043843 | 0.0% |
+| `scanlines-1` | 0.032478 | 0.032160 | -1.0% |
+| `scanlines-100` | 0.032621 | 0.032345 | -0.8% |
+| `custom-color` | 0.024502 | 0.024621 | +0.5% |
 
 Glow contribution (`defaults` minus `glow-min`): baseline 0.012074, now
-0.012111, **1.00x**.
+0.012133, **1.00x**.
 
-Six of eight cases are inside SC-001's 5%. `glow-size-min` and `custom-color`
-are outside it, visually close, and judged on hardware in T019.
+Seven of eight cases are inside SC-001's 5%. `glow-size-min` is outside it,
+visually close, and judged on hardware in T019.
 
-### How it got here: one cause, found seven times
+### How it got here: one cause, found eight times
 
 Every mismatch had the same root: a step v1.6 performed on ENCODED values was
 being performed on linear light, and the encode curve is concave, so the two
@@ -214,6 +215,22 @@ give different pictures. In the order found:
    was wrong with `custom-color`, whose secondary channel is the one luma
    weights heaviest: -9.7% to -6.1%.
 
+8. **Glow on the glyph bodies.** v1.6 composited as `scene + glow * (1 -
+   scene)`, per channel, in encoded space. In the dark gaps `(1 - scene)` is 1
+   and the term is plain addition, so it did nothing where halos overlap; but
+   on a bright glyph it attenuated the glow landing on the glyph itself, per
+   channel -- on a green glyph, no green glow and about 60% of the blue.
+   Adding the full glow there instead put extra blue on every glyph body,
+   which showed in the difference images as a blue silhouette of each
+   character. Rob asked why the silhouettes were there after the hue fix,
+   which separated this from the overlap behavior it had been conflated
+   with. The composite now applies v1.6's formula in encoded space and
+   decodes the result; the gaps are unchanged, so nothing of the linear-light
+   improvement is given up. Encoded-space addition is brighter than
+   linear-light addition over dim trail pixels, so `kBloomCeiling` came down
+   from 1.74 to 1.60 to hold the glow at 1.00x. This also finished
+   `custom-color`: -6.1% to +0.5%.
+
 And one slider mapping: v1.6's screen blend, `soft * (1 - scene)`, throttled
 glow at high intensities where much of the frame is bright. Linear addition has
 no such throttle and it is not wanted back -- it is what flattened overlapping
@@ -222,16 +239,9 @@ halos -- so the Glow Intensity slider is compressed above 100% instead
 v1.6 while leaving the default and everything below it untouched. `glow-max`
 went from +18.8% to -0.3%.
 
-### The two remaining outliers
+### The remaining outlier
 
-**`custom-color` at -6.1%.** What remains after the hue fix. v1.6's soft
-saturation and screen blend were both per channel and both concave, so they
-favored the secondary channel a little more than the encoded-ratio hue does;
-for a color whose secondary channel is green, which Rec.709 luma weights at
-0.7152, the metric amplifies a small remaining difference. Visually the case
-is close, and the difference image shows no color cast.
-
-**`glow-size-min` at +6.4%.** At the Glow Size slider's minimum the blur is
+**`glow-size-min` at +6.1%.** At the Glow Size slider's minimum the blur is
 tighter and the falloff shaping fitted at the default size lands slightly
 high. The same slider-mapping treatment as intensity would close it; it is
 marginal and deliberately left for the hardware check rather than fitted
@@ -239,17 +249,18 @@ further.
 
 ### What this means for SC-001
 
-SC-001's 5% mean-luminance gate stands. It is met on six of eight cases and
-open on the two above, both explained. Neither threshold nor gate was widened.
+SC-001's 5% mean-luminance gate stands. It is met on seven of eight cases and
+open on the one above, explained. Neither threshold nor gate was widened.
 
 ### A note on what the metrics missed
 
-Neither the glow shape error, the trail fade error, the head halo leak nor the
-glow's hue was visible to any number the harness produced. Mean luminance was within a few
+Neither the glow shape error, the trail fade error, the head halo leak, the
+glow's hue nor the glow on glyph bodies was visible to any number the harness
+produced. Mean luminance was within a few
 percent of target while the halo was nearly three times too wide at 16 px;
 the FR-005 regression test passed while every trail was 20% too bright, because
 it pinned the wrong quantity; and the head leak hid inside a `kBloomCeiling`
-that had been fitted around it. All four were caught by Rob comparing renders
+that had been fitted around it. All five were caught by Rob comparing renders
 by eye. Worth remembering when the Phase 2 and Phase 3 gates are written: a
 scalar can confirm a suspicion but will not raise one, and a fitted constant
 can absorb a defect as easily as correct for one.
