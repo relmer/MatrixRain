@@ -69,7 +69,10 @@ void ConfigDialogController::UpdateDensity (int densityPercent)
 
     if (m_snapshot.isLiveMode && m_snapshot.applicationStateRef)
     {
-        m_snapshot.applicationStateRef->OnDensityChanged (m_settings.m_densityPercent);
+        // Preview only; OK saves. The single-value ApplicationState
+        // setters save on every call, so going through them left a
+        // canceled value in the registry.
+        m_snapshot.applicationStateRef->ApplySettings (m_settings);
     }
 }
 
@@ -116,7 +119,10 @@ void ConfigDialogController::UpdateAnimationSpeed (int animationSpeedPercent)
 
     if (m_snapshot.isLiveMode && m_snapshot.applicationStateRef)
     {
-        m_snapshot.applicationStateRef->SetAnimationSpeed (m_settings.m_animationSpeedPercent);
+        // Preview only; OK saves. The single-value ApplicationState
+        // setters save on every call, so going through them left a
+        // canceled value in the registry.
+        m_snapshot.applicationStateRef->ApplySettings (m_settings);
     }
 }
 
@@ -137,7 +143,10 @@ void ConfigDialogController::UpdateGlowIntensity (int glowIntensityPercent)
 
     if (m_snapshot.isLiveMode && m_snapshot.applicationStateRef)
     {
-        m_snapshot.applicationStateRef->SetGlowIntensity (m_settings.m_glowIntensityPercent);
+        // Preview only; OK saves. The single-value ApplicationState
+        // setters save on every call, so going through them left a
+        // canceled value in the registry.
+        m_snapshot.applicationStateRef->ApplySettings (m_settings);
     }
 }
 
@@ -158,7 +167,10 @@ void ConfigDialogController::UpdateGlowSize (int glowSizePercent)
 
     if (m_snapshot.isLiveMode && m_snapshot.applicationStateRef)
     {
-        m_snapshot.applicationStateRef->SetGlowSize (m_settings.m_glowSizePercent);
+        // Preview only; OK saves. The single-value ApplicationState
+        // setters save on every call, so going through them left a
+        // canceled value in the registry.
+        m_snapshot.applicationStateRef->ApplySettings (m_settings);
     }
 }
 

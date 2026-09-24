@@ -1170,6 +1170,45 @@ namespace MatrixRainTests
         }
 
 
+        TEST_METHOD (LivePreview_DoesNotPersist_UntilOk)
+        {
+            // Rob found Cancel reverting the rain but not the registry:
+            // density, speed, glow intensity and glow size went through
+            // ApplicationState setters that save on every change, so the
+            // next start came up with the values he had canceled.
+            ScreenSaverSettings    initial {};
+            ConfigDialogController controller (m_settingsProvider);
+            ApplicationState       appState   (m_settingsProvider);
+
+
+
+            initial.m_densityPercent        = 50;
+            initial.m_animationSpeedPercent = 50;
+            initial.m_glowIntensityPercent  = 100;
+            initial.m_glowSizePercent       = 100;
+            Assert::AreEqual (S_OK, m_settingsProvider.Save (initial));
+
+            Assert::AreEqual (S_OK, controller.Initialize());
+            appState.Initialize (nullptr);
+            Assert::AreEqual (S_OK, controller.InitializeLiveMode (&appState));
+
+            controller.UpdateDensity        (90);
+            controller.UpdateAnimationSpeed (90);
+            controller.UpdateGlowIntensity  (200);
+            controller.UpdateGlowSize       (200);
+
+            Assert::AreEqual (100, m_settingsProvider.GetStored().m_glowIntensityPercent, L"A live preview must not be saved");
+
+            Assert::AreEqual (S_OK, controller.CancelLiveMode());
+
+            const ScreenSaverSettings & stored = m_settingsProvider.GetStored();
+            Assert::AreEqual (50,  stored.m_densityPercent,        L"Density not saved by the preview");
+            Assert::AreEqual (50,  stored.m_animationSpeedPercent, L"Speed not saved by the preview");
+            Assert::AreEqual (100, stored.m_glowIntensityPercent,  L"Glow intensity not saved by the preview");
+            Assert::AreEqual (100, stored.m_glowSizePercent,       L"Glow size not saved by the preview");
+        }
+
+
         TEST_METHOD (HdrSettings_RollBackOnCancel)
         {
             ScreenSaverSettings    initial {};
