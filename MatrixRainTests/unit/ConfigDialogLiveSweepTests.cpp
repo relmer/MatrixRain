@@ -25,16 +25,44 @@
 //  the renderer is a set of recording callbacks on ApplicationState.
 //
 //  The field lists below are explicit because C++ cannot enumerate a
-//  struct's members. The size check makes that safe: adding a field to
-//  ScreenSaverSettings changes its size and stops this file compiling until
-//  the new field is added to the lists.
+//  struct's members. SettingsFieldMirror makes that safe: it repeats
+//  ScreenSaverSettings' members, type for type and in order, so the two have
+//  the same size in every configuration and on every architecture. Adding a
+//  field to ScreenSaverSettings breaks the size check below, and this file
+//  stops compiling until the new field is added here and to the sweep. (A
+//  plain number does not work: std::wstring is larger in Debug builds.)
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-static_assert (sizeof (ScreenSaverSettings) == 248,
-               "ScreenSaverSettings changed: add the new field to the sweep in "
-               "ConfigDialogLiveSweepTests.cpp (StoredDifferences, RendererDifferences, "
-               "ApplyEverySetting), then update this size");
+struct SettingsFieldMirror
+{
+    int                                   densityPercent;
+    std::wstring                          colorSchemeKey;
+    int                                   animationSpeedPercent;
+    int                                   glowIntensityPercent;
+    int                                   glowSizePercent;
+    bool                                  startFullscreen;
+    bool                                  showDebugStats;
+    bool                                  multiMonitorEnabled;
+    std::wstring                          gpuAdapter;
+    bool                                  glowEnabled;
+    bool                                  scanlinesEnabled;
+    int                                   scanlinesIntensity;
+    int                                   scanlinesStyle;
+    COLORREF                              customColor;
+    HdrMode                               hdrMode;
+    int                                   highlightBrightness;
+    std::array<COLORREF, 16>              customColorPalette;
+    QualityPreset                         qualityPreset;
+    AdvancedGraphicsValues                advancedValues;
+    std::optional<AdvancedGraphicsValues> lastCustom;
+    std::optional<SystemClockTimePoint>   lastSavedTimestamp;
+};
+
+static_assert (sizeof (ScreenSaverSettings) == sizeof (SettingsFieldMirror),
+               "ScreenSaverSettings changed: add the new field to SettingsFieldMirror and to the "
+               "sweep in ConfigDialogLiveSweepTests.cpp (StoredDifferences, RendererDifferences, "
+               "ApplyEverySetting)");
 
 
 
