@@ -4,7 +4,7 @@
 
 **Created**: 2026-09-21
 
-**Status**: Draft
+**Status**: Implemented (1.7.0)
 
 **Last Updated**: 2026-09-21 (planning: "glyph compositing" replaces "additive glyph stacking", since glyphs are alpha-composited; FR-011, US2 scenario 3 and SC-004 aligned with the existing all-monitor rebuild on display-topology changes; SC-005 conditioned on SDR brightness, since headroom depends on it; analysis: FR-013 wording, SC-003 scoped to Phase 2 / HDR mode Off, key entity renamed to match the data model)
 

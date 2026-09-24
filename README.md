@@ -27,6 +27,7 @@ I built this Win32/DirectX C++ Matrix-rain screensaver/demo as a test project to
 
 | Version | Highlights |
 | :---: | :--- |
+| **1.7** | Native HDR output with HDR highlights: streak heads and the bright glyphs behind them shine above normal white on HDR monitors, while the rest of the rain keeps its familiar look. Glow and fades are now computed in linear light for smoother tails |
 | **1.5** | Added customizable scanline effect and a custom color picker. Rebuilt settings dialog as a tabbed dialog with live FPS/GPU usage statistics as you tune the settings |
 | **1.4** | Performance optimization release — pick which GPU to render on, plus Quality presets (Low/Medium/High/Custom with per-knob infotips) to dial back GPU load. Adds live multi-monitor toggle, frame cap on >60 Hz displays, and a themed two-column dialog overhaul |
 | **1.3** | Multi-monitor support — independent, DPI-aware Matrix rain on every connected display in fullscreen and screensaver modes |
@@ -112,7 +113,30 @@ The following switches are part of the Windows screensaver protocol and are invo
 - **Start Fullscreen**: Toggle whether app launches in fullscreen mode
 - **Show Debug Stats**: Display FPS and density information (disabled in screensaver modes)
 - **Show Fade Timers**: Display per-character fade countdown (disabled in screensaver modes)
+- **HDR highlights**: Auto or Off; Auto lets highlights go above normal white on monitors with Windows HDR turned on
+- **Brightness** (under HDR highlights): how bright highlights get, up to what the monitor can show (0-100%)
 - **Reset**: Restore all settings to defaults
+
+### HDR
+
+On a monitor with Windows HDR turned on, MatrixRain presents in HDR on its
+own, one monitor at a time, and follows HDR being turned on or off within
+a second.
+
+- **Trail brightness** follows the Windows **SDR content brightness**
+  slider (Settings > System > Display > HDR), the same as other SDR
+  content, so the rain matches the rest of your desktop.
+- **HDR highlights: Auto** (the default) lets the head of each streak,
+  and the brightest glyphs just behind it, shine brighter than normal
+  white, in their own color. **Brightness** sets how far, up to the
+  monitor's peak. **Off** keeps everything at normal white, exactly as
+  on an SDR monitor.
+- **How much highlights stand out** depends on the room between the SDR
+  content brightness and the monitor's peak. A lower SDR content
+  brightness leaves more room.
+- SDR monitors are not affected by any of this. When no monitor has HDR
+  on, the HDR controls gray out and the dialog says why, with a link to
+  the Windows HDR settings if a monitor supports HDR but has it off.
 
 ### Live Overlay Mode
 
@@ -228,7 +252,7 @@ To bump, edit `MatrixRainCore/Version.h` and rebuild:
 
 ```cpp
 #define VERSION_MAJOR 1
-#define VERSION_MINOR 6
+#define VERSION_MINOR 7
 #define VERSION_PATCH 0
 #define VERSION_YEAR  2026
 ```

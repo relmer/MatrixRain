@@ -4,6 +4,31 @@ All notable changes to MatrixRain are documented in this file.
 
 ## [1.7.0] - Unreleased
 
+### Added
+
+- **Native HDR output.** On a monitor with Windows HDR turned on,
+  MatrixRain now presents in HDR itself instead of being converted by
+  Windows. The rain sits at the brightness you set with the Windows "SDR
+  content brightness" slider and follows it live, so with highlights off
+  it looks the same as on an SDR monitor. Each monitor is handled on its
+  own: an HDR and an SDR monitor side by side both look right, and
+  turning HDR on or off in Windows takes effect within a second without
+  restarting. The screen saver preview, and any failure to switch,
+  fall back to SDR.
+- **HDR highlights.** On HDR monitors, the head of each streak and the
+  brightest glyphs just behind it now shine brighter than normal white,
+  in their own color, with their glow, up to what the monitor can show.
+  The rest of each trail stays at your normal brightness. Highlights
+  roll off smoothly toward the monitor's peak rather than clipping. How
+  much room there is depends on the monitor's peak brightness and the
+  Windows SDR content brightness slider: the lower that slider, the more
+  the highlights stand out.
+- **HDR settings.** The Visuals tab has an **HDR highlights** setting
+  (Auto or Off) and a **Brightness** slider for how bright highlights
+  get. When no monitor has HDR turned on the controls gray out and the
+  dialog says why; if a monitor supports HDR but has it turned off, it
+  also offers a link that opens the Windows HDR settings.
+
 ### Changed
 
 - **Light is now combined as light.** The renderer composites glyphs
@@ -16,8 +41,7 @@ All notable changes to MatrixRain are documented in this file.
   behavior where streaks overlap, the Scanlines Intensity and Style
   sliders, and every color scheme reproduce what 1.6 put on screen, to
   within a few percent of mean brightness on a fixed test scene and
-  indistinguishable side by side. No settings change. This is the
-  groundwork for native HDR output, which a later release adds.
+  indistinguishable side by side. No settings change.
 - **Shaders are compiled at build time.** A broken shader is now a build
   error carrying file, line and message, rather than a blank screen at
   run time. The D3D shader compiler is no longer loaded by the app.
@@ -32,6 +56,24 @@ All notable changes to MatrixRain are documented in this file.
   thread while the render thread was waiting on the window to finish
   resizing. The resize is now applied by the render thread itself, and
   the window answers at once. Present since windowed mode was added.
+- **Reset to defaults and Cancel did not fully reach the running rain.**
+  In the settings dialog, Reset moved every slider back, but density,
+  speed, glow intensity and glow size kept their old values on screen
+  until the slider was touched again; Cancel had the same gap.
+- **Cancel did not undo density, speed or glow.** Moving those four
+  sliders saved them at once, so after Cancel the rain looked right but
+  the next start came up with the canceled values. The dialog now saves
+  only on OK.
+- **Gray squares behind the info icons.** The settings dialog painted a
+  gray square behind each (i) icon on Windows 11's themed tabs; the
+  icons now sit on the tab's own background.
+
+### Upgrade note
+
+**On an HDR monitor, streak heads are brighter than before.** HDR
+highlights are on by default (HDR highlights: Auto, Brightness 80%). To
+keep exactly the 1.6 look, set **HDR highlights** to **Off** on the
+Visuals tab. Nothing changes on SDR monitors.
 
 ## [1.6.0] - 2026-09-21
 
