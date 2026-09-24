@@ -53,7 +53,8 @@ BOOL CALLBACK WindowsMonitorProvider::EnumProc (HMONITOR hMonitor, HDC hdc, LPRE
     HRESULT                    hr        = S_OK;
     BOOL                       fSuccess  = FALSE;
     std::vector<MonitorInfo> * pMonitors = reinterpret_cast<std::vector<MonitorInfo> *> (dwData);
-    MONITORINFO                info      = { sizeof (MONITORINFO) };
+    MONITORINFOEXW             info      = {};
+    DEVMODEW                   mode      = {};
     UINT                       dpiX      = 96;
     UINT                       dpiY      = 96;
     MonitorInfo                descriptor;
@@ -67,8 +68,19 @@ BOOL CALLBACK WindowsMonitorProvider::EnumProc (HMONITOR hMonitor, HDC hdc, LPRE
     
     CBRAEx (dwData != 0, E_POINTER);
 
+    info.cbSize = sizeof (info);
+    mode.dmSize = sizeof (mode);
+
     fSuccess = GetMonitorInfoW (hMonitor, &info);
     CWRA (fSuccess);
+
+    // The refresh rate is part of the layout Application compares on
+    // WM_DISPLAYCHANGE: the frame limiter is set from it when a context is
+    // built. Unknown (0) if the query fails; not worth failing the monitor.
+    if (EnumDisplaySettingsW (info.szDevice, ENUM_CURRENT_SETTINGS, &mode))
+    {
+        descriptor.m_refreshHz = mode.dmDisplayFrequency;
+    }
 
     hr = GetDpiForMonitor (hMonitor, MDT_EFFECTIVE_DPI, &dpiX, &dpiY);
     CHRA (hr);

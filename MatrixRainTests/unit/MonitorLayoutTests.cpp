@@ -239,6 +239,50 @@ namespace MatrixRainTests
                 Assert::AreEqual (LONG (1920), placements[1].size.cx);
                 Assert::AreEqual (LONG (1080), placements[1].size.cy);
             }
+
+
+
+            //  SameMonitorLayout: WM_DISPLAYCHANGE rebuilds only when the
+            //  layout the contexts were built for has changed. Turning HDR
+            //  on or off sends the message with nothing else changed.
+            TEST_METHOD (SameMonitorLayout_IsTrue_ForAnIdenticalLayout)
+            {
+                std::vector<MonitorInfo> a = { MakeMonitor (0, 0, 3840, 2160, 120, true), MakeMonitor (-2160, -827, 0, 3013, 144, false) };
+                std::vector<MonitorInfo> b = a;
+
+
+
+                b[0].m_handle = reinterpret_cast<HMONITOR> (1);   // Handles are not part of the layout
+
+                Assert::IsTrue (SameMonitorLayout (a, b));
+            }
+
+
+
+
+            TEST_METHOD (SameMonitorLayout_IsFalse_ForAnyLayoutChange)
+            {
+                const std::vector<MonitorInfo> base = { MakeMonitor (0, 0, 3840, 2160, 120, true), MakeMonitor (-2160, -827, 0, 3013, 144, false) };
+                std::vector<MonitorInfo>       changed;
+
+
+
+                changed = base; changed.pop_back();
+                Assert::IsFalse (SameMonitorLayout (base, changed), L"A monitor removed");
+
+                changed = base; changed[0].m_bounds.right = 2560;
+                Assert::IsFalse (SameMonitorLayout (base, changed), L"A resolution changed");
+
+                changed = base; changed[1].m_dpi = 96;
+                Assert::IsFalse (SameMonitorLayout (base, changed), L"A scale factor changed");
+
+                changed = base; changed[0].m_isPrimary = false; changed[1].m_isPrimary = true;
+                Assert::IsFalse (SameMonitorLayout (base, changed), L"The primary moved");
+
+                changed = base; changed[0].m_refreshHz = 144;
+                Assert::IsFalse (SameMonitorLayout (base, changed), L"A refresh rate changed");
+            }
+
     };
 
 

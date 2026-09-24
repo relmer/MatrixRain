@@ -1,5 +1,6 @@
 #pragma once
 
+#include "MonitorInfo.h"
 #include "RebuildCoalescer.h"
 #include "RegistrySettingsProvider.h"
 #include "ScreenSaverModeContext.h"
@@ -93,6 +94,7 @@ private:
     // Core systems
     RegistrySettingsProvider                           m_settingsProvider;
     std::unique_ptr<IMonitorProvider>                  m_monitorProvider;
+    std::vector<MonitorInfo>                           m_builtMonitorLayout;   // What the current contexts were built for
     std::vector<std::unique_ptr<MonitorRenderContext>> m_contexts;
     MonitorRenderContext *                             m_primary { nullptr };
     std::unique_ptr<InputSystem>                       m_inputSystem;

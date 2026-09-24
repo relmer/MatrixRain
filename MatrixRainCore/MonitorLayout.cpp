@@ -63,3 +63,37 @@ std::vector<MonitorPlacement> PlanFullscreenPlacements (const std::vector<Monito
 
     return placements;
 }
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  SameMonitorLayout
+//
+////////////////////////////////////////////////////////////////////////////////
+
+bool SameMonitorLayout (const std::vector<MonitorInfo> & a, const std::vector<MonitorInfo> & b)
+{
+    if (a.size() != b.size())
+    {
+        return false;
+    }
+
+    for (size_t i = 0; i < a.size(); ++i)
+    {
+        const MonitorInfo & x = a[i];
+        const MonitorInfo & y = b[i];
+
+
+        if (x.m_bounds.left   != y.m_bounds.left   || x.m_bounds.top    != y.m_bounds.top
+         || x.m_bounds.right  != y.m_bounds.right  || x.m_bounds.bottom != y.m_bounds.bottom
+         || x.m_dpi           != y.m_dpi           || x.m_isPrimary     != y.m_isPrimary
+         || x.m_refreshHz     != y.m_refreshHz)
+        {
+            return false;
+        }
+    }
+
+    return true;
+}

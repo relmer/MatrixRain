@@ -316,6 +316,24 @@ static void ApplyHdrControlsUI (HWND hVisuals, HdrMode hdrMode)
 
     const HdrControlsState state = DescribeHdrControls (QueryHdrDisplayInventory(), hdrMode);
 
+    // The 1 s timer calls this whether or not anything changed; touching
+    // the controls every time made them redraw every second. Apply only a
+    // change, or the first state for a page.
+    static HWND             s_lastPage  = nullptr;
+    static HdrControlsState s_lastState = {};
+
+
+    if (hVisuals == s_lastPage
+        && state.modeEnabled      == s_lastState.modeEnabled
+        && state.sliderEnabled    == s_lastState.sliderEnabled
+        && state.statusText       == s_lastState.statusText
+        && state.showSettingsLink == s_lastState.showSettingsLink)
+    {
+        return;
+    }
+
+    s_lastPage  = hVisuals;
+    s_lastState = state;
 
     EnableWindow (GetDlgItem (hVisuals, IDC_HDR_MODE_PROMPT),  state.modeEnabled);
     EnableWindow (GetDlgItem (hVisuals, IDC_HDR_MODE_COMBO),   state.modeEnabled);

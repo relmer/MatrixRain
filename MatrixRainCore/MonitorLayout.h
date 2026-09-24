@@ -27,3 +27,21 @@ struct MonitorPlacement
 
 
 std::vector<MonitorPlacement> PlanFullscreenPlacements (const std::vector<MonitorInfo> & monitors);
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//  SameMonitorLayout
+//
+//  True when two enumerations describe the same monitors in the same order
+//  with the same bounds, scaling, primary and refresh rate: everything a
+//  render context is built from. Windows sends WM_DISPLAYCHANGE for more
+//  than layout changes -- turning HDR on or off sends one too -- and a layout
+//  that has not changed needs no rebuild; HDR is followed in place by each
+//  context's output mode detection. Monitor handles are not compared.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+bool SameMonitorLayout (const std::vector<MonitorInfo> & a, const std::vector<MonitorInfo> & b);

@@ -21,6 +21,7 @@ struct MonitorInfo
     UINT     m_dpi       { 96          };
     bool     m_isPrimary { false       };
     HMONITOR m_handle    { nullptr     };
+    UINT     m_refreshHz { 0           };   // Current refresh rate; 0 when unknown
 
     int Width()  const { return m_bounds.right  - m_bounds.left; }
     int Height() const { return m_bounds.bottom - m_bounds.top;  }

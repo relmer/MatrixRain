@@ -419,6 +419,13 @@ HRESULT Application::CreateRenderContexts()
     HRESULT hr = S_OK;
 
 
+    // Remember the layout these contexts are built for, so WM_DISPLAYCHANGE
+    // can tell a real layout change from one that needs no rebuild.
+    if (m_monitorProvider)
+    {
+        m_builtMonitorLayout = m_monitorProvider->GetMonitors();
+    }
+
     // Resolve the user's preferred GPU adapter (description -> LUID) once
     // per (re)build so every per-monitor context is created on the same
     // device.  A saved adapter that is no longer present silently falls
@@ -1247,6 +1254,18 @@ LRESULT Application::HandleMessage (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM 
             // top-level window we own, so coalesce to a single rebuild via
             // the latch; the rebuild itself is then driven by the
             // WM_APP_REBUILD_CONTEXTS case above.
+            //
+            // Windows also sends it when only HDR is turned on or off. A
+            // rebuild then tore down every rain window and raised the
+            // settings dialog over the new ones, a visible flash, for nothing
+            // each context's output mode detection does not already follow
+            // in place within a second. So rebuild only when the layout the
+            // contexts were built for has changed.
+            if (m_monitorProvider && SameMonitorLayout (m_builtMonitorLayout, m_monitorProvider->GetMonitors()))
+            {
+                return 0;
+            }
+
             if (m_rebuildCoalescer.RequestRebuild() && m_hwnd)
             {
                 PostMessageW (m_hwnd, WM_APP_REBUILD_CONTEXTS, 0, 0);
