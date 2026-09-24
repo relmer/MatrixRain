@@ -73,10 +73,10 @@ function Read-Result ([string] $check, [string] $expected)
     }
     while ($answer -notin @('p', 'f', 's', 'pass', 'fail', 'skip'))
 
-    $outcome = switch ($answer.Substring (0, 1)) { 'p' { 'Pass' } 'f' { 'Fail' } 's' { 'Skip' } }
+    $outcome = switch ($answer.Substring(0, 1)) { 'p' { 'Pass' } 'f' { 'Fail' } 's' { 'Skip' } }
     $note    = Read-Host 'Note (optional)'
 
-    $results.Add ([pscustomobject] @{ Check = $check; Result = $outcome; Note = $note })
+    $results.Add([pscustomobject] @{ Check = $check; Result = $outcome; Note = $note })
 }
 
 
@@ -181,7 +181,7 @@ $adapters = @(Get-PnpDevice -Class Display -Status OK -ErrorAction SilentlyConti
 if ($adapters.Count -eq 0)
 {
     Write-Host 'No display adapters found; skipping.'
-    $results.Add ([pscustomobject] @{ Check = 'Check 9: GPU restart'; Result = 'Skip'; Note = 'No adapter found' })
+    $results.Add([pscustomobject] @{ Check = 'Check 9: GPU restart'; Result = 'Skip'; Note = 'No adapter found' })
 }
 else
 {
@@ -221,7 +221,7 @@ else
     }
     else
     {
-        $results.Add ([pscustomobject] @{ Check = 'Check 9: GPU restart'; Result = 'Skip'; Note = 'No adapter chosen' })
+        $results.Add([pscustomobject] @{ Check = 'Check 9: GPU restart'; Result = 'Skip'; Note = 'No adapter chosen' })
     }
 }
 
@@ -261,17 +261,17 @@ Write-Host 'Set Auto HDR back the way you like it.'
 $commit = (git -C $PSScriptRoot rev-parse --short HEAD 2>$null)
 $lines  = [System.Collections.Generic.List[string]]::new()
 
-$lines.Add ('# Phase 2 hardware checks')
-$lines.Add ('')
-$lines.Add ("Run $(Get-Date -Format 'yyyy-MM-dd HH:mm') on build $commit with ``scripts/Test-HdrPhase2.ps1``.")
-$lines.Add ('Remote Desktop (quickstart check 8) is out of scope: MatrixRain is not meant to run over RDP.')
-$lines.Add ('')
-$lines.Add ('| Check | Result | Note |')
-$lines.Add ('|---|---|---|')
+$lines.Add('# Phase 2 hardware checks')
+$lines.Add('')
+$lines.Add("Run $(Get-Date -Format 'yyyy-MM-dd HH:mm') on build $commit with ``scripts/Test-HdrPhase2.ps1``.")
+$lines.Add('Remote Desktop (quickstart check 8) is out of scope: MatrixRain is not meant to run over RDP.')
+$lines.Add('')
+$lines.Add('| Check | Result | Note |')
+$lines.Add('|---|---|---|')
 
 foreach ($r in $results)
 {
-    $lines.Add ("| $($r.Check) | $($r.Result) | $($r.Note -replace '\|', '/') |")
+    $lines.Add("| $($r.Check) | $($r.Result) | $($r.Note -replace '\|', '/') |")
 }
 
 Set-Content -Path $ResultsPath -Value $lines -Encoding utf8
