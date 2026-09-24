@@ -1120,6 +1120,55 @@ HRESULT Harness::RunLuminance()
     wprintf (L"query time        mean %.1f us, worst %.1f us over %d queries\n", totalUs / kQueries, worstUs, kQueries);
     wprintf (L"stale after       %s\n", provider.IsStale() ? L"true" : L"false");
 
+    // Every monitor on every adapter, not just the one this window is on:
+    // HDR state and the peak each reports, which is what sets how bright
+    // highlights can get there (quickstart Phase 3 check 8).
+    {
+        Microsoft::WRL::ComPtr<IDXGIFactory1> factory;
+
+
+        if (SUCCEEDED (CreateDXGIFactory1 (IID_PPV_ARGS (&factory))))
+        {
+            wprintf (L"all outputs:\n");
+
+            for (UINT a = 0; ; ++a)
+            {
+                Microsoft::WRL::ComPtr<IDXGIAdapter1> adapter;
+
+
+                if (factory->EnumAdapters1 (a, &adapter) == DXGI_ERROR_NOT_FOUND)
+                {
+                    break;
+                }
+
+                for (UINT o = 0; ; ++o)
+                {
+                    Microsoft::WRL::ComPtr<IDXGIOutput>  output;
+                    Microsoft::WRL::ComPtr<IDXGIOutput6> output6;
+                    DXGI_OUTPUT_DESC1                    desc = {};
+
+
+                    if (adapter->EnumOutputs (o, &output) == DXGI_ERROR_NOT_FOUND)
+                    {
+                        break;
+                    }
+
+                    if (FAILED (output.As (&output6)) || FAILED (output6->GetDesc1 (&desc)))
+                    {
+                        continue;
+                    }
+
+                    wprintf (L"  %-14s  hdr=%-5s  peak=%6.0f nits  %ldx%ld\n",
+                             desc.DeviceName,
+                             desc.ColorSpace == DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020 ? L"on" : L"off",
+                             desc.MaxLuminance,
+                             desc.DesktopCoordinates.right  - desc.DesktopCoordinates.left,
+                             desc.DesktopCoordinates.bottom - desc.DesktopCoordinates.top);
+                }
+            }
+        }
+    }
+
     // The switch itself, both ways, on this adapter and output.
     {
         const HRESULT toHdr = m_renderSystem->ReconfigureOutputMode (OutputMode::Hdr);
