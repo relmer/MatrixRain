@@ -22,8 +22,23 @@ jobs:
       - name: Add MSBuild to PATH
         uses: microsoft/setup-msbuild@v3
 
-      - name: Setup VSTest
-        uses: darenm/Setup-VSTest@v1.3
+      # vstest.console.exe ships with Visual Studio on the Windows runners;
+      # this finds it with vswhere and puts it on the PATH. It replaces
+      # darenm/Setup-VSTest, whose last release (v1.3) targets Node.js 20,
+      # which GitHub is retiring.
+      - name: Put VSTest on the PATH
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $vs      = & $vswhere -latest -products * -property installationPath
+          $dir     = Join-Path $vs 'Common7\IDE\CommonExtensions\Microsoft\TestWindow'
+
+          if (-not (Test-Path (Join-Path $dir 'vstest.console.exe')))
+          {
+              throw "vstest.console.exe not found under '$vs'"
+          }
+
+          Add-Content -Path $env:GITHUB_PATH -Value $dir
 
       # Backstop under the .githooks pre-commit and commit-msg hooks: catches
       # anything committed with --no-verify, or from a clone that never ran
@@ -44,7 +59,7 @@ jobs:
         run: vstest.console.exe ${{ matrix.platform }}/${{ matrix.configuration }}/MatrixRainTests.dll
 
       - name: Upload x64 Release Binary
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: matrix.configuration == 'Release'
         with:
           name: matrixrain-x64-Release
@@ -71,7 +86,7 @@ jobs:
         run: msbuild MatrixRain.sln -p:Configuration=${{ matrix.configuration }} -p:Platform=ARM64
 
       - name: Upload ARM64 Release Binaries
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: matrix.configuration == 'Release'
         with:
           name: matrixrain-arm64-Release

@@ -112,8 +112,23 @@ jobs:
       - name: Add MSBuild to PATH
         uses: microsoft/setup-msbuild@v3
 
-      - name: Setup VSTest
-        uses: darenm/Setup-VSTest@v1.3
+      # vstest.console.exe ships with Visual Studio on the Windows runners;
+      # this finds it with vswhere and puts it on the PATH. It replaces
+      # darenm/Setup-VSTest, whose last release (v1.3) targets Node.js 20,
+      # which GitHub is retiring.
+      - name: Put VSTest on the PATH
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $vs      = & $vswhere -latest -products * -property installationPath
+          $dir     = Join-Path $vs 'Common7\IDE\CommonExtensions\Microsoft\TestWindow'
+
+          if (-not (Test-Path (Join-Path $dir 'vstest.console.exe')))
+          {
+              throw "vstest.console.exe not found under '$vs'"
+          }
+
+          Add-Content -Path $env:GITHUB_PATH -Value $dir
 
       # --- Build ---
 
@@ -257,7 +272,7 @@ jobs:
           git push origin ${{ steps.tag.outputs.tag }}
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ steps.tag.outputs.tag }}
           name: MatrixRain ${{ steps.tag.outputs.version }}
