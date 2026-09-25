@@ -2,7 +2,7 @@
 
 All notable changes to MatrixRain are documented in this file.
 
-## [1.7.0] - Unreleased
+## [1.7.0] - 2026-09-24
 
 ### Added
 
