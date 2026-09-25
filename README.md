@@ -27,7 +27,8 @@ I built this Win32/DirectX C++ Matrix-rain screensaver/demo as a test project to
 
 | Version | Highlights |
 | :---: | :--- |
-| **1.7** | Native HDR output with HDR highlights: streak heads and the bright glyphs behind them shine above normal white on HDR monitors, while the rest of the rain keeps its familiar look. Glow and fades are now computed in linear light for smoother tails |
+| **1.7** | HDR support. MatrixRain now presents natively in HDR on monitors with Windows HDR turned on: streak heads and the bright glyphs behind them shine above normal white, while the rest of the rain keeps its familiar look. Glow and fades are now computed in linear light for smoother tails |
+| **1.6** | Scanline fixes: the Style slider now looks the same on every monitor regardless of size or scaling, with no moiré. Switched to semantic versioning |
 | **1.5** | Added customizable scanline effect and a custom color picker. Rebuilt settings dialog as a tabbed dialog with live FPS/GPU usage statistics as you tune the settings |
 | **1.4** | Performance optimization release — pick which GPU to render on, plus Quality presets (Low/Medium/High/Custom with per-knob infotips) to dial back GPU load. Adds live multi-monitor toggle, frame cap on >60 Hz displays, and a themed two-column dialog overhaul |
 | **1.3** | Multi-monitor support — independent, DPI-aware Matrix rain on every connected display in fullscreen and screensaver modes |
@@ -106,13 +107,12 @@ The following switches are part of the Windows screensaver protocol and are invo
 ### Settings Dialog Features
 
 - **Density**: Control the number of falling character streaks (0-100%)
-- **Animation Speed**: Adjust how fast characters fall (1-200%)
-- **Glow Intensity**: Control the bloom effect strength (0-200%)
+- **Animation Speed**: Adjust how fast characters fall (1-100%)
+- **Glow Intensity**: Control the bloom effect strength (1-200%)
 - **Glow Size**: Adjust bloom spread radius (50-200%)
 - **Color Scheme**: Choose from green, blue, red, amber, or color cycle mode
 - **Start Fullscreen**: Toggle whether app launches in fullscreen mode
 - **Show Debug Stats**: Display FPS and density information (disabled in screensaver modes)
-- **Show Fade Timers**: Display per-character fade countdown (disabled in screensaver modes)
 - **HDR highlights**: Auto or Off; Auto lets highlights go above normal white on monitors with Windows HDR turned on
 - **Brightness** (under HDR highlights): how bright highlights get, up to what the monitor can show (0-100%)
 - **Reset**: Restore all settings to defaults
