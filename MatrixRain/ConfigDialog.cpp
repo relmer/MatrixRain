@@ -213,8 +213,8 @@ static const wchar_t * GetInfoTipText (int infoId)
                    L"Significant GPU performance impact.";
 
         case IDC_GLOWINTENSITY_INFO:
-            return L"Brightness of the glow effect around bright characters. Setting "
-                   L"this to 0% disables the glow effect entirely.\r\n"
+            return L"Brightness of the glow effect around bright characters. To turn "
+                   L"the glow off entirely, clear Enable glow on the Performance tab.\r\n"
                    L"\r\n"
                    L"Significant GPU performance impact.";
 

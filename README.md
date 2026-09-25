@@ -110,7 +110,7 @@ The following switches are part of the Windows screensaver protocol and are invo
 - **Animation Speed**: Adjust how fast characters fall (1-100%)
 - **Glow Intensity**: Control the bloom effect strength (1-200%)
 - **Glow Size**: Adjust bloom spread radius (50-200%)
-- **Color Scheme**: Choose from green, blue, red, amber, or color cycle mode
+- **Color Scheme**: Choose from green, blue, red, amber, color cycle mode, or a custom color from the color picker
 - **Start Fullscreen**: Toggle whether app launches in fullscreen mode
 - **Show Debug Stats**: Display FPS and density information (disabled in screensaver modes)
 - **HDR highlights**: Auto or Off; Auto lets highlights go above normal white on monitors with Windows HDR turned on
