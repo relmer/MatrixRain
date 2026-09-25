@@ -161,8 +161,11 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
+      # v2 uses actions/cache v5 internally; v0.5.0 used v4, which targets the
+      # retiring Node.js 20. The action's repository was renamed from
+      # azure/trusted-signing-action; every input below is unchanged.
       - name: Sign binaries
-        uses: azure/trusted-signing-action@v0.5.0
+        uses: Azure/artifact-signing-action@v2.0.0
         with:
           azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
