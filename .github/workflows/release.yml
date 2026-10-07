@@ -14,9 +14,6 @@ permissions:
   contents: write
   id-token: write
 
-env:
-  WINGET_PAT: ${{ secrets.WINGET_PAT }}
-
 jobs:
   wait-for-ci:
     runs-on: windows-latest
@@ -66,6 +63,11 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 30
     environment: release
+
+    # Read here, not at the workflow level, so the secret can live in the
+    # release environment and only reach jobs that environment allows.
+    env:
+      WINGET_PAT: ${{ secrets.WINGET_PAT }}
 
     steps:
       - name: Determine tag
