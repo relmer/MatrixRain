@@ -6,7 +6,7 @@
 [![Downloads](https://img.shields.io/github/downloads/relmer/MatrixRain/total)](https://github.com/relmer/MatrixRain/releases)
 
 <!-- markdownlint-disable MD033 -->
-<video src="https://github.com/user-attachments/assets/bb39535d-49a2-4c40-8d8e-56a37b4a8f1c" autoplay loop muted playsinline></video>
+<video src="https://github.com/user-attachments/assets/0d171515-4ec2-4b0f-828a-811776dff2d3" autoplay loop muted playsinline></video>
 <!-- markdownlint-enable MD033 -->
 
 ## Install
